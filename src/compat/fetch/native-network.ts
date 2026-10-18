@@ -3,6 +3,8 @@ import { getHostCall } from "./host-call.js";
 import type { NativeConnection, NativeNetwork } from "./transport.js";
 
 export type NativeNetworkMethod =
+  | "cookiesGet"
+  | "cookiesSet"
   | "socketWatch"
   | "socketOpen"
   | "socketWrite"

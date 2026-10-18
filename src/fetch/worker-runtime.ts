@@ -5,6 +5,7 @@ import type { RequestInit as WorkerRequestInit } from "../compat/request/index.j
 import { installDirectNetworkScope } from "../compat/fetch/scope.js";
 import configuredWorker from "../configured.js";
 import { createIsolatedWorker } from "../isolated/bridge.js";
+import { createRemoteWorker } from "./remote.js";
 import { FetchRuntime, type FetchRuntimeOptions } from "./runtime.js";
 import type {
   CapacitorWorkersOptions,
@@ -115,6 +116,7 @@ function loadedWorker<Env>(
 }
 
 export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
+  private readonly remote?: ReturnType<typeof createRemoteWorker>;
   private isolated?: ReturnType<typeof createIsolatedWorker<Env>>;
   private handler?: WorkerHandler<Env>;
   private closed = false;
@@ -157,9 +159,22 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
   override readonly ready: Promise<void>;
   constructor(
     options: CapacitorWorkersOptions<Env>,
-    source: WorkerSource<Env>,
+    private readonly source: WorkerSource<Env>,
   ) {
     super(options);
+    if (source.needsRemote && !options.remote)
+      throw new TypeError(
+        "This Worker contains server routes. Set remote.origin to the existing deployed Worker.",
+      );
+    if (options.remote && !source.needsRemote)
+      throw new TypeError(
+        "remote requires build-generated server routes; configure the Worker's D1 bindings in the build plugin.",
+      );
+    if (options.remote)
+      this.remote = createRemoteWorker(
+        options.remote,
+        this.original.bind(globalThis),
+      );
     this.ready = this.initialize(options, source);
     void this.ready.catch(() => {});
   }
@@ -231,11 +246,16 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
     await this.ready;
     if (this.closed) throw new Error("Worker runtime disposed");
     request.signal.throwIfAborted();
+    const remote = this.remote && (await this.source.needsRemote!(request));
+    request.signal.throwIfAborted();
+    if (this.closed) throw new Error("Worker runtime disposed");
+    if (remote) return this.remote!.fetch(request);
     return this.handler!.fetch(request, env, ctx);
   }
   protected override close() {
     this.closed = true;
     const pending = [
+      () => this.remote?.dispose(),
       () => this.isolated?.dispose(),
       () => this.disposeDirect?.(),
       () => this.releaseNetwork?.(),
@@ -287,6 +307,8 @@ export function createFetchRuntime<Env>(options: CapacitorWorkersOptions<Env>) {
     typeof source?.loadDirect === "function"
   )
     return new PreferredFetchRuntime(options, source);
+  if (options.remote)
+    throw new TypeError("remote requires a build-generated WorkerSource.");
   if (options.prefer !== undefined)
     throw new TypeError(
       "prefer requires both createWorker and loadDirect in a WorkerSource.",
