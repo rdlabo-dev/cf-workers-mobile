@@ -8,8 +8,12 @@ full Workers parity; the boundaries below are explicit.
 
 vinext (Vite-driven Next.js builds) targets the same Workers runtime surface —
 `nodejs_compat`, `cloudflare:workers`, AsyncLocalStorage, Web streams — and is
-supported through the same compatibility profile. A dedicated vinext
-verification fixture is a follow-up item.
+supported through the same compatibility profile. **Verified locally:** a
+minimal vinext 1.2.1 app (`vinext build` output re-bundled with this alias
+profile) returns 200 with rendered HTML. The vinext server entry exports a
+handler function (not a `{ fetch }` object); the same node:async_hooks /
+node:path / node:fs / node:crypto surface is required and resolved by the
+same aliases.
 
 ## What the runtime provides
 
@@ -60,6 +64,8 @@ resolve regardless of the bundle's build-time directory.
 
 ## Current gaps
 
+- **Native WebView verification** (iOS/Android) and startup-cost measurement
+  remain follow-up before any "Complete" status claim.
 - **Bindings:** `env.ASSETS`, KV/R2/Queue are pass-through only; supply them
   via the `env` argument or stay on `dummy` cache config.
 - **Concurrent requests** need caller-side dispatch serialization (ALS boundary above).

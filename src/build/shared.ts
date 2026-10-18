@@ -43,8 +43,13 @@ export function compatibilityAliases() {
     module: compatPath("module"),
     "node:stream/web": compatPath("stream-web"),
     "stream/web": compatPath("stream-web"),
+    // The util compat reuses the npm package through its deep specifier,
+    // which must precede the bare "util" alias.
+    "util/util.js": polyfill("util/util.js"),
     "node:util": compatPath("util"),
     util: compatPath("util"),
+    "node:buffer": compatPath("buffer"),
+    buffer: compatPath("buffer"),
     "node:http": compatPath("http"),
     http: compatPath("http"),
     "node:net": compatPath("net"),
