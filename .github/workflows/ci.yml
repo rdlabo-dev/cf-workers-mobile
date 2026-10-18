@@ -69,6 +69,8 @@ jobs:
         working-directory: demo
       - run: npm run test:build-tools
         working-directory: demo
+      - run: npm run test:d1-migration
+        working-directory: demo
 
   package:
     runs-on: ubuntu-24.04

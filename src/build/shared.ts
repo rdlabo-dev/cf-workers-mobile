@@ -65,6 +65,10 @@ export function workerEntry(entry: string) {
   // exports. Keep the bootstrap free of exports and all shared code in children.
   return `const { initializeWorkerNetwork } = await import(${JSON.stringify(networkRelayPath)});\nawait initializeWorkerNetwork();\nawait import(${JSON.stringify(globalsInstallPath)});\nconst { default: worker } = await import(${JSON.stringify(entry)});\nconst { serve } = await import(${JSON.stringify(transportPath)});\nserve(worker);`;
 }
-export function workerSource(entry: string, factoryImport: string) {
-  return `import createWorker from ${JSON.stringify(factoryImport)};\nimport { installNodeGlobals } from ${JSON.stringify(globalsPath)};\nexport default { createWorker, async loadDirect() {\n  const dispose = installNodeGlobals();\n  try {\n    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };\n  } catch (error) {\n    dispose();\n    throw error;\n  }\n} };`;
+export function workerSource(
+  entry: string,
+  factoryImport: string,
+  selector?: string,
+) {
+  return `import createWorker from ${JSON.stringify(factoryImport)};\n${selector ? `import { needsRemote } from ${JSON.stringify(selector)};` : ""}\nimport { installNodeGlobals } from ${JSON.stringify(globalsPath)};\nexport default { createWorker, ${selector ? "needsRemote," : ""} async loadDirect() {\n  const dispose = installNodeGlobals();\n  try {\n    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };\n  } catch (error) {\n    dispose();\n    throw error;\n  }\n} };`;
 }

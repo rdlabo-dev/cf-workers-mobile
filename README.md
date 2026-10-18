@@ -226,7 +226,9 @@ Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a pe
 
 ## D1 and remote APIs
 
-D1 stays in the deployed Cloudflare Worker. Capacitor does not receive a D1 binding or a Cloudflare API token; D1-backed operations must be exposed as authenticated, authorized **business REST endpoints** rather than arbitrary SQL or a D1 proxy. The optional `@rdlabo/capacitor-workers/auth` client scopes requests to one HTTPS API root and accepts an application-owned per-user token provider; it does not implement login, token storage, session verification or automatic retries. See the [D1 REST migration guide](docs/d1-rest-api.md) and [migration procedure](docs/d1-migration.md).
+Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.
+
+Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `capacitorWorkers`. The optional token callback connects your existing authentication to remote requests; this package does not provide login or session management. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
 
 ## Development and testing
 
@@ -373,7 +375,7 @@ Fetch implementations extend `FetchRuntime` and share one contract suite. See [t
 ## Roadmap
 
 1. Keep the runtime small and validate Hono/Workers Express against real WebViews.
-2. Keep privileged D1 access in deployed Workers behind business APIs; local KV remains an independent, opt-in adapter. Evaluate other bindings individually without copying server privileges into the client.
+2. Reuse existing D1-backed Workers through build-generated remote execution boundaries, preserving their HTTP contracts and removing server-only implementations from Capacitor bundles. Keep local KV independent. See the [D1 migration](docs/d1-transparent-migration.md).
 3. Expand setup automation, compatibility and browser/Electron/Tauri execution. Keep Worker entry configuration and application initialization simple.
 
 The Hono + Express compatibility test app currently includes broad Node polyfills; bundle size is a PoC finding, not an optimized release. See [verification results](docs/verification.md) for measured results and limitations.
