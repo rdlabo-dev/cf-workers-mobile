@@ -46,6 +46,7 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
   }
   async function dispatch(request: DocumentRequest, signal: AbortSignal) {
     await runtime.ready;
+    signal.throwIfAborted();
     const url = new URL(request.url);
     if (
       url.origin !== new URL(baseURL).origin &&
@@ -65,6 +66,10 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
         signal,
       }),
     );
+    if (signal.aborted) {
+      void response.body?.cancel(signal.reason).catch(() => {});
+      signal.throwIfAborted();
+    }
     const resultHeaders = new Headers(response.headers);
     resultHeaders.set("cache-control", "no-store");
     return {
@@ -130,6 +135,10 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
       body: ReadableStream<Uint8Array> | null;
       [key: string]: unknown;
     }) => {
+      if (controller.signal.aborted) {
+        void result.body?.cancel(controller.signal.reason).catch(() => {});
+        controller.signal.throwIfAborted();
+      }
       if (input.stream) {
         if (result.body)
           streams.set(id, {

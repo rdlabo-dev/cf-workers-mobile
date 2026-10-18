@@ -324,3 +324,71 @@ it("returns document headers before EOF and reads bounded chunks on demand", asy
     dispatch({ action: "pull", streamId: result.streamId }),
   ).rejects.toThrow("closed");
 });
+
+it("does not resurrect a document stream after cancellation while awaiting headers", async () => {
+  const { installDocumentHost } = await import("../../src/documents/host");
+  let finish!: (response: Response) => void;
+  const cancelled = vi.fn();
+  const dispose = installDocumentHost(
+    {
+      ready: Promise.resolve(),
+      fetch: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    },
+    options.baseURL,
+  );
+  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  try {
+    const pending = dispatch({
+      id: "cancel-headers",
+      url: "capacitor://localhost/live",
+      method: "GET",
+      headers: {},
+      stream: true,
+    });
+    const result = pending.catch((error: Error) => error);
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    await dispatch({ action: "cancel", streamId: "cancel-headers" });
+    finish(
+      new Response(
+        new ReadableStream({ cancel: cancelled }, { highWaterMark: 0 }),
+      ),
+    );
+    expect(await result).toBeInstanceOf(Error);
+    expect(cancelled).toHaveBeenCalledOnce();
+    await expect(
+      dispatch({ action: "pull", streamId: "cancel-headers" }),
+    ).rejects.toThrow("closed");
+  } finally {
+    dispose();
+  }
+});
+
+it("does not dispatch a document request after disposal during startup", async () => {
+  const { installDocumentHost } = await import("../../src/documents/host");
+  let ready!: () => void;
+  const fetcher = vi.fn(async () => new Response("late"));
+  const dispose = installDocumentHost(
+    {
+      ready: new Promise<void>((resolve) => {
+        ready = resolve;
+      }),
+      fetch: fetcher,
+    },
+    options.baseURL,
+  );
+  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const pending = dispatch({
+    url: "capacitor://localhost/live",
+    method: "GET",
+    headers: {},
+    stream: true,
+  });
+  const rejected = expect(pending).rejects.toThrow();
+  dispose();
+  ready();
+  await rejected;
+  expect(fetcher).not.toHaveBeenCalled();
+});

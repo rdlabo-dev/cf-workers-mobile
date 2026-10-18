@@ -51,15 +51,31 @@ export function createIsolatedWorker<Env>(worker: Worker) {
         let upload: ReadableStreamDefaultReader<Uint8Array> | undefined;
         let uploadChunk: Uint8Array | undefined;
         let uploadBusy = false;
+        let uploadDone = false;
+        const stopUpload = (reason?: unknown) => {
+          if (uploadDone) return;
+          uploadDone = true;
+          const reader = upload;
+          upload = undefined;
+          uploadChunk = undefined;
+          if (reader) {
+            void reader.cancel(reason).catch(() => {});
+            reader.releaseLock();
+          } else void request.body?.cancel(reason).catch(() => {});
+        };
         const pullUpload = async () => {
-          if (uploadBusy || released) return;
+          if (uploadBusy || released || uploadDone) return;
           uploadBusy = true;
           try {
             upload ??= request.body!.getReader();
             if (!uploadChunk?.byteLength) {
               const next = await upload.read();
-              if (released) return;
+              if (released || uploadDone) return;
               if (next.done) {
+                uploadDone = true;
+                upload.releaseLock();
+                upload = undefined;
+                uploadChunk = undefined;
                 send({ type: "upload-end" });
                 return;
               }
@@ -70,10 +86,13 @@ export function createIsolatedWorker<Env>(worker: Worker) {
               uploadChunk = next.value;
             }
             const value = uploadChunk.slice(0, 65536);
-            uploadChunk = uploadChunk.subarray(value.byteLength);
+            uploadChunk =
+              uploadChunk.byteLength > value.byteLength
+                ? uploadChunk.subarray(value.byteLength)
+                : undefined;
             port1.postMessage({ type: "upload-chunk", value }, [value.buffer]);
           } catch (error) {
-            if (!released) {
+            if (!released && !uploadDone) {
               send({ type: "upload-error", message: String(error) });
               fail(error);
             }
@@ -99,9 +118,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
           request.signal.removeEventListener("abort", abort);
           port1.close();
           if (!dispatched) port2.close();
-          void upload?.cancel().catch(() => {});
-          upload = undefined;
-          uploadChunk = undefined;
+          stopUpload();
           calls.delete(fail);
         };
         const finishBody = (...failure: [] | [unknown]) => {
@@ -120,7 +137,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
         };
         const fail = (error: unknown) => {
           if (released) return;
-          void upload?.cancel(error).catch(() => {});
+          stopUpload(error);
           reject(error);
           backgroundDone = true;
           done();
@@ -145,8 +162,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
             return;
           }
           if (data.type === "upload-cancel") {
-            void upload?.cancel().catch(() => {});
-            uploadChunk = undefined;
+            stopUpload();
             return;
           }
           if (data.type === "response") {

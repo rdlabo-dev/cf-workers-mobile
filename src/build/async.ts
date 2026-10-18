@@ -5,10 +5,20 @@ import { readFile } from "node:fs/promises";
 import type { Plugin, Loader } from "esbuild";
 
 /** Lower function continuations, preserving module-level await and imports. */
-export async function lowerAsync(code: string, filename: string) {
+export async function lowerAsync(
+  code: string,
+  filename: string,
+  loader?: Loader,
+) {
   if (!/\basync\b/.test(code)) return { code, map: null };
   const path = filename.split("?")[0];
-  const result = await transformAsync(code, {
+  const typescript = loader
+    ? loader === "ts" || loader === "tsx"
+    : /\.[cm]?tsx?$/.test(path);
+  const jsx = loader
+    ? loader === "jsx" || loader === "tsx"
+    : /\.[jt]sx$/.test(path);
+  const options: NonNullable<Parameters<typeof transformAsync>[1]> = {
     filename: path,
     configFile: false,
     babelrc: false,
@@ -16,12 +26,27 @@ export async function lowerAsync(code: string, filename: string) {
     sourceMaps: true,
     parserOpts: {
       plugins: [
-        ...(/\.[cm]?tsx?$/.test(path) ? ["typescript" as const] : []),
-        ...(/\.[jt]sx$/.test(path) ? ["jsx" as const] : []),
+        // Parse decorators without transforming them: esbuild/TypeScript keeps
+        // ownership of legacy vs standard decorator lowering and validation.
+        "decorators",
+        "decoratorAutoAccessors",
+        ...(typescript ? ["typescript" as const] : []),
+        ...(jsx ? ["jsx" as const] : []),
       ],
     },
     plugins: [asyncGenerators, asyncFunctions],
-  });
+  };
+  let result;
+  try {
+    result = await transformAsync(code, options);
+  } catch (error) {
+    // TypeScript parameter decorators require the legacy grammar, whereas
+    // `export @decorator class` requires the standard grammar. Parse both;
+    // esbuild still owns validation against the consumer's compiler options.
+    if ((error as { code?: string }).code !== "BABEL_PARSE_ERROR") throw error;
+    options.parserOpts!.plugins![0] = "decorators-legacy";
+    result = await transformAsync(code, options);
+  }
   return {
     code: result?.code ?? code,
     map: result?.map ? JSON.stringify(result.map) : null,
@@ -34,15 +59,23 @@ export function asyncContextPlugin(): Plugin {
       build.onLoad(
         { filter: /\.[cm]?[jt]sx?$/, namespace: "file" },
         async ({ path }) => {
-          const result = await lowerAsync(await readFile(path, "utf8"), path);
           const extension = path.split(".").pop()!;
-          const loader: Loader = /^(?:m|c)?ts$/.test(extension)
-            ? "ts"
-            : extension === "tsx"
-              ? "tsx"
-              : extension === "jsx"
-                ? "jsx"
-                : "js";
+          const loader: Loader =
+            build.initialOptions.loader?.[`.${extension}`] ??
+            (/^(?:m|c)?ts$/.test(extension)
+              ? "ts"
+              : extension === "tsx"
+                ? "tsx"
+                : extension === "jsx"
+                  ? "jsx"
+                  : "js");
+          // Respect consumer loaders (including treating .js as text/assets).
+          if (!["js", "jsx", "ts", "tsx"].includes(loader)) return;
+          const result = await lowerAsync(
+            await readFile(path, "utf8"),
+            path,
+            loader,
+          );
           return {
             contents:
               result.code +

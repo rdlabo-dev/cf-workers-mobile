@@ -285,3 +285,38 @@ it("streams uploads before EOF and transfers bounded chunks", async () => {
   expect(sizes.reduce((a, b) => a + b, 0)).toBe(200000);
   expect(Math.max(...sizes)).toBeLessThanOrEqual(65536);
 });
+
+it("cancels an unread upload when a handler responds without reading it", async () => {
+  const cancel = vi.fn();
+  const { isolated, ctx, pending } = setup({
+    fetch: () => new Response("early"),
+  });
+  const body = new ReadableStream<Uint8Array>({ cancel }, { highWaterMark: 0 });
+  const request = new Request("https://test/api", {
+    method: "POST",
+    body,
+    duplex: "half",
+  } as RequestInit);
+  expect(await (await isolated.handler.fetch(request, {}, ctx)).text()).toBe(
+    "early",
+  );
+  await Promise.all(pending);
+  await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  expect(body.locked).toBe(false);
+});
+
+it("releases the upload reader after successful EOF", async () => {
+  const { isolated, ctx, pending } = setup({
+    fetch: async (request) => new Response(await request.text()),
+  });
+  const request = new Request("https://test/api", {
+    method: "POST",
+    body: "data",
+  });
+  expect(await (await isolated.handler.fetch(request, {}, ctx)).text()).toBe(
+    "data",
+  );
+  await Promise.all(pending);
+  await vi.waitFor(() => expect(isolated.activeCalls).toBe(0));
+  expect(request.body!.locked).toBe(false);
+});
