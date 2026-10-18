@@ -19,6 +19,12 @@ const runtime = capacitorWorkers({
 
 The Worker can type this binding as the exported `KVNamespace`. The same Worker can use an actual Workers KV binding. This setup uses direct execution: function-bearing bindings cannot currently cross the isolated Worker structured-clone boundary. Binding RPC remains a separate transport task; this implementation does not change the common host or runner.
 
+With build-generated remote dispatch, Wrangler KV names are local by default:
+KV alone does not require a network request. Supply the local instance through
+`env` as above. If R2 or another server dependency selects a handler for remote
+execution, that entire request uses the deployed Worker and its cloud KV. Local
+and cloud data remain independent; see the [dispatch guide](remote-service-bindings.md).
+
 ## Supported API
 
 | Operation | Behavior |

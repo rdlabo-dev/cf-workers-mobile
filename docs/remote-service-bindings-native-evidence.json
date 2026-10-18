@@ -1,7 +1,7 @@
 {
   "date": "2026-10-18",
   "base": "a803bf94d34258bb311a06506091681427a52b39",
-  "packageIntegrity": "sha512-241YRnbDjW70jQi3QjmiWG64cJGy8sehBVl15Lx4TvJdb/yHP+Dhne9hbT0+dIIjpc69+2gookAeswjPx16CpA==",
+  "packageIntegrity": "sha512-wkTiubjSQWc9FDdQ5ErvyPhv75b7jWbq1VYwZcEmCX5keUN3o5180JHRlVyCqfgPfxixrFQ8qgeCKJb2rnKoLA==",
   "iosDevice": "iPhone 17 Pro / iOS 26.1 simulator",
   "androidDevice": "Android 16 / API 36 / emulator-5554",
   "transport": "local HTTPS with test CA to real workerd, Vite production tarball consumer",
@@ -112,6 +112,22 @@
         {
           "name": "worker:delete and protected write",
           "passed": true
+        },
+        {
+          "name": "local KV uses direct execution",
+          "passed": true
+        },
+        {
+          "name": "local KV roundtrip",
+          "passed": true
+        },
+        {
+          "name": "mixed R2/KV uses cloud",
+          "passed": true
+        },
+        {
+          "name": "remote KV leaves device KV intact",
+          "passed": true
         }
       ]
     },
@@ -221,8 +237,25 @@
         {
           "name": "worker:delete and protected write",
           "passed": true
+        },
+        {
+          "name": "local KV uses direct execution",
+          "passed": true
+        },
+        {
+          "name": "local KV roundtrip",
+          "passed": true
+        },
+        {
+          "name": "mixed R2/KV uses cloud",
+          "passed": true
+        },
+        {
+          "name": "remote KV leaves device KV intact",
+          "passed": true
         }
       ]
     }
-  }
+  },
+  "change": "KV-only routes stay local by default; mixed R2/KV requests use cloud bindings before any local handler execution"
 }

@@ -226,8 +226,9 @@ Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a pe
 
 ## D1 and remote APIs
 
-R2, cloud KV, Service Bindings and Queue producers use the same build-generated
-HTTP dispatch. See the [service binding guide](docs/remote-service-bindings.md)
+R2, Service Bindings and Queue producers use the same build-generated HTTP
+dispatch. KV-only routes stay local; requests selected for remote execution use
+the deployed Worker's cloud KV. See the [service binding guide](docs/remote-service-bindings.md)
 for configuration, upload limits and verification status.
 
 Hyperdrive-backed Workers use the same generated HTTP dispatch. The plugins detect Wrangler `hyperdrive` bindings, keeping database drivers, SQL and connection credentials on the existing Worker. See [transparent Hyperdrive migration](docs/hyperdrive-transparent-migration.md) for setup, security boundaries and verification.

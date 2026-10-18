@@ -3,7 +3,8 @@
 ## Unit and status
 
 The unit is build-generated HTTP dispatch of an existing Worker's fetch handler
-when it uses R2, cloud KV, Service Bindings or Queue producers. Binding methods
+when it uses R2, Service Bindings or Queue producers. KV alone does not select
+remote execution. Binding methods
 execute unchanged inside the deployed Worker. This does not install local R2,
 KV synchronization, a client RPC proxy, or a queue consumer in Capacitor.
 
@@ -29,16 +30,43 @@ credentials and connection strings are not runtime client configuration.
 
 For nonstandard configuration locations, supply `workerConfig`. Explicit
 `r2Bindings`, `kvBindings`, `serviceBindings` and `queueBindings` arrays override
-discovery for their respective kind only. Configure `localBindings: ["LOCAL_KV"]`
-only when deliberately using the existing local KV implementation for that name.
-This is independent device storage, with no cloud synchronization or cloud KV
-consistency guarantee. R2, Service Bindings, Queue producers, D1 and Hyperdrive
-cannot be marked local. Avoid naming a local KV binding the same as a cloud one.
+discovery for their respective kind only. KV names are eligible for local
+execution by default; `kvBindings` does not force remote execution. R2, Service
+Bindings, Queue producers, D1 and Hyperdrive require the server. A name shared
+between KV and a server binding remains server-only.
+
+Execution location determines the binding instance:
+
+- A KV-only route stays local and uses the KV supplied through runtime `env`.
+- A route using R2 and KV is dispatched as one request. Both bindings execute on
+  the original Worker, using cloud KV. It never runs part of that handler locally.
+- Conservative whole-Worker fallback runs every route remotely, including KV-only
+  routes. Inspect the build report for that decision.
+
+Provide local KV through the existing feature API, using the same binding name as
+Wrangler. The build discovers names, not device storage instances. Missing `env`
+configuration does not silently switch to cloud KV. There is no cloud/device
+synchronization. `localBindings` is still available for other explicitly supplied
+local bindings; KV no longer needs that extra declaration.
+
+```ts
+import { openFeature } from "@rdlabo/capacitor-workers/features";
+import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
+const kv = await openFeature(new LocalStorageKV("my-app-settings"));
+// Pass env: { KV: kv.api } to capacitorWorkers; KV must match Wrangler's name.
+// At shutdown: await runtime.dispose(); await kv.dispose();
+```
+
+Function-bearing bindings use direct execution even with `prefer: "worker"`.
+This is the existing [local KV execution contract](kv.md), not binding RPC into a
+Dedicated Worker. Remote requests are still selected before local execution and
+use the deployed Worker's own bindings, never the local `env` instance.
 
 ```ts
 const runtime = capacitorWorkers({
   baseURL: "https://local.invalid/",
-  prefer: "worker", // direct execution is also supported
+  prefer: "worker", // local function-bearing env selects direct execution
+  env: { KV: kv.api }, // use the binding name declared in Wrangler
   remote: {
     origin: "https://your-existing-worker.example",
     getToken: () => existingSession.accessToken,
@@ -105,10 +133,11 @@ These browser runs intercept HTTPS requests into local workerd. Vite development
 startup additionally verifies local and HTTP/RPC routes in direct/Worker modes.
 
 A freshly packed tarball was independently installed into the native test consumer.
-iOS 26.1 (iPhone 17 Pro simulator) and Android 16 / API 36 (`emulator-5554`) each passed 26
+iOS 26.1 (iPhone 17 Pro simulator) and Android 16 / API 36 (`emulator-5554`) each passed 30
 checks in direct and Dedicated Worker modes on 2026-10-18. These use actual native
 HTTPS with a test CA and local workerd, covering R2 read/write/range/HEAD/delete,
-KV metadata, service HTTP/RPC, actual queue send/batch delivery, authentication,
+KV metadata, device/cloud KV separation, remote precedence for mixed R2/KV,
+service HTTP/RPC, actual queue send/batch delivery, authentication,
 and rejection of oversized uploads before storage changes.
 See [native evidence](remote-service-bindings-native-evidence.json) for the package
 integrity and individual results. The native matrix uses Vite production output;

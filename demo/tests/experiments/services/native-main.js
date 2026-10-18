@@ -1,4 +1,5 @@
 import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
 import { Capacitor } from "@capacitor/core";
 import settings from "./server.json";
 const platform = Capacitor.getPlatform();
@@ -110,6 +111,35 @@ try {
     } finally {
       await runtime.dispose();
     }
+  }
+  // Same binding name, separate device/cloud state; remote wins per request.
+  const key = `${platform}-local-${Date.now()}`;
+  const runtime = capacitorWorkers({
+    baseURL: "https://local.invalid",
+    prefer: "worker",
+    env: { CLOUD_KV: new LocalStorageKV("services-native").create() },
+    remote: { origin, getToken: () => "test-owner" },
+  });
+  try {
+    await runtime.ready;
+    check("local KV uses direct execution", runtime.execution === "direct");
+    await fetch(`/settings/${key}`, { method: "PUT", body: "device" });
+    check(
+      "local KV roundtrip",
+      (await (await fetch(`/settings/${key}`)).text()) === "device",
+    );
+    await fetch(`/api/objects/${key}`, { method: "PUT", body: "object" });
+    await fetch(`/api/kv/${key}`, { method: "PUT", body: "cloud" });
+    check(
+      "mixed R2/KV uses cloud",
+      (await (await fetch(`/api/kv/${key}`)).json()).value === "cloud",
+    );
+    check(
+      "remote KV leaves device KV intact",
+      (await (await fetch(`/settings/${key}`)).text()) === "device",
+    );
+  } finally {
+    await runtime.dispose();
   }
 } catch (e) {
   cases.push({

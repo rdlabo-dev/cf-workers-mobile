@@ -20,6 +20,7 @@ export interface ServerBuildOptions {
   /** Hyperdrive binding names when configuration is supplied by another tool. */
   hyperdriveBindings?: string[];
   r2Bindings?: string[];
+  /** KV names eligible for local execution; does not select remote dispatch. */
   kvBindings?: string[];
   serviceBindings?: string[];
   queueBindings?: string[];
@@ -134,11 +135,13 @@ export async function serverBindings(
   const serverOnly = [...d1, ...hyperdrive, ...r2, ...services, ...queues];
   if (options.localBindings?.some((name) => serverOnly.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
-  // Local KV is an existing, explicit local-storage profile. Cloud KV stays
-  // remote by default; a local override never synchronizes with the cloud.
-  const remoteKV = kv.filter((name) => !options.localBindings?.includes(name));
+  // KV does not require a network boundary. If another binding selects the
+  // request for remote execution, the original Worker uses its cloud KV there.
+  const localKV = kv.filter((name) => !serverOnly.includes(name));
   return {
-    names: [...new Set<string>([...serverOnly, ...remoteKV])],
+    names: [...new Set<string>(serverOnly)],
+    localBindings: [...new Set([...(options.localBindings ?? []), ...localKV])],
+    kvBindings: localKV,
     config: file,
     forceRemoteReason: consumers.length
       ? "Queue consumers execute only on the deployed Worker"
@@ -147,7 +150,6 @@ export async function serverBindings(
       consumers.length ||
       hyperdrive.length ||
       r2.length ||
-      remoteKV.length ||
       services.length ||
       queues.length
         ? "capacitor-workers-server.json"
@@ -206,9 +208,18 @@ export async function compileServerWorker(
   options: Pick<
     BuildOptions,
     "alias" | "tsconfig" | "define" | "conditions"
-  > & { localBindings?: string[]; forceRemoteReason?: string } = {},
+  > & {
+    localBindings?: string[];
+    kvBindings?: string[];
+    forceRemoteReason?: string;
+  } = {},
 ): Promise<ServerCompilation> {
-  const { localBindings = [], forceRemoteReason, ...buildOptions } = options;
+  const {
+    localBindings = [],
+    kvBindings = [],
+    forceRemoteReason,
+    ...buildOptions
+  } = options;
   if (localBindings.some((name) => bindings.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
   const bundled = await build({
@@ -232,7 +243,7 @@ export async function compileServerWorker(
   );
   try {
     if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);
-    return partition(source, bindings, inputs, localBindings);
+    return partition(source, bindings, inputs, localBindings, kvBindings);
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
     return {
@@ -251,6 +262,7 @@ function partition(
   bindings: string[],
   inputs: string[],
   localBindings: string[],
+  kvBindings: string[],
 ): ServerCompilation {
   const program = parseAst(source);
   const text = (node: Node) => {
@@ -384,12 +396,12 @@ function partition(
       );
     return false;
   }
-  // Direct operations on a configured server binding cannot be local Headers
+  // Direct operations on a configured server/KV binding cannot be local Headers
   // operations. Aliases and other unknown receivers retain the conservative check.
   function serverBindingReceiver(node: Node): boolean {
     if (
       node.type !== "MemberExpression" ||
-      !bindings.includes(property(node) ?? "")
+      ![...bindings, ...kvBindings].includes(property(node) ?? "")
     )
       return false;
     return (

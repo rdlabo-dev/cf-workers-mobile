@@ -38,7 +38,8 @@ export function serverModules(
     const bindings = await serverBindings(configurationRoot, options);
     if (!bindings.names.length && !bindings.forceRemoteReason) return;
     const compilation = await compileServerWorker(entry, bindings.names, {
-      localBindings: options.localBindings,
+      localBindings: bindings.localBindings,
+      kvBindings: bindings.kvBindings,
       forceRemoteReason: bindings.forceRemoteReason,
     });
     return {

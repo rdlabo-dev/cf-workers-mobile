@@ -55,7 +55,7 @@ for (const tool of ["vite", "esbuild"])
       const main = join(root, "main.js");
       await writeFile(
         main,
-        `import {capacitorWorkers} from ${JSON.stringify(join(repo, "dist/index.js"))};let runtime,token='test-owner';window.start=async prefer=>{runtime=capacitorWorkers({baseURL:'https://local.invalid',prefer,remote:{origin:'https://deployed.invalid',getToken:()=>token,maxBufferedBodyBytes:1024}});await runtime.ready;return runtime.execution;};window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const res=await fetch(path,init);return {status:res.status,text:await res.text(),etag:res.headers.get('etag'),effects:res.headers.get('x-effects')}};`,
+        `import {capacitorWorkers} from ${JSON.stringify(join(repo, "dist/index.js"))};import {LocalStorageKV} from ${JSON.stringify(join(repo, "dist/features/kv/index.js"))};let runtime,token='test-owner';window.start=async (prefer,localKV=false)=>{runtime=capacitorWorkers({baseURL:'https://local.invalid',prefer,...(localKV?{env:{CLOUD_KV:new LocalStorageKV('service-test').create()}}:{}),remote:{origin:'https://deployed.invalid',getToken:()=>token,maxBufferedBodyBytes:1024}});await runtime.ready;return runtime.execution;};window.deviceValue=key=>new LocalStorageKV('service-test').create().get(key);window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const res=await fetch(path,init);return {status:res.status,text:await res.text(),etag:res.headers.get('etag'),effects:res.headers.get('x-effects')}};`,
       );
       const out = join(root, "dist");
       if (tool === "vite")
@@ -89,7 +89,7 @@ for (const tool of ["vite", "esbuild"])
         if (/\.(js|map)$/.test(file))
           assert.doesNotMatch(
             await readFile(file, "utf8"),
-            /createMultipartUpload|resumeMultipartUpload|\.sendBatch\(|getWithMetadata|private-bucket-name|private-kv-id|private-queue-name|private-internal/,
+            /createMultipartUpload|resumeMultipartUpload|\.sendBatch\(|CLOUD_KV\.getWithMetadata|private-bucket-name|private-kv-id|private-queue-name|private-internal/,
             `server code leaked: ${file}`,
           );
       assert.equal(
@@ -294,14 +294,82 @@ for (const tool of ["vite", "esbuild"])
               );
               assert.equal(calls, before);
               assert.equal(await (await bucket.get(key)).text(), "abcdefghi");
+              if (mode === "split") {
+                await page.evaluate(() => window.stop());
+                assert.equal(
+                  await page.evaluate(
+                    (prefer) => window.start(prefer, true),
+                    prefer,
+                  ),
+                  "direct",
+                );
+                before = calls;
+                assert.equal(
+                  (
+                    await request(`/settings/${key}`, {
+                      method: "PUT",
+                      body: "device-value",
+                    })
+                  ).status,
+                  204,
+                );
+                assert.equal(
+                  (await request(`/settings/${key}`)).text,
+                  "device-value",
+                );
+                assert.equal(calls, before, "KV-only requests do not dispatch");
+                assert.equal(
+                  await kv.get(key),
+                  "shared-value",
+                  "local writes do not change cloud KV",
+                );
+                assert.equal(
+                  JSON.parse((await request(`/api/kv/${key}`)).text).value,
+                  "shared-value",
+                  "R2/KV request uses cloud KV",
+                );
+                assert.equal(calls, before + 1);
+                await context.setOffline(true);
+                assert.equal(
+                  (await request(`/settings/${key}`)).text,
+                  "device-value",
+                );
+                await context.setOffline(false);
+              } else {
+                await page.evaluate(() => window.stop());
+                await page.evaluate(
+                  (prefer) => window.start(prefer, true),
+                  prefer,
+                );
+                before = calls;
+                assert.equal(
+                  (await request(`/settings/${key}`)).text,
+                  "shared-value",
+                );
+                await request(`/settings/${key}`, {
+                  method: "PUT",
+                  body: "whole-remote-value",
+                });
+                assert.equal(
+                  calls,
+                  before + 2,
+                  "whole-Worker fallback sends KV-only routes remotely",
+                );
+                assert.equal(await kv.get(key), "whole-remote-value");
+                assert.equal(
+                  await page.evaluate((key) => window.deviceValue(key), key),
+                  null,
+                  "remote execution does not touch device KV",
+                );
+              }
+              await request(`/api/kv/${key}`, { method: "DELETE" });
+              assert.equal(await kv.get(key), null);
               assert.equal(
                 (await request(`/api/objects/${key}`, { method: "DELETE" }))
                   .status,
                 204,
               );
               assert.equal(await bucket.get(key), null);
-              await request(`/api/kv/${key}`, { method: "DELETE" });
-              assert.equal(await kv.get(key), null);
               if (mode === "split") {
                 await context.setOffline(true);
                 assert.equal((await request("/health")).status, 200);

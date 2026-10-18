@@ -268,7 +268,7 @@ try {
       report.cases.filter((test) => !test.passed),
       [],
     );
-    assert.equal(report.cases.length, services ? 26 : 20);
+    assert.equal(report.cases.length, services ? 30 : 20);
     console.log(
       `${platform}: ${report.cases.length} HTTPS/${services ? "services" : "D1"} native checks passed`,
     );

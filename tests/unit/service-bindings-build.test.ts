@@ -25,7 +25,6 @@ afterAll(async () => {
 });
 const kinds = [
   ["r2_buckets", "r2Bindings", "BUCKET"],
-  ["kv_namespaces", "kvBindings", "KV"],
   ["services", "serviceBindings", "SERVICE"],
   ["queues", "queueBindings", "QUEUE"],
 ] as const;
@@ -80,10 +79,9 @@ for (const [key, option, binding] of kinds) {
         })
       ).names,
     ).toContain("OVERRIDE");
-    if (key !== "kv_namespaces")
-      await expect(
-        serverBindings(root, { localBindings: [binding] }),
-      ).rejects.toThrow("cannot also");
+    await expect(
+      serverBindings(root, { localBindings: [binding] }),
+    ).rejects.toThrow("cannot also");
   });
   it(`detects ${key} in named TOML environments and rejects malformed bindings`, async () => {
     const file = "named.toml";
@@ -103,35 +101,71 @@ for (const [key, option, binding] of kinds) {
     ).rejects.toThrow(`Invalid ${key}`);
   });
 }
-it("allows only explicitly selected KV to keep existing local storage semantics", async () => {
+it("keeps KV-only routes local by default and mixed R2/KV operations remote", async () => {
   await writeFile(
     resolve(root, "local.json"),
     JSON.stringify({
-      kv_namespaces: [{ binding: "LOCAL" }, { binding: "CLOUD" }],
+      kv_namespaces: [{ binding: "KV" }],
       r2_buckets: [{ binding: "BUCKET" }],
     }),
   );
-  const config = await serverBindings(root, {
-    workerConfig: "local.json",
-    localBindings: ["LOCAL"],
-  });
-  expect(config.names).toEqual(["BUCKET", "CLOUD"]);
+  const config = await serverBindings(root, { workerConfig: "local.json" });
+  expect(config.names).toEqual(["BUCKET"]);
+  expect(config.localBindings).toEqual(["KV"]);
+  const entry = resolve(root, "worker.ts");
   await writeFile(
-    resolve(root, "worker.ts"),
-    `import {Hono} from 'hono'; const app=new Hono();app.get('/local',async c=>c.text(await c.env.LOCAL.get('key')));app.get('/cloud',async c=>c.text(await c.env.CLOUD.get('key')));export default app;`,
+    entry,
+    `import {Hono} from 'hono';const app=new Hono();app.get('/local/:key',async c=>c.text(await c.env.KV.get(c.req.param('key'))));app.get('/cloud/:key',async c=>{const value=await c.env.KV.get(c.req.param('key'));const object=await c.env.BUCKET.get(c.req.param('key'));return c.json({value,object});});export default app;`,
   );
-  const compiled = await compileServerWorker(
-    resolve(root, "worker.ts"),
-    config.names,
-    { localBindings: ["LOCAL"] },
-  );
-  const { needsRemote } = await selector(compiled.selector);
-  expect(await needsRemote(new Request("https://local.invalid/local"))).toBe(
+  const compiled = await serverModules(entry, root, {
+    workerConfig: "local.json",
+  }).get();
+  expect(compiled?.mode).toBe("routes");
+  const { needsRemote } = await selector(compiled!.selector);
+  expect(await needsRemote(new Request("https://local.invalid/local/a"))).toBe(
     false,
   );
-  expect(await needsRemote(new Request("https://local.invalid/cloud"))).toBe(
+  expect(await needsRemote(new Request("https://local.invalid/cloud/a"))).toBe(
     true,
   );
+  expect(compiled!.local).not.toContain("BUCKET");
+  expect(compiled!.local).toContain("KV.get");
+});
+it("does not create a remote boundary for a KV-only Worker", async () => {
+  await writeFile(
+    resolve(root, "kv.json"),
+    JSON.stringify({ kv_namespaces: [{ binding: "KV" }] }),
+  );
+  const config = await serverBindings(root, { workerConfig: "kv.json" });
+  expect(config.names).toEqual([]);
+  expect(config.localBindings).toEqual(["KV"]);
+  expect(
+    await serverModules(resolve(root, "worker.ts"), root, {
+      workerConfig: "kv.json",
+    }).get(),
+  ).toBeUndefined();
+  expect(
+    (
+      await serverBindings(root, {
+        workerConfig: "kv.json",
+        kvBindings: ["OVERRIDE"],
+      })
+    ).localBindings,
+  ).toEqual(["OVERRIDE"]);
+  await writeFile(
+    resolve(root, "kv.toml"),
+    '[[env.production.kv_namespaces]]\nbinding="NAMED_KV"',
+  );
+  expect(
+    (await serverBindings(root, { workerConfig: "kv.toml" })).localBindings,
+  ).toEqual(["NAMED_KV"]);
+  await writeFile(
+    resolve(root, "badkv.json"),
+    JSON.stringify({ kv_namespaces: [{}] }),
+  );
+  await expect(
+    serverBindings(root, { workerConfig: "badkv.json" }),
+  ).rejects.toThrow("Invalid kv_namespaces");
 });
 it("keeps mixed-kind names server-only even when the same name is also KV", async () => {
   await writeFile(

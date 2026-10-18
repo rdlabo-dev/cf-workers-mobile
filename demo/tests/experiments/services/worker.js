@@ -56,17 +56,24 @@ app.post("/api/multipart/:key/:id", async (c) => {
   const object = await upload.complete(await c.req.json());
   return c.json({ size: object.size });
 });
+// Object metadata lives in cloud KV because these operations also require R2.
 app.put("/api/kv/:key", async (c) => {
+  if (!(await c.env.BUCKET.head(c.req.param("key"))))
+    return c.text("Not found", 404);
   await c.env.CLOUD_KV.put(c.req.param("key"), await c.req.text(), {
     metadata: { owner: "test-owner" },
     expirationTtl: 60,
   });
   return c.body(null, 204);
 });
-app.get("/api/kv/:key", async (c) =>
-  c.json(await c.env.CLOUD_KV.getWithMetadata(c.req.param("key"))),
-);
+app.get("/api/kv/:key", async (c) => {
+  if (!(await c.env.BUCKET.head(c.req.param("key"))))
+    return c.text("Not found", 404);
+  return c.json(await c.env.CLOUD_KV.getWithMetadata(c.req.param("key")));
+});
 app.delete("/api/kv/:key", async (c) => {
+  if (!(await c.env.BUCKET.head(c.req.param("key"))))
+    return c.text("Not found", 404);
   await c.env.CLOUD_KV.delete(c.req.param("key"));
   return c.body(null, 204);
 });
@@ -84,4 +91,11 @@ app.post("/api/jobs/:id", async (c) => {
   ]);
   return c.json({ accepted: true }, 202);
 });
+app.put("/settings/:key", async (c) => {
+  await c.env.CLOUD_KV.put(c.req.param("key"), await c.req.text());
+  return c.body(null, 204);
+});
+app.get("/settings/:key", async (c) =>
+  c.text((await c.env.CLOUD_KV.get(c.req.param("key"))) ?? "missing"),
+);
 export default app;
