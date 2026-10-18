@@ -19,6 +19,8 @@ export const utilContract: ContractSuite<typeof utilFeature> = {
     polyfill(api) {
       if (typeof (api as { promisify?: unknown }).promisify !== "function")
         throw new Error("util.promisify missing");
+      if (typeof api.inspect !== "function" || typeof api.format !== "function")
+        throw new Error("util named exports missing");
     },
   },
 };
