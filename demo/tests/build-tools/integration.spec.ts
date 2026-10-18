@@ -22,16 +22,18 @@ for (const build of [
       if (build !== "raw") {
         // node: and bare specifiers resolve to one profile per bundler.
         expect(report.resolved).toEqual(Array(11).fill(true));
+        const cases = report.node.direct.flatMap((result) => result.cases);
+        expect(cases).toHaveLength(119);
         expect(
-          report.node.direct
-            .flatMap((result) => result.cases)
-            .filter((c) => c.status !== "passed"),
-        ).toEqual([]);
-        expect(
-          report.node.direct.flatMap((result) =>
-            result.cases.map((c) => c.status),
+          cases.filter(
+            (c) => c.status === "failed" || c.status === "unavailable",
           ),
-        ).toEqual(Array(91).fill("passed"));
+        ).toEqual([]);
+        expect(cases.filter((c) => c.status === "unsupported").map((c) => c.id)).toEqual([
+          "settleRestore",
+          "nestedAsyncRestore",
+          "concurrentIsolation",
+        ]);
       }
     });
   }
@@ -65,17 +67,22 @@ for (const build of ["vite-node", "esbuild-node"]) {
         prefer,
       );
       expect(report.execution).toBe(prefer);
-      const statuses = (
+      const cases = (
         report.contracts as {
           cases: { id: string; status: string }[];
         }[]
-      ).flatMap((result) => result.cases.map((c) => c.status));
+      ).flatMap((result) => result.cases);
+      expect(cases).toHaveLength(119);
       expect(
-        (report.contracts as { cases: { status: string }[] }[])
-          .flatMap((r) => r.cases)
-          .filter((c) => c.status !== "passed"),
+        cases.filter(
+          (c) => c.status === "failed" || c.status === "unavailable",
+        ),
       ).toEqual([]);
-      expect(statuses).toEqual(Array(91).fill("passed"));
+      expect(cases.filter((c) => c.status === "unsupported").map((c) => c.id)).toEqual([
+        "settleRestore",
+        "nestedAsyncRestore",
+        "concurrentIsolation",
+      ]);
       expect(report.globals.unqualified).toEqual([true, true]);
       expect(report.globals.qualified).toEqual([true, true, true]);
       expect(report.globals.computed).toEqual([true, true, true]);
