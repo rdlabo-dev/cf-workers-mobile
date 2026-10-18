@@ -30,6 +30,11 @@ import {
 } from "../../../src/compat/net/index.spec";
 
 import {
+  AsyncHooksImplementation,
+  asyncHooksContract,
+  NodeAsyncHooks,
+} from "../../../src/compat/async-hooks/index.spec";
+import {
   BufferImplementation,
   bufferContract,
 } from "../../../src/compat/buffer/index.spec";
@@ -49,6 +54,12 @@ export async function runNodeContracts(
     await runContract(new NodeHttp(), nodeHttpContract),
     await runContract(new NetImplementation(), netContract),
     await runContract(new BufferImplementation(), bufferContract),
+    await runContract(
+      profile === "workers"
+        ? new NodeAsyncHooks()
+        : new AsyncHooksImplementation(),
+      asyncHooksContract,
+    ),
   ];
 }
 
