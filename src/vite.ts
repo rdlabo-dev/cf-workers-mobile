@@ -39,6 +39,9 @@ function compatibilityPlugins(
             name: "capacitor-workers-global-install",
             enforce: "pre" as const,
             transform(code: string, id: string) {
+              // CommonJS proxy modules are already generated ESM. Injecting a
+              // require into their virtual .cjs IDs leaves it unbundled.
+              if (id.startsWith("\0")) return;
               const path = normalizePath(id.split("?")[0]);
               if (
                 !/\.[cm]?[jt]sx?$/.test(path) ||
@@ -48,7 +51,14 @@ function compatibilityPlugins(
                 )
               )
                 return;
-              return `import ${JSON.stringify(installGlobals === "worker" ? globalsInstallPath : nodeGlobalsInstallPath)};\n${code}`;
+              const installation = JSON.stringify(
+                installGlobals === "worker"
+                  ? globalsInstallPath
+                  : nodeGlobalsInstallPath,
+              );
+              return /\.c[jt]s$/.test(path)
+                ? `require(${installation});\n${code}`
+                : `import ${installation};\n${code}`;
             },
           },
         ]
@@ -88,6 +98,10 @@ function compatibilityPlugins(
             "dns",
             "node:dns/promises",
             "dns/promises",
+            "node:assert/strict",
+            "assert/strict",
+            "node:assert",
+            "assert",
             "node:perf_hooks",
             "perf_hooks",
             "node:trace_events",

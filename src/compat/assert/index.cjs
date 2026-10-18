@@ -1,0 +1,23 @@
+// Keep require("node:assert") callable while preserving named ESM imports.
+const api = require("./index.js").default;
+module.exports = api;
+module.exports.AssertionError = api.AssertionError;
+module.exports.deepEqual = api.deepEqual;
+module.exports.deepStrictEqual = api.deepStrictEqual;
+module.exports.doesNotMatch = api.doesNotMatch;
+module.exports.doesNotReject = api.doesNotReject;
+module.exports.doesNotThrow = api.doesNotThrow;
+module.exports.equal = api.equal;
+module.exports.fail = api.fail;
+module.exports.ifError = api.ifError;
+module.exports.match = api.match;
+module.exports.notDeepEqual = api.notDeepEqual;
+module.exports.notDeepStrictEqual = api.notDeepStrictEqual;
+module.exports.notEqual = api.notEqual;
+module.exports.notStrictEqual = api.notStrictEqual;
+module.exports.ok = api.ok;
+module.exports.partialDeepStrictEqual = api.partialDeepStrictEqual;
+module.exports.rejects = api.rejects;
+module.exports.strict = api.strict;
+module.exports.strictEqual = api.strictEqual;
+module.exports.throws = api.throws;

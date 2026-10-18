@@ -3,8 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "declaration": true
+    "declaration": true,
+    "allowJs": true
   },
-  "include": ["src"],
+  "include": ["src/**/*.ts", "src/compat/**/*.cjs"],
   "exclude": ["src/**/*.spec.ts"]
 }

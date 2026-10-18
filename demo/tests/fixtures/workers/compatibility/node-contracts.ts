@@ -1,3 +1,5 @@
+// @ts-expect-error This fixture deliberately exercises a CommonJS require entry.
+import commonJsAssertions from "./assert.cjs";
 // Type-only views: execution must use the installed public globals.
 const { Headers, Request } = globalThis as unknown as {
   Headers: typeof import("../../../../../src/compat/headers").Headers;
@@ -18,6 +20,7 @@ export default {
   async fetch() {
     return Response.json({
       contracts: await runNodeContracts("bundled"),
+      commonJsAssertions: commonJsAssertions(),
       webGlobals: {
         entry: topLevelWebGlobals,
         static: staticWebGlobals,

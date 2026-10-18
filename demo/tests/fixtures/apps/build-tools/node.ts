@@ -18,6 +18,7 @@ async function run(prefer: ExecutionPreference) {
     result = {
       execution: runtime.execution,
       contracts: payload.contracts,
+      commonJsAssertions: payload.commonJsAssertions,
       globals: payload.globals,
       webGlobals: payload.webGlobals,
     };

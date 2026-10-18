@@ -1,4 +1,8 @@
 import {
+  AssertImplementation,
+  assertContract,
+} from "../../../src/compat/assert/index.spec";
+import {
   PerfHooksImplementation,
   perfHooksContract,
 } from "../../../src/compat/perf-hooks/index.spec";
@@ -207,6 +211,7 @@ export async function runNodeContracts(
       new StreamConsumersImplementation(),
       streamConsumersContract,
     ),
+    await runContract(new AssertImplementation(), assertContract),
     await runContract(new PerfHooksImplementation(), perfHooksContract),
     await runContract(new TraceEventsImplementation(), traceEventsContract),
     await runContract(new DnsImplementation(), dnsContract),
