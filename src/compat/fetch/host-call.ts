@@ -13,19 +13,6 @@ type Host = {
   socketEnd(callback: string, id: string): void;
   socketRead(callback: string, id: string, maxBytes: number): void;
   socketClose(callback: string, id: string): void;
-  networkOpen(
-    callback: string,
-    id: string,
-    url: string,
-    method: string,
-    headers: string,
-    hasBody: boolean,
-    encoding: string,
-  ): void;
-  networkWrite(callback: string, id: string, chunk: string): void;
-  networkEnd(callback: string, id: string): void;
-  networkRead(callback: string, id: string, maxBytes: number): void;
-  networkClose(callback: string, id: string): void;
 };
 const calls = new WeakMap<Host, NativeCall>();
 /** Android's hidden document host has a JavaScript interface, not Capacitor JS. */
@@ -37,7 +24,7 @@ export function getHostCall(): NativeCall | undefined {
     };
   };
   const host = target.CapacitorWorkersHost;
-  if (!host?.networkOpen) return;
+  if (!host?.socketOpen) return;
   const existing = calls.get(host);
   if (existing) return existing;
   const pending = new Map<
@@ -94,29 +81,6 @@ export function getHostCall(): NativeCall | undefined {
             break;
           case "socketClose":
             host.socketClose(id, handle);
-            break;
-          case "networkOpen":
-            host.networkOpen(
-              id,
-              handle,
-              String(args.url),
-              String(args.method),
-              JSON.stringify(args.headers),
-              args.hasBody === true,
-              String(args.encodeResponseBody ?? "automatic"),
-            );
-            break;
-          case "networkWrite":
-            host.networkWrite(id, handle, String(args.chunk));
-            break;
-          case "networkEnd":
-            host.networkEnd(id, handle);
-            break;
-          case "networkRead":
-            host.networkRead(id, handle, Number(args.maxBytes));
-            break;
-          case "networkClose":
-            host.networkClose(id, handle);
             break;
         }
       } catch (error) {

@@ -199,19 +199,26 @@ results. Build logs and reports are written under the consumer's
 `ADB` and `ADB_SERVER_PORT` can select an alternate Android tool/server.
 The library does not start this test HTTP server.
 
-Certificate acceptance also requires the explicit online TLS suite:
+Certificate acceptance uses local TLS fixtures on ports 4204–4206:
 
 ```sh
-npm run test:workers:tls
 NETWORK_TLS=1 npm run test:native:network -- ios <simulator-UUID>
 NETWORK_TLS=1 npm run test:native:network -- android <emulator-serial>
 ```
 
-This compares the valid, self-signed and hostname-mismatch certificate endpoints
-maintained by [badssl](https://badssl.com/). The native run then requires 88 results.
-It uses public test servers and therefore needs working DNS and Internet access;
-DNS errors and timeouts are failures, not evidence that certificate validation
-worked. The ordinary 82-case loopback suite remains independent of those services.
+The fixture server generates short-lived certificates with OpenSSL: a valid
+certificate, an untrusted self-signed certificate and a trusted certificate for
+the wrong hostname. The runner installs the test CA in the selected iOS
+simulator and in the independent Android consumer's **debug-only** network
+security configuration. No test trust configuration is shipped in the library.
+Keep the fixture server running during the run so its certificates match.
+The TLS cases also consume the body and reject both clean and unclean
+EOF-delimited responses, enforcing the documented HTTPS framing requirement.
+Each platform must produce 92 successful results; DNS failures and timeouts do
+not count as certificate rejection. Native TLS tests require no external site.
+
+The separate `npm run test:workers:tls` reference test still uses public
+[badssl](https://badssl.com/) endpoints and requires working Internet/DNS.
 
 The same network run also checks `node:net`: half-close, vectored writes, custom
 lookup, `onread` buffers, abort/timeout, paused payload preservation and FIN/reset

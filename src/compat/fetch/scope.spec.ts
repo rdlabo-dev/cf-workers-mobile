@@ -6,19 +6,19 @@ const plugin = "CapacitorWorkers";
 describe("native network runtime ownership", () => {
   it("closes a header wait independently of the terminated worker", async () => {
     const native = vi.fn<NativeCall>((_, method) =>
-      method === "networkOpen" ? new Promise(() => {}) : Promise.resolve(),
+      method === "socketOpen" ? new Promise(() => {}) : Promise.resolve(),
     );
     const scope = createNetworkScope(native);
-    const opening = scope.call(plugin, "networkOpen", { id: "owned" });
+    const opening = scope.call(plugin, "socketOpen", { id: "owned" });
     const closed = scope.dispose();
     expect(scope.dispose()).toBe(closed);
     await expect(opening).rejects.toThrow("disposed");
     await closed;
-    expect(native).toHaveBeenLastCalledWith(plugin, "networkClose", {
+    expect(native).toHaveBeenLastCalledWith(plugin, "socketClose", {
       id: "owned",
     });
     await expect(
-      scope.call(plugin, "networkOpen", { id: "later" }),
+      scope.call(plugin, "socketOpen", { id: "later" }),
     ).rejects.toThrow("disposed");
     expect(native).toHaveBeenCalledTimes(2);
   });
@@ -29,13 +29,13 @@ describe("native network runtime ownership", () => {
     });
     let calls = 0;
     const native = vi.fn<NativeCall>((_, method) => {
-      if (method !== "networkClose") return Promise.resolve();
+      if (method !== "socketClose") return Promise.resolve();
       return ++calls === 1 ? releasing : Promise.resolve();
     });
     const scope = createNetworkScope(native);
-    await scope.call(plugin, "networkOpen", { id: "closing" });
+    await scope.call(plugin, "socketOpen", { id: "closing" });
     const closing = scope
-      .call(plugin, "networkClose", { id: "closing" })
+      .call(plugin, "socketClose", { id: "closing" })
       .catch(() => {});
     await vi.waitFor(() => expect(calls).toBe(1));
     const completed = vi.fn();
@@ -52,9 +52,9 @@ describe("native network runtime ownership", () => {
     const native = vi.fn<NativeCall>(async () => undefined);
     const first = createNetworkScope(native);
     const second = createNetworkScope(native);
-    await first.call(plugin, "networkOpen", { id: "first" });
+    await first.call(plugin, "socketOpen", { id: "first" });
     await expect(
-      second.call(plugin, "networkRead", { id: "first" }),
+      second.call(plugin, "socketRead", { id: "first" }),
     ).rejects.toThrow("Unknown");
     await second.dispose();
     expect(native).toHaveBeenCalledTimes(1);
@@ -64,14 +64,14 @@ describe("native network runtime ownership", () => {
   it("releases late registration without delivering its response", async () => {
     let open!: (value: unknown) => void;
     const native = vi.fn<NativeCall>((_, method) =>
-      method === "networkOpen"
+      method === "socketOpen"
         ? new Promise((resolve) => {
             open = resolve;
           })
         : Promise.resolve(),
     );
     const scope = createNetworkScope(native);
-    const opening = scope.call(plugin, "networkOpen", { id: "late" });
+    const opening = scope.call(plugin, "socketOpen", { id: "late" });
     await scope.dispose();
     await expect(opening).rejects.toThrow("disposed");
     open({ status: 200 });
@@ -79,43 +79,43 @@ describe("native network runtime ownership", () => {
   });
   it("releases all handles even when one native close fails", async () => {
     const native = vi.fn<NativeCall>(async (_, method, args) => {
-      if (method === "networkClose" && args.id === "bad")
+      if (method === "socketClose" && args.id === "bad")
         throw new Error("native cleanup");
     });
     const scope = createNetworkScope(native);
-    await scope.call(plugin, "networkOpen", { id: "bad" });
-    await scope.call(plugin, "networkOpen", { id: "good" });
+    await scope.call(plugin, "socketOpen", { id: "bad" });
+    await scope.call(plugin, "socketOpen", { id: "good" });
     await expect(scope.dispose()).rejects.toThrow(
       "Native network cleanup failed",
     );
     expect(
-      native.mock.calls.filter((call) => call[1] === "networkClose"),
+      native.mock.calls.filter((call) => call[1] === "socketClose"),
     ).toHaveLength(2);
   });
   it("does not retain successfully closed handles until runtime disposal", async () => {
     const native = vi.fn<NativeCall>(async () => undefined);
     const scope = createNetworkScope(native);
-    await scope.call(plugin, "networkOpen", { id: "done" });
-    await scope.call(plugin, "networkClose", { id: "done" });
+    await scope.call(plugin, "socketOpen", { id: "done" });
+    await scope.call(plugin, "socketClose", { id: "done" });
     await scope.dispose();
     expect(native).toHaveBeenCalledTimes(2);
   });
 });
 
-it("owns TCP and HTTP handles independently and closes both transports", async () => {
+it("owns all byte handles and closes each independently", async () => {
   const native = vi.fn<NativeCall>(async () => ({}));
   const scope = createNetworkScope(native);
   await scope.call(plugin, "socketOpen", { id: "tcp" });
-  await scope.call(plugin, "networkOpen", { id: "http" });
+  await scope.call(plugin, "socketOpen", { id: "http" });
+  await expect(scope.call(plugin, "socketOpen", { id: "tcp" })).rejects.toThrow(
+    "Duplicate network handle",
+  );
   await expect(
-    scope.call(plugin, "networkRead", { id: "tcp" }),
-  ).rejects.toThrow("transport mismatch");
-  await expect(
-    scope.call(plugin, "socketRead", { id: "http" }),
-  ).rejects.toThrow("transport mismatch");
+    scope.call(plugin, "socketRead", { id: "unknown" }),
+  ).rejects.toThrow("Unknown network handle");
   await scope.dispose();
   expect(native).toHaveBeenCalledWith(plugin, "socketClose", { id: "tcp" });
-  expect(native).toHaveBeenCalledWith(plugin, "networkClose", { id: "http" });
+  expect(native).toHaveBeenCalledWith(plugin, "socketClose", { id: "http" });
 });
 
 it("closes late TCP registration after explicit cancellation without disposing the runtime", async () => {

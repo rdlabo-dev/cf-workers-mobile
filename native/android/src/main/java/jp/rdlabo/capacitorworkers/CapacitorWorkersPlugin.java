@@ -6,16 +6,13 @@ import android.webkit.*;
 import com.getcapacitor.*;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Internal runtime host. The application keeps its ordinary BridgeActivity. */
 @CapacitorPlugin(name = "CapacitorWorkers")
 public class CapacitorWorkersPlugin extends Plugin {
     private final Handler main = new Handler(Looper.getMainLooper());
-    private volatile WorkerNetwork network = new WorkerNetwork();
+    private volatile WorkerSockets network = new WorkerSockets();
     private WebView runtime;
     private HostBridge hostBridge;
     private PluginCall starting;
@@ -24,8 +21,8 @@ public class CapacitorWorkersPlugin extends Plugin {
     private final WebViewListener networkLifecycle = new WebViewListener() {
         @Override public void onPageStarted(WebView webView) {
             bridge.execute(() -> {
-                WorkerNetwork previous = network;
-                network = new WorkerNetwork();
+                WorkerSockets previous = network;
+                network = new WorkerSockets();
                 previous.shutdown();
             });
         }
@@ -68,9 +65,9 @@ public class CapacitorWorkersPlugin extends Plugin {
 
     // ---- Outbound network transport (see src/compat/fetch/transport.ts) ----
 
-    private WorkerNetwork.Result result(PluginCall call) {
-        WorkerNetwork owner = network;
-        return new WorkerNetwork.Result() {
+    private WorkerSockets.Result result(PluginCall call) {
+        WorkerSockets owner = network;
+        return new WorkerSockets.Result() {
             @Override public void resolve(JSObject value) {
                 bridge.execute(() -> {
                     if (owner != network) return;
@@ -85,67 +82,14 @@ public class CapacitorWorkersPlugin extends Plugin {
         };
     }
 
-    private static List<String[]> headerPairs(JSArray raw) throws Exception {
-        List<String[]> headers = new ArrayList<>(raw.length());
-        for (int i = 0; i < raw.length(); i++) {
-            JSONArray pair = raw.getJSONArray(i);
-            if (pair == null || pair.length() != 2) throw new IllegalArgumentException();
-            headers.add(new String[]{ pair.getString(0), pair.getString(1) });
-        }
-        return headers;
-    }
-
-    @PluginMethod public void socketWatch(PluginCall call) { network.sockets.watch(call.getString("id"),result(call)); }
+    @PluginMethod public void socketWatch(PluginCall call) { network.watch(call.getString("id"),result(call)); }
     @PluginMethod public void socketOpen(PluginCall call) {
-        network.sockets.open(call.getString("id"),call.getString("host"),call.getInt("port",0),call.getBoolean("tls",false),result(call));
+        network.open(call.getString("id"),call.getString("host"),call.getInt("port",0),call.getBoolean("tls",false),result(call));
     }
-    @PluginMethod public void socketWrite(PluginCall call) { network.sockets.write(call.getString("id"),call.getString("chunk"),result(call)); }
-    @PluginMethod public void socketEnd(PluginCall call) { network.sockets.end(call.getString("id"),result(call)); }
-    @PluginMethod public void socketRead(PluginCall call) { network.sockets.read(call.getString("id"),call.getInt("maxBytes",65536),result(call)); }
-    @PluginMethod public void socketClose(PluginCall call) { network.sockets.close(call.getString("id"),result(call)); }
-
-    @PluginMethod public void networkOpen(PluginCall call) {
-        String id = call.getString("id");
-        String url = call.getString("url");
-        String method = call.getString("method");
-        JSArray raw = call.getArray("headers");
-        Boolean hasBody = call.getBoolean("hasBody");
-        String encode = call.getString("encodeResponseBody");
-        if (id == null || url == null || method == null || raw == null || hasBody == null) {
-            call.reject("Invalid networkOpen arguments");
-            return;
-        }
-        List<String[]> headers;
-        try {
-            headers = headerPairs(raw);
-        } catch (Exception error) {
-            call.reject("Invalid request headers");
-            return;
-        }
-        network.open(id, url, method, headers, hasBody, encode, result(call));
-    }
-    @PluginMethod public void networkWrite(PluginCall call) {
-        String id = call.getString("id");
-        String chunk = call.getString("chunk");
-        if (id == null || chunk == null) { call.reject("Invalid networkWrite arguments"); return; }
-        network.write(id, chunk, result(call));
-    }
-    @PluginMethod public void networkEnd(PluginCall call) {
-        String id = call.getString("id");
-        if (id == null) { call.reject("Invalid networkEnd arguments"); return; }
-        network.end(id, result(call));
-    }
-    @PluginMethod public void networkRead(PluginCall call) {
-        String id = call.getString("id");
-        Integer maxBytes = call.getInt("maxBytes");
-        if (id == null || maxBytes == null) { call.reject("Invalid networkRead arguments"); return; }
-        network.read(id, maxBytes, result(call));
-    }
-    @PluginMethod public void networkClose(PluginCall call) {
-        String id = call.getString("id");
-        if (id == null) { call.reject("Invalid networkClose arguments"); return; }
-        network.close(id, result(call));
-    }
+    @PluginMethod public void socketWrite(PluginCall call) { network.write(call.getString("id"),call.getString("chunk"),result(call)); }
+    @PluginMethod public void socketEnd(PluginCall call) { network.end(call.getString("id"),result(call)); }
+    @PluginMethod public void socketRead(PluginCall call) { network.read(call.getString("id"),call.getInt("maxBytes",65536),result(call)); }
+    @PluginMethod public void socketClose(PluginCall call) { network.close(call.getString("id"),result(call)); }
 
     private void close() {
         if (hostBridge != null) { hostBridge.network.shutdown(); hostBridge = null; }
@@ -173,8 +117,8 @@ public class CapacitorWorkersPlugin extends Plugin {
             );
         });
     }
-    private WorkerNetwork.Result hostResult(WebView owner, String callbackId) {
-        return new WorkerNetwork.Result() {
+    private WorkerSockets.Result hostResult(WebView owner, String callbackId) {
+        return new WorkerSockets.Result() {
             @Override public void resolve(JSObject value) {
                 deliverToHost(owner, callbackId, true, value == null ? "null" : value.toString());
             }
@@ -187,40 +131,18 @@ public class CapacitorWorkersPlugin extends Plugin {
     }
     private class HostBridge {
         private final WebView owner;
-        private final WorkerNetwork network = new WorkerNetwork();
+        private final WorkerSockets network = new WorkerSockets();
         HostBridge(WebView owner) { this.owner = owner; }
         @JavascriptInterface public void ready() {
             main.post(() -> {
                 if (runtime == owner && starting != null) { main.removeCallbacks(timeout); starting.resolve(); starting = null; }
             });
         }
-        @JavascriptInterface public void socketWatch(String callbackId,String id) { network.sockets.watch(id,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void socketOpen(String callbackId,String id,String host,int port,boolean tls) { network.sockets.open(id,host,port,tls,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void socketWrite(String callbackId,String id,String chunk) { network.sockets.write(id,chunk,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void socketEnd(String callbackId,String id) { network.sockets.end(id,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void socketRead(String callbackId,String id,int count) { network.sockets.read(id,count,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void socketClose(String callbackId,String id) { network.sockets.close(id,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void networkOpen(String callbackId, String id, String url, String method, String headersJson, boolean hasBody, String encodeResponseBody) {
-            List<String[]> headers;
-            try {
-                headers = headerPairs(new JSArray(headersJson));
-            } catch (Exception error) {
-                deliverToHost(owner, callbackId, false, "{\"message\":\"Invalid request headers\"}");
-                return;
-            }
-            network.open(id, url, method, headers, hasBody, encodeResponseBody, hostResult(owner, callbackId));
-        }
-        @JavascriptInterface public void networkWrite(String callbackId, String id, String chunkBase64) {
-            network.write(id, chunkBase64, hostResult(owner, callbackId));
-        }
-        @JavascriptInterface public void networkEnd(String callbackId, String id) {
-            network.end(id, hostResult(owner, callbackId));
-        }
-        @JavascriptInterface public void networkRead(String callbackId, String id, int maxBytes) {
-            network.read(id, maxBytes, hostResult(owner, callbackId));
-        }
-        @JavascriptInterface public void networkClose(String callbackId, String id) {
-            network.close(id, hostResult(owner, callbackId));
-        }
+        @JavascriptInterface public void socketWatch(String callbackId,String id) { network.watch(id,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void socketOpen(String callbackId,String id,String host,int port,boolean tls) { network.open(id,host,port,tls,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void socketWrite(String callbackId,String id,String chunk) { network.write(id,chunk,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void socketEnd(String callbackId,String id) { network.end(id,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void socketRead(String callbackId,String id,int count) { network.read(id,count,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void socketClose(String callbackId,String id) { network.close(id,hostResult(owner,callbackId)); }
     }
 }

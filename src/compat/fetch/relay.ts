@@ -7,11 +7,6 @@ import {
 } from "./native-network.js";
 
 const methods = new Set<NativeNetworkMethod>([
-  "networkOpen",
-  "networkWrite",
-  "networkEnd",
-  "networkRead",
-  "networkClose",
   "socketWatch",
   "socketOpen",
   "socketWrite",

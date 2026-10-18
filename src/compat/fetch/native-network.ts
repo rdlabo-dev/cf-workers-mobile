@@ -1,3 +1,4 @@
+import { HttpResponseParser } from "../http-wire/index.js";
 import { getHostCall } from "./host-call.js";
 import type { NativeConnection, NativeNetwork } from "./transport.js";
 
@@ -7,12 +8,7 @@ export type NativeNetworkMethod =
   | "socketWrite"
   | "socketEnd"
   | "socketRead"
-  | "socketClose"
-  | "networkOpen"
-  | "networkWrite"
-  | "networkEnd"
-  | "networkRead"
-  | "networkClose";
+  | "socketClose";
 
 /**
  * Narrowly typed bridge call. The same shape can be relayed through a Capacitor
@@ -30,13 +26,6 @@ export interface NativeNetworkOptions {
   chunkSize?: number;
   /** Bridge call function; defaults to `globalThis.Capacitor.nativePromise`. */
   nativeCall?: NativeCall;
-}
-
-interface HeadersResult {
-  status: number;
-  statusText: string;
-  headers: [string, string][];
-  hasBody: boolean;
 }
 
 function randomId(): string {
@@ -73,215 +62,202 @@ function defaultNativeCall(): NativeCall {
 }
 
 const CHUNK_SIZE = 65536;
-
-function chunkToBase64(chunk: Uint8Array): string {
-  const step = 0x8000;
-  let binary = "";
-  for (let i = 0; i < chunk.length; i += step) {
-    binary += String.fromCharCode(...chunk.subarray(i, i + step));
-  }
-  return btoa(binary);
+const token = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+function encode(bytes: Uint8Array): string {
+  let text = "";
+  for (let offset = 0; offset < bytes.length; offset += 8192)
+    text += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+  return btoa(text);
+}
+function decode(text: string): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 }
 
-function base64ToChunk(encoded: string): Uint8Array<ArrayBuffer> {
-  const binary = atob(encoded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function validateRequest(
-  request: Omit<
-    import("./transport.js").TransportRequest,
-    "body" | "signal"
-  > & {
-    hasBody: boolean;
-  },
-): void {
-  const url = new URL(request.url);
-  if (!["http:", "https:"].includes(url.protocol)) {
-    throw new TypeError("Network transport only supports HTTP(S) URLs");
-  }
-  if (request.method.length === 0) {
-    throw new TypeError("Request method must not be empty");
-  }
-  if (/[\r\n]/.test(request.method)) {
-    throw new TypeError("Request method contains line breaks");
-  }
-  for (const [name, value] of request.headers) {
-    if (/[\r\n]/.test(name) || /[\r\n]/.test(value)) {
-      throw new TypeError(
-        `Header ${JSON.stringify(name)} contains line breaks`,
-      );
-    }
-  }
-}
-
-function parseHeadersResult(value: unknown): HeadersResult {
-  if (typeof value !== "object" || value === null) {
-    throw new TypeError("Invalid headers response from native network");
-  }
-  const result = value as Record<string, unknown>;
-  if (
-    typeof result.status !== "number" ||
-    typeof result.statusText !== "string" ||
-    typeof result.hasBody !== "boolean"
-  ) {
-    throw new TypeError("Invalid headers response from native network");
-  }
-  if (!Array.isArray(result.headers)) {
-    throw new TypeError("Invalid headers response from native network");
-  }
-  const headers: [string, string][] = [];
-  for (const entry of result.headers) {
-    if (
-      !Array.isArray(entry) ||
-      entry.length !== 2 ||
-      typeof entry[0] !== "string" ||
-      typeof entry[1] !== "string"
-    ) {
-      throw new TypeError("Invalid header entry from native network");
-    }
-    headers.push([entry[0], entry[1]]);
-  }
-  return {
-    status: result.status,
-    statusText: result.statusText,
-    headers,
-    hasBody: result.hasBody,
-  };
-}
-
-class CapacitorNativeConnection implements NativeConnection {
-  readonly headers: Promise<HeadersResult>;
-  private readonly id: string;
-  private readonly call: NativeCall;
-  private readonly chunkSize: number;
-  private closed = false;
-  private closing?: Promise<void>;
-  private released = false;
-  private resolveHeaders!: (value: HeadersResult) => void;
-  private rejectHeaders!: (reason: unknown) => void;
-
-  constructor(id: string, call: NativeCall, chunkSize: number) {
-    this.id = id;
-    this.call = call;
-    this.chunkSize = chunkSize;
-    this.headers = new Promise<HeadersResult>((resolve, reject) => {
-      this.resolveHeaders = resolve;
-      this.rejectHeaders = reject;
-    });
-    // A caller can cancel before it starts awaiting headers.
-    void this.headers.catch(() => {});
-  }
-
-  async write(chunk: Uint8Array): Promise<void> {
-    if (this.closed) throw new Error("Network connection is closed");
-    if (!(chunk instanceof Uint8Array)) {
-      throw new TypeError("Write chunk must be a Uint8Array");
-    }
-    for (let offset = 0; offset < chunk.byteLength; offset += CHUNK_SIZE) {
-      if (this.closed) throw new Error("Network connection is closed");
-      await this.call("CapacitorWorkers", "networkWrite", {
-        id: this.id,
-        chunk: chunkToBase64(chunk.subarray(offset, offset + CHUNK_SIZE)),
-      });
-    }
-  }
-
-  async end(): Promise<void> {
-    if (this.closed) throw new Error("Network connection is closed");
-    await this.call("CapacitorWorkers", "networkEnd", { id: this.id });
-  }
-
-  async read(): Promise<Uint8Array<ArrayBuffer> | null> {
-    if (this.released) return null;
-    const result = await this.call("CapacitorWorkers", "networkRead", {
-      id: this.id,
-      maxBytes: this.chunkSize,
-    });
-    if (typeof result !== "object" || result === null) {
-      throw new TypeError("Invalid read response from native network");
-    }
-    const data = result as Record<string, unknown>;
-    if (data.eof === true) {
-      this.released = true;
-      return null;
-    }
-    if (typeof data.chunk !== "string") {
-      throw new TypeError("Invalid read response from native network");
-    }
-    return base64ToChunk(data.chunk);
-  }
-
-  close(): Promise<void> {
-    if (this.closing) return this.closing;
-    this.closed = true;
-    this.released = true;
-    this.rejectHeaders(new Error("Network connection is closed"));
-    this.closing = Promise.resolve()
-      .then(() =>
-        this.call("CapacitorWorkers", "networkClose", { id: this.id }),
-      )
-      .then(() => undefined);
-    return this.closing;
-  }
-
-  settleHeaders(result: unknown): void {
-    try {
-      this.resolveHeaders(parseHeadersResult(result));
-    } catch (error) {
-      this.rejectHeaders(error);
-    }
-  }
-
-  failHeaders(reason: unknown): void {
-    this.rejectHeaders(reason);
-  }
-}
-
+/** HTTP policy/framing lives in JS. Native receives only bounded TCP/TLS bytes. */
 export function createNativeNetwork(
   options: NativeNetworkOptions = {},
 ): NativeNetwork {
   const call = options.nativeCall ?? defaultNativeCall();
   const chunkSize = options.chunkSize ?? CHUNK_SIZE;
-  if (
-    !Number.isInteger(chunkSize) ||
-    chunkSize <= 0 ||
-    chunkSize > CHUNK_SIZE
-  ) {
+  if (!Number.isInteger(chunkSize) || chunkSize < 1 || chunkSize > CHUNK_SIZE)
     throw new TypeError("chunkSize must be an integer between 1 and 65536");
-  }
-
   return {
-    async open(request): Promise<NativeConnection> {
-      validateRequest(request);
+    async open(request) {
+      const url = new URL(request.url);
+      if (
+        !["http:", "https:"].includes(url.protocol) ||
+        url.username ||
+        url.password
+      )
+        throw new TypeError(
+          "Network transport requires an HTTP(S) URL without credentials",
+        );
+      if (!token.test(request.method) || request.method === "CONNECT")
+        throw new TypeError("Invalid HTTP method");
+      const pairs: [string, string][] = [];
+      let host = false;
+      let length: number | undefined;
+      for (const [name, value] of request.headers) {
+        if (!token.test(name) || /[^\t\x20-\x7e\x80-\xff]/.test(value))
+          throw new TypeError("Invalid HTTP header");
+        const key = name.toLowerCase();
+        if (key === "content-length") {
+          if (
+            length !== undefined ||
+            !/^\d+$/.test(value) ||
+            !Number.isSafeInteger(Number(value))
+          )
+            throw new TypeError("Invalid Content-Length");
+          length = Number(value);
+          continue;
+        }
+        // This connection owns framing and never pools or upgrades.
+        if (
+          [
+            "transfer-encoding",
+            "connection",
+            "proxy-connection",
+            "upgrade",
+          ].includes(key)
+        )
+          continue;
+        if (key === "host") {
+          if (host) throw new TypeError("Duplicate Host");
+          host = true;
+        }
+        pairs.push([name, value]);
+      }
+      if (!host) pairs.push(["Host", url.host]);
+      if (!request.hasBody && length && length > 0)
+        throw new TypeError("Content-Length without a body");
+      const chunked = request.hasBody && length === undefined;
+      if (chunked) pairs.push(["Transfer-Encoding", "chunked"]);
+      else if (
+        length !== undefined ||
+        request.hasBody ||
+        ["POST", "PUT", "PATCH"].includes(request.method)
+      )
+        pairs.push(["Content-Length", String(length ?? 0)]);
+      pairs.push(["Connection", "close"]);
+      const head = `${request.method} ${url.pathname}${url.search} HTTP/1.1\r\n${pairs.map((pair) => pair.join(": ")).join("\r\n")}\r\n\r\n`;
+      if (head.length > CHUNK_SIZE)
+        throw new TypeError("HTTP request headers exceed 64 KiB");
+      const parser = new HttpResponseParser(request.method);
       const id = randomId();
-      const connection = new CapacitorNativeConnection(id, call, chunkSize);
-      const { encodeResponseBody } = request;
-      const opening = call("CapacitorWorkers", "networkOpen", {
-        id,
-        url: request.url,
-        method: request.method,
-        headers: request.headers,
-        hasBody: request.hasBody,
-        encodeResponseBody,
-      });
-      opening.then(
-        (result) => connection.settleHeaders(result),
-        (reason) => {
-          connection.failHeaders(reason);
-          void connection.close().catch(() => {});
+      let closing: Promise<void> | undefined;
+      let ended = false,
+        sent = 0;
+      const close = () =>
+        (closing ??= Promise.resolve().then(async () => {
+          parser.dispose();
+          await call("CapacitorWorkers", "socketClose", { id });
+        }));
+      const opening = Promise.resolve()
+        .then(() =>
+          call("CapacitorWorkers", "socketOpen", {
+            id,
+            host: url.hostname.replace(/^\[|\]$/g, ""),
+            port: Number(url.port || (url.protocol === "https:" ? 443 : 80)),
+            tls: url.protocol === "https:",
+          }),
+        )
+        .then(async () => {
+          if (closing) {
+            await call("CapacitorWorkers", "socketClose", { id });
+            throw new Error("HTTP connection closed");
+          }
+        });
+      const writeBytes = async (bytes: Uint8Array) => {
+        await opening;
+        for (let offset = 0; offset < bytes.length; offset += CHUNK_SIZE) {
+          if (closing) throw new Error("HTTP connection closed");
+          await call("CapacitorWorkers", "socketWrite", {
+            id,
+            chunk: encode(bytes.subarray(offset, offset + CHUNK_SIZE)),
+          });
+        }
+      };
+      const ready = writeBytes(Uint8Array.from(head, (c) => c.charCodeAt(0)));
+      const pull = async () => {
+        const result = (await call("CapacitorWorkers", "socketRead", {
+          id,
+          maxBytes: chunkSize,
+        })) as { chunk?: string; eof?: boolean; reset?: boolean };
+        if (closing) throw new Error("HTTP connection closed");
+        if (!result || result.reset)
+          throw new TypeError("HTTP connection reset");
+        if (result.eof) {
+          // Network.framework may report missing TLS close_notify as clean EOF.
+          // Never authenticate a close-delimited HTTPS body using that signal.
+          if (url.protocol === "https:" && !parser.complete)
+            throw new TypeError(
+              "TLS EOF without complete HTTP response framing",
+            );
+          parser.finish();
+        } else if (typeof result.chunk === "string") {
+          const bytes = decode(result.chunk);
+          if (!bytes.length) throw new TypeError("Empty socket read");
+          parser.feed(bytes);
+        } else throw new TypeError("Invalid socket read result");
+      };
+      const headers = (async () => {
+        await ready;
+        while (!parser.head) await pull();
+        return parser.head;
+      })();
+      void headers.catch(() => close().catch(() => {}));
+      return {
+        headers,
+        async write(bytes) {
+          await ready;
+          if (!(bytes instanceof Uint8Array))
+            throw new TypeError("Write chunk must be a Uint8Array");
+          if (parser.complete) return; // A completed response cancels further upload.
+          if (ended || closing) throw new Error("HTTP upload is closed");
+          sent += bytes.length;
+          if (length !== undefined && sent > length)
+            throw new TypeError("Request exceeds Content-Length");
+          if (!request.hasBody && bytes.length)
+            throw new TypeError("Request has no body");
+          for (let offset = 0; offset < bytes.length; offset += CHUNK_SIZE) {
+            const part = bytes.subarray(offset, offset + CHUNK_SIZE);
+            try {
+              if (chunked)
+                await writeBytes(
+                  new TextEncoder().encode(`${part.length.toString(16)}\r\n`),
+                );
+              await writeBytes(part);
+              if (chunked) await writeBytes(new Uint8Array([13, 10]));
+            } catch (error) {
+              if (!parser.complete) throw error;
+              return;
+            }
+          }
         },
-      );
-      return connection;
+        async end() {
+          await ready;
+          if (parser.complete || ended) return;
+          ended = true;
+          if (length !== undefined && sent !== length)
+            throw new TypeError("Request does not match Content-Length");
+          try {
+            if (chunked)
+              await writeBytes(new TextEncoder().encode("0\r\n\r\n"));
+          } catch (error) {
+            if (!parser.complete) throw error;
+          }
+          // HTTP framing ends the request; do not half-close TLS before response.
+        },
+        async read() {
+          await headers;
+          while (!parser.chunks.length && !parser.complete) await pull();
+          return parser.chunks.shift() ?? null;
+        },
+        close,
+      };
     },
   };
 }
-
-/** Default native network using the Capacitor host bridge. */
 export const nativeNetwork: NativeNetwork = {
   open(request) {
     return createNativeNetwork().open(request);

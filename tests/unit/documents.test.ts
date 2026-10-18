@@ -233,3 +233,52 @@ it("disposal waits for a pending SW registration and removes it after it resolve
   expect((await ready).message).toContain("disposed");
   expect(s.registration.unregister).toHaveBeenCalled();
 });
+
+it.each([301, 302, 303, 307, 308])(
+  "prepares native navigation in JS for status %i",
+  async (status) => {
+    runtime = capacitorWorkers({
+      ...options,
+      worker: {
+        fetch: () =>
+          new Response(null, {
+            status,
+            headers: { location: "/end?q=1#section" },
+          }),
+      },
+    });
+    await runtime.ready;
+    const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+    const input = {
+      url: "capacitor://localhost/begin",
+      method: "POST",
+      headers: {
+        "content-type": "text/plain",
+        "content-language": "ja",
+        "x-keep": "yes",
+      },
+      body: btoa("payload"),
+      document: true,
+      follow: false,
+    };
+    const result = await dispatch(input);
+    const changesMethod = [301, 302, 303].includes(status);
+    expect(result.navigation).toMatchObject({
+      url: "capacitor://localhost/end?q=1#section",
+      method: changesMethod ? "GET" : "POST",
+    });
+    expect(result.navigation.body).toBe(
+      changesMethod ? undefined : btoa("payload"),
+    );
+    expect(result.navigation.headers["content-type"]).toBe(
+      changesMethod ? undefined : "text/plain",
+    );
+    expect(result.navigation.headers["content-language"]).toBe(
+      changesMethod ? undefined : "ja",
+    );
+    expect(result.navigation.headers["x-keep"]).toBe("yes");
+    await expect(dispatch({ ...input, redirectCount: 20 })).rejects.toThrow(
+      "Too many redirects",
+    );
+  },
+);

@@ -13,12 +13,7 @@ public final class CapacitorWorkersPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "socketWrite", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "socketEnd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "socketRead", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "socketClose", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "networkOpen", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "networkWrite", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "networkEnd", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "networkRead", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "networkClose", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "socketClose", returnType: CAPPluginReturnPromise)
     ]
     private var network = NetworkBridge()
     private var networkLifecycle: NetworkLifecycle?
@@ -75,11 +70,6 @@ public final class CapacitorWorkersPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func socketEnd(_ call: CAPPluginCall) { network.socketEnd(call) }
     @objc func socketRead(_ call: CAPPluginCall) { network.socketRead(call) }
     @objc func socketClose(_ call: CAPPluginCall) { network.socketClose(call) }
-    @objc func networkOpen(_ call: CAPPluginCall) { network.networkOpen(call) }
-    @objc func networkWrite(_ call: CAPPluginCall) { network.networkWrite(call) }
-    @objc func networkEnd(_ call: CAPPluginCall) { network.networkEnd(call) }
-    @objc func networkRead(_ call: CAPPluginCall) { network.networkRead(call) }
-    @objc func networkClose(_ call: CAPPluginCall) { network.networkClose(call) }
     private func close() {
         guard let child = documentController else { return }
         child.close(); child.willMove(toParent: nil); child.view.removeFromSuperview(); child.removeFromParent()

@@ -9,7 +9,6 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | Status              | Meaning                                                                                                                                                 |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Complete**        | The whole declared module/API unit satisfies the acceptance gate, including its export audit, contracts, integrations, native verification and reviews. |
-| **In progress**     | Some behavior is implemented or verified, but completeness is not established. Not eligible for merge or release.                                       |
 | **Unverified**      | A dependency polyfill or host API may provide behavior, but Workers parity has not been established. Not eligible for merge or release.                 |
 | **Not implemented** | No implementation of the required behavior exists. A placeholder or empty export is not an implementation.                                              |
 | **Out of scope**    | Not a local Node compatibility feature.                                                                                                                 |
@@ -36,6 +35,16 @@ The target is Workers semantics, including its unsupported operations. A Node AP
 Sources describe current Workers behavior. For executable follow-up, use a fixed baseline: compatibility date `2026-10-17`, no extra flags, installed workerd `1.20261012.1` and Wrangler `4.151.0`. The first-batch contracts below run against this configuration. Older compatibility dates and explicit enable/disable flags require separate profiles. The overview currently enables Node compatibility by default for dates from `2026-08-04`; do not assume every profile needs an added `nodejs_compat` flag.
 
 Classification is an engineering assessment from documented behavior and current code. Evidence for implemented profiles is recorded separately below. Unknown export details remain explicit follow-up items rather than being silently marked supported.
+
+### Web/native boundary replacement
+
+HTTP serialization/parsing and document redirect policy now run in Web code.
+Native code owns TCP/TLS and WebView lifecycle operations. This replacement
+removes the previous native HTTP clients rather than retaining an unreleased
+compatibility path. See the [boundary and current local acceptance](native-boundary-audit.md)
+for implementation responsibilities, verification, and the explicit rejection of
+EOF-delimited HTTPS bodies. The acceptance records below retain their historical
+revisions; they do not certify this replacement by themselves.
 
 ### Global, transport and Node bridge acceptance
 
@@ -188,8 +197,8 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 
 ## Inventory: runtime and globals
 
-| Implementation status | Category          | API family                                                        | Class                                                | Boundary / remaining check                                                                                                                                                                                                               |
-| --------------------- | ----------------- | ----------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implementation status | Category               | API family                                                                              | Class                                                | Boundary / remaining check                                                                                                                                                                                           |
+| --------------------- | ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Complete**          | Globals           | global alias, Buffer, process                                     | B                                                    | Prefer build injection or dedicated runtime globals. `window` is not present in a Dedicated Worker.                                                                                                                                      |
 | **Complete**          | Globals           | fetch, Request/Response/Headers, encoding, abort, structuredClone | A/B/U                                                | Reuse platform objects where compatible; record Workers extensions, forbidden mutation and cross-realm behavior separately. Node inventory does not certify all Workers Web APIs.                                                        |
 | Unverified            | Web Crypto        | crypto, SubtleCrypto                                              | A/U                                                  | See crypto table. Standard object availability is not algorithm parity.                                                                                                                                                                  |
@@ -291,7 +300,7 @@ Each compatibility module owns a directory under `src/compat/<module>/`, with `i
 | `src/compat/async-hooks/index.ts`                                 | AsyncResource is undefined; ALS is not implemented.                                                                                                                                        |
 | `src/compat/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
 | `src/features/index.ts`, `testing.ts`                             | Existing typed definitions, implementation coverage and lifecycle test harness are reusable. A new abstract framework is unnecessary.                                                      |
-| Native document plugin                                            | Document rendering plus streaming HTTP(S) transport via AsyncHTTPClient/Netty. Raw TCP uses Network.framework on iOS and the existing Netty dependency on Android; no additional native package is introduced.                                                                   |
+| Native document plugin                                            | Document rendering plus native TCP/TLS only. HTTP/1.1 framing/parsing runs in JS/WASM using llhttp. iOS uses Network.framework without AsyncHTTPClient/NIO; Android uses Netty without its HTTP codec. See the native boundary document. |
 
 ## First batch: implementation evidence and remaining work
 
@@ -345,7 +354,7 @@ Earlier global/transport verification at `13261ce` (historical evidence):
   ordering and AbortSignal constructor/method ownership.
 - [Remote CI at `13261ce`](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/39007518228) passed all five jobs. The earlier first-batch certification remains `b1a58d1`.
 
-Transport dependencies and cost: iOS uses AsyncHTTPClient 1.36.2 with Swift NIO;
+Historical transport dependencies at `13261ce` (superseded by [the Web transport](native-boundary-audit.md)): iOS used AsyncHTTPClient 1.36.2 with Swift NIO;
 Android uses Netty 4.1.139.Final and requires the documented consumer Gradle
 metadata merge. Native builds require Swift 6.2/Xcode 26 and Java 21. Brotli's
 embedded decoder module is 290,193 bytes (128,819 bytes gzip) and initializes

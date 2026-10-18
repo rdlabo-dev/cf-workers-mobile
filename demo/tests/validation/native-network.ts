@@ -208,9 +208,19 @@ export async function runNativeNetwork(
   }
   if (__NETWORK_TLS__) {
     for (const [name, url, accepted] of [
-      ["valid", "https://sha256.badssl.com/", true],
-      ["untrusted", "https://self-signed.badssl.com/", false],
-      ["hostname", "https://wrong.host.badssl.com/", false],
+      ["valid", `https://${new URL(baseURL).hostname}:4204/`, true],
+      ["untrusted", `https://${new URL(baseURL).hostname}:4205/`, false],
+      ["hostname", `https://${new URL(baseURL).hostname}:4206/`, false],
+      [
+        "unclean EOF",
+        `https://${new URL(baseURL).hostname}:4204/unclean-eof`,
+        false,
+      ],
+      [
+        "clean EOF",
+        `https://${new URL(baseURL).hostname}:4204/clean-eof`,
+        false,
+      ],
     ] as const) {
       const signal = AbortSignal.timeout(15000);
       const transport = new FetchTransport(
@@ -225,13 +235,26 @@ export async function runNativeNetwork(
             body: null,
             signal,
           });
-          await response.body?.cancel();
+          const reader = response.body?.getReader();
+          if (reader) {
+            try {
+              while (!(await reader.read()).done) {
+                /* Consume framing errors. */
+              }
+            } finally {
+              reader.releaseLock();
+            }
+          }
           assert(accepted && response.status === 200);
         } catch (error) {
           if (
             accepted ||
             signal.aborted ||
-            !/certificate|ssl|tls|trust|handshake/i.test(
+            !(
+              name.endsWith("EOF")
+                ? /tls|ssl|reset|closed|eof/i
+                : /certificate|ssl|tls|trust|handshake/i
+            ).test(
               String(error).replace(/[a-z\d.-]+\.badssl\.com/gi, "endpoint"),
             )
           )

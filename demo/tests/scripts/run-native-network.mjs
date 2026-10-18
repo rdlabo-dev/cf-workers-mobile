@@ -38,6 +38,28 @@ assert.equal(
   200,
   "Start npm run test:native:network:server first",
 );
+// Trust a generated test CA only in the simulator / independent debug consumer.
+// Production plugin trust remains the platform default.
+if (process.env.NETWORK_TLS === "1") {
+  const ca = join(demo, "artifacts/network-tls/ca.pem");
+  await readFile(ca); // The local fixture server generates these certificates.
+  if (platform === "ios") {
+    run("xcrun", ["simctl", "keychain", device, "add-root-cert", ca]);
+  } else {
+    const debug = join(consumer, "android/app/src/debug");
+    await mkdir(join(debug, "res/raw"), { recursive: true });
+    await mkdir(join(debug, "res/xml"), { recursive: true });
+    await cp(ca, join(debug, "res/raw/network_test_ca.pem"));
+    await writeFile(
+      join(debug, "res/xml/network_test_security.xml"),
+      '<network-security-config><base-config cleartextTrafficPermitted="true"><trust-anchors><certificates src="system"/></trust-anchors></base-config><debug-overrides><trust-anchors><certificates src="@raw/network_test_ca"/></trust-anchors></debug-overrides></network-security-config>',
+    );
+    await writeFile(
+      join(debug, "AndroidManifest.xml"),
+      '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:networkSecurityConfig="@xml/network_test_security"/></manifest>',
+    );
+  }
+}
 run("npm", ["run", "build:native-network"], { cwd: demo });
 await rm(join(consumer, "dist"), { recursive: true, force: true });
 await cp(join(demo, "artifacts/native-network"), join(consumer, "dist"), {
@@ -166,7 +188,7 @@ try {
   );
   assert.equal(
     results.length,
-    process.env.NETWORK_TLS === "1" ? 88 : 82,
+    process.env.NETWORK_TLS === "1" ? 92 : 82,
     "Unexpected native network contract coverage",
   );
   assert.deepEqual(

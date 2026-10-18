@@ -19,34 +19,38 @@ import javax.net.ssl.*;
 
 /** One bounded, independently half-closeable byte stream per JS socket. */
 final class WorkerSockets {
+    interface Result {
+        void resolve(JSObject value);
+        void reject(String message);
+    }
     private final Map<String, Connection> connections = new ConcurrentHashMap<>();
     private EventLoopGroup group;
     private boolean stopped;
     private final class Connection extends SimpleChannelInboundHandler<ByteBuf> {
         final String id;
-        final WorkerNetwork.Result opening;
+        final Result opening;
         final ArrayDeque<byte[]> chunks = new ArrayDeque<>();
         SocketChannel channel;
-        WorkerNetwork.Result reading, watching;
+        Result reading, watching;
         int count, offset;
         boolean ready, closed, eof, ended, writing, reset;
-        Connection(String id, WorkerNetwork.Result opening) { this.id=id; this.opening=opening; }
+        Connection(String id, Result opening) { this.id=id; this.opening=opening; }
         void fail(String message) {
             if (closed) return;
             closed=true;
             if (!ready) { ready=true; opening.reject(message); }
             if (reading!=null) {
-                WorkerNetwork.Result pending=reading; reading=null;
+                Result pending=reading; reading=null;
                 // The pinned Workers transport reports peer reset as EOF.
-                if(reset) { JSObject value=new JSObject(); value.put("eof",true); pending.resolve(value); }
+                if(reset) { JSObject value=new JSObject(); value.put("eof",true); value.put("reset",true); pending.resolve(value); }
                 else pending.reject(message);
             }
-            if(watching!=null) { WorkerNetwork.Result pending=watching; watching=null; if(reset) pending.resolve(null); else pending.reject(message); }
+            if(watching!=null) { Result pending=watching; watching=null; if(reset) pending.resolve(null); else pending.reject(message); }
             chunks.clear();
             if(channel!=null) channel.close();
         }
         void notifyEnd() {
-            if(eof && chunks.isEmpty() && watching!=null) { WorkerNetwork.Result pending=watching; watching=null; pending.resolve(null); }
+            if(eof && chunks.isEmpty() && watching!=null) { Result pending=watching; watching=null; pending.resolve(null); }
         }
         void pump() {
             if(!closed && !eof && chunks.isEmpty()) channel.read();
@@ -60,7 +64,7 @@ final class WorkerSockets {
                 offset+=size; if(offset==chunk.length) { chunks.remove(); offset=0; }
             } else if(eof) value.put("eof",true);
             else { pump(); return; }
-            WorkerNetwork.Result pending=reading; reading=null; pending.resolve(value); notifyEnd(); pump();
+            Result pending=reading; reading=null; pending.resolve(value); notifyEnd(); pump();
         }
         @Override protected void channelRead0(ChannelHandlerContext context,ByteBuf input) {
             if(closed || !input.isReadable()) return;
@@ -79,7 +83,7 @@ final class WorkerSockets {
             fail("Socket failed: "+error.getMessage());
         }
     }
-    synchronized void open(String id,String host,int port,boolean tls,WorkerNetwork.Result result) {
+    synchronized void open(String id,String host,int port,boolean tls,Result result) {
         if(stopped || id==null || id.isEmpty() || connections.containsKey(id) || host==null || host.isEmpty() || port<1 || port>65535) { result.reject("Invalid socket open"); return; }
         try {
             final SSLEngine engine;
@@ -121,8 +125,8 @@ final class WorkerSockets {
     private static String authority(java.net.InetSocketAddress address) {
         String host=address.getAddress().getHostAddress(); return (host.contains(":")?"["+host+"]":host)+":"+address.getPort();
     }
-    private void perform(String id,WorkerNetwork.Result result,java.util.function.Consumer<Connection> action) { perform(id,result,false,action); }
-    private synchronized void perform(String id,WorkerNetwork.Result result,boolean allowReset,java.util.function.Consumer<Connection> action) {
+    private void perform(String id,Result result,java.util.function.Consumer<Connection> action) { perform(id,result,false,action); }
+    private synchronized void perform(String id,Result result,boolean allowReset,java.util.function.Consumer<Connection> action) {
         if(id==null) { result.reject("Missing socket handle"); return; }
         Connection connection=connections.get(id);
         if(connection==null) { result.reject("Unknown socket handle"); return; }
@@ -130,22 +134,23 @@ final class WorkerSockets {
             if((connection.closed && !(allowReset && connection.reset)) || !connection.ready) result.reject("Socket is not connected"); else action.accept(connection);
         });
     }
-    void watch(String id,WorkerNetwork.Result result) {
+    void watch(String id,Result result) {
         perform(id,result,true,connection -> {
             if(connection.reset) { result.resolve(null); return; }
             if(connection.watching!=null) { result.reject("Socket watch already pending"); return; }
             connection.watching=result; connection.notifyEnd();
         });
     }
-    void read(String id,int count,WorkerNetwork.Result result) {
+    void read(String id,int count,Result result) {
         if(count<1 || count>65536) { result.reject("Invalid socket read size"); return; }
         perform(id,result,true,connection -> {
-            if(connection.reset) { JSObject value=new JSObject(); value.put("eof",true); result.resolve(value); return; }
+            if(connection.reset) { JSObject value=new JSObject(); value.put("eof",true); value.put("reset",true); result.resolve(value); return; }
             if(connection.reading!=null) { result.reject("Socket read already pending"); return; }
             connection.reading=result; connection.count=count; connection.drain();
         });
     }
-    void write(String id,String encoded,WorkerNetwork.Result result) {
+    void write(String id,String encoded,Result result) {
+        if(encoded == null || encoded.length() > 87384) { result.reject("Invalid socket chunk size"); return; }
         final byte[] chunk;
         try { chunk=Base64.decode(encoded,Base64.DEFAULT); } catch(Exception error) { result.reject("Invalid socket chunk"); return; }
         if(chunk.length>65536) { result.reject("Socket chunk exceeds limit"); return; }
@@ -158,7 +163,7 @@ final class WorkerSockets {
             });
         });
     }
-    void end(String id,WorkerNetwork.Result result) {
+    void end(String id,Result result) {
         perform(id,result,true,connection -> {
             if(connection.reset) { result.resolve(null); return; }
             if(connection.writing) { result.reject("Socket write still pending"); return; }
@@ -169,7 +174,7 @@ final class WorkerSockets {
             });
         });
     }
-    synchronized void close(String id,WorkerNetwork.Result result) {
+    synchronized void close(String id,Result result) {
         if(id==null) { result.reject("Missing socket handle"); return; }
         Connection connection=connections.remove(id);
         if(connection==null) { result.resolve(null); return; }

@@ -12,7 +12,7 @@ it("public disposal waits for native close before permitting a new runtime", asy
     release = resolve;
   });
   const call = vi.fn<NativeCall>((_, method) =>
-    method === "networkOpen" ? new Promise(() => {}) : closed,
+    method === "socketOpen" ? new Promise(() => {}) : closed,
   );
   vi.stubGlobal("Capacitor", {
     nativePromise: call,
@@ -39,7 +39,7 @@ it("public disposal waits for native close before permitting a new runtime", asy
   release();
   await disposed;
   expect(
-    call.mock.calls.filter(([, method]) => method === "networkClose"),
+    call.mock.calls.filter(([, method]) => method === "socketClose"),
   ).toHaveLength(1);
   const replacement = capacitorWorkers(options);
   await replacement.dispose();
@@ -106,18 +106,14 @@ it("accepts Requests created before installation and Responses from a saved cons
 it("routes public native outbound fetch through the owned byte transport", async () => {
   let read = 0;
   const call = vi.fn<NativeCall>(async (_, method) => {
-    if (method === "networkOpen")
-      return {
-        status: 200,
-        statusText: "OK",
-        headers: [
-          ["set-cookie", "a=1"],
-          ["set-cookie", "b=2"],
-        ],
-        hasBody: true,
-      };
-    if (method === "networkRead")
-      return read++ ? { eof: true } : { chunk: btoa("native response") };
+    if (method === "socketRead")
+      return read++
+        ? { eof: true }
+        : {
+            chunk: btoa(
+              "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nContent-Length: 15\r\n\r\nnative response",
+            ),
+          };
   });
   vi.stubGlobal("Capacitor", {
     nativePromise: call,
@@ -133,13 +129,13 @@ it("routes public native outbound fetch through the owned byte transport", async
     expect(response.headers.getSetCookie()).toEqual(["a=1", "b=2"]);
     expect(await response.text()).toBe("native response");
     expect(
-      call.mock.calls.find(([, method]) => method === "networkOpen")?.[2].url,
-    ).toBe("https://upstream.invalid/path");
+      call.mock.calls.find(([, method]) => method === "socketOpen")?.[2].host,
+    ).toBe("upstream.invalid");
   } finally {
     await runtime.dispose();
   }
   expect(
-    call.mock.calls.filter(([, method]) => method === "networkClose"),
+    call.mock.calls.filter(([, method]) => method === "socketClose"),
   ).toHaveLength(1);
 });
 

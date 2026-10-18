@@ -88,7 +88,6 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     weak var page: WKWebView?
     var documentURL: URL?
     private var documentTasks = Set<String>()
-    private var requests: [String: [String: Any]] = [:]
     private var redirects = 0
     private var fetchReplies: [String: (Any?, String?) -> Void] = [:]
     private var fetchRequests: [String: [String: Any]] = [:]
@@ -108,7 +107,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     func close() {
         closed = true
         for task in tasks.values { task.didFailWithError(URLError(.cancelled)) }
-        tasks.removeAll(); requests.removeAll(); documentTasks.removeAll()
+        tasks.removeAll(); documentTasks.removeAll()
         for reply in fetchReplies.values { reply(nil, "Document runtime disposed") }
         fetchReplies.removeAll(); fetchRequests.removeAll()
     }
@@ -124,7 +123,6 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         if ready { dispatch(id, task) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
             if let expired = self?.tasks.removeValue(forKey: id) {
-                self?.requests.removeValue(forKey: id)
                 self?.documentTasks.remove(id)
                 expired.didFailWithError(URLError(.timedOut))
             }
@@ -133,7 +131,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {
         guard handles(task) else { assets.webView(webView, stop: task); return }
         for (id, current) in tasks where current === task {
-            tasks.removeValue(forKey: id); requests.removeValue(forKey: id); documentTasks.remove(id)
+            tasks.removeValue(forKey: id); documentTasks.remove(id)
         }
     }
     private func dispatch(_ id: String, _ task: WKURLSchemeTask) {
@@ -158,7 +156,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
             }
             request["body"] = data.base64EncodedString()
         }
-        requests[id] = request
+        request["redirectCount"] = redirects
         request["follow"] = !documentTasks.contains(id)
         execute(request) { [weak self] result in
             guard let self = self, !self.closed else { return }
@@ -171,7 +169,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         }
     }
     private func fail(_ id: String, _ error: Error) {
-        requests.removeValue(forKey: id); documentTasks.remove(id)
+        if documentTasks.remove(id) != nil { redirects = 0 }
         tasks.removeValue(forKey: id)?.didFailWithError(error)
     }
 
@@ -214,22 +212,22 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
               let encoded = result["body"] as? String, let body = Data(base64Encoded: encoded) else { return }
         tasks.removeValue(forKey: id)
         let isDocument = documentTasks.remove(id) != nil
-        let original = requests.removeValue(forKey: id) ?? [:]
-        if isDocument && [301, 302, 303, 307, 308].contains(status), let location = headers["location"], let url = URL(string: location) {
-            redirects += 1
-            guard redirects <= 20, isLocal(url) else {
+        if isDocument, let navigation = result["navigation"] as? [String: Any] {
+            guard let address = navigation["url"] as? String, let url = URL(string: address), isLocal(url),
+                  let method = navigation["method"] as? String,
+                  let requestHeaders = navigation["headers"] as? [String: String] else {
                 redirects = 0
-                task.didFailWithError(URLError(.httpTooManyRedirects))
+                task.didFailWithError(URLError(.cannotParseResponse))
                 return
             }
+            redirects += 1
             var next = URLRequest(url: url)
-            let method = original["method"] as? String ?? "GET"
-            let becomesGET = ((status == 301 || status == 302) && method == "POST") || (status == 303 && method != "GET" && method != "HEAD")
-            next.httpMethod = becomesGET ? "GET" : method
-            next.allHTTPHeaderFields = original["headers"] as? [String: String]
-            if becomesGET {
-                for name in ["Content-Type", "Content-Length", "Content-Encoding", "Content-Language", "Content-Location"] { next.setValue(nil, forHTTPHeaderField: name) }
-            } else if let encoded = original["body"] as? String { next.httpBody = Data(base64Encoded: encoded) }
+            next.httpMethod = method
+            next.allHTTPHeaderFields = requestHeaders
+            if let encoded = navigation["body"] as? String {
+                guard let bytes = Data(base64Encoded: encoded) else { task.didFailWithError(URLError(.cannotDecodeRawData)); return }
+                next.httpBody = bytes
+            }
             // Finish no intermediate document: replace the provisional load with
             // a new native request, preserving POST for 307/308.
             task.didFailWithError(URLError(.cancelled))

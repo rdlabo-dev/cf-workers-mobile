@@ -288,7 +288,14 @@ Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`,
 
 ### Native demo
 
-The native HTTP transport requires Xcode 26 / Swift 6.2 or newer and Java 21.
+The native build requires Xcode 26 / Swift 6.2 or newer and Java 21.
+HTTP/1.1 request framing and response parsing run in JavaScript/WebAssembly.
+The native plugin provides TCP/TLS byte I/O and WebView integration; iOS uses
+Network.framework without AsyncHTTPClient or Swift NIO. Android uses Netty for
+TCP/TLS, without its HTTP codec.
+HTTPS response bodies require Content-Length or chunked framing; EOF-delimited
+HTTPS bodies fail explicitly because the native byte bridge cannot distinguish
+authenticated closure from truncation. See [the native boundary](docs/native-boundary-audit.md).
 For Android, add the following resource rules inside `android {}` in the application's
 `android/app/build.gradle` (already present in the demo):
 
@@ -330,7 +337,7 @@ The [Node.js compatibility inventory](docs/node-compatibility-inventory.md) sepa
 
 - Workers HTTP request/response streaming and native TCP are covered by shared contracts. File serving, WebSockets, other Node modules and async context propagation require their own compatibility work; the inventory records their status. The compatibility layer is not a general Node runtime.
 - `passThroughOnException`, WorkerEntrypoint/RPC and Service Worker format are unsupported. Workers-specific Request fields are covered only where stated in the compatibility inventory; `Request.cf` is preserved locally and is not populated with Cloudflare network metadata. Worker evaluation must not fetch its own local endpoints before installation.
-- CapacitorHttp's fetch patch is not tested; leave it disabled for this PoC. The package includes native HTTP/TCP transport and document integration sources (iOS SPM / Android Gradle). A plain browser uses browser Fetch; native document rendering requires Capacitor.
+- CapacitorHttp's fetch patch is not tested; leave it disabled for this PoC. The package includes native TCP/TLS transport and document integration sources (iOS SPM / Android Gradle). A plain browser uses browser Fetch; native document rendering requires Capacitor.
 
 ### Security and network boundaries
 

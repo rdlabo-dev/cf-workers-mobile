@@ -40,9 +40,9 @@ final class SocketBridge: @unchecked Sendable {
         value.buffer = Data()
         value.opening?(.failure(error)); value.opening = nil
         // The pinned Workers transport reports peer reset as EOF to readers.
-        value.reading?(value.reset ? .success(["eof": true]) : .failure(error)); value.reading = nil
+        value.reading?(value.reset ? .success(["eof": true, "reset": true]) : .failure(error)); value.reading = nil
         value.writing?(.failure(error)); value.writing = nil
-        value.watching?(value.reset ? .success([:]) : .failure(error)); value.watching = nil
+        value.watching?(value.reset ? .success(["reset": true]) : .failure(error)); value.watching = nil
         if value.cancelled { finishClose(value) } else { value.transport.cancel() }
     }
     private func finishClose(_ value: Connection) {
@@ -78,7 +78,7 @@ final class SocketBridge: @unchecked Sendable {
                     let remote = host.contains(":") ? "[\(host)]:\(port)" : "\(host):\(port)"
                     value.opening?(.success(["remoteAddress": remote])); value.opening = nil
                     self.pump(value)
-                case .failed(let error):
+                case .waiting(let error), .failed(let error):
                     // Once EOF and the final send have completed, a late
                     // NW failure must not erase the EOF waiting for JS.
                     if value.eof && value.ended { value.transport.cancel(); return }
@@ -91,7 +91,7 @@ final class SocketBridge: @unchecked Sendable {
     }
     func watch(id: String, completion: @escaping Completion) {
         queue.async {
-            if let value = self.values[id], value.reset { completion(.success([:])); return }
+            if let value = self.values[id], value.reset { completion(.success(["reset": true])); return }
             guard let value = self.values[id], !value.closed, value.ready else { completion(.failure(Failure.closed)); return }
             guard value.watching == nil else { completion(.failure(Failure.busy)); return }
             if value.eof && value.buffer.isEmpty { completion(.success([:])); return }
@@ -130,7 +130,7 @@ final class SocketBridge: @unchecked Sendable {
     func read(id: String, count: Int, completion: @escaping Completion) {
         queue.async {
             guard count > 0, count <= 65536 else { completion(.failure(Failure.invalid)); return }
-            if let value = self.values[id], value.reset { completion(.success(["eof": true])); return }
+            if let value = self.values[id], value.reset { completion(.success(["eof": true, "reset": true])); return }
             guard let value = self.values[id], !value.closed, value.ready else { completion(.failure(Failure.closed)); return }
             guard value.reading == nil else { completion(.failure(Failure.busy)); return }
             value.reading = completion; value.readCount = count
@@ -139,7 +139,7 @@ final class SocketBridge: @unchecked Sendable {
     }
     func write(id: String, data: Data?, end: Bool, completion: @escaping Completion) {
         queue.async {
-            if end, let value = self.values[id], value.reset { completion(.success([:])); return }
+            if end, let value = self.values[id], value.reset { completion(.success(["reset": true])); return }
             guard let value = self.values[id], !value.closed, value.ready else { completion(.failure(Failure.closed)); return }
             guard value.writing == nil else { completion(.failure(Failure.busy)); return }
             if value.ended { completion(end ? .success([:]) : .failure(Failure.closed)); return }

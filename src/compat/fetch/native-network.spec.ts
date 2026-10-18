@@ -1,236 +1,169 @@
 import { describe, expect, it, vi } from "vitest";
 import { createNativeNetwork, type NativeCall } from "./native-network.js";
-
-type MockCall = {
-  plugin: string;
-  method: string;
-  args: Record<string, unknown>;
-  resolve: (value: unknown) => void;
-  reject: (reason: unknown) => void;
+const request = {
+  url: "https://example.invalid/path?q=1",
+  method: "GET",
+  headers: [] as [string, string][],
+  hasBody: false,
 };
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((yes, no) => {
-    resolve = yes;
-    reject = no;
+function bridge(
+  parts: Array<{ chunk?: string; eof?: boolean; reset?: boolean }>,
+) {
+  const call = vi.fn<NativeCall>(async (_, method) => {
+    if (method === "socketRead") return parts.shift() ?? { eof: true };
   });
-  return { promise, resolve, reject };
+  return { call, network: createNativeNetwork({ nativeCall: call }) };
 }
-
-function base64Of(bytes: number[]): string {
-  return btoa(String.fromCharCode(...bytes));
-}
-
-function createMockNativeCall(): {
-  call: NativeCall;
-  calls: MockCall[];
-  release: () => void;
-} {
-  const calls: MockCall[] = [];
-  const pending = new Map<
-    string,
-    { resolve: (value: unknown) => void; reject: (reason: unknown) => void }
-  >();
-  let counter = 0;
-  const call: NativeCall = (
-    plugin: string,
-    method: string,
-    args: Record<string, unknown>,
-  ) => {
-    const id = `${method}-${counter++}`;
-    const { promise, resolve, reject } = deferred<unknown>();
-    pending.set(id, { resolve, reject });
-    calls.push({ plugin, method, args, resolve, reject });
-    return promise;
-  };
-  const release = () => {
-    for (const { reject } of pending.values()) {
-      reject(new Error("Native bridge released"));
-    }
-    pending.clear();
-  };
-  return { call, calls, release };
-}
-
-describe("createNativeNetwork", () => {
-  it("rejects unsupported URL schemes", async () => {
-    const network = createNativeNetwork({ nativeCall: vi.fn() });
-    await expect(
-      network.open({
-        url: "ftp://example.invalid",
-        method: "GET",
-        headers: [],
-        hasBody: false,
-      }),
-    ).rejects.toThrow("only supports HTTP(S)");
-  });
-
-  it("rejects malformed methods and headers", async () => {
-    const network = createNativeNetwork({ nativeCall: vi.fn() });
-    await expect(
-      network.open({
-        url: "https://example.invalid",
-        method: "GET\r\nInjected: 1",
-        headers: [],
-        hasBody: false,
-      }),
-    ).rejects.toThrow("line breaks");
-    await expect(
-      network.open({
-        url: "https://example.invalid",
-        method: "GET",
-        headers: [["Host", "example\r\nInjected: 1"]],
-        hasBody: false,
-      }),
-    ).rejects.toThrow("line breaks");
-  });
-
-  it("returns a connection whose headers resolve independently of the body", async () => {
-    const { call, calls } = createMockNativeCall();
-    const network = createNativeNetwork({ nativeCall: call });
-    const connection = await network.open({
-      url: "https://example.invalid",
-      method: "POST",
-      headers: [["Content-Type", "application/octet-stream"]],
-      hasBody: true,
-    });
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toMatchObject({
-      plugin: "CapacitorWorkers",
-      method: "networkOpen",
-      args: {
-        url: "https://example.invalid",
-        method: "POST",
-        headers: [["Content-Type", "application/octet-stream"]],
-        hasBody: true,
-      },
-    });
-    expect(typeof calls[0]!.args.id).toBe("string");
-
-    const headers = connection.headers;
-    const settle = vi.fn();
-    void headers.then(settle);
-    expect(settle).not.toHaveBeenCalled();
-
-    calls[0]!.resolve({
-      status: 200,
-      statusText: "OK",
-      headers: [
-        ["set-cookie", "a=1"],
-        ["set-cookie", "b=2"],
-      ],
-      hasBody: true,
-    });
-
-    const result = await headers;
-    expect(result.status).toBe(200);
-    expect(result.headers).toEqual([
-      ["set-cookie", "a=1"],
-      ["set-cookie", "b=2"],
+const chunk = (text: string) => ({ chunk: btoa(text) });
+describe("HTTP over native bytes", () => {
+  it("continues bounded upload after response headers until the response completes", async () => {
+    const { call, network } = bridge([
+      chunk("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n"),
+      chunk("hello"),
     ]);
-  });
-
-  it("encodes write chunks and decodes read chunks", async () => {
-    const { call, calls } = createMockNativeCall();
-    const network = createNativeNetwork({ nativeCall: call, chunkSize: 16 });
     const connection = await network.open({
-      url: "https://example.invalid",
+      ...request,
       method: "POST",
-      headers: [],
       hasBody: true,
     });
-
-    const writePromise = connection.write(new Uint8Array([1, 2, 3, 4]));
-    await vi.waitFor(() => expect(calls).toHaveLength(2));
-    expect(calls[1]).toMatchObject({
-      plugin: "CapacitorWorkers",
-      method: "networkWrite",
-      args: { chunk: base64Of([1, 2, 3, 4]) },
-    });
-
-    calls[1]!.resolve(undefined);
-    await writePromise;
-
-    const readPromise = connection.read();
-    await vi.waitFor(() => expect(calls).toHaveLength(3));
-    expect(calls[2]).toMatchObject({
-      plugin: "CapacitorWorkers",
-      method: "networkRead",
-      args: { maxBytes: 16 },
-    });
-    calls[2]!.resolve({ chunk: base64Of([5, 6]) });
-    const chunk = await readPromise;
-    expect([...(chunk as Uint8Array)]).toEqual([5, 6]);
-
-    const eofPromise = connection.read();
-    await vi.waitFor(() => expect(calls).toHaveLength(4));
-    calls[3]!.resolve({ eof: true });
-    expect(await eofPromise).toBe(null);
+    await connection.headers;
+    await connection.write(new Uint8Array(131073).fill(65));
+    await connection.end();
+    const writes = call.mock.calls
+      .filter(([, method]) => method === "socketWrite")
+      .map(([, , args]) => atob(args.chunk as string));
+    expect(writes.every((value) => value.length <= 65536)).toBe(true);
+    expect(
+      writes
+        .filter((value) => /^A+$/.test(value))
+        .reduce((sum, value) => sum + value.length, 0),
+    ).toBe(131073);
+    expect(new TextDecoder().decode((await connection.read())!)).toBe("hello");
+    expect(await connection.read()).toBeNull();
+    await connection.close();
   });
-
-  it("awaits one native close and propagates cleanup failure", async () => {
-    const { call, calls } = createMockNativeCall();
-    const network = createNativeNetwork({ nativeCall: call });
+  it.each([
+    { ...request, url: "ftp://example.invalid" },
+    { ...request, method: "GET\r\nInjected: 1" },
+    {
+      ...request,
+      headers: [["Host", "a\r\nInjected: 1"]] as [string, string][],
+    },
+    { ...request, headers: [["Content-Length", "5x"]] as [string, string][] },
+  ])("rejects invalid request before opening a socket %#", async (value) => {
+    const { call, network } = bridge([]);
+    await expect(network.open(value)).rejects.toThrow();
+    expect(call).not.toHaveBeenCalled();
+  });
+  it("parses headers independently of upload and preserves raw body bytes", async () => {
+    const { call, network } = bridge([
+      chunk(
+        "HTTP/1.1 200 OK\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nContent-Length: 2\r\n\r\n\x00\xff",
+      ),
+    ]);
     const connection = await network.open({
-      url: "https://example.invalid",
-      method: "GET",
-      headers: [],
-      hasBody: false,
+      ...request,
+      method: "POST",
+      hasBody: true,
     });
-    const closePromise = connection.close();
-    await vi.waitFor(() =>
-      expect(calls.some((c) => c.method === "networkClose")).toBe(true),
+    expect((await connection.headers).headers).toContainEqual([
+      "Set-Cookie",
+      "b=2",
+    ]);
+    expect(Array.from((await connection.read())!)).toEqual([0, 255]);
+    expect(await connection.read()).toBeNull();
+    await connection.close();
+    expect(call.mock.calls[0]).toMatchObject([
+      "CapacitorWorkers",
+      "socketOpen",
+      { host: "example.invalid", port: 443, tls: true },
+    ]);
+    expect(
+      call.mock.calls.filter(([, method]) => method === "socketClose"),
+    ).toHaveLength(1);
+  });
+  it("serializes chunked uploads in bounded socket writes", async () => {
+    let deliver!: (result: unknown) => void;
+    const response = new Promise((resolve) => {
+      deliver = resolve;
+    });
+    const call = vi.fn<NativeCall>(async (_, method) =>
+      method === "socketRead" ? response : undefined,
     );
-    const repeated = connection.close();
-    expect(repeated).toBe(closePromise);
-    await Promise.resolve();
-    calls.find((c) => c.method === "networkClose")!.reject(new Error("closed"));
-    await expect(closePromise).rejects.toThrow("closed");
-    await expect(repeated).rejects.toThrow("closed");
-    await expect(connection.headers).rejects.toThrow("connection is closed");
-    const closeCalls = calls.filter((c) => c.method === "networkClose");
-    expect(closeCalls).toHaveLength(1);
-  });
-
-  it("forwards encodeResponseBody to the native open call", async () => {
-    const { call, calls } = createMockNativeCall();
-    const network = createNativeNetwork({ nativeCall: call });
-    const request = {
-      url: "https://example.invalid",
-      method: "GET",
-      headers: [],
-      hasBody: false,
-      encodeResponseBody: "manual" as const,
-    };
-    await network.open(request);
-    expect(calls[0]!.args.encodeResponseBody).toBe("manual");
-  });
-
-  it("rejects invalid native responses", async () => {
-    const { call, calls } = createMockNativeCall();
     const network = createNativeNetwork({ nativeCall: call });
     const connection = await network.open({
-      url: "https://example.invalid",
-      method: "GET",
-      headers: [],
-      hasBody: false,
+      ...request,
+      method: "POST",
+      hasBody: true,
     });
-    calls[0]!.resolve({ status: "bad", headers: [] });
-    await expect(connection.headers).rejects.toThrow("Invalid headers");
+    await connection.write(new Uint8Array([1, 2, 3]));
+    await connection.end();
+    const wire = call.mock.calls
+      .filter(([, method]) => method === "socketWrite")
+      .map(([, , args]) => atob(args.chunk as string))
+      .join("");
+    expect(wire).toContain("POST /path?q=1 HTTP/1.1\r\n");
+    expect(wire).toContain("Transfer-Encoding: chunked\r\n");
+    expect(wire).toContain("\r\n\r\n3\r\n\x01\x02\x03\r\n0\r\n\r\n");
+    deliver(chunk("HTTP/1.1 204 No Content\r\n\r\n"));
+    await connection.headers;
+    await connection.close();
   });
-
-  it("rejects the default bridge when Capacitor is absent", () => {
-    const original = (globalThis as typeof globalThis & { Capacitor?: unknown })
-      .Capacitor;
-    (globalThis as typeof globalThis & { Capacitor?: unknown }).Capacitor =
-      undefined;
-    try {
-      expect(() => createNativeNetwork()).toThrow("Capacitor native bridge");
-    } finally {
-      (globalThis as typeof globalThis & { Capacitor?: unknown }).Capacitor =
-        original;
-    }
+  it("rejects reset rather than treating a close-delimited body as complete", async () => {
+    const { network } = bridge([
+      chunk("HTTP/1.1 200 OK\r\n\r\nhello"),
+      { eof: true, reset: true },
+    ]);
+    const connection = await network.open(request);
+    await connection.headers;
+    await connection.read();
+    await expect(connection.read()).rejects.toThrow("reset");
+    await connection.close();
+  });
+  it.each(["http:", "https:"])(
+    "handles close-delimited %s bodies explicitly",
+    async (protocol) => {
+      const { network } = bridge([chunk("HTTP/1.1 200 OK\r\n\r\nhello")]);
+      const connection = await network.open({
+        ...request,
+        url: `${protocol}//example.invalid/`,
+      });
+      await connection.headers;
+      expect(new TextDecoder().decode((await connection.read())!)).toBe(
+        "hello",
+      );
+      if (protocol === "https:")
+        await expect(connection.read()).rejects.toThrow("TLS EOF");
+      else expect(await connection.read()).toBeNull();
+      await connection.close();
+    },
+  );
+  it("rejects truncated body", async () => {
+    const { network } = bridge([
+      chunk("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhi"),
+    ]);
+    const connection = await network.open(request);
+    await connection.headers;
+    await connection.read();
+    await expect(connection.read()).rejects.toThrow();
+    await connection.close();
+  });
+  it("awaits idempotent native cleanup and propagates its failure", async () => {
+    const { call, network } = bridge([
+      chunk("HTTP/1.1 204 No Content\r\n\r\n"),
+    ]);
+    const connection = await network.open(request);
+    await connection.headers;
+    call.mockImplementation(async (_, method) => {
+      if (method === "socketClose") throw Error("cleanup");
+    });
+    const closing = connection.close();
+    expect(connection.close()).toBe(closing);
+    await expect(closing).rejects.toThrow("cleanup");
+  });
+  it("bounds read requests and rejects invalid size", () => {
+    expect(() =>
+      createNativeNetwork({ nativeCall: vi.fn(), chunkSize: 65537 }),
+    ).toThrow();
   });
 });
