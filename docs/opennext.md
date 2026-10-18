@@ -50,15 +50,19 @@ resolve regardless of the bundle's build-time directory.
   render work (microtasks, `MessageChannel` tasks, stream pulls) see Next's
   `workUnitAsyncStorage`/`workAsyncStorage` stores.
 - **Limitation:** concurrent interleaved request contexts are not isolated.
-  Serialize dispatch for correctness. `settleRestore` semantics also diverge
-  (`getStore` returns the stale store after an awaited run). Both are declared
-  unsupported cases in the module contract, verified against pinned workerd.
+  Serialized dispatch is the caller's responsibility for correctness
+  (transport-level serialization deadlocks against nested worker
+  subrequests). `settleRestore` and nested-async restore semantics also
+  diverge from real ALS (`nestedAsyncRestore`). All are declared unsupported
+  cases in the module contract, verified against workerd. Direct-mode note:
+  propagation patching rewrites realm globals, so the isolated Worker is the
+  supported execution mode for ALS-dependent code.
 
 ## Current gaps
 
 - **Bindings:** `env.ASSETS`, KV/R2/Queue are pass-through only; supply them
   via the `env` argument or stay on `dummy` cache config.
-- **Concurrent requests** need dispatch serialization (ALS boundary above).
+- **Concurrent requests** need caller-side dispatch serialization (ALS boundary above).
 - `createRequire` loads `.json` only; executable traced files must already be
   bundled by OpenNext (they are).
 - Image optimization (`/_next/image`, `cdn-cgi`) and middleware are outside
