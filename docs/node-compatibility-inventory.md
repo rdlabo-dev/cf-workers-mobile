@@ -26,7 +26,7 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:async_hooks` / AsyncLocalStorage | **Unverified**                    | Scoped implementation at `src/compat/async-hooks/index.ts` with a 14-case contract compared against pinned workerd. Synchronous scopes, enterWith/disable, bind/snapshot, sticky single-context await propagation and AsyncResource boundaries pass locally; settle-restore and interleaved-context isolation are declared unsupported. A re-bundled OpenNext (Next 15.5) handler rendered static and dynamic routes locally with this approximation; full Workers parity is not established. |
 | `node:buffer` | **Complete** | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20). |
 | `node:timers` / `node:timers/promises` | **Complete** | Whole-module implementation and shared 30-group contract in `src/compat/timers/`. [Acceptance](#timers-acceptance) and [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) passed at `c5fb8a4`; merged as `400d022`. |
-| `node:url` | **Unverified (acceptance pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
+| `node:url` | **Unverified (CI pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Scope and evidence
@@ -600,4 +600,32 @@ in direct and Dedicated Worker execution. The vectors include Unicode-mapped
 host delimiters, pinned Bidi assignments, file localhost, UNC-like paths,
 Windows drive roots and opaque custom schemes.
 
-Local verification is in progress; remote CI remains required before Complete.
+Local acceptance on 2026-10-18 for implementation commit `b1f3f12`:
+
+| Gate | Result |
+| --- | --- |
+| Library build, root/demo typechecks and URL source formatting | Passed |
+| Unit tests | 313 passed |
+| Fixed workerd | 93 passed; all 19 URL contract groups passed |
+| Chromium/WebKit production runtime | 66 passed |
+| Vite development runtime | 20 passed |
+| Build tools | 7 build tests and 30 integration tests passed |
+| Independently installed npm tarball | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22; common features 358 passed + 6 existing ALS exclusions |
+| Hono/Express demo | 8 passed |
+| Document/form regression | 72 accepted results, including 6 existing WebKit expected failures |
+| iOS 26.1 and Android 16 WebViews | Each: 494 passed + 6 existing ALS exclusions; URL 19 direct + 19 Dedicated Worker groups passed with no URL exclusions |
+| Manager and independent acceptance reviews | Passed after correction and re-review |
+| Remote CI | Pending PR publication; required before Complete |
+
+The first native run rejected a domain that desktop browsers accepted. This
+motivated the JS parser, rather than excluding the input or adding a native
+plugin. Query interoperation and the dependency-free raw ESM path were corrected
+and re-reviewed before the final runs. Global URL recognition is isolated in
+`brand.ts`, so Web-only entrypoints do not import the Node URL parser.
+
+Both final native reports identify clean revision `b1f3f12`, the device and built
+asset fingerprints. Logs and JSON evidence are retained locally under
+`demo/artifacts/url-acceptance/` (generated, not shipped). The existing isolated
+native test consumer was reused, with freshly packed library installation and
+runtime fixture assets. No URL case is excluded; the six exclusions belong to
+the existing async-hooks unit. Remote CI remains the merge/release gate.
