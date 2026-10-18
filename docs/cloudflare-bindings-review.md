@@ -22,8 +22,17 @@ The partial implementation, public export and local policy were removed. The
 remaining unit dispatches the original HTTP request to the deployed Worker.
 The second code reviews found no additional blocking changes.
 
-Final evidence review is recorded after both reviewers inspect the committed
-harness and native reports. CI remains a separate prerequisite for merging.
+Final reviews approved candidate `9d1b869` with no outstanding required changes:
+
+- Manager reviewer: confirmed the production diff is unchanged from `48f52b9`,
+  the initial LocalAssets finding is resolved, native raw reports match the
+  committed evidence, and harness hashes match.
+- Independent acceptance reviewer: independently recalculated all six harness
+  hashes, matched both 24-case raw native reports, and approved the HTTP-dispatch
+  scope and verification evidence.
+
+This approval record is a documentation-only follow-up to that reviewed candidate.
+CI remains a separate prerequisite for merging; the PR stays draft pending CI.
 
 ## Verification
 
