@@ -1,8 +1,8 @@
-import { isRequest, isResponse } from "../compat/fetch/interop.js";
+import { isRequest, isResponse } from "../browser/fetch/interop.js";
 import {
   Request as WorkerRequest,
   type RequestInit as WorkerRequestInit,
-} from "../compat/request/index.js";
+} from "../browser/request/index.js";
 import type { FetchRuntimeOptions, WorkerContext } from "./types.js";
 export type { FetchRuntimeOptions } from "./types.js";
 

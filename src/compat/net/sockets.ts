@@ -1,5 +1,5 @@
 import { observeConsumption } from "./reader.js";
-import { getNativeCall } from "../fetch/native-network.js";
+import { getNativeCall } from "../../browser/fetch/native-network.js";
 
 export interface SocketInfo {
   localAddress?: string | null;

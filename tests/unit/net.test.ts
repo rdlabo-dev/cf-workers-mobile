@@ -9,7 +9,7 @@ it("satisfies the shared net contract", async () => {
   assertContract(await runContract(new NetImplementation(net), netContract));
 });
 import { runNetIncomingContract } from "../../src/compat/net/index.spec.js";
-import { handleAsNodeConnection } from "../../src/compat/cloudflare-node/index.js";
+import { handleAsNodeConnection } from "../../src/workers/cloudflare-node/index.js";
 it("accepts TCP through the public bridge and server", async () => {
   await runNetIncomingContract(net, (socket) =>
     handleAsNodeConnection(

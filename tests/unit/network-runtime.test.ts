@@ -3,7 +3,7 @@ import { workersCapacitor } from "../../src/index";
 import {
   createNativeNetwork,
   type NativeCall,
-} from "../../src/compat/fetch/native-network";
+} from "../../src/browser/fetch/native-network";
 
 afterEach(() => vi.unstubAllGlobals());
 it("public disposal waits for native close before permitting a new runtime", async () => {

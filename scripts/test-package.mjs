@@ -25,7 +25,7 @@ for (const module of [
   }
 }
 for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
-  const notice = `dist/compat/brotli/${name}`;
+  const notice = `dist/shared/brotli/${name}`;
   if (!pack.files.some((file) => file.path === notice))
     throw new Error(
       `Missing bundled codec license notice in tarball: ${notice}`,
@@ -60,38 +60,40 @@ for (const entry of [
 }
 // Candidate Web API contracts use internal modules from the installed tarball.
 // Never copy library implementation sources from the checkout.
-await cp(
-  join(temp, "node_modules/@rdlabo/workers-capacitor/dist/compat"),
-  join(temp, "src/compat"),
-  { recursive: true },
-);
+for (const domain of ["compat", "browser", "workers", "shared"]) {
+  await cp(
+    join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
+    join(temp, "src", domain),
+    { recursive: true },
+  );
+}
 await cp(
   join(temp, "node_modules/@rdlabo/workers-capacitor/dist/environment.js"),
   join(temp, "src/environment.js"),
 );
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
-  "path",
-  "querystring",
-  "string-decoder",
-  "buffer",
-  "http",
-  "net",
-  "headers",
-  "request",
-  "response",
-  "immediate",
-  "structured-clone",
-  "encoding",
-  "abort",
-  "async-hooks",
-  "timers",
-  "fs",
-  "module",
-  "stream-web",
-  "util",
+  "compat/path",
+  "compat/querystring",
+  "compat/string-decoder",
+  "compat/buffer",
+  "compat/http",
+  "compat/net",
+  "browser/headers",
+  "browser/request",
+  "browser/response",
+  "compat/immediate",
+  "browser/structured-clone",
+  "browser/encoding",
+  "browser/abort",
+  "compat/async-hooks",
+  "compat/timers",
+  "compat/fs",
+  "compat/module",
+  "compat/stream-web",
+  "compat/util",
 ]) {
-  const directory = join("src", "compat", module);
+  const directory = join("src", module);
   await mkdir(join(temp, directory), { recursive: true });
   await cp(
     join(directory, "index.spec.ts"),

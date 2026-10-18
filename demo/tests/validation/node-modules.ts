@@ -3,7 +3,7 @@ import {
   asyncHooksContract,
   NodeAsyncHooks,
 } from "../../../src/compat/async-hooks/index.spec";
-import { installNodeGlobals } from "../../../src/compat/globals/index";
+import { installNodeGlobals } from "../../../src/shared/globals/index";
 import {
   TimersImplementation,
   timersContract,

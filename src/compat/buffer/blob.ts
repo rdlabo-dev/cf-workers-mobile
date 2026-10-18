@@ -3,7 +3,7 @@ import {
   platform,
   nativeBlobConstructor,
   nativeFileConstructor,
-} from "../globals/platform.js";
+} from "../../shared/globals/platform.js";
 const NativeBlob = platform.Blob;
 const NativeFile = platform.File;
 const nativeSize = Object.getOwnPropertyDescriptor(

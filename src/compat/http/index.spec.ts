@@ -19,7 +19,7 @@ const {
   handleAsNodeConnection,
   handleAsNodeRequest,
   httpServerHandler,
-} = cloudflareNode as unknown as typeof import("../cloudflare-node/index.js");
+} = cloudflareNode as unknown as typeof import("../../workers/cloudflare-node/index.js");
 import {
   defineFeature,
   FeatureImplementation,

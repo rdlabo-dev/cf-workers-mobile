@@ -5,9 +5,9 @@ import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   FetchPolicyImplementation,
   fetchPolicyContract,
-} from "../../../../../src/compat/fetch/policy.spec";
-import { createFetch } from "../../../../../src/compat/fetch";
-import { Request as LocalRequest } from "../../../../../src/compat/request";
+} from "../../../../../src/browser/fetch/policy.spec";
+import { createFetch } from "../../../../../src/browser/fetch";
+import { Request as LocalRequest } from "../../../../../src/browser/request";
 
 const localFetch = createFetch({
   async fetch(request) {

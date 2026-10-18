@@ -25,7 +25,7 @@ import { markContextAware } from "../async-hooks/callbacks.js";
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import { validateFunction } from "./validation.js";
-import { dispose } from "../globals/symbols.js";
+import { dispose } from "../../shared/globals/symbols.js";
 import * as timersUtil from "../immediate/index.js";
 
 import { schedule, clear, rememberHost } from "./host.js";

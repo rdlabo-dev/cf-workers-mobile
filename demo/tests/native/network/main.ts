@@ -2,8 +2,8 @@ import { createIsolatedWorker } from "../../../../dist/isolated/bridge";
 import {
   getNativeCall,
   nativeNetwork,
-} from "../../../../dist/compat/fetch/native-network";
-import { FetchTransport } from "../../../../dist/compat/fetch/transport";
+} from "../../../../dist/browser/fetch/native-network";
+import { FetchTransport } from "../../../../dist/browser/fetch/transport";
 import { runNativeNetwork } from "../../validation/native-network";
 
 const base = /Android/.test(navigator.userAgent)

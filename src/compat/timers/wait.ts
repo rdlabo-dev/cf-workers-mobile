@@ -1,4 +1,4 @@
-import { platform } from "../globals/platform.js";
+import { platform } from "../../shared/globals/platform.js";
 import { schedule, clear } from "./host.js";
 const aborted = Object.getOwnPropertyDescriptor(
   AbortSignal.prototype,

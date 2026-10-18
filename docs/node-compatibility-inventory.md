@@ -110,15 +110,15 @@ and report API-specific test names. `globals` verifies the installation lifecycl
 
 | Responsibility | Owning tests |
 | --- | --- |
-| Fetch transport and Workers HTTP policy | [fetch/index.spec.ts](../src/compat/fetch/index.spec.ts), [fetch/policy.spec.ts](../src/compat/fetch/policy.spec.ts) |
-| Headers | [headers/index.spec.ts](../src/compat/headers/index.spec.ts) |
-| Request | [request/index.spec.ts](../src/compat/request/index.spec.ts) |
-| Response and installed body decoding | [response/index.spec.ts](../src/compat/response/index.spec.ts), [response/installation.spec.ts](../src/compat/response/installation.spec.ts) |
-| AbortController / AbortSignal and timeout installation | [abort/index.spec.ts](../src/compat/abort/index.spec.ts), [abort/installation.spec.ts](../src/compat/abort/installation.spec.ts) |
-| TextEncoder / TextDecoder | [encoding/index.spec.ts](../src/compat/encoding/index.spec.ts) |
-| structuredClone | [structured-clone/index.spec.ts](../src/compat/structured-clone/index.spec.ts) |
+| Fetch transport and Workers HTTP policy | [fetch/index.spec.ts](../src/browser/fetch/index.spec.ts), [fetch/policy.spec.ts](../src/browser/fetch/policy.spec.ts) |
+| Headers | [headers/index.spec.ts](../src/browser/headers/index.spec.ts) |
+| Request | [request/index.spec.ts](../src/browser/request/index.spec.ts) |
+| Response and installed body decoding | [response/index.spec.ts](../src/browser/response/index.spec.ts), [response/installation.spec.ts](../src/browser/response/installation.spec.ts) |
+| AbortController / AbortSignal and timeout installation | [abort/index.spec.ts](../src/browser/abort/index.spec.ts), [abort/installation.spec.ts](../src/browser/abort/installation.spec.ts) |
+| TextEncoder / TextDecoder | [encoding/index.spec.ts](../src/browser/encoding/index.spec.ts) |
+| structuredClone | [structured-clone/index.spec.ts](../src/browser/structured-clone/index.spec.ts) |
 | setImmediate / clearImmediate | [immediate/index.spec.ts](../src/compat/immediate/index.spec.ts) |
-| Global installation, ownership and restoration | [globals/index.spec.ts](../src/compat/globals/index.spec.ts), [globals/web.spec.ts](../src/compat/globals/web.spec.ts) |
+| Global installation, ownership and restoration | [globals/index.spec.ts](../src/shared/globals/index.spec.ts), [globals/web.spec.ts](../src/shared/globals/web.spec.ts) |
 
 ### Test organization follow-up (2026-10-17)
 
@@ -301,9 +301,9 @@ Each compatibility module owns a directory under `src/compat/<module>/`, with `i
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/vite.ts`, `src/esbuild.ts`                                   | Broad browser polyfills and shared overrides. General Node compatibility is not certified. esbuild maps unavailable modules to an empty object, which is not proof of Workers stub parity. |
 | `src/build/shared.ts`                                             | Shared aliases for http, net, async_hooks, path, querystring, string_decoder and Cloudflare helpers. Extend this existing boundary; avoid separate Vite/esbuild truth sources.                  |
-| `src/compat/http/index.ts`, `src/compat/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.        |
+| `src/compat/http/index.ts`, `src/workers/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.        |
 | `src/compat/async-hooks/index.ts`                                 | AsyncResource is undefined; ALS is not implemented.                                                                                                                                        |
-| `src/compat/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
+| `src/shared/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
 | `src/features/index.ts`, `testing.ts`                             | Existing typed definitions, implementation coverage and lifecycle test harness are reusable. A new abstract framework is unnecessary.                                                      |
 | Native document plugin                                            | Document rendering plus native TCP/TLS only. HTTP/1.1 framing/parsing runs in JS/WASM using llhttp. iOS uses Network.framework without AsyncHTTPClient/NIO; Android uses Netty without its HTTP codec. See the native boundary document. |
 
