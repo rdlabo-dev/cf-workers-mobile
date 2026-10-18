@@ -1,6 +1,7 @@
 // esbuild injects these imports only where a Node global is referenced.
-import { Buffer } from "node:buffer";
+// Initialize process before Buffer: its util dependency reads process during evaluation.
 import process from "node:process";
+import { Buffer } from "node:buffer";
 
 import {
   setImmediate as localSetImmediate,

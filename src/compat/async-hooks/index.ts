@@ -6,9 +6,9 @@
 // capture the context at schedule/construction time). Engine async hooks
 // (workerd) or a whole-program async transform are required for real
 // continuation isolation — concurrent interleaved request contexts are NOT
-// isolated; serialize dispatch when isolation is needed. In direct mode the
-// global patches below are shared with UI code on the same realm; the
-// isolated Worker keeps them private.
+// isolated; serialize dispatch when isolation is needed. Only patch worker
+// realms: the document's fetch adapter uses MessageChannel itself, so
+// replacing its ports can prevent responses from arriving.
 
 type Context = Map<AsyncLocalStorage<unknown>, unknown>;
 let current: Context | undefined;
@@ -277,7 +277,7 @@ export function installAsyncContextPropagation(): void {
     } as unknown as typeof MessageChannel;
   }
 }
-installAsyncContextPropagation();
+if (typeof document === "undefined") installAsyncContextPropagation();
 
 // AsyncResource is intentionally minimal: bind/runInAsyncScope capture and
 // restore this implementation's context, matching Workers' synchronous

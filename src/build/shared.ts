@@ -35,6 +35,8 @@ export function compatibilityAliases() {
     "cloudflare:workers": compatPath("cloudflare-workers"),
     "node:async_hooks": compatPath("async-hooks"),
     async_hooks: compatPath("async-hooks"),
+    "node:buffer": compatPath("buffer"),
+    buffer: compatPath("buffer"),
     "node:http": compatPath("http"),
     http: compatPath("http"),
     "node:net": compatPath("net"),

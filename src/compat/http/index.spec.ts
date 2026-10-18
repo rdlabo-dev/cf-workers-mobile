@@ -662,16 +662,18 @@ export const nodeHttpContract: ContractSuite<typeof nodeHttpFeature> = {
       equal((failure as Error & { code?: string }).code, "ECONNRESET");
       equal(failure.message, "socket hang up");
       await close;
-      const invalid = new ClientRequest({ host: "invalid host" });
-      const invalidError = new Promise<Error>((resolve) =>
-        invalid.once("error", resolve),
-      );
-      const invalidClose = new Promise<void>((resolve) =>
-        invalid.once("close", resolve),
-      );
-      invalid.end();
-      equal((await invalidError).name, "TypeError");
-      await invalidClose;
+      for (const host of ["invalid host", "invalid%20host"]) {
+        const invalid = new ClientRequest({ host });
+        const invalidError = new Promise<Error>((resolve) =>
+          invalid.once("error", resolve),
+        );
+        const invalidClose = new Promise<void>((resolve) =>
+          invalid.once("close", resolve),
+        );
+        invalid.end();
+        equal((await invalidError).name, "TypeError");
+        await invalidClose;
+      }
       const mutated = new ClientRequest("http://example.test/");
       mutated.path = "//other.test/a";
       const pathError = new Promise<Error>((resolve) =>

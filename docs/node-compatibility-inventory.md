@@ -22,6 +22,7 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:net` | **Complete** | [Module contract](../src/compat/net/index.spec.ts): all 17 named exports, logical ports, Socket/Server behavior and native TCP in direct/Worker execution. Accepted at `35316ae`. |
 | Node global injection                  | **Complete**                      | Pre-evaluation Node globals, owned Web globals and native Fetch passed shared/native contracts, packed-consumer gates, reviews and CI at 13261ce. Module-scope extensions require configured/lazy loading.    |
 | `node:async_hooks` / AsyncLocalStorage | **Unverified**                    | Scoped implementation at `src/compat/async-hooks/index.ts` with a 14-case contract compared against pinned workerd. Synchronous scopes, enterWith/disable, bind/snapshot, sticky single-context await propagation and AsyncResource boundaries pass locally; settle-restore and interleaved-context isolation are declared unsupported. A re-bundled OpenNext (Next 15.5) handler rendered static and dynamic routes locally with this approximation; full Workers parity is not established. |
+| `node:buffer` | **Unverified (CI pending)** | Whole-module implementation and local acceptance are recorded in [Buffer acceptance](#buffer-acceptance). Remote CI is required before marking Complete. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Scope and evidence
@@ -152,7 +153,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Implementation status | Category             | API family                                                                         | Class                      | Implementation boundary / remaining check                                                                                                                                                            |
 | --------------------- | -------------------- | ---------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unverified            | Assertion testing    | `assert`, `assert/strict`, equality, throws/rejects                                | A                          | JS comparison and exception handling. Deep comparison involving engine-only inspection is U; test cross-realm values and error shapes.                                                               |
-| Unverified            | Buffer               | `Buffer.from/alloc/concat`, encoding, reads/writes, views                          | A                          | Typed arrays and JS codecs; test shared backing memory and byte offsets.                                                                                                                             |
+| **Unverified (CI pending)** | Buffer | Entire pinned export/static/prototype surface, Blob/File and transcode | A | [Whole-module local acceptance](#buffer-acceptance); remote CI pending.                                                                                                                             |
 | **Complete**          | Buffer globals       | unqualified `Buffer`                                                               | B                          | Inject before application/dependency evaluation; imports and global must use the same implementation.                                                                                                |
 | Unverified            | Events               | `EventEmitter`, `once`, `on`, listener bookkeeping                                 | A                          | Preserve ordering, error events, cancellation and iterator cleanup.                                                                                                                                  |
 | Not implemented       | Events + context     | `EventEmitterAsyncResource` where exposed                                          | U                          | Depends on the async context decision; do not claim parity from EventEmitter alone.                                                                                                                  |
@@ -409,3 +410,86 @@ Completed units do not certify other modules or the entire package.
 The inventory stage is complete when every overview category and stub has a route or an explicit unresolved question, as above. **Full implementation completion is a different gate**: export-level coverage, behavior contracts, build-tool integration and native evidence are still required. No A/B/C/U row should be advertised as supported from this document alone.
 
 For implementation, preserve one contract suite across workerd, direct execution and Dedicated Worker execution; validate Vite and esbuild resolution plus packed-consumer behavior. Globals must be ready before module evaluation. Scope state to the runtime, restore owned patches on disposal and avoid overwriting unrelated application globals. A `window` replacement is neither necessary nor sufficient.
+
+
+## Buffer acceptance
+
+The `node:buffer` implementation replaces the dependency fallback for both
+`node:buffer` and `buffer`. Its acceptance unit includes every named/default
+export, Buffer static and prototype methods, numeric operations, encodings,
+shared backing memory, errors, inspection, transcode, Blob and File. The pinned
+baseline remains workerd `1.20261012.1`, compatibility date `2026-10-17`.
+Workers' own unsupported `resolveObjectURL` and Blob/File `endings` behavior is
+verified as an expected rejection, not excluded from coverage.
+
+Implementation and the shared 24-group contract live together in
+[`src/compat/buffer/`](../src/compat/buffer/index.spec.ts). Numeric tests include
+independent byte expectations, and transcode covers 96 fixed workerd vectors.
+Blob/File tests include conversion order, mutable inputs, subclass branding,
+structured cloning, host interoperability, installation/restoration and late
+loading from another bundle. The implementation uses Web APIs only; no native
+plugin code is added.
+
+Integration preserves the same Buffer/Blob/File identity for application code
+and dependencies in Vite development, production and esbuild. The native run
+also exposed an Android WebView URL difference: a host containing a space is
+accepted and percent-encoded. The existing HTTP client now rejects it before
+network I/O, matching the existing fixed-workerd contract.
+
+Local acceptance on 2026-10-18 covers implementation commit `7da2af9`
+(source tree `a1994ee3717f38a14ba4d911e0da2cbedc7d99b1`) and the runner
+cleanup/result checks in `7a1d27e`:
+
+| Gate | Result |
+| --- | --- |
+| Library build and root/demo typechecks | Passed |
+| Unit tests | 297 passed |
+| Fixed workerd | 93 passed; added encoded-host case also passed in the shared Node contract |
+| Chromium/WebKit production runtime | 66 passed |
+| Vite development runtime | 20 passed |
+| Build-tool checks | 7 build tests and 30 Chromium/WebKit integration tests passed |
+| Ordinary Hono/Express demo | 8 passed |
+| Document/form regression suite | 72 accepted results, including 6 existing WebKit expected failures; no new exclusions |
+| Independently installed npm tarball | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22, common features 210, preferences 2/2 |
+| iOS 26.1, iPhone 17 Pro simulator | 346 passed, zero failures/exclusions; Buffer 24 direct + 24 Worker |
+| Android 16, Chrome WebView 155, emulator | 346 passed, zero failures/exclusions; Buffer 24 direct + 24 Worker |
+| Manager and independent acceptance review | Required code changes resolved |
+
+Both native runs used identical runtime assets: SHA-256 of
+`capacitor-workers-assets.json` is
+`dcdc6cc5fe9163d167ba5e758dc0bbdf20c1f9e53fa987d9a68b1829a147cdde`;
+`index.html` is
+`d3f0e375076e8512d617eff8c975a249c914c1ac2b51e460f8132613e41a4dfb`.
+The final native runs identify commit `7a1d27e`. Their manifests report a dirty
+checkout because this acceptance document was still being updated; production
+and test sources matched that commit. The manifests retain the observed dirty
+flag rather than relabeling the execution as a clean checkout.
+Logs and manifests are retained locally in `demo/artifacts/buffer-acceptance/`.
+
+This branch has not been pushed, so remote CI has not run. **The Complete label
+remains gated on CI; this is not a partial-support release.** The module contract
+is wired into the existing Workers, runtime, development and packed-consumer CI
+jobs; no separate opt-in test command is needed for Buffer.
+
+Reproduce the JavaScript gates from the repository root:
+
+```sh
+npm run build
+npm test
+npm run typecheck
+npm run typecheck --prefix demo
+npm run test:workers --prefix demo
+npm run test:runtime --prefix demo
+npm run test:runtime:dev --prefix demo
+npm run test:package
+npm run test:build-tools --prefix demo
+npm run test:browser --prefix demo
+npm run test:documents --prefix demo
+```
+
+For native verification, prepare the existing runtime test application using
+[the native test procedure](../demo/tests/README.md#native-checks). Run the full
+suite on iOS and Android and retain `FEATURE_REPORT` and `NATIVE_SUMMARY` logs.
+Both `node.buffer` reports must contain all 24 passing groups, and the final
+summary must contain no failures or exclusions. Do not accept only the Buffer
+subset while other runtime checks fail.

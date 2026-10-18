@@ -20,6 +20,7 @@ export default defineConfig({
       "src/compat/globals/index.spec.ts",
       "src/compat/globals/web.spec.ts",
       "src/compat/abort/installation.spec.ts",
+      "src/compat/buffer/installation.spec.ts",
       "src/compat/response/installation.spec.ts",
       "src/compat/brotli/index.spec.ts",
       "src/compat/fetch/index.spec.ts",

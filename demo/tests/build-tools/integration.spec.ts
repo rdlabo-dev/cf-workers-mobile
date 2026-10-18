@@ -31,7 +31,7 @@ for (const build of [
           report.node.direct.flatMap((result) =>
             result.cases.map((c) => c.status),
           ),
-        ).toEqual(Array(67).fill("passed"));
+        ).toEqual(Array(91).fill("passed"));
       }
     });
   }
@@ -75,7 +75,7 @@ for (const build of ["vite-node", "esbuild-node"]) {
           .flatMap((r) => r.cases)
           .filter((c) => c.status !== "passed"),
       ).toEqual([]);
-      expect(statuses).toEqual(Array(67).fill("passed"));
+      expect(statuses).toEqual(Array(91).fill("passed"));
       expect(report.globals.unqualified).toEqual([true, true]);
       expect(report.globals.qualified).toEqual([true, true, true]);
       expect(report.globals.computed).toEqual([true, true, true]);
