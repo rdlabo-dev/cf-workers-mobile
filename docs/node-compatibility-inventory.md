@@ -29,7 +29,7 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:url` | **Unverified (CI pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
 | `node:os`, `node:tty`, `node:wasi`, `node:punycode` | **Unverified (acceptance pending)** | Module-owned implementations and contracts pass workerd, browser and both native platforms. Review and remote CI remain pending. |
 | `node:constants`, `node:v8`, `node:http2`, `node:vm` | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Workerd, browser, packed-consumer and both native validations pass at `719b8fe`; review and remote CI remain pending. |
-| `node:child_process`, `node:cluster`, `node:dgram`, `node:domain`, `node:inspector` (+ promises), `node:readline` (+ promises) | **Unverified (acceptance pending)** | Pinned production behavior implemented with adjacent contracts. Workerd and browser checks pass; native acceptance, review and CI remain pending. |
+| `node:child_process`, `node:cluster`, `node:dgram`, `node:domain`, `node:inspector` (+ promises), `node:readline` (+ promises) | **Unverified (acceptance pending)** | Pinned production behavior implemented with adjacent contracts. Workerd, browser, packed-consumer and both native checks pass at `5169e5e`; review and remote CI remain pending. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Remaining implementation sequence
@@ -741,3 +741,27 @@ These experiments do not prove every possible compiler/runtime design impossible
 They rule out advertising the current monkeypatch or ordinary esbuild lowering
 as complete `async_hooks` compatibility. Full support requires a different
 execution contract or engine capability; the six existing ALS exclusions remain.
+
+### Process, terminal and inspector local acceptance
+
+At clean revision `5169e5e`, adjacent shared contracts cover `child_process`
+(5 groups), `cluster` (5), `dgram` (6), `inspector` including promises (8),
+`domain` (6), and `readline` including promises (8). They exercise Workers'
+actual non-networking/non-terminal behavior, including validation, public
+prototypes, mutable state, events, callback timing, symbols and disposal.
+`inspector/promises` deliberately preserves synchronous exceptions that differ
+from ordinary `inspector`; `readline` returns empty answers rather than throwing.
+
+- Root and demo typechecks, the fixed-workerd contract, Chromium/WebKit production
+  (66) and development (20), and build integrations (7 unit + 30 browser) passed.
+- A fresh installed tarball passed 540 common contracts plus the same 6 ALS
+  exclusions, 26 direct / 22 isolated, 10 build/raw-ESM, 2 development and
+  2 preference cases.
+- iOS 26.1 and Android 16 each passed **676 runtime checks plus the same 6 ALS
+  exclusions**. Each new module passed in direct and Dedicated Worker execution.
+- Eight inventory/engine experiments passed, including both async transform
+  counterexamples. Export enumeration does not replace behavior contracts.
+
+No new module is certified Complete by these local checks alone; independent
+review and remote CI are outstanding. Remaining functional families in the
+implementation sequence are still unfinished.
