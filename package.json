@@ -58,6 +58,10 @@
     "./environment": {
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"
+    },
+    "./features/assets": {
+      "types": "./dist/features/assets/index.d.ts",
+      "import": "./dist/features/assets/index.js"
     }
   },
   "scripts": {

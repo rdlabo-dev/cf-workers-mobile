@@ -86,6 +86,8 @@ jobs:
         working-directory: demo
       - run: npm run test:service-bindings
         working-directory: demo
+      - run: npm run test:cloudflare-bindings
+        working-directory: demo
       - run: npm run test:hyperdrive-migration
         working-directory: demo
         env:

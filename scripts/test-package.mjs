@@ -129,6 +129,13 @@ import { runContract, type ContractSuite } from "@rdlabo/capacitor-workers/testi
 import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
 import { fetchContract, fetchContractWorker } from "@rdlabo/capacitor-workers/testing/fetch";
 import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
+import { LocalAssets } from "@rdlabo/capacitor-workers/features/assets";
+import { capacitorWorkersPlugin as buildPlugin } from "@rdlabo/capacitor-workers/vite";
+const assets = new LocalAssets({ "/": "/index.html" }, { baseURL: "capacitor://localhost/" });
+const assetResponse: Promise<Response> = assets.fetch(new Request("https://worker.invalid/"));
+buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "local" });
+// @ts-expect-error Asset policies must be explicit local or remote.
+buildPlugin({ worker: "worker.ts", assetsExecution: "automatic" });
 import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();

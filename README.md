@@ -410,6 +410,18 @@ use the Fetch-only runtime for streaming uploads. LocalStorage KV stream reads d
 bounded chunks lazily, but the storage API itself necessarily returns a complete
 encoded record. Its synchronous storage/quota limits still apply.
 
+## Additional Cloudflare bindings
+
+Durable Objects, Workers AI, Vectorize, AI Search, Workflows and other cloud
+bindings are discovered for whole-request remote dispatch. `remoteBindings`
+adds server-only names (including secrets and future bindings); unrecognized
+binding-shaped configuration requires explicit acknowledgement. ASSETS uses an
+explicit `assetsExecution` policy, with a bounded local profile through
+`LocalAssets` and full cloud behavior through remote execution. See
+[Cloudflare bindings and local ASSETS](docs/cloudflare-bindings.md) for the
+configuration, supported scope and verification commands. WebSocket upgrades
+remain outside the remote HTTP transport.
+
 ## License
 
 [MIT](LICENSE).
