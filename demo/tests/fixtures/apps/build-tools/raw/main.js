@@ -1,5 +1,5 @@
 import { workersCapacitor } from "./lib/index.js";
-import { fetchContract } from "./lib/testing/fetch.js";
+import { fetchContract } from "./lib/runtime/fetch/contract.js";
 const worker = {
   createWorker: () =>
     new Worker(new URL("./worker-entry.js", import.meta.url), {

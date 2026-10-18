@@ -27,4 +27,4 @@ Blob/File are shared with the Node Buffer implementation in `../compat/buffer/bl
 Web installation uses that same implementation rather than creating a second copy.
 
 Cloudflare extensions to standard Request/Response APIs stay with their owning
-Web API. Cloudflare-only APIs belong in [workers](../workers/README.md).
+Web API. Cloudflare-only APIs belong in [workers](../cloudflare/apis/README.md).

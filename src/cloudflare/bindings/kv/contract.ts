@@ -1,5 +1,5 @@
-import { kvTextFeature, kvFeature } from "../bindings/kv/index.js";
-import type { ContractSuite } from "../features/testing.js";
+import { kvTextFeature, kvFeature } from "./index.js";
+import type { ContractSuite } from "../../../contracts/testing.js";
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected))
     throw new Error(`${JSON.stringify(actual)} != ${JSON.stringify(expected)}`);

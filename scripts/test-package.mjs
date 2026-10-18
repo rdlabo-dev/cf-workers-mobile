@@ -60,7 +60,14 @@ for (const entry of [
 }
 // Candidate Web API contracts use internal modules from the installed tarball.
 // Never copy library implementation sources from the checkout.
-for (const domain of ["compat", "browser", "workers", "shared"]) {
+for (const domain of [
+  "compat",
+  "browser",
+  "cloudflare",
+  "shared",
+  "runtime",
+  "contracts",
+]) {
   await cp(
     join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
     join(temp, "src", domain),

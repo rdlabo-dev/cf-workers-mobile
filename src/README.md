@@ -1,17 +1,30 @@
-# Runtime implementation domains
+# Source roles
 
-The runtime implementations are the core of this project. Node, browser and
-Workers APIs are peer domains directly under `src`, alongside cloud bindings.
-Placement does not certify completeness. See each domain's status and evidence.
+The core runtime and API implementations are organized by responsibility:
 
-| Folder                       | Responsibility                                       | Status entry point                                        |
-| ---------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
-| [compat](compat/README.md)   | Workers-compatible `node:*` modules and Node globals | [Node inventory](../docs/node-compatibility-inventory.md) |
-| [browser](browser/README.md) | Browser APIs adapted to Workers behavior             | [Browser API status](browser/README.md)                   |
-| [workers](workers/README.md) | Cloudflare-specific runtime modules and APIs         | [Workers status](workers/README.md)                       |
-| [shared](shared/README.md)   | Cross-domain installation, codecs and wire helpers   | Internal implementation only                              |
+```text
+compat/                 Workers-compatible Node.js modules
+browser/                Browser APIs and Workers behavior adaptations
+cloudflare/
+  apis/                 Cloudflare-specific runtime modules
+  bindings/             Local KV, binding configuration and HTTP dispatch
+runtime/
+  fetch/                Application request execution and Fetch adapter
+  isolated/             Dedicated Worker execution and transport
+  documents/            Document hosting and execution
+build/                  Source analysis, transformation and bundler support
+contracts/              Typed feature definitions, lifecycle and contract runner
+shared/                 Cross-domain initialization, codecs and wire helpers
+```
 
-Cloud resource configuration, KV and whole-request remote dispatch live in
-[bindings](bindings/README.md). Feature contract/lifecycle infrastructure stays
-in `src/features`; fetch interception and isolated execution stay in their runtime
-folders. API identity, implementation location and execution policy are separate.
+- [Node compatibility](compat/README.md) and [browser APIs](browser/README.md) own API behavior.
+- [Cloudflare](cloudflare/README.md) separates local APIs from remote services.
+- [Runtime](runtime/README.md) owns application execution, isolation and document lifetimes.
+- [Build](build/README.md) owns compile-time discovery and generated bundles.
+- [Contracts](contracts/README.md) provides reusable feature/lifecycle/testing infrastructure.
+- [Shared](shared/README.md) contains only concrete dependencies used across domains.
+
+Root modules remain package entry points and integration boundaries. Public
+`features/*`, `testing/*`, `worker`, `vite` and `esbuild` subpaths stay stable while
+package exports point to the new compiled locations. Folder presence does not
+establish complete API support; see the [support map](../docs/api-support.md).

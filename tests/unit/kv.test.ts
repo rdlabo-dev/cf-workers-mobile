@@ -1,6 +1,6 @@
 import { expect, it, vi } from "vitest";
-import { LocalStorageKV } from "../../src/bindings/kv/index";
-import { openFeature } from "../../src/features/index";
+import { LocalStorageKV } from "../../src/cloudflare/bindings/kv/index";
+import { openFeature } from "../../src/contracts/index";
 function storage() {
   const data = new Map<string, string>();
   return {
@@ -100,9 +100,9 @@ it("rejects oversized writes before changing storage", async () => {
 });
 
 it("runs the reusable contract against implementations and detects lost writes", async () => {
-  const { kvContract } = await import("../../src/testing/kv");
+  const { kvContract } = await import("../../src/cloudflare/bindings/kv/contract");
   const { runContract, assertContract } =
-    await import("../../src/features/testing");
+    await import("../../src/contracts/testing");
   class IsolatedKV extends LocalStorageKV {
     constructor() {
       super("contract");

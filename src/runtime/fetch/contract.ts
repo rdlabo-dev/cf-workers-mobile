@@ -1,5 +1,5 @@
-import { fetchFeature } from "../features/fetch.js";
-import type { ContractSuite } from "../features/testing.js";
+import { fetchFeature } from "./feature.js";
+import type { ContractSuite } from "../../contracts/testing.js";
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected))
     throw new Error(`${JSON.stringify(actual)} != ${JSON.stringify(expected)}`);

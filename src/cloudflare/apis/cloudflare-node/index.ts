@@ -6,12 +6,12 @@ import type {
   IncomingMessage,
   Server,
   ServerResponse,
-} from "../../compat/http/index.js";
+} from "../../../compat/http/index.js";
 import {
   getHandler,
   kSetIncomingBody,
   type InboundSocket,
-} from "../../compat/http/registry.js";
+} from "../../../compat/http/registry.js";
 
 export interface ServerDescriptor {
   port?: number | null;

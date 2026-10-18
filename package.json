@@ -21,28 +21,28 @@
       "import": "./dist/vite.js"
     },
     "./features": {
-      "types": "./dist/features/index.d.ts",
-      "import": "./dist/features/index.js"
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js"
     },
     "./testing": {
-      "types": "./dist/features/testing.d.ts",
-      "import": "./dist/features/testing.js"
+      "types": "./dist/contracts/testing.d.ts",
+      "import": "./dist/contracts/testing.js"
     },
     "./features/fetch": {
-      "types": "./dist/features/fetch.d.ts",
-      "import": "./dist/features/fetch.js"
+      "types": "./dist/runtime/fetch/feature.d.ts",
+      "import": "./dist/runtime/fetch/feature.js"
     },
     "./features/kv": {
-      "types": "./dist/bindings/kv/index.d.ts",
-      "import": "./dist/bindings/kv/index.js"
+      "types": "./dist/cloudflare/bindings/kv/index.d.ts",
+      "import": "./dist/cloudflare/bindings/kv/index.js"
     },
     "./testing/fetch": {
-      "types": "./dist/testing/fetch.d.ts",
-      "import": "./dist/testing/fetch.js"
+      "types": "./dist/runtime/fetch/contract.d.ts",
+      "import": "./dist/runtime/fetch/contract.js"
     },
     "./testing/kv": {
-      "types": "./dist/testing/kv.d.ts",
-      "import": "./dist/testing/kv.js"
+      "types": "./dist/cloudflare/bindings/kv/contract.d.ts",
+      "import": "./dist/cloudflare/bindings/kv/contract.js"
     },
     "./esbuild": {
       "types": "./dist/esbuild.d.ts",

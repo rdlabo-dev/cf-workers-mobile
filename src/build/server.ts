@@ -8,7 +8,10 @@ import type {
   VariableDeclarator,
 } from "estree";
 
-export { serverBindings, type ServerBuildOptions } from "../bindings/config.js";
+export {
+  serverBindings,
+  type ServerBuildOptions,
+} from "../cloudflare/bindings/config.js";
 
 export interface ServerCompilation {
   mode: "routes" | "worker";

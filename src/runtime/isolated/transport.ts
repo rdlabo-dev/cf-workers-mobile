@@ -1,6 +1,6 @@
-import { setWorkerEnv } from "../workers/cloudflare-workers/index.js";
-import { isResponse } from "../browser/fetch/interop.js";
-import { Request as WorkerRequest } from "../browser/request/index.js";
+import { setWorkerEnv } from "../../cloudflare/apis/cloudflare-workers/index.js";
+import { isResponse } from "../../browser/fetch/interop.js";
+import { Request as WorkerRequest } from "../../browser/request/index.js";
 import type { WorkerHandler } from "../fetch/types.js";
 import type { Command, Invocation, Reply } from "./protocol.js";
 

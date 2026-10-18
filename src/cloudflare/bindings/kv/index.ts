@@ -2,7 +2,7 @@ import {
   defineFeature,
   FeatureImplementation,
   FeatureUnavailable,
-} from "../../features/index.js";
+} from "../../../contracts/index.js";
 
 /** Single-key text subset of a Workers KV namespace. */
 export interface KVTextNamespace {

@@ -326,7 +326,7 @@ it("returns document headers before EOF and reads bounded chunks on demand", asy
 });
 
 it("does not resurrect a document stream after cancellation while awaiting headers", async () => {
-  const { installDocumentHost } = await import("../../src/documents/host");
+  const { installDocumentHost } = await import("../../src/runtime/documents/host");
   let finish!: (response: Response) => void;
   const cancelled = vi.fn();
   const dispose = installDocumentHost(
@@ -367,7 +367,7 @@ it("does not resurrect a document stream after cancellation while awaiting heade
 });
 
 it("does not dispatch a document request after disposal during startup", async () => {
-  const { installDocumentHost } = await import("../../src/documents/host");
+  const { installDocumentHost } = await import("../../src/runtime/documents/host");
   let ready!: () => void;
   const fetcher = vi.fn(async () => new Response("late"));
   const dispose = installDocumentHost(

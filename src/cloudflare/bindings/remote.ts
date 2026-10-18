@@ -1,19 +1,19 @@
 import {
   Response as WorkerResponse,
   networkResponse,
-} from "../browser/response/index.js";
-import { Request as WorkerRequest } from "../browser/request/index.js";
-import { Headers as WorkerHeaders } from "../browser/headers/index.js";
-import { browserFetch } from "../browser/fetch/interop.js";
-import { platform } from "../shared/globals/platform.js";
-import { createFetch } from "../browser/fetch/index.js";
+} from "../../browser/response/index.js";
+import { Request as WorkerRequest } from "../../browser/request/index.js";
+import { Headers as WorkerHeaders } from "../../browser/headers/index.js";
+import { browserFetch } from "../../browser/fetch/interop.js";
+import { platform } from "../../shared/globals/platform.js";
+import { createFetch } from "../../browser/fetch/index.js";
 import {
   createNativeNetwork,
   getNativeCall,
-} from "../browser/fetch/native-network.js";
-import { createNetworkScope } from "../browser/fetch/scope.js";
-import { FetchTransport } from "../browser/fetch/transport.js";
-import type { RemoteWorkerOptions } from "../fetch/types.js";
+} from "../../browser/fetch/native-network.js";
+import { createNetworkScope } from "../../browser/fetch/scope.js";
+import { FetchTransport } from "../../browser/fetch/transport.js";
+import type { RemoteWorkerOptions } from "../../runtime/fetch/types.js";
 
 /** Host-owned: credentials never cross the Dedicated Worker message boundary. */
 export function createRemoteWorker(

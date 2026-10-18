@@ -7,4 +7,4 @@
 | `brotli/`    | Bundled content-decoding implementation and codec asset                       |
 
 These are internal dependencies, not additional public compatibility claims.
-API behavior and contracts belong to their owning compat/browser/workers module.
+API behavior and contracts belong to their owning compat/browser/cloudflare API module.

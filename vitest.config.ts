@@ -24,7 +24,7 @@ export default defineConfig({
     // Node module contract specs run via demo tests in workerd and WebViews.
     include: [
       "tests/unit/**/*.test.ts",
-      "src/workers/cloudflare-node/index.spec.ts",
+      "src/cloudflare/apis/cloudflare-node/index.spec.ts",
       "src/shared/globals/index.spec.ts",
       "src/shared/globals/web.spec.ts",
       "src/browser/abort/installation.spec.ts",

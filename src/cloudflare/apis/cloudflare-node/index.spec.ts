@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import * as httpModule from "../../compat/http/index";
+import * as httpModule from "../../../compat/http/index";
 import * as cloudflareNodeModule from "./index";
 import {
   Agent,
@@ -14,13 +14,13 @@ import {
   maxHeaderSize,
   request,
   setMaxIdleHTTPParsers,
-} from "../../compat/http/index";
+} from "../../../compat/http/index";
 import {
   connectHandler,
   handleAsNodeConnection,
   httpServerHandler,
 } from "./index";
-import { release, setHandler } from "../../compat/http/registry";
+import { release, setHandler } from "../../../compat/http/registry";
 
 it("rejects invalid asynchronous response headers instead of leaving fetch pending", async () => {
   const server = createServer(async (_request, response) => {
@@ -132,7 +132,7 @@ it("assigns different ports to zero/omitted listeners and preserves explicit ove
 
 it("dispatches before the upload ends and streams the response before end", async () => {
   let upload!: ReadableStreamDefaultController<Uint8Array>;
-  let response!: import("../../compat/http/index").ServerResponse;
+  let response!: import("../../../compat/http/index").ServerResponse;
   const server = createServer((_request, res) => {
     response = res;
     res.write("first");
@@ -196,7 +196,7 @@ it("propagates rejected async handlers instead of leaving the request pending", 
 });
 
 it("propagates response errors after headers to the body reader", async () => {
-  let response!: import("../../compat/http/index").ServerResponse;
+  let response!: import("../../../compat/http/index").ServerResponse;
   const server = createServer((_req, res) => {
     response = res;
     res.flushHeaders();

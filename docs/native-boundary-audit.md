@@ -11,7 +11,7 @@ byte I/O and WebView lifecycle integration. No local HTTP server is started.
 | `src/shared/http-wire`      | Strict HTTP/1.1 response parsing using llhttp 9.3.0 WASM; bounded input; raw headers and bodies               |
 | iOS `SocketBridge`          | Network.framework TCP/TLS, OS certificate validation, bounded I/O, close completion and teardown              |
 | Android `WorkerSockets`     | Netty TCP/TLS, OS certificate validation, bounded I/O and teardown                                            |
-| `src/documents/host.ts`     | Document redirect method/body/header decisions and redirect limits                                            |
+| `src/runtime/documents/host.ts`     | Document redirect method/body/header decisions and redirect limits                                            |
 | Native document integration | WebView creation, scheme/navigation integration and lifecycle                                                 |
 
 The HTTP transport requests one connection per request with `Connection: close`.

@@ -1,4 +1,4 @@
-import { createIsolatedWorker } from "../../../../dist/isolated/bridge";
+import { createIsolatedWorker } from "../../../../dist/runtime/isolated/bridge";
 import {
   getNativeCall,
   nativeNetwork,

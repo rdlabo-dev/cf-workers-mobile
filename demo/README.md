@@ -16,7 +16,7 @@ plugins: [
 ];
 ```
 
-The path is relative to the configured Vite root, `src/`. The example uses [the Hono Worker](src/workers/hono/standard.ts). To try [Workers Express](src/workers/express/standard.ts), replace the active `worker` line with the commented `./workers/express/standard.ts` line in the Vite config. No changes to `main.ts` are needed.
+The path is relative to the configured Vite root, `src/`. The example uses [the Hono Worker](src/cloudflare/apis/hono/standard.ts). To try [Workers Express](src/cloudflare/apis/express/standard.ts), replace the active `worker` line with the commented `./workers/express/standard.ts` line in the Vite config. No changes to `main.ts` are needed.
 
 ## 2. Initialize and display the Worker page
 

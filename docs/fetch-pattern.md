@@ -6,9 +6,9 @@ Fetch execution uses a single template, `FetchRuntime<Env>`. `DirectFetchRuntime
 
 | Layer                         | Owns                                                                                                                                                                 |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/fetch/runtime.ts`        | URL boundary and app-origin mapping, Request construction, pre-dispatch/ongoing abort, per-call context, waitUntil/drain, Response validation and HEAD normalization |
-| `src/fetch/worker-runtime.ts` | Calling the handler directly or through the isolated bridge; isolated startup readiness and termination                                                              |
-| `src/isolated/`               | MessageChannel serialization, upload/response transport, body cancellation and Worker-side lifetime                                                                  |
+| `src/runtime/fetch/runtime.ts`        | URL boundary and app-origin mapping, Request construction, pre-dispatch/ongoing abort, per-call context, waitUntil/drain, Response validation and HEAD normalization |
+| `src/runtime/fetch/worker-runtime.ts` | Calling the handler directly or through the isolated bridge; isolated startup readiness and termination                                                              |
+| `src/runtime/isolated/`               | MessageChannel serialization, upload/response transport, body cancellation and Worker-side lifetime                                                                  |
 | `src/index.ts`                | Selecting the existing execution mode, single global installation and restoring the original fetch                                                                   |
 
 The public `workersCapacitor({ baseURL, env })` setup uses the entry configured in the Vite or esbuild plugin. Explicit `worker` options remain supported. A function with a `fetch` method is still a direct handler; only a function without that method is a Worker factory. The base class is framework-independent; Hono and Workers Express continue using the same Fetch Handler interface.

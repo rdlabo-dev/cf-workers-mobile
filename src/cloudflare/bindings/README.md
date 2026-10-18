@@ -1,7 +1,7 @@
 # Cloudflare bindings and execution policy
 
 This folder owns cloud binding discovery and execution policy. It is separate
-from the runtime APIs in `src/compat`, `src/browser` and `src/workers`.
+from the runtime APIs in `src/compat`, `src/browser` and `src/cloudflare/apis`.
 
 | Source      | Responsibility                                                        |
 | ----------- | --------------------------------------------------------------------- |
@@ -20,10 +20,10 @@ from the runtime APIs in `src/compat`, `src/browser` and `src/workers`.
 | ASSETS                                                                                             | Explicit remote policy                       | Remote routing implemented; local ASSETS not implemented                                 |
 | Unknown bindings / server secrets                                                                  | Explicit `remoteBindings` when required      | Structural unknown-binding checks; not a complete future Wrangler schema validator       |
 
-See [binding declarations and limits](../../docs/cloudflare-bindings.md),
-[KV](../../docs/kv.md), [D1](../../docs/d1-transparent-migration.md),
-[Hyperdrive](../../docs/hyperdrive-transparent-migration.md), and
-[service bindings](../../docs/remote-service-bindings.md).
+See [binding declarations and limits](../../../docs/cloudflare-bindings.md),
+[KV](../../../docs/kv.md), [D1](../../../docs/d1-transparent-migration.md),
+[Hyperdrive](../../../docs/hyperdrive-transparent-migration.md), and
+[service bindings](../../../docs/remote-service-bindings.md).
 Remote dispatch sends whole HTTP requests, not generic binding method calls.
 Cloud credentials and lifecycle stay on Workers. WebSocket upgrades are rejected.
 

@@ -5,7 +5,7 @@ export const configuredPath = fileURLToPath(
   new URL("../configured.js", import.meta.url),
 );
 export const transportPath = fileURLToPath(
-  new URL("../isolated/transport.js", import.meta.url),
+  new URL("../runtime/isolated/transport.js", import.meta.url),
 );
 export const globalsPath = fileURLToPath(
   new URL("../shared/globals/index.js", import.meta.url),
@@ -22,7 +22,7 @@ export const nodeGlobalsInstallPath = fileURLToPath(
 export const nodeCompatPath = (name: string) =>
   fileURLToPath(new URL(`../compat/${name}/index.js`, import.meta.url));
 const workersModulePath = (name: string) =>
-  fileURLToPath(new URL(`../workers/${name}/index.js`, import.meta.url));
+  fileURLToPath(new URL(`../cloudflare/apis/${name}/index.js`, import.meta.url));
 // A compat module reusing a CommonJS polyfill imports the concrete package
 // file; the bare name is the alias target, so only the deep specifier can
 // reach the real implementation without recursing.

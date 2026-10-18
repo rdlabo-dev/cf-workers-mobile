@@ -2,9 +2,9 @@ import {
   defineFeature,
   FeatureImplementation,
   type FeatureScope,
-} from "./index.js";
-import { createFetchRuntime } from "../fetch/worker-runtime.js";
-import type { WorkersCapacitorOptions } from "../fetch/types.js";
+} from "../../contracts/index.js";
+import { createFetchRuntime } from "./worker-runtime.js";
+import type { WorkersCapacitorOptions } from "./types.js";
 
 /** A deliberately small portable HTTP profile, not the full fetch specification. */
 export const fetchFeature = defineFeature<typeof fetch>()("fetch.basic", [
