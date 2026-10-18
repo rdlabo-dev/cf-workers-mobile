@@ -1,0 +1,7 @@
+apply plugin: 'com.android.library'
+android {
+    namespace 'jp.rdlabo.bridgeprobe'
+    compileSdk rootProject.ext.compileSdkVersion
+    defaultConfig { minSdkVersion rootProject.ext.minSdkVersion }
+}
+dependencies { implementation project(':capacitor-android') }

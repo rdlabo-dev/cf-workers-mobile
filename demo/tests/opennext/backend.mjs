@@ -8,6 +8,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export async function startBackend({ native = false } = {}) {
+  const pluginDriver = native
+    ? (
+        await build({
+          entryPoints: [
+            fileURLToPath(new URL("plugin-driver.ts", import.meta.url)),
+          ],
+          bundle: true,
+          format: "iife",
+          platform: "browser",
+          write: false,
+        })
+      ).outputFiles[0].text
+    : "";
   const reports = [];
   const requests = [];
   const config = { mode: "flow", id: crypto.randomUUID() };
@@ -95,6 +108,11 @@ export async function startBackend({ native = false } = {}) {
             res.end("ok");
             return;
           }
+          if (native && req.url === "/__acceptance/plugin.js") {
+            res.setHeader("content-type", "text/javascript");
+            res.end(pluginDriver);
+            return;
+          }
           if (native && req.url === "/__acceptance/driver.js") {
             res.setHeader("content-type", "text/javascript");
             res.end(
@@ -132,7 +150,7 @@ export async function startBackend({ native = false } = {}) {
                 .toString()
                 .replace(
                   "</body>",
-                  '<script src="/__acceptance/driver.js"></script></body>',
+                  '<script src="/__acceptance/plugin.js"></script><script src="/__acceptance/driver.js"></script></body>',
                 ),
             );
           const out = Object.fromEntries(response.headers);

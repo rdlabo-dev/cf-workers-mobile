@@ -4,6 +4,26 @@ Give this guide to an AI coding assistant with access to your application reposi
 
 The primary success criterion is a working native application with minimal integration effort, not a new application architecture. Keep ordinary HTML documents, links and forms where the application uses them. SPA conversion, a new client router, App Shell redesign, SSR/API separation and adding hydration are not prerequisites.
 
+## How existing Worker pages reach the screen
+
+With `render`, the library supplies the Worker's response as the response to a WebView document request. The WebView renders that HTML as a page, executes its scripts and loads its resources. The application does not need to insert HTML into an existing DOM or display it in an iframe.
+
+```text
+WebView opens /notes at the app's local origin
+  → the library receives the document request
+  → generated dispatch selects local or remote execution
+      local:  the existing Fetch handler runs on the device
+      remote: the request goes to the existing deployed Worker
+  → response status, headers and HTML body return through the document bridge
+  → WebView renders the page
+```
+
+Both execution paths use the same document response mechanism. A D1-backed page can retain authentication, its query and SSR on the remote Worker; a compatible independent page can render locally. The build may select the entire Worker for remote execution when safe separation is not possible. This is request dispatch, not moving D1 operations individually between runtimes.
+
+Following an ordinary link produces the next document request through the same mechanism. Supported form submissions and same-origin redirects also retain document navigation. Existing client scripts can provide interaction or hydration where the framework uses it. Bundled assets bypass the Worker router; other requests follow their configured routing. Preserve the application's existing page model before considering any redesign.
+
+On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker. The visible page keeps the app-local URL (normally `capacitor://localhost` on iOS and `https://localhost` on Android), while the Worker receives its logical HTTP(S) URL. This is native document rendering, not a remote browser tab or a local HTTP server. See the [native rendering guide](native-rendering-api.md) for form, redirect, asset and lifecycle limits; this does not guarantee every browser or framework feature.
+
 ## Prompt to give your AI assistant
 
 ```text
@@ -163,6 +183,24 @@ For statically analyzable Hono applications, the build may keep independent rout
 
 For example, a page that authenticates the user, queries D1 and returns SSR HTML can retain that entire sequence on the deployed Worker. The device renders the response and uses the application's existing interaction model. This requires connectivity; it does not make D1 available locally. See [D1 dispatch](d1-transparent-migration.md) and the [OpenNext sample](../demo/opennext/README.md). Remote execution is a supported way to preserve the application, not an incomplete migration requiring a subsequent redesign.
 
+### Next.js: distinguish rendering from data execution
+
+`dynamic(..., { ssr: false })` disables server prerendering for that Client Component. Its JavaScript renders it in the WebView. It does not disable the entire page's server processing, move database queries to the device, or create a remote API automatically. See [Next.js lazy loading](https://nextjs.org/docs/app/guides/lazy-loading).
+
+Inspect where each query actually executes before proposing changes:
+
+| Existing query location                                     | Behavior to preserve                                                                                                                                    |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useQuery`, SWR or client code calling an HTTP API          | The WebView executes the client code; the API handles its server operations. Preserve the existing endpoint and authentication.                         |
+| Parent Server Component or `getServerSideProps` querying D1 | The query remains server-dependent even when a child component has `ssr: false`. Use the supported remote request dispatch.                             |
+| Direct D1 access imported into client code                  | This cannot execute in the WebView. `ssr: false` does not turn it into an HTTP call; identify the invalid boundary before making a targeted correction. |
+
+For an application already structured as client rendering → API request → D1, keep that structure. Do not add another API layer, force SSR on, or replace its query library to integrate Capacitor. If the query uses Server Actions or another framework transport instead of an ordinary HTTP API, verify that transport against the documented framework limits rather than assuming identical support.
+
+Do not infer actual SSR from a flag, an HTTP 200 response or a string found in the response body. Check that the expected content exists as document elements before page scripts execute; text inside scripts or serialized RSC data is not rendered HTML. Initial HTML alone does not distinguish build-time prerendering from request-time SSR. Check framework build metadata for prerendered routes, and verify request-time rendering with fresh request-dependent values present in document elements. Without that evidence, report initial HTML with unknown rendering time. Then compare with JavaScript enabled and observe API/framework requests. A page may contain a server-rendered layout and client-only data regions simultaneously. Record the result per region and tested route, not as a universal application-wide SSR label.
+
+Component rendering and Worker dispatch are separate decisions. The build integration does not interpret `ssr: false` as a local-route instruction. A generated OpenNext Worker with cloud dependencies may still select whole-Worker remote execution for initial documents and API requests. Inspect the build report and test the actual requests; a client-rendered screen alone does not establish local startup or offline availability.
+
 ### When configuration is insufficient
 
 Reproduce the failure and identify whether it comes from configuration, the library's documented limits or the application's assumptions. Correct configuration first. If an application change is necessary, keep it scoped to the failing behavior and verify that cloud behavior is preserved.
@@ -225,6 +263,8 @@ Anonymous identity does not prove a real person, a trusted device or an official
 Capacitor bundles can be inspected. Do not embed Cloudflare management tokens, service-account private keys, database credentials or privileged service tokens in JS, native sources, `.env` values compiled into the app, or bundled files. Obfuscation does not make a secret safe. Public client identifiers/configuration are different from server credentials and must not be used as proof of trust.
 
 User credentials need expiration, revocation/logout handling and platform-appropriate storage. OS-protected storage reduces exposure but does not make a compromised device trustworthy. Avoid logging tokens and private responses; clear user-scoped cached data on account changes. The remote Worker must return only data the caller is allowed to receive.
+
+Remote HTML executes its client scripts inside the application's document WebView; plugin calls originate there, not in the remote Worker. Verify custom plugin calls, results and native event delivery from the rendered page after navigation. iOS creates a separate Capacitor document controller, so manually registered plugin instances and listeners on the original host are not assumed to carry over. Android retains the visible application WebView. The [native acceptance scenario](../demo/tests/README.md#native-plugin-calls-from-remote-pages) checks an automatically registered package plugin, including call results, native events and errors after navigation and relaunch. New documents register new listeners; old page listeners do not survive document replacement. Arbitrary custom plugin lifecycles and manual host registration remain outside that coverage.
 
 Native documents have Capacitor plugin access: escape untrusted content and do not render arbitrary HTML as application code. For cookie authentication retain CSRF protection. Native forms may omit `Origin`; do not disable CSRF validation or treat rewritten Origin as proof of trust. External-origin redirects are rejected; OAuth/SSO requires an explicit external-browser integration. See the [remote transport boundaries](d1-transparent-migration.md).
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Counter from "./counter";
+import ClientMessage from "./client-message";
 export const dynamic = "force-dynamic";
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
       <p id="server-rendered">Rendered by Next.js</p>
       <Image src="/mark.svg" alt="Sample mark" width={80} height={40} />
       <Counter />
+      <ClientMessage />
     </>
   );
 }
