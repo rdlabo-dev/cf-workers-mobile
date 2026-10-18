@@ -5,7 +5,9 @@ import { Response } from "../response/index.js";
 import { Headers } from "../headers/index.js";
 import { structuredClone } from "../structured-clone/index.js";
 
-const values = { Request, Response, Headers, structuredClone };
+import { Blob, File } from "../buffer/blob.js";
+
+const values = { Request, Response, Headers, structuredClone, Blob, File };
 type Name = keyof typeof values;
 type Target = Record<string, unknown>;
 type Patch = {

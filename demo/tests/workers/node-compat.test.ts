@@ -31,9 +31,10 @@ it("runs the node module contracts against real workerd", async () => {
     "node.string_decoder",
     "node.http",
     "node.net",
+    "node.buffer",
   ]);
   expect(reports.map((report) => report.cases.length)).toEqual([
-    14, 11, 15, 18, 9,
+    14, 11, 15, 18, 9, 24,
   ]);
   for (const report of reports) assertContract(report);
   expect(

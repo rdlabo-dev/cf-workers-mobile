@@ -11,7 +11,7 @@ const pack = JSON.parse(
     encoding: "utf8",
   }),
 )[0];
-for (const module of ["path", "querystring", "string-decoder"]) {
+for (const module of ["path", "querystring", "string-decoder", "buffer"]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
     if (!pack.files.some((file) => file.path === notice))
@@ -64,6 +64,7 @@ for (const module of [
   "path",
   "querystring",
   "string-decoder",
+  "buffer",
   "http",
   "net",
   "headers",
@@ -198,6 +199,7 @@ try {
   }
   browser = await chromium.launch();
   const page = await browser.newPage();
+  page.on("pageerror", (error) => console.error("Consumer page error:", error));
   await page.goto("http://127.0.0.1:4189/");
   await page.waitForFunction(() => window.pocDone);
   const results = await page.evaluate(() => window.pocResults);
@@ -263,7 +265,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 162 ||
+    features.flatMap((report) => report.cases).length !== 210 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -296,6 +298,15 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
         (prefer) => window.runBuildTool(prefer),
         prefer,
       );
+      if (
+        build !== "raw" &&
+        (report.node.direct.flatMap((r) => r.cases).length !== 91 ||
+          report.node.direct.some(
+            (r) =>
+              r.errors.length || r.cases.some((c) => c.status !== "passed"),
+          ))
+      )
+        throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
       if (
         report.execution !== prefer ||
         report.cases.length !== (build === "raw" ? 4 : 9) ||
