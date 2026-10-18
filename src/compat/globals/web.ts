@@ -7,7 +7,16 @@ import { structuredClone } from "../structured-clone/index.js";
 
 import { Blob, File } from "../buffer/blob.js";
 
-import * as performanceGlobals from "../perf-hooks/performance.js";
+import {
+  Performance,
+  PerformanceEntry,
+  PerformanceMark,
+  PerformanceMeasure,
+  PerformanceObserver,
+  PerformanceObserverEntryList,
+  PerformanceResourceTiming,
+  performance,
+} from "../perf-hooks/performance.js";
 const values = {
   Request,
   Response,
@@ -15,7 +24,14 @@ const values = {
   structuredClone,
   Blob,
   File,
-  ...performanceGlobals,
+  Performance,
+  PerformanceEntry,
+  PerformanceMark,
+  PerformanceMeasure,
+  PerformanceObserver,
+  PerformanceObserverEntryList,
+  PerformanceResourceTiming,
+  performance,
 };
 type Name = keyof typeof values;
 type Target = Record<string, unknown>;

@@ -62,9 +62,14 @@ function compatibilityPlugins(
           normalizePath(resolve(globalsPath, "../web.js"))
         )
           return;
-        // Vite's prebundled node:buffer and runtime globals must share Blob/File.
+        // Prebundled Node modules and runtime globals must share constructor identity.
         // Keep the distributed runtime's relative import usable as raw browser ESM.
-        return code.replace('from "../buffer/blob.js"', 'from "node:buffer"');
+        return code
+          .replace('from "../buffer/blob.js"', 'from "node:buffer"')
+          .replace(
+            'from "../perf-hooks/performance.js"',
+            'from "node:perf_hooks"',
+          );
       },
       config: () => ({
         // App globals and dependencies must share Buffer identity and the HTTP registry.
