@@ -1,4 +1,4 @@
-// Vendored from cloudflare/workerd v1.20261012.1 (src/compat/internal/internal_path.ts),
+// Vendored from cloudflare/workerd v1.20261012.1 (src/node/internal/internal_path.ts),
 // which is itself adapted from Node.js lib/path.js.
 //
 // Copyright (c) 2026 Cloudflare, Inc.

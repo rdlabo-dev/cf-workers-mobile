@@ -1,7 +1,7 @@
 # Third-party licenses
 
 `internal-querystring.ts` is vendored from workerd `v1.20261012.1`
-(`src/compat/internal/internal_querystring.ts`), which is adapted from
+(`src/node/internal/internal_querystring.ts`), which is adapted from
 Node.js `lib/querystring.js`.
 
 ## Cloudflare workerd (Apache-2.0)

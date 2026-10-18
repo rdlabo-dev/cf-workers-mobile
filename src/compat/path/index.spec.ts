@@ -88,7 +88,7 @@ export const nodePathContract: ContractSuite<typeof nodePathFeature> = {
       equal(api.join("a//b", "./c"), "a/b/c");
       equal(api.join(), ".");
       equal(api.normalize("/a//b/./c/.."), "/a/b");
-      equal(api.normalize("../a/b"), "../a/b");
+      equal(api.normalize("../a/./b"), "../a/b");
       equal(api.normalize(""), ".");
       equal(api.normalize("a/b/"), "a/b/");
       equal(api.normalize("/"), "/");

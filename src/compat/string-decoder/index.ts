@@ -1,7 +1,7 @@
 // node:string_decoder compatibility unit.
 //
 // Reproduces the Workers shell semantics of workerd 1.20261012.1
-// (src/compat/internal/internal_stringdecoder.ts): a function constructor,
+// (src/node/internal/internal_stringdecoder.ts): a function constructor,
 // prototype write/end/text methods, enumerable prototype getters for
 // lastChar/lastNeed/lastTotal, and the Workers encoding normalization
 // (null/undefined/'' all normalize to utf8). The utf8 core is implemented

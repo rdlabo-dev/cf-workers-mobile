@@ -1,7 +1,7 @@
 # Third-party licenses
 
 The decoder shell in `index.ts` reproduces the interface semantics of
-workerd `v1.20261012.1` (`src/compat/internal/internal_stringdecoder.ts`),
+workerd `v1.20261012.1` (`src/node/internal/internal_stringdecoder.ts`),
 which is adapted from Node.js `lib/string_decoder.js`. UTF-8 decoding uses a local state machine and the standard TextDecoder.
 Other encodings delegate to the `string_decoder` npm package (MIT, Joyent/Node),
 with adapters for Workers state semantics. That package is the extracted

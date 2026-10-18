@@ -1,7 +1,7 @@
 // node:querystring compatibility unit.
 //
 // Implementation is vendored from workerd 1.20261012.1
-// (src/compat/internal/internal_querystring.ts) in ./internal-querystring.ts.
+// (src/node/internal/internal_querystring.ts) in ./internal-querystring.ts.
 // See LICENSE-3RD-PARTY.md for Cloudflare/Node licenses.
 import {
   escape,

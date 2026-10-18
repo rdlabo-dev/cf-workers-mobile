@@ -1,7 +1,7 @@
 // node:path compatibility unit.
 //
 // Implementation is vendored from workerd 1.20261012.1
-// (src/compat/internal/internal_path.ts) in ./internal-path.ts, preserving
+// (src/node/internal/internal_path.ts) in ./internal-path.ts, preserving
 // Workers semantics: the virtual process cwd is '/', win32 is fully
 // implemented, and matchesGlob reproduces Workers' not-implemented
 // rejection. See LICENSE-3RD-PARTY.md for Cloudflare/Node licenses.

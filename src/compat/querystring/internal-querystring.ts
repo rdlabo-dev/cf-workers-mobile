@@ -1,5 +1,5 @@
 // Vendored from cloudflare/workerd v1.20261012.1
-// (src/compat/internal/internal_querystring.ts), adapted from Node.js
+// (src/node/internal/internal_querystring.ts), adapted from Node.js
 // lib/querystring.js.
 //
 // Copyright (c) 2017-2022 Cloudflare, Inc.

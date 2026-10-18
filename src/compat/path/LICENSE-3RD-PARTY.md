@@ -1,7 +1,7 @@
 # Third-party licenses
 
 `internal-path.ts` is vendored from workerd `v1.20261012.1`
-(`src/compat/internal/internal_path.ts`), which is adapted from Node.js
+(`src/node/internal/internal_path.ts`), which is adapted from Node.js
 `lib/path.js`.
 
 ## Cloudflare workerd (Apache-2.0)
