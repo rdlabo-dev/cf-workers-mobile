@@ -1,6 +1,6 @@
 import { documentAssets, listAssets } from "./build/documents.js";
-import { d1Modules } from "./build/d1-modules.js";
-import type { D1BuildOptions } from "./build/d1.js";
+import { serverModules } from "./build/server-modules.js";
+import type { ServerBuildOptions } from "./build/server.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -44,7 +44,7 @@ function compatibilityPlugin(): Plugin {
     },
   };
 }
-export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
+export interface CapacitorWorkersPluginOptions extends ServerBuildOptions {
   /** Workers entry relative to absWorkingDir (or cwd), or an absolute path. */
   worker: string;
   /**
@@ -79,11 +79,11 @@ export function capacitorWorkersPlugin(
         const outdir = resolve(root, config.outdir ?? dirname(config.outfile!));
         build.onEnd(async (result) => {
           if (result.errors.length) return;
-          const compilation = await d1.get();
+          const compilation = await server.get();
           if (compilation) {
             const { mode, reason, routes } = compilation;
             await writeFile(
-              resolve(outdir, "capacitor-workers-d1.json"),
+              resolve(outdir, compilation.reportFile),
               JSON.stringify({ mode, reason, routes }, null, 2),
             );
           }
@@ -101,18 +101,18 @@ export function capacitorWorkersPlugin(
         });
       }
       const originalEntry = resolve(root, options.worker);
-      const d1 = d1Modules(originalEntry, root, options);
+      const server = serverModules(originalEntry, root, options);
       let entry = originalEntry;
       let selector: string | undefined;
-      const d1Plugin: Plugin = {
-        name: "capacitor-workers-d1",
+      const serverPlugin: Plugin = {
+        name: "capacitor-workers-server",
         setup(build) {
           build.onResolve(
-            { filter: /\.capacitor-d1-(local|selector)\.js$/ },
-            ({ path }) => (d1.owns(path) ? { path } : undefined),
+            { filter: /\.capacitor-server-(local|selector)\.js$/ },
+            ({ path }) => (server.owns(path) ? { path } : undefined),
           );
           build.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, async ({ path }) => {
-            const generated = await d1.load(path);
+            const generated = await server.load(path);
             if (generated)
               return {
                 contents: generated.code,
@@ -120,28 +120,28 @@ export function capacitorWorkersPlugin(
                 resolveDir: dirname(originalEntry),
                 watchFiles: generated.inputs,
               };
-            await d1.guard(path);
+            await server.guard(path);
           });
         },
       };
       build.onStart(async () => {
-        d1.reset();
-        const compilation = await d1.get();
-        entry = compilation ? d1.localEntry : originalEntry;
-        selector = compilation ? d1.selectorEntry : undefined;
+        server.reset();
+        const compilation = await server.get();
+        entry = compilation ? server.localEntry : originalEntry;
+        selector = compilation ? server.selectorEntry : undefined;
         if (compilation)
           return {
             warnings: [
               {
                 text:
                   compilation.mode === "worker"
-                    ? `D1: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
-                    : `D1: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+                    ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+                    : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
               },
             ],
           };
       });
-      await d1Plugin.setup(build);
+      await serverPlugin.setup(build);
       const virtualFiles = async () => {
         if (!options.workerFiles?.length) return undefined;
         const map: Record<string, { base64: string }> = {};
@@ -198,7 +198,7 @@ export function capacitorWorkersPlugin(
             conditions: config.conditions,
             mainFields: config.mainFields,
             loader: config.loader,
-            plugins: [d1Plugin, compatibilityPlugin()],
+            plugins: [serverPlugin, compatibilityPlugin()],
             logLevel: "silent",
           });
           const inputs = Object.keys(result.metafile.inputs)

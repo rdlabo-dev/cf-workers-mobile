@@ -168,7 +168,7 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
       );
     if (options.remote && !source.needsRemote)
       throw new TypeError(
-        "remote requires build-generated server routes; configure the Worker's D1 bindings in the build plugin.",
+        "remote requires build-generated server routes; configure the Worker's D1 or Hyperdrive bindings in the build plugin.",
       );
     if (options.remote)
       this.remote = createRemoteWorker(

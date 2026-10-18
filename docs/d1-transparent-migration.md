@@ -73,7 +73,7 @@ This mode requires connectivity for every intercepted request; it does not make
 the existing application available offline. It is never selected by catching a
 D1 error after partly running an operation.
 
-Both build integrations emit `capacitor-workers-d1.json` describing the selected
+For D1-only builds, both integrations emit `capacitor-workers-d1.json` describing the selected
 mode and route/middleware registrations. This report is diagnostic metadata,
 not a second router maintained by application authors.
 
@@ -130,6 +130,25 @@ fallback. Abort and runtime disposal cancel pending credential lookup/transport;
 a late token cannot send after disposal. SQL removal reduces disclosure of the
 server implementation; it does not replace server-side authorization or identify
 arbitrary hardcoded secrets in otherwise local application code.
+
+## Shared transport security and upload limits
+
+App-local `Origin` and `Referer` headers are remapped to the remote origin for
+existing Worker navigation. Do not treat the rewritten Origin alone as proof of
+trusted user intent. Retain application CSRF token checks where used and restrict
+WebView content/navigation and native bridge access. HttpOnly hides cookies from
+scripts but does not prevent compromised scripts from making authenticated
+requests. Native Cookie transport does not promise browser-equivalent SameSite
+or CSRF protection.
+
+Browser uploads and native Fetch redirect-follow uploads are buffered without an
+explicit body-size cap in the shared remote transport. Large bodies can exhaust
+client memory; apply suitable client upload limits before constructing/sending
+buffered bodies. Manual native document requests retain streaming.
+
+Hyperdrive uses the same transport; see the
+[Hyperdrive guide](hyperdrive-transparent-migration.md) for binding setup and
+additional database boundaries.
 
 ## Verification
 

@@ -1,6 +1,6 @@
 # @rdlabo/capacitor-workers
 
-Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. Local requests execute without an API server or socket listener. D1-backed requests can reuse the existing deployed Worker through the build integration below. This executes JavaScript in the WebView; it does not compile Workers code to native code.
+Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. Local requests execute without an API server or socket listener. D1- and Hyperdrive-backed requests can reuse the existing deployed Worker through the build integration below. This executes JavaScript in the WebView; it does not compile Workers code to native code.
 
 ## Contents
 
@@ -225,6 +225,8 @@ Keep any other types your project already uses. This is a type-only entry; do no
 Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
 
 ## D1 and remote APIs
+
+Hyperdrive-backed Workers use the same generated HTTP dispatch. The plugins detect Wrangler `hyperdrive` bindings, keeping database drivers, SQL and connection credentials on the existing Worker. See [transparent Hyperdrive migration](docs/hyperdrive-transparent-migration.md) for setup, security boundaries and verification.
 
 Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.
 
