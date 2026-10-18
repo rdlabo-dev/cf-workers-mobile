@@ -1,8 +1,14 @@
+import { installWebGlobals } from "../compat/globals/web.js";
+import { createOutboundFetch } from "../compat/fetch/outbound.js";
+import { browserFetch, isRequest } from "../compat/fetch/interop.js";
+import type { RequestInit as WorkerRequestInit } from "../compat/request/index.js";
+import { installDirectNetworkScope } from "../compat/fetch/scope.js";
 import configuredWorker from "../configured.js";
 import { createIsolatedWorker } from "../isolated/bridge.js";
 import { FetchRuntime, type FetchRuntimeOptions } from "./runtime.js";
 import type {
   CapacitorWorkersOptions,
+  LoadedWorker,
   WorkerContext,
   WorkerFactory,
   WorkerHandler,
@@ -11,11 +17,47 @@ import type {
 
 export class DirectFetchRuntime<Env> extends FetchRuntime<Env> {
   readonly execution = "direct" as const;
+  private readonly releaseNetwork: (() => Promise<void>) | undefined;
+  private readonly restoreWeb: () => void;
+  private readonly outbound: ReturnType<typeof createOutboundFetch>;
   constructor(
     options: FetchRuntimeOptions<Env>,
     private readonly worker: WorkerHandler<Env>,
   ) {
     super(options);
+    this.restoreWeb = installWebGlobals();
+    try {
+      this.releaseNetwork = installDirectNetworkScope();
+      this.outbound = createOutboundFetch(this.original.bind(globalThis));
+    } catch (error) {
+      this.restoreWeb();
+      throw error;
+    }
+  }
+  protected override externalFetch(
+    input: RequestInfo | URL,
+    init: RequestInit | undefined,
+    url: URL,
+  ): Promise<Response> {
+    if (
+      this.localURL &&
+      url.protocol === this.localURL.protocol &&
+      url.host === this.localURL.host
+    )
+      return browserFetch(
+        isRequest(input) ? input : url.href,
+        init as WorkerRequestInit,
+        this.original.bind(globalThis),
+      ) as unknown as Promise<Response>;
+    return this.outbound(
+      isRequest(input) ? input : url.href,
+      init as WorkerRequestInit,
+    ) as unknown as Promise<Response>;
+  }
+  protected override close() {
+    const closing = this.releaseNetwork?.();
+    if (closing) return closing.finally(this.restoreWeb);
+    this.restoreWeb();
   }
   protected dispatch(request: Request, env: Env, ctx: WorkerContext) {
     return this.worker.fetch(request, env, ctx);
@@ -35,7 +77,7 @@ export class IsolatedFetchRuntime<Env> extends FetchRuntime<Env> {
     return this.isolated.handler.fetch(request, env, ctx);
   }
   protected override close() {
-    this.isolated.dispose();
+    return this.isolated.dispose();
   }
 }
 
@@ -66,12 +108,49 @@ function plainData(value: unknown, seen = new Set<object>()): boolean {
   });
 }
 
+function loadedWorker<Env>(
+  value: WorkerHandler<Env> | LoadedWorker<Env>,
+): value is LoadedWorker<Env> {
+  return "handler" in value && typeof value.dispose === "function";
+}
+
 export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
   private isolated?: ReturnType<typeof createIsolatedWorker<Env>>;
   private handler?: WorkerHandler<Env>;
   private closed = false;
   private loadingDirect = false;
   private selected?: "worker" | "direct";
+  private disposeDirect?: () => void | Promise<void>;
+  private startupDisposal?: Promise<void>;
+  private releaseNetwork?: () => Promise<void>;
+  private restoreWeb?: () => void;
+  private outbound?: ReturnType<typeof createOutboundFetch>;
+  protected override externalFetch(
+    input: RequestInfo | URL,
+    init: RequestInit | undefined,
+    url: URL,
+  ): Promise<Response> {
+    if (!this.outbound)
+      return browserFetch(
+        isRequest(input) ? input : url.href,
+        init as WorkerRequestInit,
+        this.original.bind(globalThis),
+      ) as unknown as Promise<Response>;
+    if (
+      this.localURL &&
+      url.protocol === this.localURL.protocol &&
+      url.host === this.localURL.host
+    )
+      return browserFetch(
+        isRequest(input) ? input : url.href,
+        init as WorkerRequestInit,
+        this.original.bind(globalThis),
+      ) as unknown as Promise<Response>;
+    return this.outbound(
+      isRequest(input) ? input : url.href,
+      init as WorkerRequestInit,
+    ) as unknown as Promise<Response>;
+  }
   get execution() {
     return this.selected;
   }
@@ -112,17 +191,36 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
       }
     }
     this.loadingDirect = true;
-    let handler: WorkerHandler<Env>;
     try {
-      handler = await source.loadDirect();
+      this.restoreWeb = installWebGlobals();
+      this.releaseNetwork = installDirectNetworkScope();
+      this.outbound = createOutboundFetch(this.original.bind(globalThis));
+      const loaded = await source.loadDirect();
+      const owned = loadedWorker(loaded);
+      const dispose = owned ? () => loaded.dispose() : undefined;
+      try {
+        const handler = owned ? loaded.handler : loaded;
+        if (this.closed) throw new Error("Worker runtime disposed");
+        if (typeof handler?.fetch !== "function")
+          throw new TypeError("worker.fetch is required.");
+        this.disposeDirect = dispose;
+        this.handler = handler;
+        this.selected = "direct";
+      } catch (error) {
+        this.startupDisposal = Promise.resolve().then(() => dispose?.());
+        await this.startupDisposal;
+        throw error;
+      }
+    } catch (error) {
+      try {
+        await this.releaseNetwork?.();
+      } finally {
+        this.restoreWeb?.();
+      }
+      throw error;
     } finally {
       this.loadingDirect = false;
     }
-    if (this.closed) throw new Error("Worker runtime disposed");
-    if (typeof handler?.fetch !== "function")
-      throw new TypeError("worker.fetch is required.");
-    this.handler = handler;
-    this.selected = "direct";
   }
   protected async dispatch(request: Request, env: Env, ctx: WorkerContext) {
     if (this.closed) throw new Error("Worker runtime disposed");
@@ -137,7 +235,37 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
   }
   protected override close() {
     this.closed = true;
-    this.isolated?.dispose();
+    const pending = [
+      () => this.isolated?.dispose(),
+      () => this.disposeDirect?.(),
+      () => this.releaseNetwork?.(),
+      // An import already in flight may return a loader-owned resource later.
+      // initialize() disposes that resource when closed; join it before allowing
+      // another runtime to acquire globals or native ownership.
+      () =>
+        this.loadingDirect
+          ? this.ready.catch(() => {}).then(() => this.startupDisposal)
+          : this.startupDisposal,
+    ]
+      .map((close) => {
+        try {
+          return close();
+        } catch (error) {
+          return Promise.reject(error);
+        }
+      })
+      .filter((value): value is Promise<void> => value !== undefined);
+    if (pending.length)
+      return Promise.allSettled(pending)
+        .then((results) => {
+          const failures = results.flatMap((result) =>
+            result.status === "rejected" ? [result.reason] : [],
+          );
+          if (failures.length)
+            throw new AggregateError(failures, "Runtime cleanup failed");
+        })
+        .finally(() => this.restoreWeb?.());
+    this.restoreWeb?.();
   }
 }
 

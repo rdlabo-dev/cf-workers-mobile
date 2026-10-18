@@ -173,3 +173,55 @@ Service Worker registration cleanup and native asset fallback on the current cli
 The packaged runner performs the same assertions in its `reinit` stage through
 the bundled `lifecycle.js` entry, so the CDP probe remains for the earlier
 overlay investigation only.
+
+## Native outbound HTTP contracts
+
+The raw byte transport and Workers Fetch policy run against the same loopback
+fixture in direct execution and a Dedicated Worker. Tests include redirects,
+compression, cookies, streaming, cancellation, main-frame reload and Worker
+termination. The public `capacitorWorkers()` entry is exercised in both realms.
+
+After building the library, prepare an independent packed consumer as above:
+
+```sh
+npm run test:native:package:prepare
+# Keep this server running in another terminal:
+npm run test:native:network:server
+# Run one platform at a time against the same consumer:
+npm run test:native:network -- ios <simulator-UUID>
+npm run test:native:network -- android <emulator-serial>
+```
+
+These commands replace only the temporary consumer's generated `dist`, sync the
+plugin, build, install and check all 82 results. They fail on missing or failed
+results. Build logs and reports are written under the consumer's
+`artifacts/network/`. Android uses `10.0.2.2:4201`; iOS uses `127.0.0.1:4201`.
+`ADB` and `ADB_SERVER_PORT` can select an alternate Android tool/server.
+The library does not start this test HTTP server.
+
+Certificate acceptance uses local TLS fixtures on ports 4204–4206:
+
+```sh
+NETWORK_TLS=1 npm run test:native:network -- ios <simulator-UUID>
+NETWORK_TLS=1 npm run test:native:network -- android <emulator-serial>
+```
+
+The fixture server generates short-lived certificates with OpenSSL: a valid
+certificate, an untrusted self-signed certificate and a trusted certificate for
+the wrong hostname. The runner installs the test CA in the selected iOS
+simulator and in the independent Android consumer's **debug-only** network
+security configuration. No test trust configuration is shipped in the library.
+Keep the fixture server running during the run so its certificates match.
+The TLS cases also consume the body and reject both clean and unclean
+EOF-delimited responses, enforcing the documented HTTPS framing requirement.
+Each platform must produce 92 successful results; DNS failures and timeouts do
+not count as certificate rejection. Native TLS tests require no external site.
+
+The separate `npm run test:workers:tls` reference test still uses public
+[badssl](https://badssl.com/) endpoints and requires working Internet/DNS.
+
+The same network run also checks `node:net`: half-close, vectored writes, custom
+lookup, `onread` buffers, abort/timeout, paused payload preservation and FIN/reset
+notification before and after data delivery. Both Cloudflare TCP helpers dispatch
+through a public `net.Server`, including drop, pause-on-connect and close ordering.
+The server registers a logical port; it does not open an OS listening socket.

@@ -1,3 +1,5 @@
+import { isResponse } from "../compat/fetch/interop.js";
+import { Request as WorkerRequest } from "../compat/request/index.js";
 import type { WorkerHandler } from "../fetch/types.js";
 import type { Command, Invocation, Reply } from "./protocol.js";
 
@@ -56,13 +58,13 @@ export function serve(worker: WorkerHandler<unknown>) {
     const pending: Promise<unknown>[] = [];
     const errors: string[] = [];
     try {
-      const request = new Request(url, {
+      const request = new WorkerRequest(url, {
         method,
         headers,
         body,
         signal: controller.signal,
       });
-      const response = await worker.fetch(request, env, {
+      const response = await worker.fetch(request as unknown as Request, env, {
         props: {},
         passThroughOnException() {
           throw new Error(
@@ -77,7 +79,7 @@ export function serve(worker: WorkerHandler<unknown>) {
           );
         },
       });
-      if (!(response instanceof Response) || response.status === 0)
+      if (!isResponse(response) || response.status === 0)
         throw new TypeError("worker.fetch must return a non-error Response.");
       if (response.bodyUsed || response.body?.locked)
         throw new TypeError("worker.fetch returned an unusable response body.");

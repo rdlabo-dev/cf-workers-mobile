@@ -5,12 +5,14 @@ import { fileURLToPath } from "node:url";
 const [app, framework, ...extra] = process.argv.slice(2);
 if (
   extra.length ||
-  !["validation", "runtime", "native-documents"].includes(app) ||
+  !["validation", "runtime", "native-documents", "native-network"].includes(
+    app,
+  ) ||
   (framework !== undefined &&
     (app !== "native-documents" || !["hono", "express"].includes(framework)))
 ) {
   throw new Error(
-    "Usage: npm run test:native:prepare -- validation|runtime|native-documents [hono|express]",
+    "Usage: npm run test:native:prepare -- validation|runtime|native-documents|native-network [hono|express]",
   );
 }
 

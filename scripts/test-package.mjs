@@ -11,6 +11,20 @@ const pack = JSON.parse(
     encoding: "utf8",
   }),
 )[0];
+for (const module of ["path", "querystring", "string-decoder"]) {
+  for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
+    const notice = `dist/compat/${module}/${name}`;
+    if (!pack.files.some((file) => file.path === notice))
+      throw new Error(`Missing upstream license notice in tarball: ${notice}`);
+  }
+}
+for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
+  const notice = `dist/compat/brotli/${name}`;
+  if (!pack.files.some((file) => file.path === notice))
+    throw new Error(
+      `Missing bundled codec license notice in tarball: ${notice}`,
+    );
+}
 await writeFile(
   join(temp, "package.json"),
   JSON.stringify({ name: "fresh-consumer", private: true, type: "module" }),
@@ -37,6 +51,35 @@ for (const entry of [
   "tests/fixtures",
 ]) {
   await cp(join("demo", entry), join(temp, "demo", entry), { recursive: true });
+}
+// Candidate Web API contracts use internal modules from the installed tarball.
+// Never copy library implementation sources from the checkout.
+await cp(
+  join(temp, "node_modules/@rdlabo/capacitor-workers/dist/compat"),
+  join(temp, "src/compat"),
+  { recursive: true },
+);
+// Copy module-owned contracts separately; these are not shipped.
+for (const module of [
+  "path",
+  "querystring",
+  "string-decoder",
+  "http",
+  "net",
+  "headers",
+  "request",
+  "response",
+  "immediate",
+  "structured-clone",
+  "encoding",
+  "abort",
+]) {
+  const directory = join("src", "compat", module);
+  await mkdir(join(temp, directory), { recursive: true });
+  await cp(
+    join(directory, "index.spec.ts"),
+    join(temp, directory, "index.spec.ts"),
+  );
 }
 await writeFile(
   join(temp, "vite.config.mjs"),
@@ -220,7 +263,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 28 ||
+    features.flatMap((report) => report.cases).length !== 162 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -304,6 +347,14 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
         );
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
+    page.on("requestfailed", (request) =>
+      console.error("Consumer request:", request.url(), request.failure()),
+    );
+    page.on("pageerror", (error) => console.error("Consumer page:", error));
+    page.on("console", (message) => {
+      if (message.type() === "error")
+        console.error("Consumer console:", message.text());
+    });
     await page.goto("http://127.0.0.1:4187/features.html");
     await page.waitForFunction(
       () => typeof window.runConfiguredFeature === "function",
@@ -323,6 +374,9 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     console.log(
       "Packed consumer: configured Fetch subpath in Vite dev 2/2 passed",
     );
+  } catch (error) {
+    console.error(devOutput);
+    throw error;
   } finally {
     dev.kill("SIGTERM");
   }
@@ -336,7 +390,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     ),
   );
   console.log(
-    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features 28/28, preferences 2/2 passed (${temp})`,
+    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).length} passed, 0 exclusions, preferences 2/2 passed (${temp})`,
   );
 } finally {
   await browser?.close();

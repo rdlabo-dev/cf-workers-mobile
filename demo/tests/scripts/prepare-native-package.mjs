@@ -167,6 +167,19 @@ await writeFile(
 run("npm", ["run", "build"], consumer);
 run("npx", ["cap", "add", "ios"], consumer);
 run("npx", ["cap", "add", "android"], consumer);
+// The same application-level packaging configuration documented for consumers.
+const appGradle = join(consumer, "android/app/build.gradle");
+await writeFile(
+  appGradle,
+  (await readFile(appGradle, "utf8")).replace(
+    "android {",
+    `android {
+    packaging.resources {
+        excludes += 'META-INF/INDEX.LIST'
+        merges += 'META-INF/io.netty.versions.properties'
+    }`,
+  ),
+);
 run("npx", ["cap", "sync"], consumer);
 const ios = JSON.parse(
   await readFile(join(consumer, "ios/App/App/capacitor.config.json"), "utf8"),

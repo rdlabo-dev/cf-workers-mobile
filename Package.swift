@@ -13,7 +13,9 @@ let package = Package(
     targets: [
         .target(
             name: "RdlaboCapacitorWorkers",
-            dependencies: [.product(name: "Capacitor", package: "capacitor-swift-pm")],
+            dependencies: [
+                .product(name: "Capacitor", package: "capacitor-swift-pm")
+            ],
             path: "native/ios"
         )
     ]

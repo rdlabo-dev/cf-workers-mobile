@@ -16,9 +16,13 @@ function setup(
   const direct = {
     fetch: vi.fn((_request: Request, _env: unknown) => new Response("direct")),
   };
+  const disposeDirect = vi.fn();
   const source = {
     createWorker: vi.fn(() => workerFor(workerHandler) as unknown as Worker),
-    loadDirect: vi.fn(async () => direct),
+    loadDirect: vi.fn(async () => ({
+      handler: direct,
+      dispose: disposeDirect,
+    })),
   };
   const runtime = createFetchRuntime({
     worker: source,
@@ -27,7 +31,7 @@ function setup(
     env,
   });
   cleanups.push(() => runtime.dispose());
-  return { runtime, source, direct, workerHandler };
+  return { runtime, source, direct, disposeDirect, workerHandler };
 }
 it("prefers a worker without loading the direct module", async () => {
   const { runtime, source } = setup();
@@ -36,10 +40,12 @@ it("prefers a worker without loading the direct module", async () => {
   expect(source.loadDirect).not.toHaveBeenCalled();
 });
 it("prefers direct without creating a worker", async () => {
-  const { runtime, source } = setup("direct");
+  const { runtime, source, disposeDirect } = setup("direct");
   await runtime.ready;
   expect(await (await runtime.fetch("https://test/api")).text()).toBe("direct");
   expect(source.createWorker).not.toHaveBeenCalled();
+  runtime.dispose();
+  expect(disposeDirect).toHaveBeenCalledOnce();
 });
 it("falls back before dispatch when Worker is unavailable", async () => {
   const { runtime, source } = setup(undefined, {}, true);
@@ -72,23 +78,79 @@ it("does not replay failed requests in another environment", async () => {
   expect(workerHandler.fetch).toHaveBeenCalledOnce();
 });
 it("does not dispatch after disposal during lazy initialization", async () => {
-  let resolve!: (value: { fetch: () => Response }) => void;
   const direct = { fetch: vi.fn(() => new Response()) };
+  const disposeDirect = vi.fn();
+  let resolve!: (value: {
+    handler: typeof direct;
+    dispose: typeof disposeDirect;
+  }) => void;
   const runtime = createFetchRuntime({
     baseURL: "https://test/api",
     prefer: "direct",
     worker: {
       createWorker: vi.fn(),
       loadDirect: () =>
-        new Promise<{ fetch: () => Response }>((done) => {
+        new Promise<{
+          handler: typeof direct;
+          dispose: typeof disposeDirect;
+        }>((done) => {
           resolve = done;
         }),
     },
   });
   runtime.dispose();
-  resolve(direct);
+  resolve({ handler: direct, dispose: disposeDirect });
   await expect(runtime.ready).rejects.toThrow("disposed");
   expect(direct.fetch).not.toHaveBeenCalled();
+  expect(disposeDirect).toHaveBeenCalledOnce();
+});
+it("does not release a newer direct load when an older disposed load resolves", async () => {
+  const firstHandler = { fetch: vi.fn(() => new Response("first")) };
+  const secondHandler = { fetch: vi.fn(() => new Response("second")) };
+  const disposeFirst = vi.fn();
+  const disposeSecond = vi.fn();
+  let resolveFirst!: (value: {
+    handler: typeof firstHandler;
+    dispose: typeof disposeFirst;
+  }) => void;
+  let loads = 0;
+  const source = {
+    createWorker: vi.fn(),
+    loadDirect: () => {
+      if (loads++ === 0)
+        return new Promise<{
+          handler: typeof firstHandler;
+          dispose: typeof disposeFirst;
+        }>((resolve) => {
+          resolveFirst = resolve;
+        });
+      return Promise.resolve({
+        handler: secondHandler,
+        dispose: disposeSecond,
+      });
+    },
+  };
+  const first = createFetchRuntime({
+    baseURL: "https://test/api",
+    prefer: "direct",
+    worker: source,
+  });
+  first.dispose();
+  const second = createFetchRuntime({
+    baseURL: "https://test/api",
+    prefer: "direct",
+    worker: source,
+  });
+  await second.ready;
+
+  resolveFirst({ handler: firstHandler, dispose: disposeFirst });
+  await expect(first.ready).rejects.toThrow("disposed");
+  expect(disposeFirst).toHaveBeenCalledOnce();
+  expect(disposeSecond).not.toHaveBeenCalled();
+  expect(await (await second.fetch("https://test/api")).text()).toBe("second");
+
+  second.dispose();
+  expect(disposeSecond).toHaveBeenCalledOnce();
 });
 it("falls back on a platform constructor denial, but not a script startup error", async () => {
   vi.stubGlobal("Worker", function Worker() {});
@@ -237,4 +299,46 @@ it("aborts queued worker requests before startup without replaying them", async 
   await runtime.ready;
   expect(await (await runtime.fetch("https://test/api")).text()).toBe("ready");
   expect(handler.fetch).toHaveBeenCalledOnce();
+});
+
+it("releases a loaded worker when its fetch accessor throws", async () => {
+  const failure = new Error("fetch getter failed");
+  const dispose = vi.fn();
+  const runtime = createFetchRuntime({
+    baseURL: "https://test/api",
+    prefer: "direct",
+    worker: {
+      createWorker: vi.fn(),
+      loadDirect: async () => ({
+        handler: {
+          get fetch(): never {
+            throw failure;
+          },
+        },
+        dispose,
+      }),
+    },
+  });
+  await expect(runtime.ready).rejects.toBe(failure);
+  runtime.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
+});
+
+it("preserves the loaded worker as the disposer receiver", async () => {
+  const owned = {
+    handler: { fetch: () => new Response("ok") },
+    releases: 0,
+    dispose() {
+      this.releases++;
+    },
+  };
+  const runtime = createFetchRuntime({
+    baseURL: "https://test/api",
+    prefer: "direct",
+    worker: { createWorker: vi.fn(), loadDirect: async () => owned },
+  });
+  await runtime.ready;
+  runtime.dispose();
+  runtime.dispose();
+  expect(owned.releases).toBe(1);
 });

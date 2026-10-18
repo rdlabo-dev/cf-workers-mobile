@@ -15,4 +15,5 @@ android {
 
 dependencies {
     implementation project(':capacitor-android')
+    implementation 'io.netty:netty-handler:4.1.139.Final'
 }

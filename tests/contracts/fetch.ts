@@ -215,16 +215,16 @@ export function defineFetchContract(
       },
     );
 
-    it("delegates outside requests unchanged, including Request identity and init", async () => {
+    it("delegates pre-installation outside Requests unchanged, including identity and init", async () => {
       const network = vi.fn(async () => new Response("network"));
       globalThis.fetch = network;
-      runtime = install({
-        baseURL: "https://api.example/api",
-        worker: { fetch: () => new Response() },
-      });
       const request = new Request("https://outside.example/api", {
         method: "POST",
         body: "body",
+      });
+      runtime = install({
+        baseURL: "https://api.example/api",
+        worker: { fetch: () => new Response() },
       });
       const init = { headers: { "x-test": "yes" } };
       await runtime.fetch(request, init);

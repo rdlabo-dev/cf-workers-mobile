@@ -28,7 +28,11 @@
     "test:upstream:workerd": "vitest run --config tests/vitest.upstream.config.ts",
     "test:upstream:prepare": "node tests/scripts/prepare-upstream.mjs",
     "test:upstream": "node tests/scripts/run-upstream-native.mjs",
-    "test:upstream:browser": "vite build --config tests/upstream/hono-jsx-ssr/browser/vite.config.ts && playwright test --config tests/playwright.upstream.config.ts"
+    "test:upstream:browser": "vite build --config tests/upstream/hono-jsx-ssr/browser/vite.config.ts && playwright test --config tests/playwright.upstream.config.ts",
+    "build:native-network": "node tests/scripts/build-native-network.mjs",
+    "test:native:network:server": "node tests/scripts/network-server.mjs",
+    "test:native:network": "node tests/scripts/run-native-network.mjs",
+    "test:workers:tls": "vitest run --config tests/vitest.tls.config.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
@@ -44,10 +48,11 @@
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "cf": "^1.0.0-beta.17",
+    "esbuild": "^0.28.2",
+    "miniflare": "5.20261012.0-beta",
     "typescript": "^7.0.2",
     "vite": "^7.3.7",
     "vitest": "^5.0.5",
-    "wrangler": "^4.151.0",
-    "esbuild": "^0.28.2"
+    "wrangler": "^4.151.0"
   }
 }

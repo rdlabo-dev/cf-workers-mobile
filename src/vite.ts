@@ -4,27 +4,76 @@ import { existsSync } from "node:fs";
 import {
   configuredPath,
   compatibilityAliases,
+  globalsInstallPath,
+  nodeGlobalsInstallPath,
+  globalsPath,
   workerEntry,
-  compatPath,
 } from "./build/shared.js";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import inject from "@rollup/plugin-inject";
 import type { Plugin, PluginOption } from "vite";
 import { normalizePath } from "vite";
 
 /** Add only to the Capacitor/browser build, never the Cloudflare build. */
-function compatibilityPlugins(): PluginOption[] {
+function compatibilityPlugins(
+  installGlobals: false | "worker" | "node" = false,
+): PluginOption[] {
+  // Overrides take bare module names only; both bare and "node:" imports of
+  // the same module resolve to the shared compat profile.
+  const overrides = Object.fromEntries(
+    Object.entries(compatibilityAliases()).filter(
+      ([specifier]) => !specifier.includes(":") && !specifier.includes("/"),
+    ),
+  );
   return [
+    ...(installGlobals
+      ? [
+          {
+            name: "capacitor-workers-global-install",
+            enforce: "pre" as const,
+            transform(code: string, id: string) {
+              const path = normalizePath(id.split("?")[0]);
+              if (
+                !/\.[cm]?[jt]sx?$/.test(path) ||
+                path.includes("/node_modules/") ||
+                path.startsWith(
+                  normalizePath(resolve(globalsPath, "../../../")),
+                )
+              )
+                return;
+              return `import ${JSON.stringify(installGlobals === "worker" ? globalsInstallPath : nodeGlobalsInstallPath)};\n${code}`;
+            },
+          },
+        ]
+      : []),
     {
       name: "capacitor-workers",
       config: () => ({
         // Express and cloudflare:node must share one prebundled HTTP registry.
-        optimizeDeps: { include: ["cloudflare:node"] },
+        optimizeDeps: { include: ["cloudflare:node", "node:http", "http"] },
         resolve: {
           alias: compatibilityAliases(),
         },
       }),
     },
-    ...nodePolyfills({ overrides: { http: compatPath("http") } }),
+    ...nodePolyfills({
+      overrides,
+      globals: { Buffer: false, global: false, process: false },
+    }),
+    {
+      ...inject({
+        Buffer: [globalsPath, "Buffer"],
+        process: [globalsPath, "process"],
+        global: [globalsPath, "global"],
+        setImmediate: [globalsPath, "setImmediate"],
+        clearImmediate: [globalsPath, "clearImmediate"],
+        exclude: [
+          normalizePath(globalsPath),
+          normalizePath(globalsInstallPath),
+        ],
+      }),
+      enforce: "post",
+    },
   ];
 }
 
@@ -65,6 +114,7 @@ export function capacitorWorkersPlugin(
       enforce: "pre",
       config: () => ({
         optimizeDeps: { exclude: ["@rdlabo/capacitor-workers"] },
+        worker: { format: "es" },
       }),
       configResolved(config) {
         root = config.root;
@@ -106,7 +156,16 @@ export function capacitorWorkersPlugin(
           );
         entries.set(generated, entry);
         return `import Constructor from ${JSON.stringify(generated + "?worker")};
-export default { createWorker: () => new Constructor(), loadDirect: async () => (await import(${JSON.stringify(entry)})).default };`;
+import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
+export default { createWorker: () => new Constructor(), async loadDirect() {
+  const dispose = installNodeGlobals();
+  try {
+    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+} };`;
       },
     },
     workerEntryPlugin(entries),
@@ -119,12 +178,12 @@ export default { createWorker: () => new Constructor(), loadDirect: async () => 
             plugins: () => [
               ...(previous?.() ?? []),
               workerEntryPlugin(entries),
-              ...compatibilityPlugins(),
+              ...compatibilityPlugins("worker"),
             ],
           },
         };
       },
     },
-    ...compatibilityPlugins(),
+    ...compatibilityPlugins(options.worker ? false : "node"),
   ];
 }

@@ -57,20 +57,20 @@ export async function stopDocumentWorker() {
   if (isDocumentWorker(container.controller)) workers.add(container.controller);
   // Unregister alone leaves already controlled documents intercepted. Disable
   // dispatch and wait for acknowledgement before completing cleanup.
-  let acknowledged = true;
+  const acknowledged = new Set<ServiceWorker>();
   try {
-    const results = await Promise.all(
-      [...workers]
-        .filter(isDocumentWorker)
-        .map((worker) => notify(worker!, disableMessage)),
+    await Promise.all(
+      [...workers].filter(isDocumentWorker).map(async (worker) => {
+        if (await notify(worker!, disableMessage)) acknowledged.add(worker!);
+      }),
     );
-    acknowledged = results.every(Boolean);
   } finally {
     await Promise.all(registrations.map((entry) => entry.unregister()));
   }
   // Versions predating the disable protocol cannot release an existing client.
   // A fresh document after unregistering drops their controller.
-  if (!acknowledged && isDocumentWorker(container.controller))
+  const controller = container.controller;
+  if (isDocumentWorker(controller) && !acknowledged.has(controller!))
     location.reload();
 }
 

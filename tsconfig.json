@@ -7,7 +7,11 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@rdlabo/capacitor-workers/features": ["./src/features/index.ts"],
+      "@rdlabo/capacitor-workers/testing": ["./src/features/testing.ts"]
+    }
   },
   "include": ["src", "tests", "*.ts"]
 }

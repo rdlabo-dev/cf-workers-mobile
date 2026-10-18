@@ -1,0 +1,3 @@
+The compiled Brotli decoder bundles brotli-dec-wasm 2.3.2
+(https://github.com/ustclug-dev/brotli-dec-wasm), licensed under MIT OR Apache-2.0.
+Its notices and license texts accompany this module.

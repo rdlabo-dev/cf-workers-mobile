@@ -1,6 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
+    packaging.resources {
+        excludes += 'META-INF/INDEX.LIST'
+        merges += 'META-INF/io.netty.versions.properties'
+    }
     namespace = "jp.rdlabo.capacitorworkers.poc"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {

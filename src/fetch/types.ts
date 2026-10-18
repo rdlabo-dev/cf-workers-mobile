@@ -23,10 +23,15 @@ export interface FetchRuntimeOptions<Env> {
   onBackgroundError?: (error: unknown) => void;
 }
 
+export interface LoadedWorker<Env = Record<string, unknown>> {
+  handler: WorkerHandler<Env>;
+  dispose(): void | Promise<void>;
+}
+
 /** Supplied by a build plugin or explicit ESM wiring; direct code loads only when selected. */
 export interface WorkerSource<Env = Record<string, unknown>> {
   createWorker: WorkerFactory;
-  loadDirect(): Promise<WorkerHandler<Env>>;
+  loadDirect(): Promise<WorkerHandler<Env> | LoadedWorker<Env>>;
 }
 export type ExecutionPreference = "worker" | "direct";
 

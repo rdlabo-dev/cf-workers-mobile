@@ -10,6 +10,7 @@ export type {
   WorkerContext,
   WorkerFactory,
   WorkerSource,
+  LoadedWorker,
   ExecutionPreference,
   WorkerHandler,
 } from "./fetch/types.js";
@@ -30,6 +31,7 @@ export function capacitorWorkers<Env = Record<string, unknown>>(
   globalThis.fetch = runtime.fetch;
   installed = true;
   let disposed = false;
+  let disposal: Promise<void> | undefined;
   let documents: ReturnType<typeof startRendering> | undefined;
   try {
     documents =
@@ -42,17 +44,32 @@ export function capacitorWorkers<Env = Record<string, unknown>>(
             original.bind(globalThis),
           );
   } catch (error) {
-    runtime.dispose();
     globalThis.fetch = original;
-    installed = false;
+    const cleanup = runtime.dispose();
+    if (cleanup)
+      void cleanup
+        .finally(() => {
+          installed = false;
+        })
+        .catch(console.error);
+    else installed = false;
     throw error;
   }
-  const releaseInstallation = (error: unknown): never => {
+  const releaseInstallation = async (error: unknown): Promise<never> => {
     if (!disposed) {
-      runtime.dispose();
       if (globalThis.fetch === runtime.fetch) globalThis.fetch = original;
-      installed = false;
       disposed = true;
+      disposal = Promise.resolve(runtime.dispose()).finally(() => {
+        installed = false;
+      });
+    }
+    try {
+      await disposal;
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        "Startup and cleanup failed",
+      );
     }
     throw error;
   };
@@ -71,7 +88,6 @@ export function capacitorWorkers<Env = Record<string, unknown>>(
           },
         )
       : runtime.ready;
-  let disposal: Promise<void> | undefined;
   return {
     ready,
     get execution() {
@@ -84,19 +100,27 @@ export function capacitorWorkers<Env = Record<string, unknown>>(
         throw new Error(
           "fetch changed after installation; restore it before disposing.",
         );
-      runtime.dispose();
+      const runtimeDisposal = runtime.dispose();
       globalThis.fetch = original;
       disposed = true;
-      if (documents) {
-        disposal = documents.dispose().finally(() => {
-          installed = false;
-        });
-        return disposal;
-      }
-      if (previousRendering) {
-        disposal = previousRendering.finally(() => {
-          installed = false;
-        });
+      const pending = [
+        runtimeDisposal,
+        documents?.dispose(),
+        previousRendering,
+      ].filter((value): value is Promise<void> => value !== undefined);
+      if (pending.length) {
+        disposal = Promise.allSettled(pending)
+          .then((results) => {
+            const errors = results.flatMap((result) =>
+              result.status === "rejected" ? [result.reason] : [],
+            );
+            if (errors.length === 1) throw errors[0];
+            if (errors.length)
+              throw new AggregateError(errors, "Runtime cleanup failed");
+          })
+          .finally(() => {
+            installed = false;
+          });
         return disposal;
       }
       installed = false;

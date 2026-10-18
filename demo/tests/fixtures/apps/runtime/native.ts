@@ -1,7 +1,8 @@
+import { runWebApis } from "../../../validation/web-apis";
 import { Capacitor } from "@capacitor/core";
 import { runFrameworkContract } from "./frameworks";
 
-type Result = { name: string; ok: boolean; error?: string };
+type Result = { name: string; ok: boolean; error?: string; excluded?: boolean };
 const results: Result[] = [];
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected))
@@ -140,7 +141,7 @@ export async function runNativeExperiment() {
       results.push({ name, ok: false, error: String(error) });
     } finally {
       clearTimeout(timer);
-      runtime?.dispose();
+      await runtime?.dispose();
     }
   }
   for (const framework of ["hono", "express"] as const) {
@@ -177,13 +178,15 @@ export async function runNativeExperiment() {
       });
     } finally {
       clearTimeout(timer);
-      runtime?.dispose();
+      await runtime?.dispose();
     }
   }
   let featureTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const reports = await Promise.race([
-      window.runFeatures(),
+      Promise.all([window.runFeatures(), runWebApis()]).then((reports) =>
+        reports.flat(),
+      ),
       new Promise<never>((_, reject) => {
         featureTimer = setTimeout(
           () => reject(new Error("Feature verification timed out")),
@@ -191,13 +194,16 @@ export async function runNativeExperiment() {
         );
       }),
     ]);
-    for (const report of reports)
+    for (const report of reports) {
+      console.log("FEATURE_REPORT", JSON.stringify(report));
       for (const test of report.cases)
         results.push({
           name: `${report.environment}: ${report.feature}/${test.id}`,
           ok: test.status === "passed",
+          excluded: test.status === "unsupported",
           error: test.reason,
         });
+    }
   } catch (error) {
     results.push({
       name: "common feature verification",
@@ -238,6 +244,13 @@ export async function runNativeExperiment() {
         ).text(),
         "preference 🍷",
       );
+      const globals = await (await fetch("/api/node-globals")).json();
+      equal(globals.unqualified, [true, true]);
+      equal(globals.qualified, [true, true, true]);
+      equal(globals.computed, [true, true, true]);
+      equal(globals.dynamic, [true, true, true, true, true]);
+      equal(globals.processEnv, {});
+      results.push({ name: `node globals: ${mode}`, ok: true });
       results.push({ name: `preference: ${mode}`, ok: true });
     } catch (error) {
       results.push({
@@ -247,7 +260,7 @@ export async function runNativeExperiment() {
       });
     } finally {
       clearTimeout(timer);
-      runtime.dispose();
+      await runtime.dispose();
     }
   }
   const report = {
@@ -259,7 +272,15 @@ export async function runNativeExperiment() {
   };
   document.body.innerHTML = "<h1></h1><pre></pre>";
   document.querySelector("h1")!.textContent =
-    `${results.every((r) => r.ok) ? "PASS" : "FAIL"} ${results.filter((r) => r.ok).length}/${results.length}`;
+    `${results.every((r) => r.ok) ? "PASS" : "FAIL"} ${results.filter((r) => r.ok && !r.excluded).length} passed, ${results.filter((r) => r.excluded).length} excluded`;
   document.querySelector("pre")!.textContent = JSON.stringify(report, null, 2);
   console.log("NATIVE_EXPERIMENT", JSON.stringify(report));
+  console.log(
+    "NATIVE_SUMMARY",
+    JSON.stringify({
+      passed: results.filter((r) => r.ok && !r.excluded).length,
+      excluded: results.filter((r) => r.excluded).length,
+      failures: results.filter((r) => !r.ok),
+    }),
+  );
 }

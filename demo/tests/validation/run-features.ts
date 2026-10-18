@@ -9,6 +9,8 @@ const isolated = () =>
 import { fetchContract } from "@rdlabo/capacitor-workers/testing/fetch";
 import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
 import { wasmContract } from "./contracts/wasm";
+import { runNodeContracts } from "./node-modules";
+import { runNodeContractsInWorker } from "./node-worker";
 import { PersistentText, WasmValidation } from "./implementations";
 export async function runFeatures() {
   await verifyKVPersistence();
@@ -34,6 +36,10 @@ export async function runFeatures() {
     environment: "webview",
     ...(await runContract(new WasmValidation(), wasmContract)),
   });
+  for (const report of await runNodeContracts("bundled"))
+    reports.push({ environment: "direct", ...report });
+  for (const report of await runNodeContractsInWorker())
+    reports.push({ environment: "isolated", ...report });
   for (const report of reports) assertContract(report);
   return reports;
 }

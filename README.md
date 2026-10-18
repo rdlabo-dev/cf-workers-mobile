@@ -146,6 +146,15 @@ Explicit direct-handler imports and standard `new Worker(new URL(...), { type: "
 
 Direct imports remain supported: `import worker from "./worker"` supplies an object with `fetch` and runs in the UI global scope. Hono needs no build plugin in that mode; Workers Express still needs the compatibility plugin. Worker subrequests stay outside UI interception only when `runtime.execution` is `"worker"`; direct fallback shares the UI global environment.
 
+If the Worker or any dependency uses Workers extensions (for example
+`Headers.getAll("set-cookie")` or `Request.cf`) during module evaluation, configure
+`worker` in the Vite/esbuild plugin as shown above. The runtime installs its Web
+APIs before loading that entry and its dependencies, in both execution modes.
+With a direct static import, module evaluation happens before `capacitorWorkers()`
+can initialize those APIs; only calls made after initialization use the installed
+implementations. For plain JavaScript, use the `loadDirect` source shown above
+when initialization must precede module evaluation.
+
 ### URL contract
 
 #### How local requests are selected
@@ -198,7 +207,7 @@ app.listen(3000);
 export default httpServerHandler({ port: 3000 });
 ```
 
-Use the plugin shown above only in the Capacitor/browser build, never the Cloudflare build. It supplies limited Node HTTP compatibility and browser polyfills. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
+Use the plugin shown above only in the Capacitor/browser build, never the Cloudflare build. It supplies Workers-compatible `node:http` and `node:net` adapters alongside browser polyfills; the [compatibility inventory](docs/node-compatibility-inventory.md) records the verified baseline and modules. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
 
 ### TypeScript types
 
@@ -279,6 +288,26 @@ Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`,
 
 ### Native demo
 
+The native build requires Xcode 26 / Swift 6.2 or newer and Java 21.
+HTTP/1.1 request framing and response parsing run in JavaScript/WebAssembly.
+The native plugin provides TCP/TLS byte I/O and WebView integration; iOS uses
+Network.framework without AsyncHTTPClient or Swift NIO. Android uses Netty for
+TCP/TLS, without its HTTP codec.
+HTTPS response bodies require Content-Length or chunked framing; EOF-delimited
+HTTPS bodies fail explicitly because the native byte bridge cannot distinguish
+authenticated closure from truncation. See [the native boundary](docs/native-boundary-audit.md).
+For Android, add the following resource rules inside `android {}` in the application's
+`android/app/build.gradle` (already present in the demo):
+
+```groovy
+packaging.resources {
+    excludes += 'META-INF/INDEX.LIST'
+    merges += 'META-INF/io.netty.versions.properties'
+}
+```
+
+These combine Netty's dependency metadata; the library does not modify the application's Gradle configuration.
+
 Run the following from `demo/`, after building its web assets:
 
 ```sh
@@ -302,17 +331,19 @@ CI runs library/type checks, real local workerd contracts, Chromium/WebKit integ
 - `ctx.waitUntil()` tracks promises without delaying the response; `runtime.drain()` waits for them. Errors go to optional `onBackgroundError` (default: console). OS suspension/termination can stop pending work.
 - Fetch abort rejects the caller and propagates a signal. It cannot forcibly stop arbitrary application work. Cookies, redirect following, `Response.url` population, credentials/cache policies and CORS enforcement are not emulated for local calls.
 
+The [Node.js compatibility inventory](docs/node-compatibility-inventory.md) separates JS implementations, global adapters, native transports and architecture gaps. Its implementation status distinguishes completed, verified units from planned or unverified modules.
+
 ### Framework and platform limits
 
-- Express request/response bodies are buffered. Streaming, file serving, compressed request bodies, WebSockets, arbitrary Node APIs and async context propagation are not guaranteed. The compatibility layer is not a general Node runtime.
-- `passThroughOnException`, WorkerEntrypoint/RPC, Service Worker format and Workers-specific Request fields are unsupported. Worker evaluation must not fetch its own local endpoints before installation.
-- CapacitorHttp's fetch patch is not tested; leave it disabled for this PoC. The Fetch-only path adds no native code beyond the generated Capacitor projects. The `render` option's native document integration ships its own packaged plugin sources (iOS SPM / Android Gradle); it is native-only and does not run in a plain browser.
+- Workers HTTP request/response streaming and native TCP are covered by shared contracts. File serving, WebSockets, other Node modules and async context propagation require their own compatibility work; the inventory records their status. The compatibility layer is not a general Node runtime.
+- `passThroughOnException`, WorkerEntrypoint/RPC and Service Worker format are unsupported. Workers-specific Request fields are covered only where stated in the compatibility inventory; `Request.cf` is preserved locally and is not populated with Cloudflare network metadata. Worker evaluation must not fetch its own local endpoints before installation.
+- CapacitorHttp's fetch patch is not tested; leave it disabled for this PoC. The package includes native TCP/TLS transport and document integration sources (iOS SPM / Android Gradle). A plain browser uses browser Fetch; native document rendering requires Capacitor.
 
 ### Security and network boundaries
 
 - Client bundles are readable by users. Do not bundle server secrets or privileged backend logic. Unsupported operations do not automatically connect to cloud resources.
 
-With a direct Worker import, matching Worker subrequests can re-enter the UI handler. With Worker execution, outbound fetch uses the Dedicated Worker's own global fetch. It still follows WebView networking/CORS policies; this is not a workerd isolate or a CORS bypass.
+With a direct Worker import, matching Worker subrequests can re-enter the UI handler. In Capacitor, outbound HTTP(S) uses the packaged native transport, including when relayed from a Dedicated Worker. This transport handles headers, redirects and response bytes outside browser CORS enforcement. In a plain browser, outbound requests use browser Fetch and remain subject to its CORS and header restrictions. Neither execution mode is a workerd isolate.
 
 ### Worker transport and resource lifetime
 
@@ -323,6 +354,8 @@ The isolated transport buffers uploads and streams responses as pull-driven Mess
 See [the runtime investigation and validation history](docs/runtime-contract.md). The validation app under `demo/tests/fixtures/apps/runtime/` now uses the library's public factory path; the transport is no longer copied into the demo. Its native assets are prepared using the documented test command. No npm release has been published by this change.
 
 ## Extending the library
+
+We accept completed compatibility units only. Partial implementations remain development work and are not eligible for merge or release. See the [contribution and acceptance policy](CONTRIBUTING.md).
 
 ### Common feature standard
 

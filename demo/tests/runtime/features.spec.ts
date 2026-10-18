@@ -5,12 +5,12 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
   await page.goto("/");
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
-  expect(reports.map((report) => report.cases.length)).toEqual([4, 4, 18, 2]);
-  expect(
-    reports
-      .flatMap((report) => report.cases)
-      .every((test) => test.status === "passed"),
-  ).toBe(true);
+  expect(reports.map((report) => report.cases.length)).toEqual([
+    4, 4, 18, 2, 14, 11, 15, 18, 9, 14, 11, 15, 18, 9,
+  ]);
+  const cases = reports.flatMap((report) => report.cases);
+  expect(reports.flatMap((report) => report.errors)).toEqual([]);
+  expect(cases.filter((test) => test.status !== "passed")).toEqual([]);
 });
 
 test("KV survives a WebView document reload and remains namespace-isolated", async ({

@@ -1,8 +1,10 @@
+import { createNetworkRelay } from "../compat/fetch/relay.js";
 import type { WorkerHandler } from "../fetch/types.js";
 import type { Command, Reply } from "./protocol.js";
 
 /** Internal Dedicated Worker transport. */
 export function createIsolatedWorker<Env>(worker: Worker) {
+  const network = createNetworkRelay(worker);
   const calls = new Set<(error: Error) => void>();
   let failure: Error | undefined;
   let started!: () => void;
@@ -18,16 +20,23 @@ export function createIsolatedWorker<Env>(worker: Worker) {
     startupFailed(failure);
     for (const fail of calls) fail(failure);
     worker.terminate();
+    return network.dispose();
   };
-  worker.onmessage = ({ data }) => {
+  worker.onmessage = (event) => {
+    network.receive(event);
+    const { data } = event;
     if (data.type === "ready") started();
   };
   worker.onerror = (event) => {
     event.preventDefault();
-    stop(new Error(event.message || "Worker startup failed"));
+    void stop(new Error(event.message || "Worker startup failed"))?.catch(
+      console.error,
+    );
   };
   worker.onmessageerror = () =>
-    stop(new Error("Worker message could not be decoded"));
+    void stop(new Error("Worker message could not be decoded"))?.catch(
+      console.error,
+    );
 
   const handler: WorkerHandler<Env> = {
     async fetch(request, env, ctx) {
@@ -215,7 +224,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
       return calls.size;
     },
     dispose() {
-      stop(new Error("Worker runtime disposed"));
+      return stop(new Error("Worker runtime disposed"));
     },
   };
 }

@@ -54,6 +54,7 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
       body?: string;
       document?: boolean;
       follow?: boolean;
+      redirectCount?: number;
     },
   ) {
     let request: DocumentRequest = {
@@ -69,30 +70,11 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
       if (
         !redirects.includes(result.status) ||
         !locationHeader ||
-        !input.follow
-      ) {
-        if (
-          input.document &&
-          redirects.includes(result.status) &&
-          locationHeader
-        ) {
-          const target = new URL(locationHeader, result.url);
-          if (target.origin !== new URL(baseURL).origin)
-            throw new TypeError(
-              "External document redirects are not supported",
-            );
-          const local = new URL(input.url);
-          result.headers.location =
-            local.protocol +
-            "//" +
-            local.host +
-            target.pathname +
-            target.search +
-            target.hash;
-        }
+        (!input.follow && !input.document)
+      )
         return { ...result, body: encode(result.body) };
-      }
-      if (count >= 20) throw new TypeError("Too many redirects");
+      if ((input.follow ? count : (input.redirectCount ?? 0)) >= 20)
+        throw new TypeError("Too many redirects");
       const target = new URL(locationHeader, result.url);
       if (target.origin !== new URL(baseURL).origin)
         throw new TypeError("External document redirects are not supported");
@@ -117,6 +99,29 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
         body: becomesGET ? undefined : request.body,
         headers: Object.fromEntries(headers),
       };
+      if (!input.follow) {
+        const local = new URL(input.url);
+        const url =
+          local.protocol +
+          "//" +
+          local.host +
+          target.pathname +
+          target.search +
+          target.hash;
+        result.headers.location = url;
+        return {
+          ...result,
+          body: encode(result.body),
+          navigation: {
+            url,
+            method: request.method,
+            headers: request.headers,
+            ...(request.body === undefined
+              ? {}
+              : { body: encode(request.body) }),
+          },
+        };
+      }
     }
   }
   const message = async (event: MessageEvent<DocumentRequest>) => {

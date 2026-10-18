@@ -2,17 +2,16 @@ import { documentAssets, listAssets } from "./build/documents.js";
 import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Plugin } from "esbuild";
 import {
   configuredPath,
   compatibilityAliases,
+  globalsPath,
   workerEntry,
   workerSource,
 } from "./build/shared.js";
 
 const require = createRequire(import.meta.url);
-const globals = fileURLToPath(new URL("./compat/globals.js", import.meta.url));
 function compatibilityPlugin(): Plugin {
   return {
     name: "capacitor-workers-compatibility",
@@ -38,7 +37,7 @@ function compatibilityPlugin(): Plugin {
         () => ({ contents: "module.exports = {};", loader: "js" }),
       );
       build.initialOptions.inject = [
-        ...new Set([...(build.initialOptions.inject ?? []), globals]),
+        ...new Set([...(build.initialOptions.inject ?? []), globalsPath]),
       ];
     },
   };

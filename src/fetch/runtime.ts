@@ -1,3 +1,8 @@
+import { isRequest, isResponse } from "../compat/fetch/interop.js";
+import {
+  Request as WorkerRequest,
+  type RequestInit as WorkerRequestInit,
+} from "../compat/request/index.js";
 import type { FetchRuntimeOptions, WorkerContext } from "./types.js";
 export type { FetchRuntimeOptions } from "./types.js";
 
@@ -5,11 +10,12 @@ export type { FetchRuntimeOptions } from "./types.js";
 export abstract class FetchRuntime<Env = Record<string, unknown>> {
   private readonly base: URL;
   private readonly boundary: string;
-  private readonly localURL: URL | undefined;
-  private readonly original: typeof fetch;
+  protected readonly localURL: URL | undefined;
+  protected readonly original: typeof fetch;
   private readonly env: Env;
   private readonly pending = new Set<Promise<void>>();
   private disposed = false;
+  private disposal: void | Promise<void> = undefined;
   readonly ready: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: FetchRuntimeOptions<Env>) {
@@ -40,12 +46,20 @@ export abstract class FetchRuntime<Env = Record<string, unknown>> {
     env: Env,
     ctx: WorkerContext,
   ): Response | Promise<Response>;
-  protected close(): void {}
+  protected close(): void | Promise<void> {}
+
+  protected externalFetch(
+    input: RequestInfo | URL,
+    init: RequestInit | undefined,
+    _url: URL,
+  ): Promise<Response> {
+    return this.original.call(globalThis, input, init);
+  }
 
   /** Bound function; creating a runtime does not patch global fetch. */
   readonly fetch: typeof fetch = async (input, init) => {
-    const isRequest = input instanceof Request;
-    const address = isRequest ? input.url : String(input);
+    const inputIsRequest = isRequest(input);
+    const address = inputIsRequest ? input.url : String(input);
     const url = new URL(
       address,
       globalThis.document?.baseURI ??
@@ -61,16 +75,25 @@ export abstract class FetchRuntime<Env = Record<string, unknown>> {
       url.protocol === this.localURL.protocol &&
       url.host === this.localURL.host;
     if (!matchesPath || (url.origin !== this.base.origin && !isLocal)) {
-      return this.original.call(globalThis, input, init);
+      return this.externalFetch(input, init, url);
     }
     if (url.username || url.password)
       throw new TypeError("Request URL must not contain credentials.");
     const target = new URL(this.base.origin);
     target.pathname = url.pathname;
     target.search = url.search;
-    const request = isRequest
-      ? new Request(target, new Request(input, init))
-      : new Request(target, init);
+    const request = (inputIsRequest
+      ? new WorkerRequest(
+          target,
+          new WorkerRequest(
+            input,
+            init as WorkerRequestInit,
+          ) as WorkerRequestInit,
+        )
+      : new WorkerRequest(
+          target,
+          init as WorkerRequestInit,
+        )) as unknown as Request;
     request.signal.throwIfAborted();
     const ctx: WorkerContext = {
       props: {},
@@ -111,7 +134,7 @@ export abstract class FetchRuntime<Env = Record<string, unknown>> {
     } finally {
       request.signal.removeEventListener("abort", abort);
     }
-    if (!(response instanceof Response))
+    if (!isResponse(response))
       throw new TypeError("worker.fetch must return a Response.");
     if (response.type === "error")
       throw new TypeError("worker.fetch returned a network error response.");
@@ -129,8 +152,9 @@ export abstract class FetchRuntime<Env = Record<string, unknown>> {
   }
 
   dispose() {
-    if (this.disposed) return;
-    this.close();
+    if (this.disposed) return this.disposal;
+    this.disposal = this.close();
     this.disposed = true;
+    return this.disposal;
   }
 }

@@ -157,3 +157,21 @@ it.each(["web", "android"])(
     expect(fetch).toBe(nativeFetch);
   },
 );
+
+it("does not reload an acknowledged controller when another registration worker times out", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const s = setup();
+  const inactive = {
+    ...s.own,
+    postMessage: vi.fn((_message, ports) => ports[0].close()),
+  };
+  s.registration.active = inactive;
+  const stopped = stopDocumentWorker();
+  // Let the real MessageChannel deliver the current controller's acknowledgement.
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await vi.advanceTimersByTimeAsync(2000);
+  await stopped;
+  expect(s.registration.unregister).toHaveBeenCalledOnce();
+  expect(location.reload).not.toHaveBeenCalled();
+});

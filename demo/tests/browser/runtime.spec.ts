@@ -4,24 +4,16 @@ import { test, expect } from "@playwright/test";
 test.use({ baseURL: "http://127.0.0.1:4188" });
 
 test("Fetch adapter preserves browser Request semantics", async ({ page }) => {
-  for (const file of [
-    "index.js",
-    "configured.js",
-    "documents/runtime.js",
-    "documents/host.js",
-    "documents/registration.js",
-    "fetch/runtime.js",
-    "fetch/worker-runtime.js",
-    "isolated/bridge.js",
-  ]) {
+  await page.route("**/runtime-under-test/**", async (route) => {
+    const file = new URL(route.request().url()).pathname.slice(
+      "/runtime-under-test/".length,
+    );
     const source = await readFile(
       new URL("../../../dist/" + file, import.meta.url),
       "utf8",
     );
-    await page.route("**/runtime-under-test/" + file, (route) =>
-      route.fulfill({ contentType: "text/javascript", body: source }),
-    );
-  }
+    await route.fulfill({ contentType: "text/javascript", body: source });
+  });
   await page.goto("/");
   await page.waitForFunction(() => window.pocDone);
   const result = await page.evaluate(async () => {
