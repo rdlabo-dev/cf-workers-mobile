@@ -1,4 +1,20 @@
 import {
+  PunycodeImplementation,
+  punycodeContract,
+} from "../../../src/compat/punycode/index.spec";
+import {
+  WasiImplementation,
+  wasiContract,
+} from "../../../src/compat/wasi/index.spec";
+import {
+  OsImplementation,
+  osContract,
+} from "../../../src/compat/os/index.spec";
+import {
+  TtyImplementation,
+  ttyContract,
+} from "../../../src/compat/tty/index.spec";
+import {
   UrlImplementation,
   urlContract,
 } from "../../../src/compat/url/index.spec";
@@ -82,6 +98,10 @@ export async function runNodeContracts(
     await runContract(new BufferImplementation(), bufferContract),
     await runContract(new TimersImplementation(), timersContract),
     await runContract(new UrlImplementation(), urlContract),
+    await runContract(new OsImplementation(), osContract),
+    await runContract(new TtyImplementation(), ttyContract),
+    await runContract(new WasiImplementation(), wasiContract),
+    await runContract(new PunycodeImplementation(), punycodeContract),
   ];
   reports.push(
     await runContract(

@@ -18,6 +18,10 @@ for (const module of [
   "buffer",
   "timers",
   "url",
+  "os",
+  "tty",
+  "wasi",
+  "punycode",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -66,6 +70,14 @@ await cp(
   join(temp, "src/compat"),
   { recursive: true },
 );
+await cp(
+  "src/compat/os/constants.spec.ts",
+  join(temp, "src/compat/os/constants.spec.ts"),
+);
+await cp(
+  "src/compat/punycode/upstream.spec.ts",
+  join(temp, "src/compat/punycode/upstream.spec.ts"),
+);
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
   "path",
@@ -84,6 +96,10 @@ for (const module of [
   "async-hooks",
   "timers",
   "url",
+  "os",
+  "tty",
+  "wasi",
+  "punycode",
   "fs",
   "module",
   "stream-web",
@@ -288,7 +304,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 364 ||
+    features.flatMap((report) => report.cases).length !== 412 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -325,7 +341,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 168 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 192 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

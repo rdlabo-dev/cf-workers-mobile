@@ -29,6 +29,35 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:url` | **Unverified (CI pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
+## Remaining implementation sequence
+
+The remaining work is tracked as whole modules. No new PR or release is created
+merely because one subset passes. Existing Complete modules retain their original
+acceptance records; extending a dependency requires regression verification.
+
+On 2026-10-18, the fixed runtime audit enumerated **70 builtins/subpaths and 1,597
+namespace export entries (including defaults and aliases)**. This is an export
+inventory, not a behavioral coverage count. The reproducible test and exact
+export manifest live in [`demo/tests/experiments/node-compat/`](../demo/tests/experiments/node-compat/inventory.test.mjs).
+Run `node --test tests/experiments/node-compat/inventory.test.mjs` from `demo`.
+Raw descriptor evidence is generated in `demo/artifacts/node-inventory/`.
+
+| Order | Remaining whole-module units | Completion work |
+| --- | --- | --- |
+| 1 | `os`, `tty`, `wasi`, `punycode` | Fixed virtual platform and stub semantics; full export/prototype contracts, then all acceptance environments. |
+| 2 | `util`, `util/types`, `sys`, `assert`, `assert/strict`, `events` | Type-brand experiments and async-context dependency audit precede whole-module certification. |
+| 3 | `stream`, `stream/web`, `stream/promises`, `stream/consumers`, `_stream_*` | Public surface, backpressure, cancellation, adapters and Web/native brand interoperability. |
+| 4 | `fs`, `fs/promises`, `module`, `process`, `constants` | Shared VFS lifecycle, descriptors/devices, resolution and synchronous APIs; no implicit persistent device filesystem. |
+| 5 | `https`, `tls`, `dns`, `dns/promises`, `_http_*`, `_tls_*` | Reuse accepted transport; audit each facade, options, errors and cleanup against workerd. |
+| 6 | `crypto`, `zlib` | Algorithm/codec matrix and known-answer vectors; explicitly assess sync operations, opaque keys and dependency cost. |
+| 7 | `async_hooks`, `diagnostics_channel` | Finish engine-capability experiments; record architecture limits only with reproductions. Sticky context is not full support. |
+| 8 | `console`, `perf_hooks` | Global identity, time semantics, output behavior and complete export contracts. |
+| 9 | `child_process`, `cluster`, `dgram`, `domain`, `http2`, `inspector` (+ promises), `readline` (+ promises), `repl`, `sqlite`, `test`, `trace_events`, `v8`, `vm`, `worker_threads` | Verify actual behavior first, including non-throwing stub state and validation; documentation labels alone do not justify empty exports. |
+
+`os`, `tty`, `wasi`, and `punycode` now have module-owned implementations and shared contracts.
+Their workerd checks pass; full acceptance is pending. URL remains locally
+accepted with remote CI pending. No other row is promoted by the export audit.
+
 ## Scope and evidence
 
 Inventory date: 2026-10-17. Inventory starting point: `b58b543` (PR #16). The initial inventory used `2f10c95`; the first three module certifications now reference `b1a58d1`. The earlier global/transport acceptance references `13261ce`; its native suites exercised the implementation saved in `7366156`, with the subsequent constructor-ownership guard verified by unit tests, browser integration and CI.
@@ -182,7 +211,18 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Not implemented       | Module               | builtinModules, isBuiltin, getBuiltinModule-style registry                         | A + build                  | Generate one registry for Vite/esbuild and runtime lookup. Confirm which APIs live on `module` vs `process`.                                                                                         |
 | Not implemented       | Module               | createRequire, resolution, dynamic module loading/hooks                            | U                          | Determine Workers' actual supported subset first. Statically bundled dependencies can use build-time resolution; arbitrary unbundled Node resolution must not be assumed.                            |
 
-[util documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/util/) explicitly excludes several type-inspection methods (`isExternal`, `isProxy`, `isKeyObject`, and the documented WebAssembly compiled-module predicate). These belong to S for that documented profile, not to a project requirement to expose V8 internals. Resolve documentation/runtime differences against the fixed baseline.
+The documentation's unsupported type-inspection list is not sufficient for this
+fixed profile. A reproducible [engine-boundary probe](../demo/tests/experiments/node-compat/engine-boundaries.test.mjs)
+shows that `util.types.isProxy()` returns true for both ordinary and revoked
+proxies without invoking traps, and false for the original target. The pinned
+[workerd util implementation](https://github.com/cloudflare/workerd/blob/5358e3d337336eaf696a48bc1563d808b10feba5/src/workerd/api/node/util.h)
+exposes engine type inspection. This API is **not S** on this profile. Ordinary
+Web JavaScript has no general, non-observable proxy inspection primitive;
+wrapping future Proxy constructors cannot recognize pre-existing/cross-realm
+proxies. The whole `util/types` unit remains uncertified while this boundary is
+unresolved. The same probe confirms native async continuation isolation in
+workerd and rejects `new sqlite.DatabaseSync(':memory:')` with `TypeError:
+Illegal constructor`; neither outcome certifies a local implementation.
 
 [Zlib documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/zlib/) identifies the codec families; it does not establish that the repository's browser dependency implements all of them. [Test documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/test/) defines the MockTracker scope.
 
@@ -303,7 +343,7 @@ Each compatibility module owns a directory under `src/compat/<module>/`, with `i
 | `src/vite.ts`, `src/esbuild.ts`                                   | Broad browser polyfills and shared overrides. General Node compatibility is not certified. esbuild maps unavailable modules to an empty object, which is not proof of Workers stub parity. |
 | `src/build/shared.ts`                                             | Shared aliases for http, net, async_hooks, path, querystring, string_decoder and Cloudflare helpers. Extend this existing boundary; avoid separate Vite/esbuild truth sources.                  |
 | `src/compat/http/index.ts`, `src/compat/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.        |
-| `src/compat/async-hooks/index.ts`                                 | AsyncResource is undefined; ALS is not implemented.                                                                                                                                        |
+| `src/compat/async-hooks/index.ts`                                 | Scoped ALS and AsyncResource implementations exist; native continuation isolation is not established (see async-context inventory).                                                                                                                                        |
 | `src/compat/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
 | `src/features/index.ts`, `testing.ts`                             | Existing typed definitions, implementation coverage and lifecycle test harness are reusable. A new abstract framework is unnecessary.                                                      |
 | Native document plugin                                            | Document rendering plus native TCP/TLS only. HTTP/1.1 framing/parsing runs in JS/WASM using llhttp. iOS uses Network.framework without AsyncHTTPClient/NIO; Android uses Netty without its HTTP codec. See the native boundary document. |
