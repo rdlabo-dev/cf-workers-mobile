@@ -48,23 +48,29 @@ test("Fetch-only migration releases current clients and preserves application re
 test("document transport can start again after shutdown", async ({ page }) => {
   await page.goto("/lifecycle.html");
   await page.waitForFunction(() => !!(window as any).documentLifecycle);
-  await page.evaluate(async () => {
-    const api = (window as any).documentLifecycle;
-    for (let i = 0; i < 2; i++) {
-      await api.registerDocumentWorker("https://worker.example");
-      await navigator.serviceWorker.ready;
-      if (!navigator.serviceWorker.controller)
-        await new Promise<void>((resolve) =>
-          navigator.serviceWorker.addEventListener(
-            "controllerchange",
-            () => resolve(),
-            { once: true },
-          ),
-        );
+  for (let i = 0; i < 2; i++) {
+    await page.evaluate(() =>
+      (window as any).documentLifecycle
+        .registerDocumentWorker("https://worker.example")
+        .then(() => undefined),
+    );
+    // Unregistering leaves the previous controller attached to this page.
+    // Wait for the new registration to control it, as the runtime does.
+    await page.waitForFunction(async () => {
+      const registration = await navigator.serviceWorker.getRegistration("/");
+      return (
+        registration?.active &&
+        !registration.installing &&
+        !registration.waiting &&
+        navigator.serviceWorker.controller === registration.active
+      );
+    });
+    await page.evaluate(async () => {
+      const api = (window as any).documentLifecycle;
       await api.enableDocumentWorker();
       await api.stopDocumentWorker();
-    }
-  });
+    });
+  }
   await page.goto("/after-dispose.html");
   await expect(page.locator("h1")).toHaveText("Native asset after disposal");
 });
