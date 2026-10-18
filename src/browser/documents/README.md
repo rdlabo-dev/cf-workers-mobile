@@ -6,4 +6,4 @@ facilities, including those provided by a Capacitor WebView.
 
 Request execution is delegated to `src/cloudflare/workers`. Build-time asset bundling
 and source transformation remain in `src/tooling` and `scripts/build-document-assets.mjs`.
-See [document rendering](../../../docs/document-rendering.md) for behavior and limitations.
+See [document rendering](../../../docs/native-rendering-api.md) for behavior and limitations.

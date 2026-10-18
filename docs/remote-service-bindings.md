@@ -8,8 +8,6 @@ KV-only requests follow the binding execution policy. Remote binding methods
 execute unchanged inside the deployed Worker. This does not install local R2,
 KV synchronization, a client RPC proxy, or a queue consumer in Capacitor.
 
-Status: **In progress** pending required CI. Independent manager and acceptance
-reviews approved the implementation; see the [review record](remote-service-bindings-review.md).
 The workerd integration baseline is Miniflare `5.20261012.0-beta`, compatibility
 date `2026-10-01`. Browser integration is supporting evidence, not native
 transport certification.
@@ -131,7 +129,7 @@ from enqueueing does not mean that downstream processing has completed. Network
 failure or cancellation does not prove a write/enqueue did not happen. The client
 adds no automatic retry or offline write queue.
 
-## Reproducible evidence
+## Verification
 
 Run `npm run build`, `npm test`, then `npm run test:service-bindings` in `demo`.
 The latter executes a real workerd R2 bucket, KV namespaces, HTTP/RPC service and
@@ -144,20 +142,6 @@ written to `demo/artifacts/service-bindings/report.json`.
 
 These browser runs intercept HTTPS requests into local workerd. Vite development
 startup additionally verifies local and HTTP/RPC routes in direct/Worker modes.
-
-A freshly packed tarball was independently installed into the native test consumer.
-iOS 26.1 (iPhone 17 Pro simulator) and Android 16 / API 36 (`emulator-5554`) each passed 34
-checks in direct and Dedicated Worker modes on 2026-10-18. These use actual native
-HTTPS with a test CA and local workerd, covering R2 read/write/range/HEAD/delete,
-KV metadata, explicit local/remote KV-only policies, device/cloud KV separation,
-remote precedence for mixed R2/KV,
-service HTTP/RPC, actual queue send/batch delivery, authentication,
-and rejection of oversized uploads before storage changes.
-See [native evidence](remote-service-bindings-native-evidence.json) for the package
-integrity and individual results. The native matrix uses Vite production output;
-esbuild and whole-Worker variants are covered by browser integration. It does not
-certify physical devices, deployed Cloudflare infrastructure, or every shared
-transport contract (Cookie, redirects and cancellation have separate D1 tests).
 
 Reproduce with the existing native harness:
 
@@ -172,17 +156,6 @@ node demo/tests/experiments/d1/native-run.mjs android <emulator-id> --services
 Use `--refresh` with an existing services-native consumer to reuse its native
 build directories while installing a new tarball. The harness reuses the D1 test
 app ID; do not run D1 and service native tests concurrently on the same device.
-The full `npm run test:package` regression passed on 2026-10-18 after disk space
-became available: Vite/esbuild/browser ESM 10/10, configured Fetch subpath in Vite
-dev 2/2, direct 26/26, isolated 22/22, common features 320 passed, and preferences
-2/2. The existing feature inventory also reports six declared unsupported cases;
-this change does not claim those unrelated features as complete. This successful
-run supersedes the earlier failed runs under disk pressure.
-
-Manager and independent acceptance reviews approved candidate `310479f` with no
-required changes. Required CI remains a merge gate; the PR stays draft until
-that gate passes.
-
 ## Platform references
 
 - [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)

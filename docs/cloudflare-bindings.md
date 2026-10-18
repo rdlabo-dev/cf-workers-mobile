@@ -114,17 +114,12 @@ unit is build-generated HTTP dispatch, not local emulation of cloud binding APIs
   responses are observed with browser HTTP caching disabled by the test server;
   Range responses are compared with the same request sent directly to workerd.
   This verifies forwarding, not a client recreation of Cloudflare cache behavior.
-- Fresh packed-consumer native runs pass 24 checks each on iOS and Android,
-  covering direct and Dedicated Worker execution, DO HTTP/RPC/state/authorization,
-  ASSETS GET/SPA/HEAD/304 and Range forwarding. See the
-  [native evidence](cloudflare-bindings-native-evidence.json) and
-  [review record](cloudflare-bindings-review.md).
 - Cloud AI, indexes and Workflows are verified as names for HTTP dispatch, not
   emulated APIs or paid live-service tests. Native transport contracts are shared
   with existing remote services.
 
 Cache API, HTMLRewriter and local ASSETS are separate unfinished compatibility
-units; this PR does not activate them in production aliases or exports.
+units; the package does not activate them in production aliases or exports.
 
 ## References
 

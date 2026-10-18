@@ -31,4 +31,4 @@ follow these roles: `tooling/vite`, `tooling/esbuild`, `shared/contracts`, `shar
 are removed rather than retained as compatibility aliases.
 
 Folder presence does not establish complete API support; see the
-[support map](../docs/api-support.md).
+[compatibility limits](../docs/compatibility.md).

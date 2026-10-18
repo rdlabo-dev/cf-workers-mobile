@@ -1,4 +1,4 @@
-# Common feature standard
+# Feature contract API
 
 The unit of compatibility is a **named, typed profile**, not a base class for each API category. One profile connects its API type, declared behavior cases, implementations and tests. An implementation can be local, delegated or supplied by workerd without changing the contract runner.
 
@@ -87,36 +87,18 @@ Requirements are executable checks in `create`, not strings in an unverified cap
 
 `assertContract` rejects failed/unavailable cases, cleanup failures and reports with no passing cases. A partial profile can contain explicit unsupported entries; CI requiring full coverage must additionally assert all statuses are `passed`, as the demo does. Changing coverage is a reviewable scope change, not a way to hide a failing case. Vitest and Playwright remain the test runners; the common layer has no test framework dependency.
 
-## Three implementations of the same standard
+## FetchRuntime
 
-| Profile                  | Local implementation                                                | Reference / verification                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `fetch.basic`            | `FetchImplementation` connects existing direct or isolated runtimes | Same four HTTP cases run against an actual local workerd HTTP endpoint                                                      |
-| `kv.local.v1`            | `LocalStorageKV` persistent binding                                 | Same eighteen text/binary/stream/metadata/bulk/list/expiration/Unicode cases run against an actual local Workers KV binding |
-| `engine.wasm-validation` | Current engine's `WebAssembly.validate`                             | Same two valid/invalid-module cases run in workerd and WebViews                                                             |
+`FetchRuntime` is exported from the package root for custom execution adapters.
+Subclasses implement `dispatch(request, env, ctx)` and may override `ready` and
+`close(): void | Promise<void>` for startup and owned-resource cleanup.
+Construction does not patch global fetch; call the bound `fetch` method directly.
+Keep `fetch`, `drain` and `dispose` inherited so URL boundaries, aborts, response
+validation, HEAD normalization and cleanup share the same behavior.
+`drain` tracks background work, not response body consumption. Direct disposal
+cannot forcibly stop arbitrary handler code.
 
-Fetch connects through `@rdlabo/workers-capacitor/cloudflare/workers`; both the feature adapter and existing `workersCapacitor` installer use `createFetchRuntime`. The installer remains synchronous and application setup is unchanged. The existing fifteen fetch adapter cases and framework/transport tests remain as more detailed regression suites; the four portable HTTP cases do not replace them or claim that all URL/interception behavior exists in workerd.
-
-Reusable HTTP and KV assertions are exported from `@rdlabo/workers-capacitor/cloudflare/workers/testing` and `@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing`. The HTTP subpath also exports `fetchContractWorker`, the neutral Worker fixture; mount it at `https://worker.invalid/api` when running `fetchContract`. The engine demonstration remains in `demo/tests/validation/contracts/wasm.ts`. Environment-specific implementations live in `demo/tests/validation/implementations.ts`. The common runner itself never imports fetch, KV or WebAssembly. The workerd HTTP adapter converts the harness's Response type to a standard Response for this buffered HTTP profile; it makes no claim about streaming equivalence.
-
-Workers KV uses the official [local binding facility](https://developers.cloudflare.com/kv/concepts/kv-bindings/), with an exclusively owned ephemeral namespace cleared before and after each case. The shipped local adapter uses Web Storage; its test wrapper deletes only test-owned keys. See [KV scope and usage](kv.md). Expiration, metadata and listing are included; cloud consistency and synchronization are not emulated. The earlier delegated-binding branch is not merged by this change. Its transport can later supply an API through this same standard without adding a new test architecture.
-
-Completion for a new contribution: define the typed profile and scope, implement and declare coverage, add shared expectations, connect its real Workers reference, run type/unit/browser/native checks, and record actual supported environments and omissions. Do not edit the common runner to add another API category.
-
-## Implementation guardrails and reusable contracts
-
-Runtime checks belong to implementations. Validate inputs, reject unsupported options, detect missing facilities and propagate backend failures there, so application callers receive the same protections without importing testing code. The host remains responsible only for lifecycle and result handling; it contains no API-specific validation.
-
-Published contract suites check the portable behavior promised by a profile. Implementations and their real Workers references run the same suite. Implementation rejection tests (for example unknown option fields) remain separate from shared compatibility assertions. Do not impose an implementation-specific rejection on a Workers reference that accepts the operation. Backend persistence, quota and namespace isolation are also verified separately.
-
-```ts
-import { runContract, assertContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
-import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
-
-// implementation is your FeatureImplementation<typeof kvFeature>.
-// Its create(scope) must prepare isolated test state and register its cleanup.
-const report = await runContract(implementation, kvContract);
-assertContract(report);
-```
-
-The KV suite writes several keys and assumes the test namespace is empty at the start of each case. Supply a test-only namespace and delete owned test data in the provider's cleanup. Never point it at application data. `runContract` creates a new feature scope per case, but does not clear externally owned storage. `assertContract` permits explicitly unsupported cases; require every case status to be `passed` when validating the entire profile. No test framework dependency or generic persistence fixture abstraction is introduced.
+Use `workersCapacitor` for application setup. Reusable Fetch and KV contracts are
+exported from `cloudflare/workers/testing` and `cloudflare/bindings/kv/testing`
+under the package name. KV test providers must isolate and clean their own
+namespace; creating a fresh scope does not clear persistent storage.

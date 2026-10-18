@@ -78,8 +78,6 @@ npm run ios
 
 `tests/validation/` and `tests/fixtures/` contain the validation app and test-only Workers. `npm run test:browser` builds the same demo once with Hono and once with Express, then checks both pages in Chromium and WebKit. The Express switch lives in [tests/vite.express.config.ts](tests/vite.express.config.ts), and assertions live in [tests/browser/demo.spec.ts](tests/browser/demo.spec.ts). The compatibility app is built and served separately. The normal `src/` application and its build do not depend on these files. See the [repository testing guide](../README.md#development-and-testing) for the full test commands.
 
-The [document-rendering experiment](../docs/document-rendering.md) is the earlier investigation of Hono/TSX and Express pages, scripts, and top-level navigation. It is not part of the setup above and not the shipping path; the packaged equivalent is [`rendering/`](rendering) below.
-
 ## Worker-rendered native documents
 
 [`rendering/`](rendering) is a separate example using `workersCapacitor({ render: "/" })`.

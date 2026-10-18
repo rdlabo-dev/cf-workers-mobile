@@ -17,11 +17,9 @@ This is a source inventory, not a claim that every Web API is complete.
 | Body codecs                      | `body/`                                   | Internal shared Request/Response implementation; not a separate public API   |
 | Streams, URL and other host APIs | No separate implementation in this folder | Host/dependency use does not establish complete Workers parity               |
 
-Existing baseline and native evidence remain in the
-[global/transport acceptance record](../../docs/node-compatibility-inventory.md#global-transport-and-node-bridge-acceptance)
-and [native boundary audit](../../docs/native-boundary-audit.md).
-This reorganization does not recertify those historical runs or declare additional
-APIs complete. New API completion still requires the full contribution gate.
+Current API scope and transport constraints are described in the
+[compatibility guide](../../docs/compatibility.md).
+API completion requires the full contribution gate.
 
 Blob/File are shared with the Node Buffer implementation in `../compat/buffer/blob.ts`;
 Web installation uses that same implementation rather than creating a second copy.
