@@ -240,7 +240,7 @@ Configure the existing Worker entry in the plugin, then set `remote: { origin: "
 
 ## Development and testing
 
-Requires Node 22.12+, npm, and the native SDKs for native tests. Package publication, PR creation and cloud deployment are not part of these commands.
+Requires Node 22.18+ (22.x) or 24.11+, npm, and the native SDKs for native tests. Package publication, PR creation and cloud deployment are not part of these commands.
 
 ### Library and package tests
 
@@ -362,7 +362,7 @@ With a direct Worker import, matching Worker subrequests can re-enter the UI han
 
 ### Worker transport and resource lifetime
 
-The isolated transport buffers uploads and streams responses as pull-driven MessagePort chunks, including on iOS 26.1. It preserves status/statusText/headers, body cancellation, abort after headers and background completion. Invalid/used/locked responses and status-0 opaque/error responses reject. Errors retain name/message, not identity/stack; custom abort/cancel reasons are not transported to the Worker. Unconsumed response bodies retain resources until consumed, cancelled or disposed. `drain()` tracks background work, not body consumption.
+The isolated transport streams uploads and responses as pull-driven MessagePort chunks (uploads are split at 64 KiB). Upload handlers can run before EOF; cancellation releases the upload reader. It preserves status/statusText/headers, body cancellation, abort after headers and background completion. Invalid/used/locked responses and status-0 opaque/error responses reject. Errors retain name/message, not identity/stack; custom abort/cancel reasons are not transported to the Worker. Unconsumed response bodies retain resources until consumed, cancelled or disposed. `drain()` tracks background work, not body consumption.
 
 ### Validation history
 
@@ -387,6 +387,28 @@ Fetch implementations extend `FetchRuntime` and share one contract suite. See [t
 3. Expand setup automation, compatibility and browser/Electron/Tauri execution. Keep Worker entry configuration and application initialization simple.
 
 The Hono + Express compatibility test app currently includes broad Node polyfills; bundle size is a PoC finding, not an optimized release. See [verification results](docs/verification.md) for measured results and limitations.
+
+## Execution environment and async context
+
+The original Worker handler remains the Cloudflare entry. Install the Vite/esbuild
+plugin only in the Capacitor/browser build: its aliases select the local API
+implementations; the Cloudflare build retains native `node:*` and `cloudflare:*`.
+`getExecutionEnvironment()` (also available from `@rdlabo/capacitor-workers/environment`)
+distinguishes Cloudflare Workers, native Capacitor hosts, browser workers, browsers,
+and unknown realms. A browser Dedicated Worker is not Cloudflare Workers.
+Installing the Capacitor runtime in Cloudflare Workers fails before changing globals.
+
+Capacitor builds lower async functions and generators, preserving module-level
+`await`, so AsyncLocalStorage scopes restore immediately and Promise continuations
+retain their own stores. Application handlers need no edits. Native async callbacks
+created outside this build pipeline (for example with `eval`) are rejected as ALS
+scope callbacks. Cloudflare continues to use its native async context implementation.
+
+Document responses are fetched incrementally on iOS and Android. Native document
+uploads still cross a buffered boundary and reject above 8 MiB before concatenation;
+use the Fetch-only runtime for streaming uploads. LocalStorage KV stream reads decode
+bounded chunks lazily, but the storage API itself necessarily returns a complete
+encoded record. Its synchronous storage/quota limits still apply.
 
 ## License
 

@@ -1,3 +1,4 @@
+import { asyncContextPlugin, lowerAsync } from "./build/async.js";
 import { documentAssets, listAssets } from "./build/documents.js";
 import { serverModules } from "./build/server-modules.js";
 import type { ServerBuildOptions } from "./build/server.js";
@@ -115,7 +116,7 @@ export function capacitorWorkersPlugin(
             const generated = await server.load(path);
             if (generated)
               return {
-                contents: generated.code,
+                contents: (await lowerAsync(generated.code, path, "js")).code,
                 loader: "js",
                 resolveDir: dirname(originalEntry),
                 watchFiles: generated.inputs,
@@ -198,7 +199,7 @@ export function capacitorWorkersPlugin(
             conditions: config.conditions,
             mainFields: config.mainFields,
             loader: config.loader,
-            plugins: [serverPlugin, compatibilityPlugin()],
+            plugins: [serverPlugin, compatibilityPlugin(), asyncContextPlugin()],
             logLevel: "silent",
           });
           const inputs = Object.keys(result.metafile.inputs)
@@ -220,6 +221,7 @@ export function capacitorWorkersPlugin(
           };
         },
       );
+      await asyncContextPlugin().setup(build);
     },
   };
 }

@@ -108,20 +108,38 @@ export class StorageNamespace implements KVNamespace {
     textDecoder = decoder,
   ): KVValue<unknown> {
     if (!record) return { value: null, metadata: null };
+    if (type === "stream") {
+      // Storage necessarily returns a string, but decode only on demand. Keep
+      // base64 groups intact and release the encoded value on cancel/EOF.
+      let data = record.data;
+      let offset = 0;
+      const value = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            const end = Math.min(offset + 65536, data.length);
+            if (end > offset)
+              controller.enqueue(decode(data.slice(offset, end)));
+            offset = end;
+            if (offset === data.length) {
+              data = "";
+              controller.close();
+            }
+          },
+          cancel() {
+            data = "";
+          },
+        },
+        { highWaterMark: 0 },
+      );
+      return { value, metadata: record.metadata ?? null };
+    }
     const bytes = decode(record.data);
     const value =
       type === "arrayBuffer"
         ? bytes.buffer
-        : type === "stream"
-          ? new ReadableStream<Uint8Array>({
-              start(controller) {
-                controller.enqueue(bytes);
-                controller.close();
-              },
-            })
-          : type === "json"
-            ? JSON.parse(textDecoder.decode(bytes))
-            : textDecoder.decode(bytes);
+        : type === "json"
+          ? JSON.parse(textDecoder.decode(bytes))
+          : textDecoder.decode(bytes);
     return { value, metadata: record.metadata ?? null };
   }
   private readMany(keys: string[], type: KVReadType, metadata: boolean) {
@@ -242,18 +260,20 @@ export class StorageNamespace implements KVNamespace {
       metadata = JSON.parse(serialized);
     }
     let bytes: Uint8Array;
+    let encodedStream: string | undefined;
     if (typeof value === "string") bytes = encoder.encode(value);
-    else if (value instanceof ArrayBuffer)
-      bytes = new Uint8Array(value).slice();
-    else if (ArrayBuffer.isView(value))
-      bytes = new Uint8Array(
-        value.buffer,
-        value.byteOffset,
-        value.byteLength,
-      ).slice();
-    else if (value instanceof ReadableStream) {
+    else if (value instanceof ArrayBuffer) {
+      if (value.byteLength > maxValue)
+        throw new RangeError("KV value exceeds 25 MiB");
+      bytes = new Uint8Array(value);
+    } else if (ArrayBuffer.isView(value)) {
+      if (value.byteLength > maxValue)
+        throw new RangeError("KV value exceeds 25 MiB");
+      bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    } else if (value instanceof ReadableStream) {
       const reader = value.getReader();
-      const chunks: Uint8Array[] = [];
+      const parts: string[] = [];
+      let carry = new Uint8Array(0);
       let size = 0;
       try {
         while (true) {
@@ -263,7 +283,29 @@ export class StorageNamespace implements KVNamespace {
             throw new TypeError("KV stream must contain bytes");
           size += item.value.byteLength;
           if (size > maxValue) throw new RangeError("KV value exceeds 25 MiB");
-          chunks.push(item.value.slice());
+          // Only a two-byte remainder crosses input chunks; no whole-value
+          // decoded copy or concatenation buffer is retained.
+          let offset = 0;
+          if (carry.length) {
+            const take = Math.min(3 - carry.length, item.value.length);
+            const joined = new Uint8Array(carry.length + take);
+            joined.set(carry);
+            joined.set(item.value.subarray(0, take), carry.length);
+            offset = take;
+            carry = joined;
+            if (carry.length === 3) {
+              parts.push(encode(carry));
+              carry = new Uint8Array(0);
+            }
+          }
+          for (; offset + 3 <= item.value.length; ) {
+            const end =
+              offset +
+              Math.min(49152, Math.floor((item.value.length - offset) / 3) * 3);
+            parts.push(encode(item.value.subarray(offset, end)));
+            offset = end;
+          }
+          if (offset < item.value.length) carry = item.value.slice(offset);
         }
       } catch (error) {
         try {
@@ -275,16 +317,13 @@ export class StorageNamespace implements KVNamespace {
       } finally {
         reader.releaseLock();
       }
-      bytes = new Uint8Array(size);
-      let offset = 0;
-      for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
-      }
+      if (carry.length) parts.push(encode(carry));
+      encodedStream = parts.join("");
+      bytes = new Uint8Array(0);
     } else throw new TypeError("KV value must be text, bytes or a byte stream");
     if (bytes.length > maxValue)
       throw new RangeError("KV value exceeds 25 MiB");
-    const data = encode(bytes);
+    const data = encodedStream ?? encode(bytes);
     const committedAt = Math.floor(Date.now() / 1000);
     const expiration =
       expirationTtl !== undefined

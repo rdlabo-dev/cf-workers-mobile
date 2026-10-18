@@ -49,6 +49,57 @@ export function createIsolatedWorker<Env>(worker: Worker) {
         let released = false;
         let dispatched = false;
         let upload: ReadableStreamDefaultReader<Uint8Array> | undefined;
+        let uploadChunk: Uint8Array | undefined;
+        let uploadBusy = false;
+        let uploadDone = false;
+        const stopUpload = (reason?: unknown) => {
+          if (uploadDone) return;
+          uploadDone = true;
+          const reader = upload;
+          upload = undefined;
+          uploadChunk = undefined;
+          if (reader) {
+            void reader.cancel(reason).catch(() => {});
+            reader.releaseLock();
+          } else void request.body?.cancel(reason).catch(() => {});
+        };
+        const pullUpload = async () => {
+          if (uploadBusy || released || uploadDone) return;
+          uploadBusy = true;
+          try {
+            upload ??= request.body!.getReader();
+            if (!uploadChunk?.byteLength) {
+              const next = await upload.read();
+              if (released || uploadDone) return;
+              if (next.done) {
+                uploadDone = true;
+                upload.releaseLock();
+                upload = undefined;
+                uploadChunk = undefined;
+                send({ type: "upload-end" });
+                return;
+              }
+              if (!(next.value instanceof Uint8Array))
+                throw new TypeError(
+                  "Request body must contain Uint8Array chunks.",
+                );
+              uploadChunk = next.value;
+            }
+            const value = uploadChunk.slice(0, 65536);
+            uploadChunk =
+              uploadChunk.byteLength > value.byteLength
+                ? uploadChunk.subarray(value.byteLength)
+                : undefined;
+            port1.postMessage({ type: "upload-chunk", value }, [value.buffer]);
+          } catch (error) {
+            if (!released && !uploadDone) {
+              send({ type: "upload-error", message: String(error) });
+              fail(error);
+            }
+          } finally {
+            uploadBusy = false;
+          }
+        };
         let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
         let pulled: (() => void) | undefined;
         let cancelled:
@@ -67,6 +118,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
           request.signal.removeEventListener("abort", abort);
           port1.close();
           if (!dispatched) port2.close();
+          stopUpload();
           calls.delete(fail);
         };
         const finishBody = (...failure: [] | [unknown]) => {
@@ -85,7 +137,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
         };
         const fail = (error: unknown) => {
           if (released) return;
-          void upload?.cancel(error).catch(() => {});
+          stopUpload(error);
           reject(error);
           backgroundDone = true;
           done();
@@ -97,8 +149,7 @@ export function createIsolatedWorker<Env>(worker: Worker) {
             return;
           }
           send("abort");
-          reject(request.signal.reason);
-          finishBody(request.signal.reason);
+          fail(request.signal.reason);
         };
         calls.add(fail);
         request.signal.addEventListener("abort", abort, { once: true });
@@ -106,6 +157,14 @@ export function createIsolatedWorker<Env>(worker: Worker) {
           fail(new Error("Response message could not be decoded"));
         port1.onmessage = ({ data }: MessageEvent<Reply>) => {
           if (released) return;
+          if (data.type === "upload-pull") {
+            void pullUpload();
+            return;
+          }
+          if (data.type === "upload-cancel") {
+            stopUpload();
+            return;
+          }
           if (data.type === "response") {
             if (request.signal.aborted) {
               send("cancel");
@@ -171,46 +230,16 @@ export function createIsolatedWorker<Env>(worker: Worker) {
         void (async () => {
           await ready;
           if (released) return;
-          let body: ArrayBuffer | null = null;
-          if (request.body) {
-            upload = request.body.getReader();
-            try {
-              const chunks: Uint8Array[] = [];
-              let length = 0;
-              while (true) {
-                const chunk = await upload.read();
-                if (released) return;
-                if (chunk.done) break;
-                if (!(chunk.value instanceof Uint8Array))
-                  throw new TypeError(
-                    "Request body must contain Uint8Array chunks.",
-                  );
-                chunks.push(chunk.value);
-                length += chunk.value.byteLength;
-              }
-              const bytes = new Uint8Array(length);
-              let offset = 0;
-              for (const chunk of chunks) {
-                bytes.set(chunk, offset);
-                offset += chunk.byteLength;
-              }
-              body = bytes.buffer;
-            } finally {
-              upload.releaseLock();
-              upload = undefined;
-            }
-          }
-          if (released) return;
           worker.postMessage(
             {
               port: port2,
               url: request.url,
               method: request.method,
               headers: [...request.headers],
-              body,
+              hasBody: request.body !== null,
               env,
             },
-            body ? [port2, body] : [port2],
+            [port2],
           );
           dispatched = true;
         })().catch(fail);

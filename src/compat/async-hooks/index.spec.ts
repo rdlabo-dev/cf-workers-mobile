@@ -296,21 +296,9 @@ export class AsyncHooksImplementation extends FeatureImplementation<
       snapshot: { status: "supported" },
       throwRestore: { status: "supported" },
       awaitPropagation: { status: "supported" },
-      settleRestore: {
-        status: "unsupported",
-        reason:
-          "Sticky approximation keeps the last context installed after the callback promise settles, so getStore returns a stale store instead of undefined.",
-      },
-      nestedAsyncRestore: {
-        status: "unsupported",
-        reason:
-          "Sticky contexts are not restored between nested async runs; inner store stays visible where outer should resume.",
-      },
-      concurrentIsolation: {
-        status: "unsupported",
-        reason:
-          "Isolating interleaved async contexts needs engine async hooks; this approximation keeps one context installed per pending callback.",
-      },
+      settleRestore: { status: "supported" },
+      nestedAsyncRestore: { status: "supported" },
+      concurrentIsolation: { status: "supported" },
       microtaskTimer: { status: "supported" },
       resourceScope: { status: "supported" },
       resourceMeta: { status: "supported" },

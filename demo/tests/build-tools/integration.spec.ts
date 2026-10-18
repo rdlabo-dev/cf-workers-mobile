@@ -31,11 +31,7 @@ for (const build of [
         ).toEqual([]);
         expect(
           cases.filter((c) => c.status === "unsupported").map((c) => c.id),
-        ).toEqual([
-          "settleRestore",
-          "nestedAsyncRestore",
-          "concurrentIsolation",
-        ]);
+        ).toEqual([]);
       }
     });
   }
@@ -82,7 +78,7 @@ for (const build of ["vite-node", "esbuild-node"]) {
       ).toEqual([]);
       expect(
         cases.filter((c) => c.status === "unsupported").map((c) => c.id),
-      ).toEqual(["settleRestore", "nestedAsyncRestore", "concurrentIsolation"]);
+      ).toEqual([]);
       expect(report.globals.unqualified).toEqual([true, true]);
       expect(report.globals.qualified).toEqual([true, true, true]);
       expect(report.globals.computed).toEqual([true, true, true]);
