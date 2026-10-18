@@ -3,7 +3,7 @@ import { createTestHarness } from "wrangler";
 import {
   assertContract,
   type ContractResult,
-} from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/testing";
 const harness = createTestHarness({
   workers: [
     {

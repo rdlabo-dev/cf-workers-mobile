@@ -8,8 +8,8 @@ import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
-import { capacitorWorkersPlugin as vitePlugin } from "../../../../dist/vite.js";
-import { capacitorWorkersPlugin as esbuildPlugin } from "../../../../dist/esbuild.js";
+import { workersCapacitorPlugin as vitePlugin } from "../../../../dist/vite.js";
+import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/esbuild.js";
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const worker = fileURLToPath(new URL("worker.js", import.meta.url));
 const artifacts = join(repo, "demo/artifacts/cloudflare-bindings");
@@ -80,7 +80,7 @@ for (const tool of ["vite", "esbuild"])
       const main = join(root, "main.js");
       await writeFile(
         main,
-        `import {capacitorWorkers} from ${JSON.stringify(join(repo, "dist/index.js"))};import {LocalAssets} from ${JSON.stringify(join(repo, "dist/features/assets/index.js"))};let runtime,token='owner';window.start=async(prefer,assets)=>{runtime=capacitorWorkers({baseURL:'https://local.invalid',prefer,...(assets?{env:{ASSETS:new LocalAssets({'/assets':'/static/index.html','/index.html':'/static/index.html'},{baseURL:location.href,notFoundHandling:'single-page-application'})}}:{}),remote:{origin:'https://deployed.invalid',getToken:()=>token}});await runtime.ready;return runtime.execution;};window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const r=await fetch(path,init);return {status:r.status,body:await r.text()}};`,
+        `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};import {LocalAssets} from ${JSON.stringify(join(repo, "dist/features/assets/index.js"))};let runtime,token='owner';window.start=async(prefer,assets)=>{runtime=workersCapacitor({baseURL:'https://local.invalid',prefer,...(assets?{env:{ASSETS:new LocalAssets({'/assets':'/static/index.html','/index.html':'/static/index.html'},{baseURL:location.href,notFoundHandling:'single-page-application'})}}:{}),remote:{origin:'https://deployed.invalid',getToken:()=>token}});await runtime.ready;return runtime.execution;};window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const r=await fetch(path,init);return {status:r.status,body:await r.text()}};`,
       );
       const out = join(root, "dist");
       const opts = {

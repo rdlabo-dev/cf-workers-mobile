@@ -1,4 +1,4 @@
-import { capacitorWorkersPlugin } from "../../../dist/esbuild.js";
+import { workersCapacitorPlugin } from "../../../dist/esbuild.js";
 import { build } from "esbuild";
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -14,7 +14,7 @@ await build({
     __NETWORK_TLS__: process.env.NETWORK_TLS === "1" ? "true" : "false",
   },
   plugins: [
-    capacitorWorkersPlugin({
+    workersCapacitorPlugin({
       worker: fileURLToPath(
         new URL("../../src/workers/hono/standard.ts", import.meta.url),
       ),

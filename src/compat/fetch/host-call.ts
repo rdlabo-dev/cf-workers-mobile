@@ -20,12 +20,12 @@ const calls = new WeakMap<Host, NativeCall>();
 /** Android's hidden document host has a JavaScript interface, not Capacitor JS. */
 export function getHostCall(): NativeCall | undefined {
   const target = globalThis as typeof globalThis & {
-    CapacitorWorkersHost?: Host;
-    CapacitorWorkersHostCallback?: {
+    WorkersCapacitorHost?: Host;
+    WorkersCapacitorHostCallback?: {
       deliver(id: string, success: boolean, value: unknown): void;
     };
   };
-  const host = target.CapacitorWorkersHost;
+  const host = target.WorkersCapacitorHost;
   if (!host?.socketOpen) return;
   const existing = calls.get(host);
   if (existing) return existing;
@@ -50,9 +50,9 @@ export function getHostCall(): NativeCall | undefined {
         );
     },
   };
-  if (target.CapacitorWorkersHostCallback)
+  if (target.WorkersCapacitorHostCallback)
     throw new Error("Native network callback is already installed");
-  target.CapacitorWorkersHostCallback = callback;
+  target.WorkersCapacitorHostCallback = callback;
   const call: NativeCall = (_plugin, method, args) =>
     new Promise((resolve, reject) => {
       const id = crypto.randomUUID();

@@ -17,7 +17,7 @@ function setup(cache = new Map<string, Response>()) {
   }));
   const nativeFetch = vi.fn(async (request: string | Request) =>
     String(typeof request === "string" ? request : request.url).includes(
-      "capacitor-workers-assets.json",
+      "workers-capacitor-assets.json",
     )
       ? Response.json(assets)
       : new Response("asset"),
@@ -44,7 +44,7 @@ function setup(cache = new Map<string, Response>()) {
     },
     self: {
       location: new URL(
-        "https://localhost/capacitor-workers-sw.js?baseURL=https%3A%2F%2Fworker.example",
+        "https://localhost/workers-capacitor-sw.js?baseURL=https%3A%2F%2Fworker.example",
       ),
       addEventListener: (name: string, handler: any) =>
         listeners.set(name, handler),
@@ -53,7 +53,7 @@ function setup(cache = new Map<string, Response>()) {
           hostAvailable
             ? [
                 {
-                  url: "https://localhost/index.html?__capacitor_workers_host=1",
+                  url: "https://localhost/index.html?__workers_capacitor_host=1",
                   postMessage: async (request: any, ports: MessagePort[]) => {
                     ports[0].postMessage(await dispatch(request));
                     ports[0].close();
@@ -73,8 +73,8 @@ function setup(cache = new Map<string, Response>()) {
       const port = { postMessage: vi.fn() };
       listeners.get("message")!({
         data: disabled
-          ? "capacitor-workers:disable-documents"
-          : "capacitor-workers:enable-documents",
+          ? "workers-capacitor:disable-documents"
+          : "workers-capacitor:enable-documents",
         ports: [port],
         waitUntil: (value: Promise<void>) => {
           pending = value;

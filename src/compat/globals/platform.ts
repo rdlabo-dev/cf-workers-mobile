@@ -1,8 +1,8 @@
 export const nativeBlobConstructor = Symbol.for(
-  "@rdlabo/capacitor-workers/native-blob",
+  "@rdlabo/workers-capacitor/native-blob",
 );
 export const nativeFileConstructor = Symbol.for(
-  "@rdlabo/capacitor-workers/native-file",
+  "@rdlabo/workers-capacitor/native-file",
 );
 
 function original<T>(value: T, key: symbol): T {

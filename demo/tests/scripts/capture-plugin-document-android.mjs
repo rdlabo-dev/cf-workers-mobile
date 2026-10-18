@@ -69,8 +69,8 @@ try {
     const checked = await call("Runtime.evaluate", {
       expression: `(async () => {
         const before = await navigator.serviceWorker.getRegistrations();
-        const hadDocumentRegistration = before.some(r => [r.active,r.waiting,r.installing].some(w => w && new URL(w.scriptURL).pathname === "/capacitor-workers-sw.js"));
-        const app = DocumentLifecycleTest.capacitorWorkers({
+        const hadDocumentRegistration = before.some(r => [r.active,r.waiting,r.installing].some(w => w && new URL(w.scriptURL).pathname === "/workers-capacitor-sw.js"));
+        const app = DocumentLifecycleTest.workersCapacitor({
           baseURL: "https://worker.invalid/api",
           worker: {fetch: () => new Response("fetch-only")},
         });
@@ -80,13 +80,13 @@ try {
           const text = await response.text();
           const registrations = await navigator.serviceWorker.getRegistrations();
           return {hadDocumentRegistration, controlled: !!navigator.serviceWorker.controller,
-            documentRegistrations: registrations.filter(r => [r.active,r.waiting,r.installing].some(w => w && new URL(w.scriptURL).pathname === "/capacitor-workers-sw.js")).length,
+            documentRegistrations: registrations.filter(r => [r.active,r.waiting,r.installing].some(w => w && new URL(w.scriptURL).pathname === "/workers-capacitor-sw.js")).length,
             nativeAssetFallback: response.status === 404 && text === "",
             nativeStatus: response.status, nativeBody: text,
             api: await (await fetch("/api/check")).text()};
         } finally {
           await app.dispose();
-          await Capacitor.nativePromise("CapacitorWorkers", "stop", {});
+          await Capacitor.nativePromise("WorkersCapacitor", "stop", {});
         }
       })()`,
       awaitPromise: true,

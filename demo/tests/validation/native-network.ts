@@ -9,7 +9,7 @@ import {
   nodeHttpNetworkContract,
   nodeHttpNetworkFeature,
 } from "../../../src/compat/http/index.spec";
-import { capacitorWorkers } from "../../../dist/index";
+import { workersCapacitor } from "../../../dist/index";
 import { createFetch } from "../../../dist/compat/fetch";
 import { Request } from "../../../dist/compat/request";
 import {
@@ -272,7 +272,7 @@ export async function runNativeNetwork(
     method: "POST",
     body: "pre-install request",
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid",
     worker: {
       async fetch(request) {

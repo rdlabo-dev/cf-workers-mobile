@@ -16,7 +16,7 @@ custom-controller setup below is the earlier experiment, not the proposed public
 Visible Capacitor WebView: normal document / link / resource request
   → iOS WKURLSchemeHandler or Android Service Worker FetchEvent
   → offscreen WebView that stays alive across document navigation
-  → existing capacitor-workers transport and dedicated Worker
+  → existing workers-capacitor transport and dedicated Worker
   → Hono or Express Fetch Handler
   → Response bytes / status / headers
   → visible WebView's normal document loader
@@ -74,7 +74,7 @@ The separate browser Service Worker comparison has 16 successful Chromium tests.
 
 The ordinary demo browser suite passed all eight regression tests. Demo typechecking and both runtime-host build modes also passed. Native outcomes are manual simulator/emulator runs, not GitHub Actions results. CI runs the browser comparison, builds the Express host variant, and runs the workerd suite, but does not run this native driver.
 
-Reports appear in the visible page and at `localStorage['native-document-result']`; the state machine lives in sessionStorage so it survives document navigation. Start a fresh app process for each run. A previous report alone is not evidence: check the framework and current on-screen result. Evidence files live under ignored `demo/artifacts/native-documents-*` and `demo/artifacts/split-fetch-*-ios.json`. Each iOS runtime launch removes the previous native report to avoid mistaking an interrupted run for success. The iOS probe also writes `Documents/native-document-result.json` in the simulator app container; obtain the current container with `xcrun simctl get_app_container <device> jp.rdlabo.capacitorworkers.poc data` after each installation.
+Reports appear in the visible page and at `localStorage['native-document-result']`; the state machine lives in sessionStorage so it survives document navigation. Start a fresh app process for each run. A previous report alone is not evidence: check the framework and current on-screen result. Evidence files live under ignored `demo/artifacts/native-documents-*` and `demo/artifacts/split-fetch-*-ios.json`. Each iOS runtime launch removes the previous native report to avoid mistaking an interrupted run for success. The iOS probe also writes `Documents/native-document-result.json` in the simulator app container; obtain the current container with `xcrun simctl get_app_container <device> jp.rdlabo.workerscapacitor.poc data` after each installation.
 
 The workerd suite separately executes both Worker fixtures, including their generated script routes. It does not test native interception. The earlier Turbo implementation and dependencies were removed; only its investigation record remains.
 

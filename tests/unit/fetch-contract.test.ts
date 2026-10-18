@@ -1,5 +1,5 @@
 import {
-  capacitorWorkers,
+  workersCapacitor,
   FetchRuntime,
   type WorkerContext,
 } from "../../src/index";
@@ -10,11 +10,11 @@ import {
 import { workerFor } from "../helpers/isolated-worker";
 
 defineFetchContract("direct FetchRuntime", (options) => {
-  const runtime = capacitorWorkers(options);
+  const runtime = workersCapacitor(options);
   return { ...runtime, fetch: globalThis.fetch };
 });
 defineFetchContract("isolated FetchRuntime", (options) => {
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     ...options,
     worker: () => workerFor(options.worker) as unknown as Worker,
   });

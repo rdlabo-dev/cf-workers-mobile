@@ -5,7 +5,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { chromium } from "@playwright/test";
 
 const root = process.cwd();
-const temp = await mkdtemp(join(tmpdir(), "capacitor-workers-consumer-"));
+const temp = await mkdtemp(join(tmpdir(), "workers-capacitor-consumer-"));
 const pack = JSON.parse(
   execFileSync("npm", ["pack", "--json", "--pack-destination", temp], {
     encoding: "utf8",
@@ -61,12 +61,12 @@ for (const entry of [
 // Candidate Web API contracts use internal modules from the installed tarball.
 // Never copy library implementation sources from the checkout.
 await cp(
-  join(temp, "node_modules/@rdlabo/capacitor-workers/dist/compat"),
+  join(temp, "node_modules/@rdlabo/workers-capacitor/dist/compat"),
   join(temp, "src/compat"),
   { recursive: true },
 );
 await cp(
-  join(temp, "node_modules/@rdlabo/capacitor-workers/dist/environment.js"),
+  join(temp, "node_modules/@rdlabo/workers-capacitor/dist/environment.js"),
   join(temp, "src/environment.js"),
 );
 // Copy module-owned contracts separately; these are not shipped.
@@ -101,8 +101,8 @@ for (const module of [
 await writeFile(
   join(temp, "vite.config.mjs"),
   `import { readFile } from 'node:fs/promises';
-import { capacitorWorkersPlugin } from '@rdlabo/capacitor-workers/vite';
-export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},capacitorWorkersPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
+import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/vite';
+export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},workersCapacitorPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
 );
 execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
   cwd: temp,
@@ -110,33 +110,33 @@ execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
 });
 await writeFile(
   join(temp, "consumer.ts"),
-  `/// <reference types="@rdlabo/capacitor-workers/cloudflare" />
+  `/// <reference types="@rdlabo/workers-capacitor/cloudflare" />
 import worker from "./demo/src/workers/hono/standard";
 import { httpServerHandler } from "cloudflare:node";
 const handler = httpServerHandler({ port: 3000 });
 const response: Promise<Response> = handler.fetch(new Request("https://worker.invalid/api"));
 // @ts-expect-error Logical ports must be numeric.
 httpServerHandler({ port: "3000" });
-import { capacitorWorkers, FetchRuntime, type WorkerContext } from "@rdlabo/capacitor-workers";
+import { workersCapacitor, FetchRuntime, type WorkerContext } from "@rdlabo/workers-capacitor";
 class ExampleRuntime extends FetchRuntime<{ label: string }> {
   protected dispatch(request: Request, env: { label: string }, ctx: WorkerContext) {
     ctx.waitUntil(Promise.resolve());
     return new Response(env.label + request.method);
   }
 }
-import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/capacitor-workers/features";
-import { runContract, type ContractSuite } from "@rdlabo/capacitor-workers/testing";
-import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
-import { fetchContract, fetchContractWorker } from "@rdlabo/capacitor-workers/testing/fetch";
-import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
-import { LocalAssets } from "@rdlabo/capacitor-workers/features/assets";
-import { capacitorWorkersPlugin as buildPlugin } from "@rdlabo/capacitor-workers/vite";
+import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/features";
+import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/testing";
+import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
+import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/testing/fetch";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
+import { LocalAssets } from "@rdlabo/workers-capacitor/features/assets";
+import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/vite";
 const assets = new LocalAssets({ "/": "/index.html" }, { baseURL: "capacitor://localhost/" });
 const assetResponse: Promise<Response> = assets.fetch(new Request("https://worker.invalid/"));
 buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "local" });
 // @ts-expect-error Asset policies must be explicit local or remote.
 buildPlugin({ worker: "worker.ts", assetsExecution: "automatic" });
-import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
+import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();
 const bytes: Promise<ArrayBuffer | null> = kv.get("key", "arrayBuffer");
@@ -173,7 +173,7 @@ void openFeature(new Implementation()).then(session => {
 const example = new ExampleRuntime({ baseURL: "https://worker.invalid/api", env: { label: "local" } });
 const fetcher: typeof fetch = example.fetch;
 example.dispose();
-const runtime = capacitorWorkers({worker, baseURL:"https://worker.invalid/api"});
+const runtime = workersCapacitor({worker, baseURL:"https://worker.invalid/api"});
 const ready: Promise<void> = runtime.ready;
 // @ts-expect-error Worker handlers must not degrade to any.
 const invalid: number = worker;
@@ -232,8 +232,8 @@ try {
   // Rebuild the same installed tarball consumer using the public isolated import.
   await writeFile(
     join(temp, "vite.config.mjs"),
-    `import { capacitorWorkersPlugin } from '@rdlabo/capacitor-workers/vite';
-export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorkersPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
+    `import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/vite';
+export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
   );
   execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
     cwd: temp,

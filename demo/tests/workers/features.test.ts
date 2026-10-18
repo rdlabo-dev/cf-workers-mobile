@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createTestHarness } from "wrangler";
-import { FeatureImplementation } from "@rdlabo/capacitor-workers/features";
-import { fetchFeature } from "@rdlabo/capacitor-workers/features/fetch";
+import { FeatureImplementation } from "@rdlabo/workers-capacitor/features";
+import { fetchFeature } from "@rdlabo/workers-capacitor/features/fetch";
 import {
   assertContract,
   runContract,
   type ContractResult,
-} from "@rdlabo/capacitor-workers/testing";
-import { fetchContract } from "@rdlabo/capacitor-workers/testing/fetch";
+} from "@rdlabo/workers-capacitor/testing";
+import { fetchContract } from "@rdlabo/workers-capacitor/testing/fetch";
 const http = createTestHarness({
   workers: [
     {

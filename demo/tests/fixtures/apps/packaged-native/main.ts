@@ -1,6 +1,6 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 localStorage.removeItem("packaged-stop");
-let app = capacitorWorkers({
+let app = workersCapacitor({
   baseURL: "https://worker.invalid",
   render: "/pages/home",
 });
@@ -18,7 +18,7 @@ if ((window as any).Capacitor?.getPlatform() === "ios") {
         clearInterval(timer);
         return;
       }
-      app = capacitorWorkers({
+      app = workersCapacitor({
         baseURL: "https://worker.invalid",
         render: "/pages/home",
       });

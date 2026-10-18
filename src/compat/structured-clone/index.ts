@@ -624,7 +624,7 @@ export function structuredClone<T>(
     );
   const transfer = transfers(options);
   const metadata: Metadata[] = [];
-  const tag = "__capacitor_workers_clone__";
+  const tag = "__workers_capacitor_clone__";
   const markers: object[] = [];
   const encoded = encode(
     value,

@@ -1,5 +1,5 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
-import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
 import { Capacitor } from "@capacitor/core";
 import settings from "./server.json";
 const platform = Capacitor.getPlatform();
@@ -14,7 +14,7 @@ try {
   for (const prefer of ["direct", "worker"]) {
     let token = "test-owner";
     const key = `${platform}-${prefer}-${Date.now()}`;
-    const runtime = capacitorWorkers({
+    const runtime = workersCapacitor({
       baseURL: "https://local.invalid",
       prefer,
       remote: { origin, getToken: () => token, maxBufferedBodyBytes: 1024 },
@@ -127,7 +127,7 @@ try {
   }
   // Same binding name, separate device/cloud state; remote wins per request.
   const key = `${platform}-local-${Date.now()}`;
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://local.invalid",
     prefer: "worker",
     env: { CLOUD_KV: new LocalStorageKV("services-native").create() },

@@ -3,7 +3,7 @@ import {
   AsyncResource,
 } from "../../src/compat/async-hooks/index";
 import { expect, it } from "vitest";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   AsyncHooksImplementation,
   asyncHooksContract,

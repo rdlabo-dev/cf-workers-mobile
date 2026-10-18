@@ -17,16 +17,16 @@ interface NativeBridge {
 function bridge(): NativeBridge | undefined {
   const host = (
     globalThis as typeof globalThis & {
-      CapacitorWorkersHost?: { ready(): void };
+      WorkersCapacitorHost?: { ready(): void };
     }
-  ).CapacitorWorkersHost;
+  ).WorkersCapacitorHost;
   if (
     host &&
-    new URL(location.href).searchParams.has("__capacitor_workers_host")
+    new URL(location.href).searchParams.has("__workers_capacitor_host")
   )
     return {
       getPlatform: () => "android",
-      isPluginAvailable: (name) => name === "CapacitorWorkers",
+      isPluginAvailable: (name) => name === "WorkersCapacitor",
       nativePromise: async (_name, method) => {
         if (method === "hostReady") host.ready();
       },
@@ -60,8 +60,8 @@ export function validateRendering(render: string, baseURL: string) {
     throw new TypeError("render must be a local absolute path");
   if (!bridge() || !["ios", "android"].includes(bridge()!.getPlatform()))
     throw new Error("Document rendering currently requires native Capacitor");
-  if (!bridge()!.isPluginAvailable("CapacitorWorkers"))
-    throw new Error("CapacitorWorkers native integration is not installed");
+  if (!bridge()!.isPluginAvailable("WorkersCapacitor"))
+    throw new Error("WorkersCapacitor native integration is not installed");
 }
 export function startRendering(
   runtime: DocumentRuntime,
@@ -75,23 +75,23 @@ export function startRendering(
   const startup = new AbortController();
   let started = false;
   const call = (method: string, options: unknown = {}) =>
-    native.nativePromise("CapacitorWorkers", method, options);
+    native.nativePromise("WorkersCapacitor", method, options);
   const ready = (async () => {
     await runtime.ready;
     if (closed) throw new Error("Document rendering disposed");
     if (
       native.getPlatform() === "android" &&
-      new URL(location.href).searchParams.has("__capacitor_workers_host")
+      new URL(location.href).searchParams.has("__workers_capacitor_host")
     ) {
       await call("hostReady");
       return;
     }
-    const response = await nativeFetch("/capacitor-workers-assets.json", {
+    const response = await nativeFetch("/workers-capacitor-assets.json", {
       signal: startup.signal,
     });
     if (!response.ok)
       throw new Error(
-        "Document assets are missing; build with capacitorWorkersPlugin before Capacitor copy/sync",
+        "Document assets are missing; build with workersCapacitorPlugin before Capacitor copy/sync",
       );
     const assets: unknown = await response.json();
     if (
@@ -116,7 +116,7 @@ export function startRendering(
       pageScript,
       assets,
       bootstrapURL: new URL(
-        "/index.html?__capacitor_workers_host=1",
+        "/index.html?__workers_capacitor_host=1",
         location.href,
       ).href,
     });

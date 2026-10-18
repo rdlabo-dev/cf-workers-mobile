@@ -50,7 +50,7 @@ for (const config of configurations) {
     await configuration({ env: { production: config } });
     const found = await serverBindings(root, {});
     expect(found.names).toEqual(["CLOUD"]);
-    expect(found.reportFile).toBe("capacitor-workers-server.json");
+    expect(found.reportFile).toBe("workers-capacitor-server.json");
     await expect(
       serverBindings(root, { localBindings: ["CLOUD"] }),
     ).rejects.toThrow("cannot also");

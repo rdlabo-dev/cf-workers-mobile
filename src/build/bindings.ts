@@ -22,7 +22,7 @@ export interface ServerBuildOptions {
   remoteBindings?: string[];
   /** Required for configured assets. Local requires the explicit LocalAssets runtime binding. */
   assetsExecution?: "local" | "remote";
-  /** Names explicitly supplied through capacitorWorkers({ env }); other env access stays on the server. */
+  /** Names explicitly supplied through workersCapacitor({ env }); other env access stays on the server. */
   localBindings?: string[];
 }
 export async function serverBindings(
@@ -379,7 +379,7 @@ export async function serverBindings(
       remoteKV.length ||
       services.length ||
       queues.length
-        ? "capacitor-workers-server.json"
-        : "capacitor-workers-d1.json",
+        ? "workers-capacitor-server.json"
+        : "workers-capacitor-d1.json",
   };
 }

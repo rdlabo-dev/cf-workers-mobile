@@ -14,7 +14,7 @@ const methods = new Set<NativeNetworkMethod>([
   "socketRead",
   "socketClose",
 ]);
-const connect = "capacitor-workers:network";
+const connect = "workers-capacitor:network";
 
 /** The parent owns native handles even if the worker crashes or is terminated. */
 export function createNetworkRelay(worker: Worker) {
@@ -42,7 +42,7 @@ export function createNetworkRelay(worker: Worker) {
       )
         return;
       try {
-        const value = await scope.call("CapacitorWorkers", method, args);
+        const value = await scope.call("WorkersCapacitor", method, args);
         if (!disposed) received.postMessage({ id, value });
       } catch (error) {
         if (!disposed) received.postMessage({ id, error: String(error) });

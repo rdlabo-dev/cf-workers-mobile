@@ -23,7 +23,7 @@ Use the existing Worker entry and its Wrangler configuration with either the
 Vite or esbuild plugin:
 
 ```ts
-capacitorWorkersPlugin({
+workersCapacitorPlugin({
   worker: "src/worker.ts",
   kvExecution: { SETTINGS: "local", SHARED: "remote" },
 });
@@ -63,10 +63,10 @@ local bindings; KV uses `kvExecution` instead. Declaring a remote KV name in
 does not override another server dependency or whole-Worker fallback.
 
 ```ts
-import { openFeature } from "@rdlabo/capacitor-workers/features";
-import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
+import { openFeature } from "@rdlabo/workers-capacitor/features";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
 const kv = await openFeature(new LocalStorageKV("my-app-settings"));
-// Pass env: { SETTINGS: kv.api } to capacitorWorkers; SETTINGS must match Wrangler's name.
+// Pass env: { SETTINGS: kv.api } to workersCapacitor; SETTINGS must match Wrangler's name.
 // At shutdown: await runtime.dispose(); await kv.dispose();
 ```
 
@@ -76,7 +76,7 @@ Dedicated Worker. Remote requests are still selected before local execution and
 use the deployed Worker's own bindings, never the local `env` instance.
 
 ```ts
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://local.invalid/",
   prefer: "worker", // local function-bearing env selects direct execution
   env: { SETTINGS: kv.api }, // use the binding name declared in Wrangler
@@ -91,7 +91,7 @@ const runtime = capacitorWorkers({
 Selected requests go to this origin with the original path, query, method and
 body before local execution. Safe unrelated routes remain local. If partitioning
 cannot be proven safe, the entire Worker is dispatched remotely. Inspect
-`capacitor-workers-server.json` for that decision. Wrangler Queue consumer
+`workers-capacitor-server.json` for that decision. Wrangler Queue consumer
 configuration forces whole-Worker dispatch, including consumer-only projects;
 queue handlers must remain on the server. Queue delivery is never started inside
 the app.

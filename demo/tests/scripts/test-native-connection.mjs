@@ -12,7 +12,7 @@ const overlay = (action) =>
     "tests/scripts/native-connection-overlay.mjs",
     action,
   ]);
-const app = "jp.rdlabo.capacitorworkers.poc";
+const app = "jp.rdlabo.workerscapacitor.poc";
 await mkdir(`${cwd}/artifacts`, { recursive: true });
 const log = await open(`${cwd}/artifacts/connection-build.log`, "w");
 overlay("apply");

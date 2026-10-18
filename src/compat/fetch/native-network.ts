@@ -152,11 +152,11 @@ export function createNativeNetwork(
       const close = () =>
         (closing ??= Promise.resolve().then(async () => {
           parser.dispose();
-          await call("CapacitorWorkers", "socketClose", { id });
+          await call("WorkersCapacitor", "socketClose", { id });
         }));
       const opening = Promise.resolve()
         .then(() =>
-          call("CapacitorWorkers", "socketOpen", {
+          call("WorkersCapacitor", "socketOpen", {
             id,
             host: url.hostname.replace(/^\[|\]$/g, ""),
             port: Number(url.port || (url.protocol === "https:" ? 443 : 80)),
@@ -165,7 +165,7 @@ export function createNativeNetwork(
         )
         .then(async () => {
           if (closing) {
-            await call("CapacitorWorkers", "socketClose", { id });
+            await call("WorkersCapacitor", "socketClose", { id });
             throw new Error("HTTP connection closed");
           }
         });
@@ -173,7 +173,7 @@ export function createNativeNetwork(
         await opening;
         for (let offset = 0; offset < bytes.length; offset += CHUNK_SIZE) {
           if (closing) throw new Error("HTTP connection closed");
-          await call("CapacitorWorkers", "socketWrite", {
+          await call("WorkersCapacitor", "socketWrite", {
             id,
             chunk: encode(bytes.subarray(offset, offset + CHUNK_SIZE)),
           });
@@ -181,7 +181,7 @@ export function createNativeNetwork(
       };
       const ready = writeBytes(Uint8Array.from(head, (c) => c.charCodeAt(0)));
       const pull = async () => {
-        const result = (await call("CapacitorWorkers", "socketRead", {
+        const result = (await call("WorkersCapacitor", "socketRead", {
           id,
           maxBytes: chunkSize,
         })) as { chunk?: string; eof?: boolean; reset?: boolean };

@@ -47,7 +47,7 @@ for (const [key, option, binding] of kinds) {
     );
     const found = await serverBindings(root, {});
     expect(found.names).toEqual([binding]);
-    expect(found.reportFile).toBe("capacitor-workers-server.json");
+    expect(found.reportFile).toBe("workers-capacitor-server.json");
     expect(JSON.stringify(found)).not.toMatch(
       /private-id|private-bucket|private-service|private-queue/,
     );
@@ -250,7 +250,7 @@ it("keeps consumer-only Workers and their fetch handlers on the server", async (
   expect(result?.mode).toBe("worker");
   expect(result?.reason).toContain("Queue consumers");
   expect(result?.local).not.toContain("consumer-private-code");
-  expect(result?.reportFile).toBe("capacitor-workers-server.json");
+  expect(result?.reportFile).toBe("workers-capacitor-server.json");
 });
 
 it("requires explicit KV policy and rejects invalid or conflicting policies", async () => {
@@ -285,7 +285,7 @@ it("requires explicit KV policy and rejects invalid or conflicting policies", as
   });
   expect(found.names).toEqual(["KV"]);
   expect(found.localBindings).toEqual([]);
-  expect(found.reportFile).toBe("capacitor-workers-server.json");
+  expect(found.reportFile).toBe("workers-capacitor-server.json");
   const entry = resolve(root, "remote-kv.ts");
   await writeFile(
     entry,

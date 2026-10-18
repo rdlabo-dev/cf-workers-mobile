@@ -1,4 +1,4 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import {
   EncodingImplementation,
   encodingContract,
@@ -7,7 +7,7 @@ import {
   AbortImplementation,
   abortContract,
 } from "../../../src/compat/abort/index.spec";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   HeadersImplementation,
   headersContract,
@@ -56,7 +56,7 @@ export type WebApiName = keyof typeof contracts;
 export async function runWebApiContracts(name?: WebApiName) {
   // Standalone API contracts own the same Web globals as an application runtime,
   // including resource-management symbols on older WebViews.
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://web-contract.invalid",
     worker: { fetch: () => new globalThis.Response(null, { status: 204 }) },
   });

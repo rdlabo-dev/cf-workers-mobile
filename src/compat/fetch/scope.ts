@@ -18,7 +18,7 @@ export function createNetworkScope(nativeCall: NativeCall) {
     const existing = closing.get(id);
     if (existing) return existing;
     const promise = Promise.resolve()
-      .then(() => nativeCall("CapacitorWorkers", "socketClose", { id }))
+      .then(() => nativeCall("WorkersCapacitor", "socketClose", { id }))
       .then(() => {
         handles.delete(id);
         closing.delete(id);
@@ -28,7 +28,7 @@ export function createNetworkScope(nativeCall: NativeCall) {
   };
   const call: NativeCall = (plugin, method, args) => {
     if (disposal) return Promise.reject(new Error("Network runtime disposed"));
-    if (plugin !== "CapacitorWorkers" || typeof args.id !== "string")
+    if (plugin !== "WorkersCapacitor" || typeof args.id !== "string")
       return Promise.reject(new TypeError("Invalid network call"));
     const id = args.id;
     const opening = method === "socketOpen";

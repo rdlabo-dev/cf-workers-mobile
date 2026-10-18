@@ -22,7 +22,7 @@ test("Fetch-only migration releases current clients and preserves application re
       );
     await api.enableDocumentWorker();
     Object.assign(window, { Capacitor: { getPlatform: () => "android" } });
-    const app = api.capacitorWorkers({
+    const app = api.workersCapacitor({
       baseURL: "https://worker.example/api",
       worker: { fetch: () => new Response("api") },
     });

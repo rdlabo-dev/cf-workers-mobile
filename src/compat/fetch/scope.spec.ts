@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createNetworkScope } from "./scope.js";
 import type { NativeCall } from "./native-network.js";
 
-const plugin = "CapacitorWorkers";
+const plugin = "WorkersCapacitor";
 describe("native network runtime ownership", () => {
   it("closes a header wait independently of the terminated worker", async () => {
     const native = vi.fn<NativeCall>((_, method) =>

@@ -91,7 +91,7 @@ if (flag === "--clone-only") process.exit(0);
 // Independent consumer: installs the packed library tarball, the upstream
 // application and the small Capacitor fixture. No repository symlinks.
 const consumer = await realpath(
-  await mkdtemp(join(tmpdir(), `capacitor-workers-upstream-${sample}-`)),
+  await mkdtemp(join(tmpdir(), `workers-capacitor-upstream-${sample}-`)),
 );
 const packed = JSON.parse(
   execFileSync("npm", ["pack", "--json", "--pack-destination", consumer], {
@@ -103,9 +103,9 @@ const packed = JSON.parse(
 const files = packed.files.map((file) => file.path);
 for (const expected of [
   "Package.swift",
-  "native/ios/CapacitorWorkersPlugin.swift",
+  "native/ios/WorkersCapacitorPlugin.swift",
   "native/android/build.gradle",
-  "native/android/src/main/java/jp/rdlabo/capacitorworkers/CapacitorWorkersPlugin.java",
+  "native/android/src/main/java/jp/rdlabo/workerscapacitor/WorkersCapacitorPlugin.java",
 ])
   assert.ok(files.includes(expected), `Missing packed file: ${expected}`);
 await writeFile(
@@ -117,7 +117,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "@rdlabo/capacitor-workers": `file:./${packed.filename}`,
+        "@rdlabo/workers-capacitor": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -149,8 +149,8 @@ assert.ok(
 );
 run("npm", ["install"], consumer);
 assert.equal(
-  await realpath(join(consumer, "node_modules/@rdlabo/capacitor-workers")),
-  join(consumer, "node_modules/@rdlabo/capacitor-workers"),
+  await realpath(join(consumer, "node_modules/@rdlabo/workers-capacitor")),
+  join(consumer, "node_modules/@rdlabo/workers-capacitor"),
   "Must install tarball, not link repo",
 );
 run("npm", ["run", "build"], consumer);
@@ -173,7 +173,7 @@ run("npx", ["cap", "sync"], consumer);
 const ios = JSON.parse(
   await readFile(join(consumer, "ios/App/App/capacitor.config.json"), "utf8"),
 );
-assert.ok(ios.packageClassList.includes("CapacitorWorkersPlugin"));
+assert.ok(ios.packageClassList.includes("WorkersCapacitorPlugin"));
 const android = JSON.parse(
   await readFile(
     join(consumer, "android/app/src/main/assets/capacitor.plugins.json"),
@@ -183,7 +183,7 @@ const android = JSON.parse(
 assert.ok(
   android.some(
     (plugin) =>
-      plugin.classpath === "jp.rdlabo.capacitorworkers.CapacitorWorkersPlugin",
+      plugin.classpath === "jp.rdlabo.workerscapacitor.WorkersCapacitorPlugin",
   ),
 );
 await writeFile(

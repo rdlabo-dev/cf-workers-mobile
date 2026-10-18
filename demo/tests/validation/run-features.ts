@@ -1,13 +1,13 @@
 import { verifyKVPersistence } from "./kv";
-import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
-import { assertContract, runContract } from "@rdlabo/capacitor-workers/testing";
+import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
+import { assertContract, runContract } from "@rdlabo/workers-capacitor/testing";
 import worker from "../fixtures/workers/compatibility/fetch";
 const isolated = () =>
   new Worker(new URL("./entries/fetch.ts", import.meta.url), {
     type: "module",
   });
-import { fetchContract } from "@rdlabo/capacitor-workers/testing/fetch";
-import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
+import { fetchContract } from "@rdlabo/workers-capacitor/testing/fetch";
+import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
 import { wasmContract } from "./contracts/wasm";
 import { runLocalNodeContracts } from "./node-modules";
 import { runNodeContractsInWorker } from "./node-worker";

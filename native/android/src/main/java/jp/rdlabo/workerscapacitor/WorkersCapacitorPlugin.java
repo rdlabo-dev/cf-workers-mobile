@@ -1,4 +1,4 @@
-package jp.rdlabo.capacitorworkers;
+package jp.rdlabo.workerscapacitor;
 
 import android.os.Handler;
 import android.os.Looper;
@@ -10,8 +10,8 @@ import org.json.JSONObject;
 import org.json.JSONArray;
 
 /** Internal runtime host. The application keeps its ordinary BridgeActivity. */
-@CapacitorPlugin(name = "CapacitorWorkers")
-public class CapacitorWorkersPlugin extends Plugin {
+@CapacitorPlugin(name = "WorkersCapacitor")
+public class WorkersCapacitorPlugin extends Plugin {
     private final Handler main = new Handler(Looper.getMainLooper());
     private volatile WorkerSockets network = new WorkerSockets();
     private WebView runtime;
@@ -48,7 +48,7 @@ public class CapacitorWorkersPlugin extends Plugin {
             runtime.getSettings().setJavaScriptEnabled(true);
             runtime.getSettings().setDomStorageEnabled(true);
             hostBridge = new HostBridge(runtime);
-            runtime.addJavascriptInterface(hostBridge, "CapacitorWorkersHost");
+            runtime.addJavascriptInterface(hostBridge, "WorkersCapacitorHost");
             runtime.setWebViewClient(new WebViewClient() {
                 @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                     return bridge.getLocalServer().shouldInterceptRequest(request);
@@ -127,7 +127,7 @@ public class CapacitorWorkersPlugin extends Plugin {
         if (timeout != null) main.removeCallbacks(timeout);
         if (starting != null) { starting.reject("Document runtime disposed"); starting = null; }
         if (runtime != null) {
-            runtime.stopLoading(); runtime.removeJavascriptInterface("CapacitorWorkersHost"); runtime.destroy(); runtime = null;
+            runtime.stopLoading(); runtime.removeJavascriptInterface("WorkersCapacitorHost"); runtime.destroy(); runtime = null;
         }
     }
     @Override protected void handleOnDestroy() { bridge.removeWebViewListener(networkLifecycle); main.post(this::close); network.shutdown(); }
@@ -135,14 +135,14 @@ public class CapacitorWorkersPlugin extends Plugin {
     /**
      * JavaScript interface exposed to the hidden document runtime. The bridge
      * is synchronous, so network results are delivered back into the WebView
-     * via CapacitorWorkersHostCallback.deliver(callbackId, success, json).
+     * via WorkersCapacitorHostCallback.deliver(callbackId, success, json).
      */
     private void deliverToHost(WebView owner, String callbackId, boolean success, String resultJson) {
         main.post(() -> {
             WebView view = runtime;
             if (view == null || view != owner) return;
             view.evaluateJavascript(
-                "CapacitorWorkersHostCallback.deliver(" + JSONObject.quote(callbackId)
+                "WorkersCapacitorHostCallback.deliver(" + JSONObject.quote(callbackId)
                     + "," + success + "," + (resultJson == null ? "null" : resultJson) + ")",
                 null
             );
@@ -169,8 +169,8 @@ public class CapacitorWorkersPlugin extends Plugin {
                 if (runtime == owner && starting != null) { main.removeCallbacks(timeout); starting.resolve(); starting = null; }
             });
         }
-        @JavascriptInterface public void cookiesGet(String callbackId,String url) { CapacitorWorkersPlugin.this.cookiesGet(url,hostResult(owner,callbackId)); }
-        @JavascriptInterface public void cookiesSet(String callbackId,String url,String cookies) { CapacitorWorkersPlugin.this.cookiesSet(url,cookies,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void cookiesGet(String callbackId,String url) { WorkersCapacitorPlugin.this.cookiesGet(url,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void cookiesSet(String callbackId,String url,String cookies) { WorkersCapacitorPlugin.this.cookiesSet(url,cookies,hostResult(owner,callbackId)); }
         @JavascriptInterface public void socketWatch(String callbackId,String id) { network.watch(id,hostResult(owner,callbackId)); }
         @JavascriptInterface public void socketOpen(String callbackId,String id,String host,int port,boolean tls) { network.open(id,host,port,tls,hostResult(owner,callbackId)); }
         @JavascriptInterface public void socketWrite(String callbackId,String id,String chunk) { network.write(id,chunk,hostResult(owner,callbackId)); }

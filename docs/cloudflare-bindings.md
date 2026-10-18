@@ -37,7 +37,7 @@ Resource IDs, model/index names, certificates and secret values are not copied
 from Wrangler into the client.
 
 ```ts
-capacitorWorkersPlugin({
+workersCapacitorPlugin({
   worker: "src/worker.ts",
   workerConfig: "wrangler.jsonc", // optional if auto-discovered
   remoteBindings: ["PAYMENT_SECRET", "FUTURE_SERVICE"],
@@ -48,7 +48,7 @@ capacitorWorkersPlugin({
 `remoteBindings` adds server-only names, including ordinary secrets that are not
 listed in Wrangler, and bindings configured by other tools. It does not replace
 discovery of known services. A name cannot also appear in `localBindings`.
-Supply `remote.origin` to `capacitorWorkers` as for existing remote services.
+Supply `remote.origin` to `workersCapacitor` as for existing remote services.
 Do not inject server secrets through the client runtime's `env` or bundler defines.
 
 Unknown configuration objects containing `binding`, or nested `bindings` entries
@@ -62,7 +62,7 @@ A request using any remote binding executes entirely remotely, even when the
 same handler also reads local-configured KV or ASSETS. Cloud instances are used
 for the entire request. Conservative whole-Worker fallback preserves shared
 state, additional exports, middleware and error handling. Review the generated
-`capacitor-workers-server.json` report.
+`workers-capacitor-server.json` report.
 
 Durable Object HTTP and RPC calls inside the original HTTP handler are supported
 by this dispatch path. **WebSocket/HTTP upgrades are not supported by this
@@ -99,13 +99,13 @@ Choose `local` for this explicitly supported profile:
 
 ```ts
 // Vite or esbuild plugin
-capacitorWorkersPlugin({ worker: "src/worker.ts", assetsExecution: "local" });
+workersCapacitorPlugin({ worker: "src/worker.ts", assetsExecution: "local" });
 ```
 
 ```ts
 // Capacitor bootstrap; public/app-shell.html must be included in the app build.
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
-import { LocalAssets } from "@rdlabo/capacitor-workers/features/assets";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { LocalAssets } from "@rdlabo/workers-capacitor/features/assets";
 
 const assets = new LocalAssets(
   {
@@ -118,7 +118,7 @@ const assets = new LocalAssets(
     notFoundHandling: "single-page-application",
   },
 );
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://app.example",
   env: { ASSETS: assets },
   // Add remote: { origin: "https://app.example" } if the build selects remote routes.

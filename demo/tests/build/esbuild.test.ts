@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { context, type BuildResult } from "esbuild";
 import { expect, it } from "vitest";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/esbuild";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/esbuild";
 
 it("watches Worker dependencies and emits a new asset without writing output", async () => {
-  const dir = await mkdtemp(resolve(tmpdir(), "capacitor-workers-watch-"));
+  const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-watch-"));
   const results: BuildResult[] = [];
   await writeFile(resolve(dir, "value.js"), 'export default "before-change";');
   await writeFile(
@@ -16,7 +16,7 @@ it("watches Worker dependencies and emits a new asset without writing output", a
   );
   await writeFile(
     resolve(dir, "main.js"),
-    `import {capacitorWorkers} from ${JSON.stringify(fileURLToPath(import.meta.resolve("@rdlabo/capacitor-workers")))}; globalThis.runtime = capacitorWorkers({baseURL:"https://worker.invalid/api"});`,
+    `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("@rdlabo/workers-capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:"https://worker.invalid/api"});`,
   );
   const build = await context({
     absWorkingDir: dir,
@@ -26,7 +26,7 @@ it("watches Worker dependencies and emits a new asset without writing output", a
     format: "esm",
     write: false,
     plugins: [
-      capacitorWorkersPlugin({ worker: "worker.js" }),
+      workersCapacitorPlugin({ worker: "worker.js" }),
       {
         name: "capture",
         setup(build) {
@@ -61,7 +61,7 @@ it.each([true, false])(
   "preserves an explicit JSX loader (async=%s)",
   async (asyncFunction) => {
     const { build } = await import("esbuild");
-    const dir = await mkdtemp(resolve(tmpdir(), "capacitor-workers-jsx-"));
+    const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-jsx-"));
     try {
       await writeFile(
         resolve(dir, "main.js"),
@@ -76,7 +76,7 @@ it.each([true, false])(
         platform: "browser",
         write: false,
         loader: { ".js": "jsx" },
-        plugins: [capacitorWorkersPlugin({ worker: "unused.js" })],
+        plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
       });
       expect(result.errors).toEqual([]);
       expect(result.outputFiles[0].text).toContain("createElement");
@@ -88,7 +88,7 @@ it.each([true, false])(
 
 it("does not transform source files explicitly loaded as text", async () => {
   const { build } = await import("esbuild");
-  const dir = await mkdtemp(resolve(tmpdir(), "capacitor-workers-text-"));
+  const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-text-"));
   try {
     await writeFile(
       resolve(dir, "main.js"),
@@ -107,7 +107,7 @@ it("does not transform source files explicitly loaded as text", async () => {
       platform: "browser",
       write: false,
       loader: { ".ts": "text" },
-      plugins: [capacitorWorkersPlugin({ worker: "unused.js" })],
+      plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
     });
     expect(result.outputFiles[0].text).toContain(
       "async <this is not JavaScript>",
@@ -122,7 +122,7 @@ it.each([true, false])(
   async (legacy) => {
     const { build } = await import("esbuild");
     const dir = await mkdtemp(
-      resolve(tmpdir(), "capacitor-workers-decorator-"),
+      resolve(tmpdir(), "workers-capacitor-decorator-"),
     );
     try {
       await writeFile(
@@ -138,7 +138,7 @@ it.each([true, false])(
         platform: "browser",
         write: false,
         tsconfigRaw: { compilerOptions: { experimentalDecorators: legacy } },
-        plugins: [capacitorWorkersPlugin({ worker: "unused.js" })],
+        plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
       });
       expect(result.errors).toEqual([]);
       expect(result.outputFiles[0].text).toContain("Service");

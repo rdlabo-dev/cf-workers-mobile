@@ -11,8 +11,8 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import mysql from "mysql2/promise";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { capacitorWorkersPlugin as vitePlugin } from "../../../../dist/vite.js";
-import { capacitorWorkersPlugin as esbuildPlugin } from "../../../../dist/esbuild.js";
+import { workersCapacitorPlugin as vitePlugin } from "../../../../dist/vite.js";
+import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/esbuild.js";
 
 export function databaseIntegration(kind) {
   const hyperdrive = kind === "hyperdrive";
@@ -137,8 +137,8 @@ export function databaseIntegration(kind) {
     );
     await writeFile(
       join(root, "main.js"),
-      `import {capacitorWorkers} from ${JSON.stringify(join(repo, "dist/index.js"))};
-    window.run=async prefer=>{const runtime=capacitorWorkers({baseURL:'https://local.invalid/',prefer,remote:{origin:'https://deployed-worker.invalid',getToken:()=> 'test-alice'}});try{await runtime.ready;return {execution:runtime.execution,html:await(await fetch('/')).text(),row:await(await fetch('/api/counters/alice')).json()};}finally{await runtime.dispose();}};`,
+      `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};
+    window.run=async prefer=>{const runtime=workersCapacitor({baseURL:'https://local.invalid/',prefer,remote:{origin:'https://deployed-worker.invalid',getToken:()=> 'test-alice'}});try{await runtime.ready;return {execution:runtime.execution,html:await(await fetch('/')).text(),row:await(await fetch('/api/counters/alice')).json()};}finally{await runtime.dispose();}};`,
     );
     const server = await createViteServer({
       configFile: false,
@@ -268,9 +268,9 @@ export function databaseIntegration(kind) {
         const main = join(root, "main.js");
         await writeFile(
           main,
-          `import {capacitorWorkers} from ${JSON.stringify(join(repo, "dist/index.js"))};
+          `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};
     let runtime; let token='test-alice';
-    window.start=async prefer=>{ runtime=capacitorWorkers({baseURL:'https://local.invalid/',prefer,remote:{origin:'https://deployed-worker.invalid',getToken:()=>token}}); await runtime.ready; return runtime.execution; };
+    window.start=async prefer=>{ runtime=workersCapacitor({baseURL:'https://local.invalid/',prefer,remote:{origin:'https://deployed-worker.invalid',getToken:()=>token}}); await runtime.ready; return runtime.execution; };
     window.stop=()=>runtime.dispose();
     window.token=value=>token=value;
     window.request=async(path,init)=>{const response=await fetch(path,init);return {status:response.status,text:await response.text(),effects:response.headers.get('x-effect-total')};};
@@ -319,8 +319,8 @@ export function databaseIntegration(kind) {
             join(
               out,
               hyperdrive
-                ? "capacitor-workers-server.json"
-                : "capacitor-workers-d1.json",
+                ? "workers-capacitor-server.json"
+                : "workers-capacitor-d1.json",
             ),
             "utf8",
           ),

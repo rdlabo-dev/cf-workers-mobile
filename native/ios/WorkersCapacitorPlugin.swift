@@ -1,10 +1,10 @@
 import Capacitor
 import WebKit
 
-@objc(CapacitorWorkersPlugin)
-public final class CapacitorWorkersPlugin: CAPPlugin, CAPBridgedPlugin {
-    public let identifier = "CapacitorWorkersPlugin"
-    public let jsName = "CapacitorWorkers"
+@objc(WorkersCapacitorPlugin)
+public final class WorkersCapacitorPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "WorkersCapacitorPlugin"
+    public let jsName = "WorkersCapacitor"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "cookiesGet", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "cookiesSet", returnType: CAPPluginReturnPromise),
@@ -32,9 +32,9 @@ public final class CapacitorWorkersPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         networkLifecycle = lifecycle
-        content.add(lifecycle, name: "CapacitorWorkersNetworkReset")
+        content.add(lifecycle, name: "WorkersCapacitorNetworkReset")
         content.addUserScript(WKUserScript(
-            source: "window.webkit.messageHandlers.CapacitorWorkersNetworkReset.postMessage(null)",
+            source: "window.webkit.messageHandlers.WorkersCapacitorNetworkReset.postMessage(null)",
             injectionTime: .atDocumentStart, forMainFrameOnly: true
         ))
     }

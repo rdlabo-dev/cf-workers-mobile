@@ -1,4 +1,4 @@
-import type { KVTextNamespace } from "@rdlabo/capacitor-workers/features/kv";
+import type { KVTextNamespace } from "@rdlabo/workers-capacitor/features/kv";
 /** The same handler runs against Workers KV and the WebView binding. */
 export default {
   async fetch(request: Request, env: { KV: KVTextNamespace }) {

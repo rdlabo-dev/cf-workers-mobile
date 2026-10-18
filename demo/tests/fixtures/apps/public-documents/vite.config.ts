@@ -1,12 +1,12 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig(({ mode }) => ({
   root: here("."),
   publicDir: here("../native-documents/public"),
   plugins: [
-    capacitorWorkersPlugin({
+    workersCapacitorPlugin({
       worker: here(
         `../../workers/rendering/${mode === "express" ? "express.ts" : "hono.tsx"}`,
       ),
