@@ -1,3 +1,4 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
 import { expect, test } from "@playwright/test";
 test("one feature standard covers direct/isolated fetch, state and engine capability", async ({
   page,
@@ -5,26 +6,20 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
   await page.goto("/");
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
-  expect(reports.map((report) => report.cases.length)).toEqual([
-    4, 4, 18, 2, 14, 11, 15, 18, 9, 24, 30, 15, 8, 2, 1, 2, 14, 11, 15, 18, 9,
-    24, 30, 15, 8, 2, 1, 2,
-  ]);
-  const cases = reports.flatMap((report) => report.cases);
-  expect(reports.flatMap((report) => report.errors)).toEqual([]);
-  expect(
-    cases.filter(
-      (result) => result.status === "failed" || result.status === "unavailable",
-    ),
-  ).toEqual([]);
+  const expected = Object.entries(expectedCases).flatMap(([feature, cases]) =>
+    (feature.startsWith("node.") || feature === "fetch.basic"
+      ? ["direct", "isolated"]
+      : ["webview"]
+    ).map((environment) => [environment, feature, cases]),
+  );
   expect(
     reports
-      .filter((report) => report.feature === "node.async-hooks")
-      .map((report) =>
-        report.cases
-          .filter((result) => result.status === "unsupported")
-          .map((result) => result.id),
-      ),
-  ).toEqual([[], []]);
+      .map((r) => [r.environment, r.feature, r.cases.map((c) => c.id)])
+      .sort(),
+  ).toEqual(expected.sort());
+  const cases = reports.flatMap((report) => report.cases);
+  expect(reports.flatMap((report) => report.errors)).toEqual([]);
+  expect(cases.filter((result) => result.status !== "passed")).toEqual([]);
 });
 
 test("KV survives a WebView document reload and remains namespace-isolated", async ({

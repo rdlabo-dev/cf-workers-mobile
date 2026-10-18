@@ -9,6 +9,12 @@ export function runNodeContractsInWorker(): Promise<ContractResult[]> {
   const worker = nodeWorker();
   return new Promise<ContractResult[]>((resolve, reject) => {
     worker.onmessage = (event) => resolve(event.data);
-    worker.onerror = (event) => reject(event.error ?? new Error(event.message));
+    worker.onerror = (event) =>
+      reject(
+        event.error ??
+          new Error(
+            `${event.message} (${event.filename}:${event.lineno}:${event.colno})`,
+          ),
+      );
   }).finally(() => worker.terminate());
 }

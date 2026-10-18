@@ -1,9 +1,19 @@
+import * as hooks from "./hooks.js";
+export * from "./hooks.js";
 import { contextAware, addCallbackBinding } from "./callbacks.js";
 import { getExecutionEnvironment } from "../../environment.js";
 // Context propagation uses synchronous scopes and captured Promise callbacks.
 // Native await bypasses Promise.then: browser builds must lower async functions
 // with the supplied build plugins. Reject untransformed async scope callbacks
 // before they can silently read another request's store.
+
+const storageInstances = new WeakSet<object>();
+const resourceInstances = new WeakSet<object>();
+const illegalInvocation =
+  "Illegal invocation: function called with incorrect `this` reference. See https://developers.cloudflare.com/workers/observability/errors/#illegal-invocation-errors for details.";
+function brand(instances: WeakSet<object>, value: object): void {
+  if (!instances.has(value)) throw new TypeError(illegalInvocation);
+}
 
 type Context = Map<AsyncLocalStorage<unknown>, unknown>;
 let current: Context | undefined;
@@ -16,7 +26,7 @@ function withContext<T, A extends unknown[]>(
   const previous = current;
   current = context;
   try {
-    return Reflect.apply(callback, undefined, args);
+    return Reflect.apply(callback, globalThis, args);
   } finally {
     current = previous;
   }
@@ -44,15 +54,35 @@ addCallbackBinding((callback) => {
 });
 
 export class AsyncLocalStorage<Store = unknown> {
-  constructor() {
+  readonly #defaultValue: Store | undefined;
+  readonly #name: string;
+  constructor(options?: { defaultValue?: Store; name?: string }) {
+    if (
+      options != null &&
+      typeof options !== "object" &&
+      typeof options !== "function"
+    )
+      throw new TypeError(
+        "Failed to construct 'AsyncLocalStorage': constructor parameter 1 is not of type 'AsyncLocalStorageOptions'.",
+      );
+    this.#defaultValue = options?.defaultValue;
+    const name = options?.name;
+    this.#name = name == null ? "" : stringValue(name);
+    storageInstances.add(this);
     // An unused import must not mutate timer/global ownership. Install only
     // when a Worker actually starts using context propagation.
     installAsyncContextPropagation();
   }
 
+  get name() {
+    brand(storageInstances, this);
+    return this.#name;
+  }
+
   static bind<Args extends unknown[], T>(
     callback: (...args: Args) => T,
   ): (...args: Args) => T {
+    functionArgument(callback, "bind", "AsyncLocalStorage", 1, "Function");
     const context = capture();
     return (...args: Args) => withContext(context, callback, args);
   }
@@ -66,18 +96,20 @@ export class AsyncLocalStorage<Store = unknown> {
   }
 
   disable(): void {
-    current?.delete(this as AsyncLocalStorage<unknown>);
+    brand(storageInstances, this);
+    throw new Error("asyncLocalStorage.disable() is not implemented");
   }
 
   getStore(): Store | undefined {
-    return current?.get(this as AsyncLocalStorage<unknown>) as
-      | Store
-      | undefined;
+    brand(storageInstances, this);
+    return current?.has(this as AsyncLocalStorage<unknown>)
+      ? (current.get(this as AsyncLocalStorage<unknown>) as Store | undefined)
+      : this.#defaultValue;
   }
 
-  enterWith(store: Store): void {
-    if (current === undefined) current = new Map();
-    current.set(this as AsyncLocalStorage<unknown>, store);
+  enterWith(_store: Store): never {
+    brand(storageInstances, this);
+    throw new Error("asyncLocalStorage.enterWith() is not implemented");
   }
 
   run<Args extends unknown[], T>(
@@ -85,6 +117,8 @@ export class AsyncLocalStorage<Store = unknown> {
     callback: (...args: Args) => T,
     ...args: Args
   ): T {
+    brand(storageInstances, this);
+    functionArgument(callback, "run", "AsyncLocalStorage", 2, "function");
     const context = capture() ?? new Map();
     context.set(this as AsyncLocalStorage<unknown>, store);
     return scope(context, callback, args);
@@ -94,15 +128,17 @@ export class AsyncLocalStorage<Store = unknown> {
     callback: (...args: Args) => T,
     ...args: Args
   ): T {
+    brand(storageInstances, this);
+    functionArgument(callback, "exit", "AsyncLocalStorage", 1, "function");
     const context = capture() ?? new Map();
-    context.delete(this as AsyncLocalStorage<unknown>);
+    context.set(this as AsyncLocalStorage<unknown>, undefined);
     return scope(context, callback, args);
   }
 }
 
 let propagated = false;
 /** Patch Promise/timers/microtasks once per realm. Safe to call repeatedly. */
-export function installAsyncContextPropagation(): void {
+function installAsyncContextPropagation(): void {
   if (propagated || getExecutionEnvironment() === "cloudflare-workers") return;
   propagated = true;
   const then = Promise.prototype.then;
@@ -147,54 +183,8 @@ export function installAsyncContextPropagation(): void {
       (globalThis as unknown as Record<string, unknown>)[name] =
         wrapCallback(schedule);
   }
-  // Stream pulls/writes run continuations after their creating scope
-  // settled; wrap source/sink callbacks with the context at construction.
-  const wrapMethods =
-    (names: string[]) =>
-    <T>(source: T): T => {
-      if (source === null || typeof source !== "object") return source;
-      const context = capture();
-      const wrapped = Object.create(Object.getPrototypeOf(source));
-      for (const name of [...Object.getOwnPropertyNames(source), ...names]) {
-        const fn = (source as Record<string, unknown>)[name];
-        wrapped[name] =
-          names.includes(name) && typeof fn === "function"
-            ? (...args: unknown[]) =>
-                withContext(context, () => Reflect.apply(fn, source, args), [])
-            : fn;
-      }
-      return wrapped;
-    };
-  const NativeReadableStream = globalThis.ReadableStream;
-  if (typeof NativeReadableStream === "function") {
-    const wrapSource = wrapMethods(["pull", "cancel", "start"]);
-    globalThis.ReadableStream = class extends (NativeReadableStream as new (
-      source?: unknown,
-      strategy?: QueuingStrategy,
-    ) => ReadableStream) {
-      constructor(source?: unknown, strategy?: QueuingStrategy) {
-        super(wrapSource(source) as UnderlyingSource | undefined, strategy);
-      }
-      static [Symbol.hasInstance](value: unknown) {
-        return value instanceof NativeReadableStream;
-      }
-    } as typeof ReadableStream;
-  }
-  const NativeWritableStream = globalThis.WritableStream;
-  if (typeof NativeWritableStream === "function") {
-    const wrapSink = wrapMethods(["write", "close", "abort", "start"]);
-    globalThis.WritableStream = class extends (NativeWritableStream as new (
-      sink?: unknown,
-      strategy?: QueuingStrategy,
-    ) => WritableStream) {
-      constructor(sink?: unknown, strategy?: QueuingStrategy) {
-        super(wrapSink(sink) as UnderlyingSink | undefined, strategy);
-      }
-      static [Symbol.hasInstance](value: unknown) {
-        return value instanceof NativeWritableStream;
-      }
-    } as typeof WritableStream;
-  }
+  // Stream constructors capture callbacks through the shared callback binding.
+  // Their public identity must remain stable after AsyncLocalStorage is used.
   // Schedulers such as React's use MessageChannel; deliver each posted
   // message to its listeners under the context captured at postMessage.
   const NativeMessageChannel = globalThis.MessageChannel;
@@ -308,64 +298,117 @@ export function installAsyncContextPropagation(): void {
     } as unknown as typeof MessageChannel;
   }
 }
-// AsyncResource is intentionally minimal: bind/runInAsyncScope capture and
-// restore this implementation's context, matching Workers' synchronous
-// boundary. Hook ids, emitInit/emitBefore/emitAfter and real async tracking
-// are not provided.
+// AsyncResource preserves the synchronous Workers API and its zero-valued
+// resource IDs. Context continuation isolation retains the engine limitations
+// documented above.
 export class AsyncResource {
-  readonly #context = capture();
-  readonly #type: string;
-  constructor(type: string, _options?: { triggerAsyncId?: number }) {
-    this.#type = type;
-  }
-  get type() {
-    return this.#type;
+  readonly #context: Context | undefined;
+  constructor(type?: string, options?: { triggerAsyncId?: number }) {
+    if (type != null) stringValue(type);
+    if (
+      options != null &&
+      typeof options !== "object" &&
+      typeof options !== "function"
+    )
+      throw new TypeError(
+        "Failed to construct 'AsyncResource': constructor parameter 2 is not of type 'Options'.",
+      );
+    if (options?.triggerAsyncId !== undefined)
+      throw new Error(
+        "The 'triggerAsyncId' field on 'Options' is not implemented.",
+      );
+    this.#context = capture();
+    resourceInstances.add(this);
   }
   bind<F extends (...args: any[]) => any>(fn: F, thisArg?: unknown): F {
+    brand(resourceInstances, this);
+    functionArgument(fn, "bind", "AsyncResource", 1, "Function");
     const context = this.#context;
-    return function (this: unknown, ...args: any[]) {
-      return withContext(
+    const bound = (...args: any[]) =>
+      withContext(
         context,
-        () => Reflect.apply(fn, thisArg ?? this, args),
+        () =>
+          Reflect.apply(fn, thisArg === undefined ? globalThis : thisArg, args),
         [],
       );
-    } as F;
+    Object.defineProperty(bound, "name", { value: "", configurable: true });
+    Object.assign(bound, { asyncResource: this });
+    return bound as F;
   }
   runInAsyncScope<F extends (...args: any[]) => any>(
     fn: F,
     thisArg?: unknown,
     ...args: any[]
   ): ReturnType<F> {
+    brand(resourceInstances, this);
+    functionArgument(fn, "runInAsyncScope", "AsyncResource", 1, "function");
     const context = this.#context;
     return withContext(
       context,
-      () => Reflect.apply(fn, thisArg, args) as ReturnType<F>,
+      () =>
+        Reflect.apply(
+          fn,
+          thisArg === undefined ? globalThis : thisArg,
+          args,
+        ) as ReturnType<F>,
       [],
     );
   }
   static bind<F extends (...args: any[]) => any>(
     fn: F,
-    _type?: string,
+    type?: string,
     thisArg?: unknown,
   ): F {
-    const context = capture();
-    return function (this: unknown, ...args: any[]) {
-      return withContext(
-        context,
-        () => Reflect.apply(fn, thisArg ?? this, args),
-        [],
-      );
-    } as F;
+    functionArgument(fn, "bind", "AsyncResource", 1, "Function");
+    return new AsyncResource(type).bind(fn, thisArg);
   }
-  emitDestroy(): this {
-    return this;
+  emitDestroy(): void {
+    brand(resourceInstances, this);
   }
   asyncId(): number {
+    brand(resourceInstances, this);
     return 0;
   }
   triggerAsyncId(): number {
+    brand(resourceInstances, this);
     return 0;
   }
 }
 
-export default { AsyncLocalStorage, AsyncResource };
+export default { AsyncLocalStorage, AsyncResource, ...hooks };
+
+function stringValue(value: unknown): string {
+  if (typeof value === "symbol")
+    throw new TypeError("Cannot convert a Symbol value to a string");
+  return `${value}`;
+}
+function functionArgument(
+  value: unknown,
+  method: string,
+  owner: string,
+  parameter: number,
+  type: string,
+): void {
+  if (typeof value !== "function")
+    throw new TypeError(
+      `Failed to execute '${method}' on '${owner}': parameter ${parameter} is not of type '${type}'.`,
+    );
+}
+
+for (const [name, Type] of Object.entries({
+  AsyncLocalStorage,
+  AsyncResource,
+})) {
+  Object.defineProperty(Type, "name", { value: name, configurable: true });
+  Object.defineProperty(Type.prototype, Symbol.toStringTag, {
+    value: name,
+    configurable: true,
+  });
+  for (const key of Object.getOwnPropertyNames(Type.prototype)) {
+    if (key !== "constructor")
+      Object.defineProperty(Type.prototype, key, {
+        ...Object.getOwnPropertyDescriptor(Type.prototype, key),
+        enumerable: true,
+      });
+  }
+}

@@ -22,66 +22,123 @@ export const nodeGlobalsInstallPath = fileURLToPath(
 export const nodeCompatPath = (name: string) =>
   fileURLToPath(new URL(`../compat/${name}/index.js`, import.meta.url));
 const workersModulePath = (name: string) =>
-  fileURLToPath(new URL(`../cloudflare/apis/${name}/index.js`, import.meta.url));
+  fileURLToPath(
+    new URL(`../cloudflare/apis/${name}/index.js`, import.meta.url),
+  );
 // A compat module reusing a CommonJS polyfill imports the concrete package
 // file; the bare name is the alias target, so only the deep specifier can
 // reach the real implementation without recursing.
 const polyfill = (specifier: string) =>
   fileURLToPath(import.meta.resolve(specifier));
-export function compatibilityAliases() {
+// One entry per builtin; subpaths precede parent aliases when expanded.
+// The optional third path is the CommonJS constructor entry.
+const builtins: readonly (readonly [string, string, string?])[] = [
+  ["punycode", "punycode/index.js"],
+  ["child_process", "child-process/index.js"],
+  ["cluster", "cluster/index.js"],
+  ["dgram", "dgram/index.js"],
+  ["inspector/promises", "inspector/promises.js"],
+  ["inspector", "inspector/index.js"],
+  ["readline/promises", "readline/promises.js"],
+  ["readline", "readline/index.js"],
+  ["domain", "domain/index.js"],
+  ["stream/promises", "stream-promises/index.js"],
+  ["stream/consumers", "stream-consumers/index.js"],
+  ["dns/promises", "dns/promises.js"],
+  ["dns", "dns/index.js"],
+  ["assert/strict", "assert/index.cjs"],
+  ["assert", "assert/index.cjs"],
+  ["perf_hooks", "perf-hooks/index.js"],
+  ["trace_events", "trace-events/index.js"],
+  ["https", "https/index.js"],
+  ["worker_threads", "worker-threads/index.js"],
+  ["node:test", "test/index.js"],
+  ["node:sqlite", "sqlite/index.js"],
+  ["repl", "repl/index.js"],
+  ["vm", "vm/index.js"],
+  ["http2", "http2/index.js"],
+  ["constants", "constants/index.js"],
+  ["v8", "v8/index.js"],
+  ["wasi", "wasi/index.js"],
+  ["os", "os/index.js"],
+  ["tty", "tty/index.js"],
+  ["url", "url/index.js"],
+  ["diagnostics_channel", "diagnostics-channel/index.js"],
+  ["_tls_common", "tls-common/index.js"],
+  ["async_hooks", "async-hooks/index.js"],
+  ["timers/promises", "timers/promises.js"],
+  ["timers", "timers/index.js"],
+  ["fs/promises", "fs/promises/index.js"],
+  ["fs", "fs/index.js"],
+  ["module", "module/index.js"],
+  ["_stream_readable", "stream-readable/index.js", "stream-readable/index.cjs"],
+  ["_stream_writable", "stream-writable/index.js", "stream-writable/index.cjs"],
+  ["_stream_duplex", "stream-duplex/index.js", "stream-duplex/index.cjs"],
+  [
+    "_stream_transform",
+    "stream-transform/index.js",
+    "stream-transform/index.cjs",
+  ],
+  [
+    "_stream_passthrough",
+    "stream-passthrough/index.js",
+    "stream-passthrough/index.cjs",
+  ],
+  ["stream/web", "stream-web/index.js"],
+  ["util", "util/index.js"],
+  ["buffer", "buffer/index.js"],
+  ["_http_agent", "http-agent/index.js"],
+  ["_http_client", "http-client/index.js"],
+  ["_http_incoming", "http-incoming/index.js"],
+  ["http", "http/index.js"],
+  ["net", "net/index.js"],
+  ["stream", "stream/index.js", "stream/index.cjs"],
+  ["path/win32", "path/win32/index.js"],
+  ["path/posix", "path/posix/index.js"],
+  ["path", "path/index.js"],
+  ["querystring", "querystring/index.js"],
+  ["string_decoder", "string-decoder/index.js"],
+];
+
+function builtinAliases(commonJS = false): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [name, esm, cjs] of builtins) {
+    if (commonJS && !cjs) continue;
+    const path = fileURLToPath(
+      new URL(`../compat/${commonJS ? cjs : esm}`, import.meta.url),
+    );
+    result[name] = path;
+    if (!name.startsWith("node:")) result[`node:${name}`] = path;
+  }
+  return Object.fromEntries(
+    Object.entries(result).sort(([a], [b]) => b.length - a.length),
+  );
+}
+
+export function compatibilityAliases(): Record<string, string> {
   return {
-    // readable-stream uses this trailing-slash package import. Resolve it
-    // before Vite converts the process prefix into a directory path.
     "process/": stdlib.process,
     "cloudflare:node": workersModulePath("cloudflare-node"),
     "cloudflare:workers": workersModulePath("cloudflare-workers"),
-    "node:async_hooks": nodeCompatPath("async-hooks"),
-    async_hooks: nodeCompatPath("async-hooks"),
-    "node:timers/promises": fileURLToPath(
-      new URL("../compat/timers/promises.js", import.meta.url),
-    ),
-    "timers/promises": fileURLToPath(
-      new URL("../compat/timers/promises.js", import.meta.url),
-    ),
-    "node:timers": nodeCompatPath("timers"),
-    timers: nodeCompatPath("timers"),
-    "node:fs/promises": nodeCompatPath("fs/promises"),
-    "fs/promises": nodeCompatPath("fs/promises"),
-    "node:fs": nodeCompatPath("fs"),
-    fs: nodeCompatPath("fs"),
-    "node:module": nodeCompatPath("module"),
-    module: nodeCompatPath("module"),
-    "node:stream/web": nodeCompatPath("stream-web"),
-    "stream/web": nodeCompatPath("stream-web"),
-    // The util compat reuses the npm package through its deep specifier,
-    // which must precede the bare "util" alias.
+    "punycode/": polyfill("punycode/punycode.js"),
     "util/util.js": polyfill("util/util.js"),
-    "node:util": nodeCompatPath("util"),
-    util: nodeCompatPath("util"),
-    "node:buffer": nodeCompatPath("buffer"),
-    buffer: nodeCompatPath("buffer"),
-    "node:http": nodeCompatPath("http"),
-    http: nodeCompatPath("http"),
-    "node:net": nodeCompatPath("net"),
-    net: nodeCompatPath("net"),
-    "node:stream": polyfill("readable-stream/lib/ours/browser.js"),
-    stream: polyfill("readable-stream/lib/ours/browser.js"),
-    // Subpath aliases must precede their parents: object-form alias entries
-    // also match an "<alias>/" prefix.
-    "node:path/win32": nodeCompatPath("path/win32"),
-    "path/win32": nodeCompatPath("path/win32"),
-    "node:path/posix": nodeCompatPath("path/posix"),
-    "path/posix": nodeCompatPath("path/posix"),
-    "node:path": nodeCompatPath("path"),
-    path: nodeCompatPath("path"),
-    "node:querystring": nodeCompatPath("querystring"),
-    querystring: nodeCompatPath("querystring"),
     "string_decoder/lib/string_decoder.js": polyfill(
       "string_decoder/lib/string_decoder.js",
     ),
-    "node:string_decoder": nodeCompatPath("string-decoder"),
-    string_decoder: nodeCompatPath("string-decoder"),
+    ...builtinAliases(),
   };
+}
+
+export function commonJSCompatibilityAliases(): Record<string, string> {
+  return builtinAliases(true);
+}
+
+export function compatibilityDependencies(): string[] {
+  return [
+    "cloudflare:node",
+    "cloudflare:workers",
+    ...Object.keys(builtinAliases()),
+  ];
 }
 export function workerEntry(entry: string, virtualFiles?: string) {
   // WebKit can evaluate a Worker entry twice when a dynamic child imports its

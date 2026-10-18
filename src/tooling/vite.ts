@@ -2,12 +2,14 @@ import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
 import { serverModules } from "./server-modules.js";
 import type { ServerBuildOptions } from "./server.js";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import {
   configuredPath,
   compatibilityAliases,
+  compatibilityDependencies,
+  commonJSCompatibilityAliases,
   globalsInstallPath,
   nodeGlobalsInstallPath,
   globalsPath,
@@ -25,10 +27,20 @@ function compatibilityPlugins(
 ): PluginOption[] {
   // Overrides take bare module names only; both bare and "node:" imports of
   // the same module resolve to the shared compat profile.
+  const globalsRuntimePath = globalsInjectPath.replace(
+    /inject\.js$/,
+    "runtime.js",
+  );
+  const aliases = compatibilityAliases();
+  const commonJS = commonJSCompatibilityAliases();
+  const commonJSPaths = new Map(
+    Object.entries(commonJS).map(([specifier, path]) => [
+      normalizePath(aliases[specifier as keyof typeof aliases]!),
+      path,
+    ]),
+  );
   const overrides = Object.fromEntries(
-    Object.entries(compatibilityAliases()).filter(
-      ([specifier]) => !specifier.includes(":"),
-    ),
+    Object.entries(aliases).filter(([specifier]) => !specifier.includes(":")),
   );
   return [
     {
@@ -47,6 +59,9 @@ function compatibilityPlugins(
             name: "workers-capacitor-global-install",
             enforce: "pre" as const,
             transform(code: string, id: string) {
+              // CommonJS proxy modules are already generated ESM. Injecting a
+              // require into their virtual .cjs IDs leaves it unbundled.
+              if (id.startsWith("\0")) return;
               const path = normalizePath(id.split("?")[0]);
               if (
                 !/\.[cm]?[jt]sx?$/.test(path) ||
@@ -56,7 +71,14 @@ function compatibilityPlugins(
                 )
               )
                 return;
-              return `import ${JSON.stringify(installGlobals === "worker" ? globalsInstallPath : nodeGlobalsInstallPath)};\n${code}`;
+              const installation = JSON.stringify(
+                installGlobals === "worker"
+                  ? globalsInstallPath
+                  : nodeGlobalsInstallPath,
+              );
+              return /\.c[jt]s$/.test(path)
+                ? `require(${installation});\n${code}`
+                : `import ${installation};\n${code}`;
             },
           },
         ]
@@ -64,37 +86,57 @@ function compatibilityPlugins(
     {
       name: "workers-capacitor",
       enforce: "pre",
-      transform(code, id) {
-        if (
-          normalizePath(id.split("?")[0]) !==
-          normalizePath(resolve(globalsPath, "../web.js"))
-        )
-          return;
-        // Vite's prebundled node:buffer and runtime globals must share Blob/File.
-        // Keep the distributed runtime's relative import usable as raw browser ESM.
-        return code.replace(
-          'from "../../compat/buffer/blob.js"',
-          'from "node:buffer"',
-        );
+      async resolveId(source, importer, options) {
+        if (options.custom?.["node-resolve"]?.isRequire)
+          return commonJS[source] ?? commonJSPaths.get(normalizePath(source));
+        if (!importer || !source.startsWith(".")) return;
+        const root = normalizePath(resolve(globalsPath, "../../.."));
+        const owner = normalizePath(importer.split("?")[0]);
+        if (!owner.startsWith(`${root}/`)) return;
+        const target = normalizePath(resolve(dirname(owner), source));
+        // Runtime-relative imports and public builtins must resolve to the same
+        // optimized module. Keep internal buffer/performance imports untouched.
+        let specifier: string | undefined;
+        if (target === `${root}/compat/stream-web/index.js`)
+          specifier = "node:stream/web";
+        else if (
+          owner === `${root}/browser/body/stream-body.js` ||
+          owner === `${root}/shared/globals/web.js`
+        ) {
+          if (target === `${root}/compat/buffer/blob.js`)
+            specifier = "node:buffer";
+          if (target === `${root}/compat/perf-hooks/performance.js`)
+            specifier = "node:perf_hooks";
+        }
+        if (specifier)
+          return this.resolve(specifier, importer, { skipSelf: true });
       },
       config: () => ({
         // App globals and dependencies must share Buffer identity and the HTTP registry.
         optimizeDeps: {
-          esbuildOptions: { plugins: [asyncContextPlugin()] },
-          include: [
-            "cloudflare:node",
-            "node:http",
-            "http",
-            "node:buffer",
-            "buffer",
-            "node:timers",
-            "timers",
-            "node:timers/promises",
-            "timers/promises",
-          ],
+          esbuildOptions: {
+            plugins: [
+              asyncContextPlugin(),
+              {
+                name: "workers-capacitor-commonjs-builtins",
+                setup(build) {
+                  build.onResolve(
+                    {
+                      filter: /^(?:node:)?[\w/]+$/,
+                    },
+                    ({ path, kind }) =>
+                      kind === "require-call" && commonJS[path]
+                        ? { path: commonJS[path] }
+                        : undefined,
+                  );
+                },
+              },
+            ],
+          },
+          include: compatibilityDependencies(),
         },
         resolve: {
-          alias: compatibilityAliases(),
+          alias: aliases,
         },
       }),
     },
@@ -105,13 +147,16 @@ function compatibilityPlugins(
     {
       ...inject({
         Buffer: [globalsInjectPath, "Buffer"],
-        process: [globalsInjectPath, "process"],
-        global: [globalsInjectPath, "global"],
-        setImmediate: [globalsInjectPath, "setImmediate"],
-        clearImmediate: [globalsInjectPath, "clearImmediate"],
+        // util reads process during Buffer initialization. Keep this import
+        // independent of the injector that also imports Buffer.
+        process: [aliases["process/"], "default"],
+        global: [globalsRuntimePath, "global"],
+        setImmediate: [globalsRuntimePath, "setImmediate"],
+        clearImmediate: [globalsRuntimePath, "clearImmediate"],
         exclude: [
           normalizePath(globalsPath),
           normalizePath(globalsInjectPath),
+          normalizePath(globalsRuntimePath),
           normalizePath(globalsInstallPath),
         ],
       }),

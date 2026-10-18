@@ -13,20 +13,43 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | **Not implemented** | No implementation of the required behavior exists. A placeholder or empty export is not an implementation.                                              |
 | **Out of scope**    | Not a local Node compatibility feature.                                                                                                                 |
 
-| Module / feature                       | Current status                    | Implemented scope and remaining work                                                                                                                                                                          |
-| -------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node:path`                            | **Complete**                      | [Module contract](../src/compat/path/index.spec.ts): POSIX, win32, relative resolution and the actual Workers `matchesGlob` rejection. Accepted at `b1a58d1`; remote CI passed.                               |
-| `node:querystring`                     | **Complete**                      | [Module contract](../src/compat/querystring/index.spec.ts), including all seven exports. Accepted at `b1a58d1`; remote CI passed.                                                                             |
-| `node:string_decoder`                  | **Complete**                      | [Module contract](../src/compat/string-decoder/index.spec.ts), including constructor, prototype, encodings and public state. Accepted at `b1a58d1`; remote CI passed.                                         |
-| `node:http` / Cloudflare Node bridge | **Complete** | Export/prototype audits, HTTP client/server contracts and TCP dispatch through public `net.Server` and both Cloudflare helpers. Accepted at `35316ae`. |
-| `node:net` | **Complete** | [Module contract](../src/compat/net/index.spec.ts): all 17 named exports, logical ports, Socket/Server behavior and native TCP in direct/Worker execution. Accepted at `35316ae`. |
-| Node global injection                  | **Complete**                      | Pre-evaluation Node globals, owned Web globals and native Fetch passed shared/native contracts, packed-consumer gates, reviews and CI at 13261ce. Module-scope extensions require configured/lazy loading.    |
-| `node:fs` / `node:fs/promises`         | **Unverified**                    | Read-only VFS with `workerFiles` bundler embedding; verified against a re-bundled OpenNext handler locally. Write APIs, FileHandle, watch and realpath edge cases are unimplemented. |
-| `node:module` / `node:stream/web` / `node:util` | **Unverified**      | Scoped shims: `createRequire` (VFS `.json` only), platform stream constructors, util polyfill + `TextEncoder`/`TextDecoder`. Verified transitively by the OpenNext smoke. |
-| `node:async_hooks` / AsyncLocalStorage | **Unverified** | Scoped implementation with a 15-case contract. Capacitor builds lower async functions/generators and capture Promise continuations; settle restoration, nested scopes and concurrent isolation are covered. Cloudflare retains native async hooks. Full module/native acceptance remains outstanding. |
-| `node:buffer` | **Complete** | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20). |
-| `node:timers` / `node:timers/promises` | **Unverified (CI pending)** | Whole-module implementation and shared 30-group contract are in `src/compat/timers/`. [Acceptance evidence](#timers-acceptance) records local verification; remote CI remains the merge gate. |
-| Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
+| Module / feature                                                                                                               | Current status                      | Implemented scope and remaining work                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `node:path`                                                                                                                    | **Complete**                        | [Module contract](../src/compat/path/index.spec.ts): POSIX, win32, relative resolution and the actual Workers `matchesGlob` rejection. Accepted at `b1a58d1`; remote CI passed.                                                                                                                        |
+| `node:querystring`                                                                                                             | **Complete**                        | [Module contract](../src/compat/querystring/index.spec.ts), including all seven exports. Accepted at `b1a58d1`; remote CI passed.                                                                                                                                                                      |
+| `node:string_decoder`                                                                                                          | **Complete**                        | [Module contract](../src/compat/string-decoder/index.spec.ts), including constructor, prototype, encodings and public state. Accepted at `b1a58d1`; remote CI passed.                                                                                                                                  |
+| `node:http` / Cloudflare Node bridge                                                                                           | **Complete**                        | Export/prototype audits, HTTP client/server contracts and TCP dispatch through public `net.Server` and both Cloudflare helpers. Accepted at `35316ae`.                                                                                                                                                 |
+| `node:net`                                                                                                                     | **Complete**                        | [Module contract](../src/compat/net/index.spec.ts): all 17 named exports, logical ports, Socket/Server behavior and native TCP in direct/Worker execution. Accepted at `35316ae`.                                                                                                                      |
+| Node global injection                                                                                                          | **Complete**                        | Pre-evaluation Node globals, owned Web globals and native Fetch passed shared/native contracts, packed-consumer gates, reviews and CI at 13261ce. Module-scope extensions require configured/lazy loading.                                                                                             |
+| `node:fs` / `node:fs/promises`                                                                                                 | **Unverified**                      | Read-only VFS with `workerFiles` bundler embedding; verified against a re-bundled OpenNext handler locally. Write APIs, FileHandle, watch and realpath edge cases are unimplemented.                                                                                                                   |
+| `node:module` / `node:stream/web` / `node:util`                                                                                | **Unverified**                      | Scoped shims: `createRequire` (VFS `.json` only), platform stream constructors, util polyfill + `TextEncoder`/`TextDecoder`. Verified transitively by the OpenNext smoke.                                                                                                                              |
+| `node:async_hooks` / AsyncLocalStorage                                                                                         | **Unverified**                      | 22 shared contract groups cover the pinned Workers stubs, synchronous scopes and transformed asynchronous restoration/isolation. Main's build-time async lowering is retained. Request-origin and whole-module/native acceptance remain outstanding.                                                   |
+| `node:buffer`                                                                                                                  | **Complete**                        | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20).                                                                                                            |
+| `node:timers` / `node:timers/promises`                                                                                         | **Complete**                        | Whole-module implementation and shared 30-group contract in `src/compat/timers/`. [Acceptance](#timers-acceptance) and [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) passed at `c5fb8a4`; merged as `400d022`.                                                 |
+| `node:url`                                                                                                                     | **Unverified (CI pending)**         | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance).                                                                                                                                                               |
+| `node:os`, `node:tty`, `node:wasi`, `node:punycode`                                                                            | **Unverified (acceptance pending)** | Module-owned implementations and contracts pass workerd, browser and both native platforms. Review and remote CI remain pending.                                                                                                                                                                       |
+| `node:constants`, `node:v8`, `node:http2`, `node:vm`                                                                           | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Workerd, browser, packed-consumer and both native validations pass at `719b8fe`; review and remote CI remain pending. |
+| `node:child_process`, `node:cluster`, `node:dgram`, `node:domain`, `node:inspector` (+ promises), `node:readline` (+ promises) | **Unverified (acceptance pending)** | Pinned production behavior implemented with adjacent contracts. Workerd, browser, packed-consumer and both native checks pass at `5169e5e`; review and remote CI remain pending.                                                                                                                       |
+| `node:repl`, `node:sqlite`, `node:test`                                                                                        | **Unverified (acceptance pending)** | Pinned REPL/SQLite stub behavior and Workers MockTracker API implemented with adjacent contracts. Local workerd/browser/package/native checks pass at `052647f`; independent review and remote CI remain pending. `node:test` is the Workers mock API, not Node's entire test runner.                  |
+| Other module families                                                                                                          | **Unverified or Not implemented**   | See each row below. Other module families are not certified Complete.                                                                                                                                                                                                                                  |
+
+## Remaining implementation sequence
+
+The scope is **all remaining Node compatibility modules**, including existing
+PoC shims and dependency polyfills. The recent seventeen families are not the
+completion boundary. No new PR or release is created merely because a subset
+passes. Existing Complete units retain their acceptance records; changing shared
+dependencies requires their regression checks.
+
+The fixed runtime audit enumerates **70 builtins/subpaths and 1,597 namespace
+export entries**. The whole-surface browser audit now checks every entry through
+the public esbuild plugin. **18 entries had import/export gaps before the main merge.** The other 52 only have matching export names, not automatic
+behavioral acceptance.
+
+See the [complete 70-entry matrix and dependency order](node-compatibility-surface.md).
+Run `npm run test:node-inventory` from `demo` after building the library.
+Raw results are written to `demo/artifacts/node-inventory/`. Missing imports
+remain visible, and newly failing modules outside the recorded debt fail the audit.
 
 ## Scope and evidence
 
@@ -108,17 +131,17 @@ Global installation and API compatibility are separate test responsibilities.
 Each API owns its behavior contract; environment runners execute those contracts
 and report API-specific test names. `globals` verifies the installation lifecycle.
 
-| Responsibility | Owning tests |
-| --- | --- |
-| Fetch transport and Workers HTTP policy | [fetch/index.spec.ts](../src/browser/fetch/index.spec.ts), [fetch/policy.spec.ts](../src/browser/fetch/policy.spec.ts) |
-| Headers | [headers/index.spec.ts](../src/browser/headers/index.spec.ts) |
-| Request | [request/index.spec.ts](../src/browser/request/index.spec.ts) |
-| Response and installed body decoding | [response/index.spec.ts](../src/browser/response/index.spec.ts), [response/installation.spec.ts](../src/browser/response/installation.spec.ts) |
-| AbortController / AbortSignal and timeout installation | [abort/index.spec.ts](../src/browser/abort/index.spec.ts), [abort/installation.spec.ts](../src/browser/abort/installation.spec.ts) |
-| TextEncoder / TextDecoder | [encoding/index.spec.ts](../src/browser/encoding/index.spec.ts) |
-| structuredClone | [structured-clone/index.spec.ts](../src/browser/structured-clone/index.spec.ts) |
-| setImmediate / clearImmediate | [immediate/index.spec.ts](../src/compat/immediate/index.spec.ts) |
-| Global installation, ownership and restoration | [globals/index.spec.ts](../src/shared/globals/index.spec.ts), [globals/web.spec.ts](../src/shared/globals/web.spec.ts) |
+| Responsibility                                         | Owning tests                                                                                                                                   |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fetch transport and Workers HTTP policy                | [fetch/index.spec.ts](../src/browser/fetch/index.spec.ts), [fetch/policy.spec.ts](../src/browser/fetch/policy.spec.ts)                         |
+| Headers                                                | [headers/index.spec.ts](../src/browser/headers/index.spec.ts)                                                                                  |
+| Request                                                | [request/index.spec.ts](../src/browser/request/index.spec.ts)                                                                                  |
+| Response and installed body decoding                   | [response/index.spec.ts](../src/browser/response/index.spec.ts), [response/installation.spec.ts](../src/browser/response/installation.spec.ts) |
+| AbortController / AbortSignal and timeout installation | [abort/index.spec.ts](../src/browser/abort/index.spec.ts), [abort/installation.spec.ts](../src/browser/abort/installation.spec.ts)             |
+| TextEncoder / TextDecoder                              | [encoding/index.spec.ts](../src/browser/encoding/index.spec.ts)                                                                                |
+| structuredClone                                        | [structured-clone/index.spec.ts](../src/browser/structured-clone/index.spec.ts)                                                                |
+| setImmediate / clearImmediate                          | [immediate/index.spec.ts](../src/compat/immediate/index.spec.ts)                                                                               |
+| Global installation, ownership and restoration         | [globals/index.spec.ts](../src/shared/globals/index.spec.ts), [globals/web.spec.ts](../src/shared/globals/web.spec.ts)                         |
 
 ### Test organization follow-up (2026-10-17)
 
@@ -156,7 +179,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Implementation status | Category             | API family                                                                         | Class                      | Implementation boundary / remaining check                                                                                                                                                            |
 | --------------------- | -------------------- | ---------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unverified            | Assertion testing    | `assert`, `assert/strict`, equality, throws/rejects                                | A                          | JS comparison and exception handling. Deep comparison involving engine-only inspection is U; test cross-realm values and error shapes.                                                               |
-| **Complete** | Buffer | Entire pinned export/static/prototype surface, Blob/File and transcode | A | [Whole-module acceptance](#buffer-acceptance); PR #20 remote CI passed.                                                                                                                             |
+| **Complete**          | Buffer               | Entire pinned export/static/prototype surface, Blob/File and transcode             | A                          | [Whole-module acceptance](#buffer-acceptance); PR #20 remote CI passed.                                                                                                                              |
 | **Complete**          | Buffer globals       | unqualified `Buffer`                                                               | B                          | Inject before application/dependency evaluation; imports and global must use the same implementation.                                                                                                |
 | Unverified            | Events               | `EventEmitter`, `once`, `on`, listener bookkeeping                                 | A                          | Preserve ordering, error events, cancellation and iterator cleanup.                                                                                                                                  |
 | Not implemented       | Events + context     | `EventEmitterAsyncResource` where exposed                                          | U                          | Depends on the async context decision; do not claim parity from EventEmitter alone.                                                                                                                  |
@@ -164,7 +187,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | **Complete**          | Path                 | `win32`                                                                            | A                          | Implemented with the pinned Workers module, including the subpath export; accepted at `b1a58d1`; remote CI passed.                                                                                   |
 | **Complete**          | Path                 | cwd-dependent `resolve`/`relative`                                                 | A                          | Matches the pinned Workers virtual root `/`; accepted at `b1a58d1`; remote CI passed.                                                                                                                |
 | **Complete**          | Path                 | `matchesGlob`                                                                      | A/S                        | Reproduces the pinned Workers throwing behavior with a passing contract; remote CI passed at `b1a58d1`.                                                                                              |
-| Unverified            | URL                  | `URL`, `URLSearchParams`, legacy parse/format/resolve, file URL conversion         | A                          | Standard APIs plus JS adaptation; Node-specific options need contract tests.                                                                                                                         |
+| Unverified            | URL                  | `URL`, `URLSearchParams`, legacy parse/format/resolve, file URL conversion         | A                          | Whole-module JS adapter, pinned Ada IDNA data and shared contract. See [URL acceptance](#url-acceptance).                                                                                            |
 | **Complete**          | Query strings        | parse/stringify/escape/unescape                                                    | A                          | All seven exports covered by the expanded module contract; remote CI passed at `b1a58d1`.                                                                                                            |
 | Unverified            | Punycode             | encode/decode, domain conversion helpers                                           | A                          | JS algorithm; preserve deprecated-module availability for the selected profile.                                                                                                                      |
 | **Complete**          | String decoder       | `StringDecoder` constructor and write/end/text                                     | A                          | Constructor, methods, encoding/state and reuse contracts verified locally; remote CI passed at `b1a58d1`.                                                                                            |
@@ -181,7 +204,18 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Not implemented       | Module               | builtinModules, isBuiltin, getBuiltinModule-style registry                         | A + build                  | Generate one registry for Vite/esbuild and runtime lookup. Confirm which APIs live on `module` vs `process`.                                                                                         |
 | Not implemented       | Module               | createRequire, resolution, dynamic module loading/hooks                            | U                          | Determine Workers' actual supported subset first. Statically bundled dependencies can use build-time resolution; arbitrary unbundled Node resolution must not be assumed.                            |
 
-[util documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/util/) explicitly excludes several type-inspection methods (`isExternal`, `isProxy`, `isKeyObject`, and the documented WebAssembly compiled-module predicate). These belong to S for that documented profile, not to a project requirement to expose V8 internals. Resolve documentation/runtime differences against the fixed baseline.
+The documentation's unsupported type-inspection list is not sufficient for this
+fixed profile. A reproducible [engine-boundary probe](../demo/tests/experiments/node-compat/engine-boundaries.probe.mjs)
+shows that `util.types.isProxy()` returns true for both ordinary and revoked
+proxies without invoking traps, and false for the original target. The pinned
+[workerd util implementation](https://github.com/cloudflare/workerd/blob/5358e3d337336eaf696a48bc1563d808b10feba5/src/workerd/api/node/util.h)
+exposes engine type inspection. This API is **not S** on this profile. Ordinary
+Web JavaScript has no general, non-observable proxy inspection primitive;
+wrapping future Proxy constructors cannot recognize pre-existing/cross-realm
+proxies. The whole `util/types` unit remains uncertified while this boundary is
+unresolved. The same probe confirms native async continuation isolation in
+workerd and rejects `new sqlite.DatabaseSync(':memory:')` with `TypeError:
+Illegal constructor`; neither outcome certifies a local implementation.
 
 [Zlib documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/zlib/) identifies the codec families; it does not establish that the repository's browser dependency implements all of them. [Test documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/test/) defines the MockTracker scope.
 
@@ -201,8 +235,8 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 
 ## Inventory: runtime and globals
 
-| Implementation status | Category               | API family                                                                              | Class                                                | Boundary / remaining check                                                                                                                                                                                           |
-| --------------------- | ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implementation status | Category          | API family                                                        | Class                                                | Boundary / remaining check                                                                                                                                                                                                               |
+| --------------------- | ----------------- | ----------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Complete**          | Globals           | global alias, Buffer, process                                     | B                                                    | Prefer build injection or dedicated runtime globals. `window` is not present in a Dedicated Worker.                                                                                                                                      |
 | **Complete**          | Globals           | fetch, Request/Response/Headers, encoding, abort, structuredClone | A/B/U                                                | Reuse platform objects where compatible; record Workers extensions, forbidden mutation and cross-realm behavior separately. Node inventory does not certify all Workers Web APIs.                                                        |
 | Unverified            | Web Crypto        | crypto, SubtleCrypto                                              | A/U                                                  | See crypto table. Standard object availability is not algorithm parity.                                                                                                                                                                  |
@@ -213,7 +247,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Not implemented       | Process           | cwd/chdir                                                         | A                                                    | Shared virtual cwd; validate against the virtual FS.                                                                                                                                                                                     |
 | Unverified            | Process           | hrtime, uptime and time-derived values                            | A/U                                                  | Implement documented compatibility behavior; native precision and matching timestamps are not the goal. Other process-v2 exports need baseline inspection.                                                                               |
 | Unverified            | Process           | exit, abort, fatal errors / runtime termination                   | U; D for uninstrumented direct execution             | Throwing an exception is catchable and is not proof of termination semantics. Inspect Workers behavior. Worker-host termination may cover isolated mode; an ordinary plugin cannot stop arbitrary main-realm JS while preserving the UI. |
-| Unverified            | Timers            | setTimeout/Interval/Immediate, clear variants, promises           | A+B                                                  | Whole-module Web implementation with compatible handles, cancellation, Promise helpers and scheduler. See [timers acceptance](#timers-acceptance). Background OS suspension remains an execution limit.                                                          |
+| Complete              | Timers            | setTimeout/Interval/Immediate, clear variants, promises           | A+B                                                  | Whole-module Web implementation with compatible handles, cancellation, Promise helpers and scheduler. See [timers acceptance](#timers-acceptance). Background OS suspension remains an execution limit.                                  |
 | Unverified            | Console           | log/info/warn/error, format, Console streams, groups/timers       | A+B                                                  | Capture original sinks to prevent recursion; decide which methods require global installation.                                                                                                                                           |
 | Unverified            | Errors            | classes, codes, causes, validation                                | A                                                    | JS construction and validation; don't rely on host-specific message text accidentally.                                                                                                                                                   |
 | Unverified            | Errors            | captureStackTrace, structured stack formatting and exact stacks   | U                                                    | Browser engines differ. Exact V8 frames/internal hooks are D without engine support; determine whether required Workers exports actually expose them.                                                                                    |
@@ -226,43 +260,43 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 
 ## Inventory: async context and diagnostics
 
-[AsyncLocalStorage documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/) requires context to survive asynchronous work. A scoped implementation now exists at `src/compat/async-hooks/index.ts` with [its module contract](../src/compat/async-hooks/index.spec.ts) compared against pinned workerd in `demo/tests/workers/node-compat.test.ts`. The pinned workerd baseline itself does not implement `enterWith()`, `disable()`, or `AsyncResource` constructor-type/async-id surfaces; those rows are declared unsupported for the workers profile.
+[AsyncLocalStorage documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/) requires context to survive asynchronous work. A scoped implementation now exists at `src/compat/async-hooks/index.ts` with [its module contract](../src/compat/async-hooks/index.spec.ts) compared against pinned workerd in `demo/tests/workers/node-compat.test.ts`. The pinned baseline throws for `enterWith()` and `disable()`. The local implementation now preserves those errors, accepts the Workers AsyncResource constructor options, and returns its zero IDs and undefined destroy result. All 22 async-hooks contract groups run against workerd and the transformed local profile, without the former three continuation exclusions.
 
-| Implementation status | API / behavior                                                                       | Class                                                   | Decision                                                                                                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Implemented (scoped)  | ALS run/getStore/exit within synchronous callbacks                                   | A                                                       | Contract-verified locally and against workerd; enterWith/disable additionally pass locally where workerd itself is unimplemented.                                                            |
-| Implemented (scoped)  | ALS static bind/snapshot; AsyncResource bind/runInAsyncScope                         | A for explicit synchronous boundary / U for descendants | Contract-verified. AsyncResource meta (type/emitDestroy/async ids) is a local extension beyond the workerd surface.                                                                          |
-| Implemented (transformed) | ALS across awaits, nested scopes and interleaved contexts | Build/runtime integration | Capacitor Vite/esbuild builds lower async functions and generators. Promise callbacks, timers, MessageChannel and stream callbacks capture context; scopes restore immediately. The shared contract enables settleRestore, nestedAsyncRestore and concurrentIsolation. |
-| Not implemented | Arbitrary untransformed native async/await and unhandled-rejection context | Host limitation | Native await bypasses Promise.then. Native async run/exit callbacks outside the build pipeline reject explicitly. Dynamic code must participate in the transform. |
-| In progress | Whole-program async transformation | Build/runtime integration | Implemented in Capacitor Vite/esbuild builds, including dependencies and async generators; module-level await remains native. Full module and native acceptance is still required before marking Complete. |
-| Not implemented       | Remaining async_hooks exports                                                        | U/S                                                     | Extract Workers exports first; Node hook APIs must not be inferred from the ALS module name.                                                                                              |
-| Not implemented       | diagnostics_channel channel/hasSubscribers/subscribe/unsubscribe/publish             | A                                                       | Per-runtime registry and synchronous ordered delivery.                                                                                                                                    |
-| Not implemented       | diagnostics_channel bindStore/runStores/tracingChannel context propagation           | U                                                       | Depends on ALS result; ordinary event publication does not establish context parity.                                                                                                      |
-| Out of scope          | Diagnostic forwarding to Tail Workers                                                | Outside local Node runtime scope                        | A cloud service integration, not recreated by the local channel implementation. No implicit cloud connection.                                                                             |
+| Implementation status               | API / behavior                                                                                   | Class                                                   | Decision                                                                                                                                                                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implemented (scoped)                | ALS run/getStore/exit within synchronous callbacks                                               | A                                                       | Contract-verified locally and against workerd, including the pinned enterWith/disable errors.                                                                                                                                                             |
+| Implemented (scoped)                | ALS static bind/snapshot; AsyncResource bind/runInAsyncScope                                     | A for explicit synchronous boundary / U for descendants | Contract-verified against the pinned Workers metadata; no additional type property or desktop Node destroy result is exposed.                                                                                                                             |
+| Implemented (contracts)             | ALS across transformed awaits, nested scopes and concurrent requests                             | A with build transform                                  | Main's Vite/esbuild async lowering and captured Promise continuations replace the former sticky approximation. Native async callbacks that bypass the build plugin are rejected.                                                                          |
+| Not implemented                     | ALS across arbitrary native async/await, concurrent interleaved contexts and unhandled rejection | D for global monkey-patching alone                      | `await` bypasses patched Promise.then in V8/JSC, so continuation capture cannot see interleaved contexts. The contract case `concurrentIsolation` is declared unsupported for the local implementation. Normal Capacitor calls do not add an engine hook. |
+| Not implemented                     | ALS with whole-program async transformation or a supported host context primitive                | U                                                       | Prototype including dependencies, dynamic import, native promises, nesting, cancellation and unhandled rejection. This changes build/runtime assumptions and is not a completed solution.                                                                 |
+| Implemented (contracts)             | Remaining async_hooks exports                                                                    | S                                                       | Workers hook functions and zero-valued provider constants are implemented and compared against the pinned runtime. Whole-module acceptance still depends on the async-continuation boundary.                                                              |
+| Implemented (contracts)             | diagnostics_channel channel/hasSubscribers/subscribe/unsubscribe/publish                         | A                                                       | Pinned channel identities, name conversion, snapshot delivery, KJ deletion order, receivers and propagated subscriber errors are implemented with shared workerd contracts.                                                                               |
+| Implemented (synchronous contracts) | diagnostics_channel bindStore/runStores/tracingChannel context propagation                       | U for async descendants                                 | Synchronous store snapshots and tracing lifecycle are implemented. Asynchronous store propagation still depends on the ALS boundary; matching exports and synchronous tests do not certify the whole module.                                              |
+| Out of scope                        | Diagnostic forwarding to Tail Workers                                                            | Outside local Node runtime scope                        | A cloud service integration, not recreated by the local channel implementation. No implicit cloud connection.                                                                                                                                             |
 
 See [Diagnostics Channel](https://developers.cloudflare.com/workers/runtime-apis/nodejs/diagnostics-channel/) for the boundary between local channels and Tail Workers.
 
 ## Inventory: filesystem and network
 
-| Implementation status | Category               | API family                                                                              | Class                                                | Boundary / remaining check                                                                                                                                                                                           |
-| --------------------- | ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Not implemented       | FS                     | read/write/open/close, metadata, directories, links, sync/callback/promises, FileHandle | A candidate                                          | In-memory virtual FS; inspect Workers-supported operations and error codes, file descriptor lifetime and request isolation. No device Filesystem plugin inherently required.                                         |
+| Implementation status | Category               | API family                                                                              | Class                                                | Boundary / remaining check                                                                                                                                                                                                                                                                                |
+| --------------------- | ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Not implemented       | FS                     | read/write/open/close, metadata, directories, links, sync/callback/promises, FileHandle | A candidate                                          | In-memory virtual FS; inspect Workers-supported operations and error codes, file descriptor lifetime and request isolation. No device Filesystem plugin inherently required.                                                                                                                              |
 | Implemented (scoped)  | FS                     | `/bundle` files                                                                         | A + build                                            | Read-only in-memory VFS at `src/compat/fs` (`readFileSync`/`readdirSync`/`existsSync`/`statSync`/`lstatSync`/`realpathSync` + `fs/promises` subset), populated by the `workerFiles` bundler option. Verified against an OpenNext handler. Writes, FileHandle, descriptors and watch remain unimplemented. |
-| Not implemented       | FS                     | `/tmp`, `/dev/null`, `/dev/zero`, `/dev/full`, `/dev/random`                            | A                                                    | Virtual devices and secure random source. Match Workers' lifetime and permission rules; do not introduce persistence.                                                                                                |
-| Not implemented       | FS                     | watch, permissions/ownership and other host-like operations                             | U/S                                                  | Establish which operations Workers implements, ignores or rejects. Never infer mobile filesystem behavior from API names.                                                                                            |
-| **Complete**       | HTTP receiving         | Server, IncomingMessage, ServerResponse, createServer, listen/close                     | A                                                    | Fetch-handler adaptation with an in-memory server registry. No network listener.                                                                                                                                     |
-| **Complete**       | Cloudflare Node bridge | httpServerHandler, handleAsNodeRequest, connectHandler, handleAsNodeConnection          | A                                                    | HTTP and TCP dispatch pass through the public Server/Socket APIs, including both TCP helpers. Accepted at 35316ae.                                                                                          |
-| **Complete** | HTTP sending | `node:http` request/get, ClientRequest, response stream, abort | A over native transport | Shared real-network contracts on workerd and both native transports; accepted at 35316ae. |
-| Unverified | HTTPS module | `node:https` facade and exports | A over native transport | Native HTTPS transport is tested; the separate Node module has not been certified. |
-| **Complete**          | HTTP/HTTPS transport   | unrestricted cross-origin responses, controlled cookies/headers, redirects              | C for required behavior unavailable to WebView fetch | Native streaming byte transports and Workers Fetch policy pass 86 checks per platform; native packed-consumer, review and CI gates passed at 13261ce. Browser fallback retains CORS restrictions.                    |
-| Not implemented       | DNS                    | resolve4/6 and other documented resolve variants, promises                              | A over DoH; C if browser transport blocks it         | Implement Workers' DNS-over-HTTPS route, subject to actual CORS/connectivity. No OS resolver is inherently necessary.                                                                                                |
-| Not implemented       | DNS                    | lookup, lookupService, generic resolve                                                  | S per current docs                                   | Preserve documented failure, rather than silently use a device resolver.                                                                                                                                             |
-| **Complete**            | Net                    | isIP/isIPv4/isIPv6, BlockList, SocketAddress                                            | A                                                    | Pinned export, argument, state and matching contracts, including malformed inputs. Accepted at 35316ae.                                                                                                                                                     |
-| **Complete**       | Net                    | Socket/connect/createConnection, read/write/end/destroy                                 | C                                                    | Bounded native TCP transport with half-close, onread, flow control, cancellation, paused FIN/reset and cleanup contracts on both WebViews. Accepted at 35316ae.                                                                                                                       |
-| **Complete**       | Net                    | Server/listen, accepting inbound platform sockets                                       | A                                                    | Pinned workerd registers a logical port and routes platform-provided sockets to net.Server through cloudflare:node. This is not an OS socket listener; the compatible public Server/Socket path is tested locally, including drop, pause and close ordering. Accepted at 35316ae. |
-| Not implemented       | TLS                    | connect, TLSSocket connection and I/O                                                   | C                                                    | TLS socket transport, validation and relevant connection metadata. Audit supported options before choosing native SDK APIs.                                                                                          |
-| Unverified            | TLS                    | checkServerIdentity, certificate/context representation                                 | A candidate / U detail                               | Parsing/name checks can be JS. createSecureContext material consumed by native TLS may require C; callback shape alone does not decide.                                                                              |
-| Unverified            | TLS                    | server creation and other documented absent APIs                                        | S                                                    | Match Workers rejection.                                                                                                                                                                                             |
+| Not implemented       | FS                     | `/tmp`, `/dev/null`, `/dev/zero`, `/dev/full`, `/dev/random`                            | A                                                    | Virtual devices and secure random source. Match Workers' lifetime and permission rules; do not introduce persistence.                                                                                                                                                                                     |
+| Not implemented       | FS                     | watch, permissions/ownership and other host-like operations                             | U/S                                                  | Establish which operations Workers implements, ignores or rejects. Never infer mobile filesystem behavior from API names.                                                                                                                                                                                 |
+| **Complete**          | HTTP receiving         | Server, IncomingMessage, ServerResponse, createServer, listen/close                     | A                                                    | Fetch-handler adaptation with an in-memory server registry. No network listener.                                                                                                                                                                                                                          |
+| **Complete**          | Cloudflare Node bridge | httpServerHandler, handleAsNodeRequest, connectHandler, handleAsNodeConnection          | A                                                    | HTTP and TCP dispatch pass through the public Server/Socket APIs, including both TCP helpers. Accepted at 35316ae.                                                                                                                                                                                        |
+| **Complete**          | HTTP sending           | `node:http` request/get, ClientRequest, response stream, abort                          | A over native transport                              | Shared real-network contracts on workerd and both native transports; accepted at 35316ae.                                                                                                                                                                                                                 |
+| Unverified            | HTTPS module           | `node:https` facade and exports                                                         | A over native transport                              | Native HTTPS transport is tested; the separate Node module has not been certified.                                                                                                                                                                                                                        |
+| **Complete**          | HTTP/HTTPS transport   | unrestricted cross-origin responses, controlled cookies/headers, redirects              | C for required behavior unavailable to WebView fetch | Native streaming byte transports and Workers Fetch policy pass 86 checks per platform; native packed-consumer, review and CI gates passed at 13261ce. Browser fallback retains CORS restrictions.                                                                                                         |
+| Not implemented       | DNS                    | resolve4/6 and other documented resolve variants, promises                              | A over DoH; C if browser transport blocks it         | Implement Workers' DNS-over-HTTPS route, subject to actual CORS/connectivity. No OS resolver is inherently necessary.                                                                                                                                                                                     |
+| Not implemented       | DNS                    | lookup, lookupService, generic resolve                                                  | S per current docs                                   | Preserve documented failure, rather than silently use a device resolver.                                                                                                                                                                                                                                  |
+| **Complete**          | Net                    | isIP/isIPv4/isIPv6, BlockList, SocketAddress                                            | A                                                    | Pinned export, argument, state and matching contracts, including malformed inputs. Accepted at 35316ae.                                                                                                                                                                                                   |
+| **Complete**          | Net                    | Socket/connect/createConnection, read/write/end/destroy                                 | C                                                    | Bounded native TCP transport with half-close, onread, flow control, cancellation, paused FIN/reset and cleanup contracts on both WebViews. Accepted at 35316ae.                                                                                                                                           |
+| **Complete**          | Net                    | Server/listen, accepting inbound platform sockets                                       | A                                                    | Pinned workerd registers a logical port and routes platform-provided sockets to net.Server through cloudflare:node. This is not an OS socket listener; the compatible public Server/Socket path is tested locally, including drop, pause and close ordering. Accepted at 35316ae.                         |
+| Not implemented       | TLS                    | connect, TLSSocket connection and I/O                                                   | C                                                    | TLS socket transport, validation and relevant connection metadata. Audit supported options before choosing native SDK APIs.                                                                                                                                                                               |
+| Unverified            | TLS                    | checkServerIdentity, certificate/context representation                                 | A candidate / U detail                               | Parsing/name checks can be JS. createSecureContext material consumed by native TLS may require C; callback shape alone does not decide.                                                                                                                                                                   |
+| Unverified            | TLS                    | server creation and other documented absent APIs                                        | S                                                    | Match Workers rejection.                                                                                                                                                                                                                                                                                  |
 
 Sources: [FS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/fs/), [HTTP](https://developers.cloudflare.com/workers/runtime-apis/nodejs/http/), [HTTPS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/https/), [DNS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/dns/), [Net](https://developers.cloudflare.com/workers/runtime-apis/nodejs/net/), [TLS](https://developers.cloudflare.com/workers/runtime-apis/nodejs/tls/).
 
@@ -270,7 +304,7 @@ A native transport must also work when the handler executes in a Dedicated Worke
 
 ## All documented non-functional stub modules
 
-The [official stub inventory](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#non-functional-stub-modules) contains these 16 modules. Each has a planned route of **S through A** for the applicable compatibility profile; this is not an implementation status. None has a verified stub-parity contract in this repository. Import availability, export shape, no-op vs throwing behavior and errors need per-export baseline tests; a blanket empty object is not enough.
+The [official stub inventory](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#non-functional-stub-modules) contains these 16 modules. Each has a planned route of **S through A** for the applicable compatibility profile; this is not an implementation status. Module-owned contracts now verify the implemented candidates listed in the status and local-acceptance sections. Independent review and remote CI are still required for Complete. `trace_events`, `_stream_wrap` and `worker_threads` remain pending implementation. Import availability alone is insufficient: contracts must cover export shape, no-op vs throwing behavior, state and errors.
 
 | Implementation status | Modules          | What is not required for Workers parity                                   |
 | --------------------- | ---------------- | ------------------------------------------------------------------------- |
@@ -297,15 +331,15 @@ Dates/flags govern whether these are importable. Do not broaden a stub into a fu
 
 Each compatibility module owns a directory under `src/compat/<module>/`, with `index.ts` as its entry point. Subpaths and dependency declarations stay inside that directory (for example, `path/posix/index.ts` and `path/win32/index.ts`). Each module keeps its tests, including contract definitions and coverage, in the adjacent `index.spec.ts`; environment runners in `demo/tests/` execute those same contracts. Test code is excluded from the production compilation. TypeScript preserves the implementation structure in `dist/compat/`; the shared build aliases resolve to the compiled entry points.
 
-| Current code                                                      | Actual evidence / gap                                                                                                                                                                      |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/tooling/vite.ts`, `src/tooling/esbuild.ts`                                   | Broad browser polyfills and shared overrides. General Node compatibility is not certified. esbuild maps unavailable modules to an empty object, which is not proof of Workers stub parity. |
-| `src/tooling/shared.ts`                                             | Shared aliases for http, net, async_hooks, path, querystring, string_decoder and Cloudflare helpers. Extend this existing boundary; avoid separate Vite/esbuild truth sources.                  |
-| `src/compat/http/index.ts`, `src/cloudflare/apis/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.        |
-| `src/compat/async-hooks/index.ts`                                 | AsyncResource is undefined; ALS is not implemented.                                                                                                                                        |
-| `src/shared/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
-| `src/shared/contracts/index.ts`, `testing.ts`                             | Existing typed definitions, implementation coverage and lifecycle test harness are reusable. A new abstract framework is unnecessary.                                                      |
-| Native document plugin                                            | Document rendering plus native TCP/TLS only. HTTP/1.1 framing/parsing runs in JS/WASM using llhttp. iOS uses Network.framework without AsyncHTTPClient/NIO; Android uses Netty without its HTTP codec. See the native boundary document. |
+| Current code                                                       | Actual evidence / gap                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/tooling/vite.ts`, `src/tooling/esbuild.ts`                                    | Broad browser polyfills and shared overrides. General Node compatibility is not certified. esbuild maps unavailable modules to an empty object, which is not proof of Workers stub parity.                                               |
+| `src/tooling/shared.ts`                                              | Shared aliases for http, net, async_hooks, path, querystring, string_decoder and Cloudflare helpers. Extend this existing boundary; avoid separate Vite/esbuild truth sources.                                                           |
+| `src/compat/http/index.ts`, `src/cloudflare/apis/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.                    |
+| `src/compat/async-hooks/index.ts`                                  | Scoped ALS and AsyncResource implementations exist; native continuation isolation is not established (see async-context inventory).                                                                                                      |
+| `src/shared/globals/index.ts`                                      | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.                                                           |
+| `src/shared/contracts/index.ts`, `testing.ts`                              | Existing typed definitions, implementation coverage and lifecycle test harness are reusable. A new abstract framework is unnecessary.                                                                                                    |
+| Native document plugin                                             | Document rendering plus native TCP/TLS only. HTTP/1.1 framing/parsing runs in JS/WASM using llhttp. iOS uses Network.framework without AsyncHTTPClient/NIO; Android uses Netty without its HTTP codec. See the native boundary document. |
 
 ## First batch: implementation evidence and remaining work
 
@@ -318,12 +352,12 @@ Baseline: workerd **1.20261012.1**, compatibility date **2026-10-17**, no additi
 compatibility flags. The contract is shared by workerd and both local execution
 modes, rather than maintaining separate expected outputs for the browser.
 
-| Unit                                                   | Implemented and tested                                                                                                                                                                                                                                           | Contract groups |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `node:path`, `path`, and both `posix`/`win32` subpaths | All exported operations, POSIX and Windows paths, UNC/namespaces, relative resolution, invalid arguments and export identity. `matchesGlob` reproduces the baseline's actual rejection.                                                                          | 14              |
-| `node:querystring`, `querystring`                      | All seven exports, separators, duplicate keys, limits, malformed escapes, null-prototype results, custom codecs, URI errors and BOM preservation.                                                                                                                | 11              |
-| `node:string_decoder`, `string_decoder`                | Constructor, `write`/`end`/`text`, all baseline encodings, `lastChar`/`lastNeed`/`lastTotal`, partial and invalid input, BOM, input windows, invalid receivers and reuse after `end`.                                                                            | 15              |
-| HTTP / Cloudflare Node bridge (earlier evidence; completed at `35316ae` above)             | Server/port descriptors, lifecycle, streaming, asynchronous errors, dispatch context, client request/get/validation/destroy/timeout, headers and baseline stubs. Six additional real-network groups exercise the client through native Fetch and pinned workerd. | 18              |
+| Unit                                                                           | Implemented and tested                                                                                                                                                                                                                                           | Contract groups |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `node:path`, `path`, and both `posix`/`win32` subpaths                         | All exported operations, POSIX and Windows paths, UNC/namespaces, relative resolution, invalid arguments and export identity. `matchesGlob` reproduces the baseline's actual rejection.                                                                          | 14              |
+| `node:querystring`, `querystring`                                              | All seven exports, separators, duplicate keys, limits, malformed escapes, null-prototype results, custom codecs, URI errors and BOM preservation.                                                                                                                | 11              |
+| `node:string_decoder`, `string_decoder`                                        | Constructor, `write`/`end`/`text`, all baseline encodings, `lastChar`/`lastNeed`/`lastTotal`, partial and invalid input, BOM, input windows, invalid receivers and reuse after `end`.                                                                            | 15              |
+| HTTP / Cloudflare Node bridge (earlier evidence; completed at `35316ae` above) | Server/port descriptors, lifecycle, streaming, asynchronous errors, dispatch context, client request/get/validation/destroy/timeout, headers and baseline stubs. Six additional real-network groups exercise the client through native Fetch and pinned workerd. | 18              |
 
 Path and querystring adapt the pinned workerd source. StringDecoder uses a local
 UTF-8 state machine plus adapters around the npm `string_decoder` implementation
@@ -414,7 +448,6 @@ The inventory stage is complete when every overview category and stub has a rout
 
 For implementation, preserve one contract suite across workerd, direct execution and Dedicated Worker execution; validate Vite and esbuild resolution plus packed-consumer behavior. Globals must be ready before module evaluation. Scope state to the runtime, restore owned patches on disposal and avoid overwriting unrelated application globals. A `window` replacement is neither necessary nor sufficient.
 
-
 ## Buffer acceptance
 
 The `node:buffer` implementation replaces the dependency fallback for both
@@ -443,20 +476,20 @@ Local acceptance on 2026-10-18 covers implementation commit `7da2af9`
 (source tree `a1994ee3717f38a14ba4d911e0da2cbedc7d99b1`) and the runner
 cleanup/result checks in `7a1d27e`:
 
-| Gate | Result |
-| --- | --- |
-| Library build and root/demo typechecks | Passed |
-| Unit tests | 297 passed |
-| Fixed workerd | 93 passed; added encoded-host case also passed in the shared Node contract |
-| Chromium/WebKit production runtime | 66 passed |
-| Vite development runtime | 20 passed |
-| Build-tool checks | 7 build tests and 30 Chromium/WebKit integration tests passed |
-| Ordinary Hono/Express demo | 8 passed |
-| Document/form regression suite | 72 accepted results, including 6 existing WebKit expected failures; no new exclusions |
-| Independently installed npm tarball | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22, common features 210, preferences 2/2 |
-| iOS 26.1, iPhone 17 Pro simulator | 346 passed, zero failures/exclusions; Buffer 24 direct + 24 Worker |
-| Android 16, Chrome WebView 155, emulator | 346 passed, zero failures/exclusions; Buffer 24 direct + 24 Worker |
-| Manager and independent acceptance review | Required code changes resolved |
+| Gate                                      | Result                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Library build and root/demo typechecks    | Passed                                                                                                             |
+| Unit tests                                | 297 passed                                                                                                         |
+| Fixed workerd                             | 93 passed; added encoded-host case also passed in the shared Node contract                                         |
+| Chromium/WebKit production runtime        | 66 passed                                                                                                          |
+| Vite development runtime                  | 20 passed                                                                                                          |
+| Build-tool checks                         | 7 build tests and 30 Chromium/WebKit integration tests passed                                                      |
+| Ordinary Hono/Express demo                | 8 passed                                                                                                           |
+| Document/form regression suite            | 72 accepted results, including 6 existing WebKit expected failures; no new exclusions                              |
+| Independently installed npm tarball       | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22, common features 210, preferences 2/2 |
+| iOS 26.1, iPhone 17 Pro simulator         | 346 passed, zero failures/exclusions; Buffer 24 direct + 24 Worker                                                 |
+| Android 16, Chrome WebView 155, emulator  | 346 passed, zero failures/exclusions; Buffer 24 direct + 24 Worker                                                 |
+| Manager and independent acceptance review | Required code changes resolved                                                                                     |
 
 Both native runs used identical runtime assets: SHA-256 of
 `workers-capacitor-assets.json` is
@@ -524,28 +557,29 @@ Node timer globals are installed through the existing configured Worker bootstra
 raw browser ESM remains Web-only. Vite and esbuild inject only Node global values,
 separately from lifecycle installation. ALS callback capture preserves timer
 identity and ownership, including multiple independently loaded ALS modules.
-This does **not** certify async-hooks as a whole: its pre-existing settle-restore
-and interleaved-context exclusions remain visible in reports.
+This historical timer acceptance did **not** certify async-hooks as a whole.
+The later main merge adds build-time continuation lowering and enables the
+restoration/isolation contracts; whole-module acceptance remains outstanding.
 
 No native plugin implementation is added. Local verification and review results
 are recorded below; remote CI must pass before this unit is marked Complete.
 
 Local acceptance on 2026-10-18 for implementation commit `4c73eb7`:
 
-| Gate | Result |
-| --- | --- |
-| Library build, root/demo typechecks and changed-source formatting | Passed |
-| Unit tests | 304 passed |
-| Fixed workerd | 93 passed, including all 30 timers contract groups |
-| Chromium/WebKit production runtime | 66 passed |
-| Vite development runtime | 20 passed |
-| Build tools | 7 build tests and 30 integration tests passed |
-| Independently installed npm tarball | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22, common features 294 passed + 4 existing ALS exclusions |
-| Hono/Express demo | 8 passed |
-| Document/form regression | 72 accepted results, including the 6 existing WebKit expected failures |
-| iOS 26.1 and Android 16 WebViews | Each: 430 passed + 4 existing ALS exclusions; timers 30 direct + 30 Dedicated Worker passed with no timer exclusions |
-| Manager and independent code reviews | Passed after correction and re-review |
-| Remote CI | Pending publication of this branch |
+| Gate                                                              | Result                                                                                                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Library build, root/demo typechecks and changed-source formatting | Passed                                                                                                                               |
+| Unit tests                                                        | 304 passed                                                                                                                           |
+| Fixed workerd                                                     | 93 passed, including all 30 timers contract groups                                                                                   |
+| Chromium/WebKit production runtime                                | 66 passed                                                                                                                            |
+| Vite development runtime                                          | 20 passed                                                                                                                            |
+| Build tools                                                       | 7 build tests and 30 integration tests passed                                                                                        |
+| Independently installed npm tarball                               | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22, common features 294 passed + 4 existing ALS exclusions |
+| Hono/Express demo                                                 | 8 passed                                                                                                                             |
+| Document/form regression                                          | 72 accepted results, including the 6 existing WebKit expected failures                                                               |
+| iOS 26.1 and Android 16 WebViews                                  | Each: 430 passed + 4 existing ALS exclusions; timers 30 direct + 30 Dedicated Worker passed with no timer exclusions                 |
+| Manager and independent code reviews                              | Passed after correction and re-review                                                                                                |
+| Remote CI                                                         | [Passed](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) at `c5fb8a4`; merged as `400d022`                 |
 
 Native runs used a separate test application ID to avoid overwriting another
 verification app. Their reports identify the platform, device and built-asset
@@ -561,3 +595,344 @@ passed: build and root/demo typechecks, 308 unit tests, 93 workerd tests,
 30 build-tool integration tests, and the packed consumer
 (320 feature passes + 6 declared async-hooks exclusions). The native results
 above remain evidence for `4c73eb7`; they do not claim a native rerun of the merge.
+
+## URL acceptance
+
+The acceptance unit is the complete `node:url` / `url` module, against workerd
+`1.20261012.1`, compatibility date `2026-10-17`, with no additional flags.
+The module and adjacent tests live in [`src/compat/url/`](../src/compat/url/index.spec.ts).
+The export audit covers all 13 named exports and the default namespace, including
+URL/URLSearchParams, legacy Url, parse/format/resolve/resolveObject, domain
+conversion, file URL helpers, toPathIfFileURL and urlToHttpOptions.
+
+The configured runtime owns/restores the global URL constructor so global and
+module identity agree. It uses the pinned WHATWG URL JavaScript parser because iOS WebView rejects
+some ASCII IDNA output that Workers accepts. It matches Workers' unsupported
+createObjectURL/revokeObjectURL behavior. URLSearchParams uses the platform
+constructor and a native query owner, retaining live linkage, borrowed method
+behavior and native Request/Response BodyInit branding. The full prototype is
+audited.
+Pre-installation URLs and URLs created by separately loaded bundles remain valid
+inputs to Node helpers. Installation tests cover ownership, rollback, disposal
+and an application replacing the global.
+
+IDNA mapping, Bidi and ContextJ behavior use tables extracted from the exact
+Ada 4.0.0 archive pinned by workerd. Punycode is pure JavaScript; NFC uses
+String.prototype.normalize. The maintainer generator pins the archive SHA-256;
+its C++20 extraction step is not part of library builds or consumer requirements.
+No native plugin or Wasm runtime is added. Notices travel with the package.
+The generated IDNA tables occupy about 239 kB and the generated WHATWG parser
+about 114 kB of source before bundling/compression. The parser is regenerated
+from `whatwg-url` 17.3.0 and the lockfile; consumers do not install that package.
+
+The shared contract includes upstream modern/legacy URL vectors, 1,364 IDNA
+comparisons and 837 constructor/base/setter comparisons captured against the
+fixed workerd profile. Both successful values and rejected inputs are compared
+in direct and Dedicated Worker execution. The vectors include Unicode-mapped
+host delimiters, pinned Bidi assignments, file localhost, UNC-like paths,
+Windows drive roots and opaque custom schemes.
+
+Local acceptance on 2026-10-18 for implementation commit `b1f3f12`:
+
+| Gate                                                          | Result                                                                                                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Library build, root/demo typechecks and URL source formatting | Passed                                                                                                                               |
+| Unit tests                                                    | 313 passed                                                                                                                           |
+| Fixed workerd                                                 | 93 passed; all 19 URL contract groups passed                                                                                         |
+| Chromium/WebKit production runtime                            | 66 passed                                                                                                                            |
+| Vite development runtime                                      | 20 passed                                                                                                                            |
+| Build tools                                                   | 7 build tests and 30 integration tests passed                                                                                        |
+| Independently installed npm tarball                           | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22; common features 358 passed + 6 existing ALS exclusions |
+| Hono/Express demo                                             | 8 passed                                                                                                                             |
+| Document/form regression                                      | 72 accepted results, including 6 existing WebKit expected failures                                                                   |
+| iOS 26.1 and Android 16 WebViews                              | Each: 494 passed + 6 existing ALS exclusions; URL 19 direct + 19 Dedicated Worker groups passed with no URL exclusions               |
+| Manager and independent acceptance reviews                    | Passed after correction and re-review                                                                                                |
+| Remote CI                                                     | Pending PR publication; required before Complete                                                                                     |
+
+The first native run rejected a domain that desktop browsers accepted. This
+motivated the JS parser, rather than excluding the input or adding a native
+plugin. Query interoperation and the dependency-free raw ESM path were corrected
+and re-reviewed before the final runs. Global URL recognition is isolated in
+`brand.ts`, so Web-only entrypoints do not import the Node URL parser.
+
+Both final native reports identify clean revision `b1f3f12`, the device and built
+asset fingerprints. Logs and JSON evidence are retained locally under
+`demo/artifacts/url-acceptance/` (generated, not shipped). The existing isolated
+native test consumer was reused, with freshly packed library installation and
+runtime fixture assets. No URL case is excluded; the six exclusions belong to
+the existing async-hooks unit. Remote CI remains the merge/release gate.
+
+## Virtual platform and Punycode local acceptance
+
+`os`, `tty`, `wasi`, and `punycode` use the pinned workerd sources and keep their
+shared contracts next to their implementations. The contracts cover all named
+and default exports, fixed platform/constants behavior, class/prototype identity,
+input validation, callback order and the actual Workers unsupported operations.
+Punycode includes upstream RFC vectors and Unicode/surrogate cases. These units
+add no native implementation or runtime dependencies.
+
+At `8d4d508`, iOS 26.1 and Android 16 each passed **542 runtime checks**, with
+only the six pre-existing async-hooks exclusions. Each of the four new modules
+passed every group in both direct and Dedicated Worker execution (6 os, 5 tty,
+8 wasi, 5 punycode). Native reports identify clean revision `8d4d508` and artifact
+hashes; evidence is retained in `demo/artifacts/node-completion-acceptance/`.
+
+Local checks also passed: build/typechecks, 343 unit tests, 93 workerd tests,
+66 production Chromium/WebKit tests, 20 Vite development tests, 7 build-tool
+unit tests and 30 integration tests. The packed consumer passed 10 build-tool/raw
+ESM, 2 development, 26 direct, 22 isolated, 406 shared features plus the 6 existing
+ALS exclusions, and 2 preference checks. Vite development now optimizes net with
+tty to preserve Socket constructor identity. Remote CI and independent acceptance
+review remain pending, so these units are not marked Complete.
+
+The separate async-lowering experiment passes concurrent/nested restoration in
+Chromium and WebKit after esbuild converts async functions to explicit Promise
+continuations. This is only evidence for a possible build-time route. It does not
+certify async-hooks, dynamic imports, unhandled rejection, third-party native
+async callbacks or every build/runtime mode.
+
+### Constants, V8, HTTP/2 and VM local acceptance
+
+At `719b8fe`, shared contracts cover `constants` (3 groups), `v8` (11),
+`http2` (5), and `vm` (10), alongside the earlier platform modules.
+The full suite passed 343 unit tests, the fixed-workerd Node contract,
+20 Vite development tests, 7 build tests and 30 Vite/esbuild browser tests.
+The fresh installed tarball passed 464 common contracts with the same 6
+pre-existing ALS exclusions, 26 direct / 22 isolated cases, 10 build/raw-ESM
+cases, 2 development cases and 2 preference cases.
+
+iOS 26.1 and Android 16 each passed **600 runtime checks plus 6 existing ALS
+exclusions** from clean revision `719b8fe`. Every new module group passed in
+both direct and Dedicated Worker execution. Evidence is retained under
+`demo/artifacts/node-completion-acceptance/` locally.
+This is local validation, not completed remote CI or independent review.
+
+Vite development verification caught a circular dependency caused by injecting
+`global`/`process` through a module that also imports Buffer. Non-Buffer globals
+now have an independent injection source; production, development, esbuild and
+installed-package regressions passed after this correction.
+
+### Async transform boundary experiments
+
+The ES2016 lowering prototype restores concurrent/nested context in Chromium
+and WebKit only for the instrumented code. Two additional counterexamples are
+covered by `async-transform.probe.mjs`:
+
+- An untransformed native async callback still loses context even when its caller
+  was transformed. Ordinary raw JavaScript, separately loaded dependencies and
+  code produced at runtime cannot be certified by transforming just the entry.
+- esbuild's ordinary async lowering observes a Promise's overridden `then` getter
+  where native `await` does not, introducing a rejection. Lowering is not an
+  observationally equivalent replacement for native async semantics.
+
+These experiments do not prove every possible compiler/runtime design impossible.
+They rule out advertising the current monkeypatch or ordinary esbuild lowering
+as complete `async_hooks` compatibility. Full support requires a different
+execution contract or engine capability; the six existing ALS exclusions remain.
+
+### Process, terminal and inspector local acceptance
+
+At clean revision `5169e5e`, adjacent shared contracts cover `child_process`
+(5 groups), `cluster` (5), `dgram` (6), `inspector` including promises (8),
+`domain` (6), and `readline` including promises (8). They exercise Workers'
+actual non-networking/non-terminal behavior, including validation, public
+prototypes, mutable state, events, callback timing, symbols and disposal.
+`inspector/promises` deliberately preserves synchronous exceptions that differ
+from ordinary `inspector`; `readline` returns empty answers rather than throwing.
+
+- Root and demo typechecks, the fixed-workerd contract, Chromium/WebKit production
+  (66) and development (20), and build integrations (7 unit + 30 browser) passed.
+- A fresh installed tarball passed 540 common contracts plus the same 6 ALS
+  exclusions, 26 direct / 22 isolated, 10 build/raw-ESM, 2 development and
+  2 preference cases.
+- iOS 26.1 and Android 16 each passed **676 runtime checks plus the same 6 ALS
+  exclusions**. Each new module passed in direct and Dedicated Worker execution.
+- Eight inventory/engine experiments passed, including both async transform
+  counterexamples. Export enumeration does not replace behavior contracts.
+
+No new module is certified Complete by these local checks alone; independent
+review and remote CI are outstanding. Remaining functional families in the
+implementation sequence are still unfinished.
+
+### Mandatory-prefix module comparison
+
+The pinned workerd runtime exports `node:test` (`mock`, `MockTracker`,
+`MockFunctionContext`), while the installed Wrangler builtin resolver rejects
+its static import. The shared Node-contract Vitest test now bundles with esbuild,
+leaves `node:*` imports external, and runs the result in the same pinned workerd
+through Miniflare. Bare builtins are normalized to their `node:` form. This
+keeps the oracle as the real runtime; it does not substitute local compatibility
+implementations or claim that Wrangler's static resolver supports `node:test`.
+
+The SQLite contract matches the pinned profile: both exposed constructors throw
+`TypeError: Illegal constructor`, and backup throws synchronously. It does not
+create a local SQLite database and is separate from D1 support. Other dates/flags
+that expose functioning SQLite require a separate compatibility profile.
+
+### REPL, SQLite and mock tracking local acceptance
+
+At clean revision `052647f`, `repl` has 6 contract groups, `sqlite` 4, and
+`test` 14. The mock contracts cover calls, constructors, replacements, one-shot
+implementations, limits, descriptors, accessors, restoration and validation,
+including the pinned runtime's symbol-method restoration behavior. SQLite
+constructor names are explicitly retained after production minification.
+
+| Local check                              | Result                                                                                                                      |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Build, root/demo typechecks              | Passed                                                                                                                      |
+| Unit tests                               | 343 passed                                                                                                                  |
+| Fixed workerd suite                      | 93 passed                                                                                                                   |
+| Chromium/WebKit production / development | 66 / 20 passed                                                                                                              |
+| Build-tool tests                         | 7 unit + 30 browser passed                                                                                                  |
+| Fresh installed tarball                  | 588 common passed + 6 existing ALS exclusions; 26 direct / 22 isolated, 10 build/raw-ESM, 2 development, 2 preference cases |
+| iOS 26.1                                 | 724 passed + 6 existing ALS exclusions                                                                                      |
+| Android 16                               | 724 passed + 6 existing ALS exclusions                                                                                      |
+
+Both native reports identify clean revision `052647f` and asset fingerprints.
+Every group in all 17 newly implemented families passes in direct and Dedicated
+Worker execution, without new exclusions or native plugin changes.
+
+**The overall Node compatibility task is not complete.** The remaining sequence
+still includes util/assert/events, stream, writable FS/module/process,
+HTTPS/TLS/DNS facades, crypto/zlib, async context/diagnostics, console/performance,
+and the remaining tracing/thread/stream-wrapper surfaces. Existing Complete
+certifications remain separate from these pending families and local candidates.
+
+## Shared util completion work and oracle correction
+
+The `util` contract now imports `node:util`, so the workerd runner executes the
+real builtin and Vite/esbuild resolve the same contract to the local adapter.
+Previously, the test imported the local source even in the workerd runner.
+The `stream/web` contract has received the same correction. Historical smoke
+results from those test paths must not be read as builtin parity evidence.
+
+`fs` and `module` still use local VFS setup and remain local smoke tests. They
+are no longer included in the workerd comparison report. Equivalent workerd
+fixtures and full module coverage remain required; they are not waived.
+
+The adjacent util contract now contains ten groups covering encoders, default
+export identity, promisify/custom promisification, callbackify and falsy
+rejections, dotenv parsing and malformed inputs, inheritance/extension helpers,
+and the pinned Workers unsupported operations. The implementation ports the
+fixed workerd source for these operations, including its custom argument-name
+symbol, microtask scheduling and parser edge cases. Original notices are shipped
+beside the module. This is development work: inspection, types, MIME, async abort,
+call sites, styling and the remaining util surface still prevent whole-module
+acceptance. No Complete status is assigned to util by these passing groups.
+
+Local validation for the util core changes at `42399b6`:
+
+- Root and demo typechecks pass; 343 unit tests pass.
+- The corrected pinned-workerd Node contract passes, including ten util groups.
+  The two local-only VFS/module smoke suites are excluded from that oracle report,
+  rather than counted as builtin comparisons.
+- Chromium/WebKit production tests pass (66); Vite development tests pass (20).
+- The installed tarball consumer passes 26 direct and 22 isolated checks,
+  604 common cases plus the existing six ALS exclusions, ten Vite/esbuild/raw ESM
+  checks, two configured Vite development checks and both preference checks.
+  After disk exhaustion during the build-tools stage, the same installed consumer
+  was reused to rerun the consumer tests successfully.
+- iOS 26.1 and Android 16 each pass 740 runtime checks with the six existing ALS
+  exclusions. The ten util groups pass in both direct and Dedicated Worker modes.
+  Both reports record clean revision `42399b6`; local evidence is retained in
+  `demo/artifacts/util-core-acceptance/`.
+
+The package runner now verifies a unique identity file before using its preview
+server, preventing a stale server on the configured port from supplying another
+build's results. The default port remains 4189 and can be overridden using
+`CONSUMER_PREVIEW_PORT` for independent local runs. No new module has received
+whole-module acceptance, independent review or remote CI from this work.
+
+## HTTPS, port, stream consumer and DNS development checkpoint
+
+Implementation revision: `d153758`. Added module directories contain adjacent
+contracts and the pinned upstream license notices. These are local development
+candidates; no additional whole-module Complete certification or release is
+claimed by this checkpoint.
+
+- `https`: pinned Agent/Server facades, protocol checks and the shared HTTP
+  client's `_defaultAgent` selection (including `agent: false`). Ten groups.
+- `_http_agent`, `_http_client`, `_http_incoming`: exact reference re-exports of
+  the public HTTP implementation. Two groups per module.
+- `worker_threads`: pinned Workers stubs and environment state; local ports with
+  microtask delivery, transfer rejection, cloning, listener lifecycle and
+  bidirectional close. Twelve groups. Trusted-event branding, global identity,
+  and additional host-object serialization remain unresolved; this module is
+  not certified complete.
+- `stream/consumers`: all five pinned consumer functions, tested with split UTF-8,
+  strings, bytes, JSON, empty inputs, errors and iterator cleanup. Ten groups.
+  iOS 26.1 lacks stream async iteration, so this module uses the standard Reader
+  API only when that host capability is absent; reader cancellation and lock
+  release are preserved.
+- `dns` and `dns/promises`: pinned callback/Promise APIs, record normalization and
+  a JS port of the Rust CAA/NAPTR parsers. Fourteen groups share deterministic
+  DNS-over-HTTPS fixtures with workerd. No actual external DNS is used by these
+  contracts. Hyperdrive/service-binding synthetic address overrides are not
+  implemented; the local resolver currently has no remote service bindings.
+
+Native testing caught another iOS 26.1 issue: `Symbol.asyncDispose` is absent at
+module evaluation. The Worker stub now uses the existing shared disposal symbol,
+preventing an accidental method named `"undefined"`. Neither native code nor the
+iOS deployment target was changed.
+
+Validation at this checkpoint:
+
+- Root/demo typechecks, 343 unit tests, and the pinned workerd Node contracts pass.
+- Chromium/WebKit production (66) and Vite development (20) tests pass.
+- The installed tarball consumer passes 26 direct, 22 isolated, 708 common checks
+  plus six existing ALS exclusions, ten build-tool/raw ESM checks, two configured
+  development checks and two preference checks. All seven added module
+  directories ship compiled entries, declarations and both upstream notices.
+- iOS 26.1 and Android 16 each pass 844 native runtime checks plus the six existing ALS
+  exclusions, with clean source revision and asset hashes recorded.
+
+The 70-entry surface audit now has 32 entries with import/export differences.
+The other 38 only have matching export names; this does not establish behavioral
+acceptance. The six existing ALS exclusions remain. Streams, util/assert/events,
+filesystem/module/process, TLS, crypto/compression and the other entries listed
+in the surface audit are still unfinished. They have not been relabeled as
+technically impossible. **The overall compatibility task remains incomplete.**
+
+## Stream distribution and iOS byte-stream verification
+
+Revision `05ba1b4` owns the web-streams-polyfill 4.3.0 asset and license in the
+published package. No import map is required by raw browser ESM. Vite development
+shares constructor identities between prebundled Node modules and runtime code.
+The fallback supplies byte streams on iOS 26.1, where native construction throws
+`ReadableByteStreamController is not implemented`.
+
+Body movement, Blob/File readers, codecs and ownership are covered in the shared
+contracts. Forced fallback now also applies to the separately bundled Web API
+tests, including execution after globals have been restored. Local tests passed:
+420 unit tests, 66 forced-fallback browser tests, six forced-fallback Vite-dev
+tests, and the pinned workerd contracts. The installed consumer passed 26 direct,
+22 isolated, 840 common checks plus six ALS exclusions, ten build-tool/raw ESM
+checks and the configured development/preference checks. Clean revision
+`05ba1b4` passed 976 native checks plus six ALS exclusions on both iOS 26.1 and
+Android 16. Evidence is retained in
+`demo/artifacts/node-stream-distribution-acceptance/`.
+
+These checks do not close the remaining Workers tee cancellation/pipeTo timing
+or async-context differences. Native code and the iOS deployment target remain
+unchanged. No additional whole-module completion, remote CI or release is
+claimed by this implementation evidence.
+
+### TLS context helpers candidate
+
+`node:_tls_common` now ports the pinned Workers SecureContext and legacy
+certificate translation helpers. Eight shared groups cover the complete module
+namespace, callable construction, ignored options and property access order,
+validation, certificate mutation, issuer references and malformed inputs.
+Workerd, Chromium and WebKit run the same contract. This does not certify the
+separate `node:tls` networking module or expose platform trust configuration.
+Whole-module review remains pending. At `61c4b3f`, native iOS 26.1 and Android 16
+ran all eight groups in direct and Worker execution. The full native report
+passed 1,102 checks on each platform, with zero exclusions or failures. Raw
+reports and revision/asset fingerprints are retained locally under
+`demo/artifacts/main-merge-native-acceptance/`.
+
+The main merge retains the renamed `@rdlabo/workers-capacitor` package, API
+responsibility folders and async continuation lowering. Its installed-tarball
+validation passed 950 common cases with zero exclusions, including restoration,
+nested async scopes and concurrent ALS isolation. The native results above rerun that merged runtime rather than reusing
+pre-merge results.

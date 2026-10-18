@@ -58,10 +58,11 @@ export class FetchTransport {
       rejectFailure(
         reason ?? new DOMException("Connection closed", "AbortError"),
       );
-      closing = Promise.all([
-        reader?.cancel(reason).catch(() => {}),
-        connection?.close(),
-      ]).then(() => {});
+      // A tee branch's cancellation waits for its retained sibling. Redirect
+      // replay owns that sibling, so awaiting it here would deadlock an early
+      // response. Cancel the upload, but await only native resource release.
+      void reader?.cancel(reason).catch(() => {});
+      closing = Promise.resolve(connection?.close());
       void closing.catch(() => {});
       return closing;
     };

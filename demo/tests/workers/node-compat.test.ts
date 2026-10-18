@@ -1,53 +1,69 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
+import { builtinModules } from "node:module";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { createTestHarness } from "wrangler";
+import { build } from "esbuild";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import {
   assertContract,
   type ContractResult,
 } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
-const harness = createTestHarness({
-  workers: [
-    {
-      config: {
-        name: "node-compat",
-        main: "tests/fixtures/workers/compatibility/node.ts",
-        compatibility_date: "2026-10-17",
-      },
-    },
-  ],
-});
+let harness: Miniflare;
 beforeAll(async () => {
-  await harness.listen();
+  // Wrangler's builtin resolver omits mandatory-prefix node:test. Keep all
+  // node:* imports external so this contract exercises real workerd builtins.
+  const bundle = await build({
+    entryPoints: ["tests/fixtures/workers/compatibility/node.ts"],
+    bundle: true,
+    write: false,
+    format: "esm",
+    platform: "browser",
+    plugins: [
+      {
+        name: "workerd-builtins",
+        setup(builder) {
+          const names = new Set(
+            builtinModules.filter((name) => !name.startsWith("node:")),
+          );
+          builder.onResolve({ filter: /^[a-z_]/ }, ({ path }) =>
+            names.has(path)
+              ? { path: `node:${path}`, external: true }
+              : undefined,
+          );
+        },
+      },
+    ],
+    external: ["node:*", "cloudflare:*"],
+  });
+  harness = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      compatibilityDate: "2026-10-17",
+      script: bundle.outputFiles[0].text,
+    }),
+  );
+  await harness.ready;
 });
 afterAll(async () => {
-  await harness.close();
+  await harness?.dispose();
 });
 
 it("runs the node module contracts against real workerd", async () => {
-  const reports = (await (await harness.fetch("/")).json()) as ContractResult[];
-  expect(reports.map((report) => report.feature)).toEqual([
-    "node.path",
-    "node.querystring",
-    "node.string_decoder",
-    "node.http",
-    "node.net",
-    "node.buffer",
-    "node.timers",
-    "node.async-hooks",
-    "node.fs",
-    "node.module",
-    "node.stream-web",
-    "node.util",
-  ]);
-  expect(reports.map((report) => report.cases.length)).toEqual([
-    14, 11, 15, 18, 9, 24, 30, 15, 8, 2, 1, 2,
-  ]);
+  const reports = (await (
+    await harness.dispatchFetch("https://node-compat.invalid/")
+  ).json()) as ContractResult[];
+  const expected = Object.entries(expectedCases).filter(
+    ([feature]) =>
+      feature.startsWith("node.") &&
+      !["node.fs", "node.module"].includes(feature),
+  );
+  expect(
+    reports.map((r) => [r.feature, r.cases.map((c) => c.id)]).sort(),
+  ).toEqual(expected.sort());
   for (const report of reports) assertContract(report);
   expect(
     reports
       .flatMap((report) => report.cases)
-      .every(
-        (test) => test.status === "passed" || test.status === "unsupported",
-      ),
+      .every((test) => test.status === "passed"),
   ).toBe(true);
 });

@@ -52,6 +52,36 @@ function fixture() {
 }
 
 describe("native byte transport ownership", () => {
+  it("finishes an early response without waiting for the retained replay branch", async () => {
+    const f = fixture();
+    const accepted = deferred<void>();
+    vi.mocked(f.connection.write).mockReturnValue(accepted.promise);
+    const [upload, replay] = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1]));
+      },
+    }).tee();
+    const pending = f.transport.fetch({
+      ...f.request,
+      method: "POST",
+      body: upload,
+    });
+    await vi.waitFor(() => expect(f.connection.write).toHaveBeenCalledOnce());
+    f.respond();
+    const response = await pending;
+    const done = vi.fn();
+    const reading = response.body!.getReader().read().then(done);
+    try {
+      await vi.waitFor(() => expect(done).toHaveBeenCalledOnce());
+      expect(f.connection.close).toHaveBeenCalledOnce();
+      expect(upload.locked).toBe(false);
+    } finally {
+      await replay.cancel();
+      accepted.resolve();
+      await reading;
+    }
+  });
+
   it("preserves duplicate headers and reads only on demand", async () => {
     const f = fixture();
     const response = f.transport.fetch(f.request);

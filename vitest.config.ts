@@ -20,6 +20,7 @@ export default defineConfig({
     },
   ],
   test: {
+    setupFiles: ["tests/setup/node-host.ts"],
     server: { deps: { inline: [/brotli-dec-wasm/] } },
     // Node module contract specs run via demo tests in workerd and WebViews.
     include: [
@@ -30,9 +31,14 @@ export default defineConfig({
       "src/browser/abort/installation.spec.ts",
       "src/compat/buffer/installation.spec.ts",
       "src/compat/timers/installation.spec.ts",
+      "src/compat/url/installation.spec.ts",
+      "src/compat/url/interop.spec.ts",
       "src/compat/timers/host.spec.ts",
       "src/compat/async-hooks/callbacks.spec.ts",
       "src/browser/response/installation.spec.ts",
+      "src/compat/perf-hooks/installation.spec.ts",
+      "src/compat/stream-web/installation.spec.ts",
+      "src/compat/stream-web/context.spec.ts",
       "src/shared/brotli/index.spec.ts",
       "src/browser/fetch/index.spec.ts",
       "src/browser/fetch/interop.spec.ts",

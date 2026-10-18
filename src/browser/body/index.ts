@@ -1,8 +1,14 @@
-import { platform } from "../../shared/globals/platform.js";
+import { StreamBody } from "./stream-body.js";
+import { usesPonyfill } from "../../compat/stream-web/runtime.js";
+import {
+  ReadableStream,
+  TransformStream,
+} from "../../compat/stream-web/index.js";
+import { platform, nativeStreams } from "../../shared/globals/platform.js";
 import type { Headers } from "../headers/index.js";
 
 // Capture platform body codecs before any runtime globals are installed.
-const PlatformResponse = platform.Response;
+const PlatformResponse = usesPonyfill ? StreamBody : platform.Response;
 /** Workers clones cf through JSON and requires an object before and after cloning. */
 export function cloneValue(value: Record<string, unknown> | undefined) {
   if (value === undefined) return undefined;
@@ -30,7 +36,11 @@ export function webString(value: unknown): string {
 
 const bodies = new WeakMap<
   Body,
-  { response: globalThis.Response; headers: Headers; rewindable: boolean }
+  {
+    response: globalThis.Response | StreamBody;
+    headers: Headers;
+    rewindable: boolean;
+  }
 >();
 function state(body: Body) {
   const value = bodies.get(body);
@@ -70,7 +80,9 @@ export abstract class Body {
     bodies.set(this, {
       response: new PlatformResponse(body),
       headers,
-      rewindable: !(body instanceof ReadableStream),
+      rewindable:
+        !(body instanceof ReadableStream) &&
+        !(body instanceof nativeStreams.ReadableStream),
     });
     const contentType = state(this).response.headers.get("content-type");
     if (contentType && !headers.has("content-type"))

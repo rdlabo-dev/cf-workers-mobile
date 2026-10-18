@@ -1,3 +1,7 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
+const expectedNodeCases = Object.entries(expectedCases)
+  .filter(([feature]) => feature.startsWith("node."))
+  .sort();
 import { test, expect } from "@playwright/test";
 for (const build of [
   "vite-hono",
@@ -23,7 +27,12 @@ for (const build of [
         // node: and bare specifiers resolve to one profile per bundler.
         expect(report.resolved).toEqual(Array(11).fill(true));
         const cases = report.node.direct.flatMap((result) => result.cases);
-        expect(cases).toHaveLength(149);
+        expect(
+          report.node.direct
+            .map((r) => [r.feature, r.cases.map((c) => c.id)])
+            .sort(),
+        ).toEqual(expectedNodeCases);
+        expect(report.node.direct.flatMap((r) => r.errors)).toEqual([]);
         expect(
           cases.filter(
             (c) => c.status === "failed" || c.status === "unavailable",
@@ -65,12 +74,27 @@ for (const build of ["vite-node", "esbuild-node"]) {
         prefer,
       );
       expect(report.execution).toBe(prefer);
+      expect(report.commonJsStreams).toEqual(Array(7).fill(true));
+      expect(report.commonJsAssertions).toEqual({
+        callable: true,
+        sameDefault: true,
+      });
       const cases = (
         report.contracts as {
+          feature: string;
+          errors: string[];
           cases: { id: string; status: string }[];
         }[]
       ).flatMap((result) => result.cases);
-      expect(cases).toHaveLength(149);
+      const contracts = report.contracts as {
+        feature: string;
+        errors: string[];
+        cases: { id: string }[];
+      }[];
+      expect(
+        contracts.map((r) => [r.feature, r.cases.map((c) => c.id)]).sort(),
+      ).toEqual(expectedNodeCases);
+      expect(contracts.flatMap((r) => r.errors)).toEqual([]);
       expect(
         cases.filter(
           (c) => c.status === "failed" || c.status === "unavailable",

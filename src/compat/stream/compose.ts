@@ -1,0 +1,369 @@
+// @ts-nocheck
+// Copyright (c) 2017-2022 Cloudflare, Inc.
+// Licensed under the Apache 2.0 license found in the LICENSE file or at:
+//     https://opensource.org/licenses/Apache-2.0
+//
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+import { pipelineImpl } from "./pipeline.js";
+import { Duplex } from "./duplex.js";
+import { Readable as ReadableConstructor } from "./readable.js";
+import {
+  isNodeStream,
+  isReadable,
+  isWritable,
+  isWebStream,
+  isTransformStream,
+  isWritableStream,
+  isReadableStream,
+  kIsClosedPromise,
+} from "./util.js";
+import { destroyer } from "./destroy.js";
+import { eos } from "./end-of-stream.js";
+import { once } from "./once.js";
+import {
+  AbortError,
+  ERR_INVALID_ARG_VALUE,
+  ERR_MISSING_ARGS,
+  ERR_WEB_STREAM_INTEROP_UNSUPPORTED,
+} from "./errors.js";
+
+export function compose(...streams) {
+  if (streams.length === 0) {
+    throw new ERR_MISSING_ARGS("streams");
+  }
+
+  if (streams.length === 1) {
+    return Duplex.from(streams[0]);
+  }
+
+  const orgStreams = [...streams];
+
+  if (typeof streams[0] === "function") {
+    streams[0] = Duplex.from(streams[0]);
+  }
+
+  if (typeof streams[streams.length - 1] === "function") {
+    const idx = streams.length - 1;
+    streams[idx] = Duplex.from(streams[idx]);
+  }
+
+  for (let n = 0; n < streams.length; ++n) {
+    if (!isNodeStream(streams[n]) && !isWebStream(streams[n])) {
+      // TODO(ronag): Add checks for non streams.
+      continue;
+    }
+    if (
+      n < streams.length - 1 &&
+      !(
+        isReadable(streams[n]) ||
+        isReadableStream(streams[n]) ||
+        isTransformStream(streams[n])
+      )
+    ) {
+      throw new ERR_INVALID_ARG_VALUE(
+        `streams[${n}]`,
+        orgStreams[n],
+        "must be readable",
+      );
+    }
+    if (
+      n > 0 &&
+      !(
+        isWritable(streams[n]) ||
+        isWritableStream(streams[n]) ||
+        isTransformStream(streams[n])
+      )
+    ) {
+      throw new ERR_INVALID_ARG_VALUE(
+        `streams[${n}]`,
+        orgStreams[n],
+        "must be writable",
+      );
+    }
+  }
+
+  let ondrain;
+  let onfinish;
+  let onclose;
+  let tailReader;
+  let teardownPipeline;
+  let tailFinished = false;
+  let pipelineDone = false;
+  let d;
+
+  function onfinished(err) {
+    const cb = onclose;
+    onclose = null;
+    pipelineDone = true;
+
+    if (cb) {
+      cb(err);
+    } else if (err) {
+      d.destroy(err);
+    } else if (!readable && !writable) {
+      d.destroy();
+    } else {
+      finishWritable();
+    }
+  }
+
+  // Completes _final once the tail has finished — and, for a web tail, once
+  // the pipeline has completed too. A web tail is observed through its
+  // readable side (eos over the interop hook), which can close before the
+  // pipeline's last write into it has settled (a close() that closes the
+  // readable at once but resolves later); a node tail's eos() covers both of
+  // its sides.
+  function finishWritable() {
+    if (!onfinish || !tailFinished) {
+      return;
+    }
+    if (!pipelineDone && !isNodeStream(tail)) {
+      return;
+    }
+    const cb = onfinish;
+    onfinish = null;
+    cb();
+  }
+
+  const head = streams[0];
+  const last = streams[streams.length - 1];
+
+  const writable = !!(
+    isWritable(head) ||
+    isWritableStream(head) ||
+    isTransformStream(head)
+  );
+
+  // A composed stream with a writable side must learn when its tail
+  // finishes; for a web tail that takes the Node.js interop hook (see
+  // streams_end_of_stream.ts). Refused before the pipeline starts and before
+  // any lock is taken, so the caller's streams are left as they were.
+  if (writable && isWebStream(last)) {
+    const toRead = isTransformStream(last) ? last.readable : last;
+    if (toRead[kIsClosedPromise] === undefined) {
+      throw new ERR_WEB_STREAM_INTEROP_UNSUPPORTED("compose()");
+    }
+  }
+
+  // Destroying the composed stream while the pipeline runs must tear the
+  // pipeline down. A node tail is destroyed as a stage and the pipeline
+  // follows; a web tail cannot be, so the pipeline is failed directly with
+  // the destroy error instead (see streams_pipeline.js), which destroys
+  // every stage the same way.
+  const tail = pipelineImpl(streams, once(onfinished), {
+    onTeardown: (teardown) => {
+      teardownPipeline = teardown;
+    },
+  });
+
+  const readable = !!(
+    isReadable(tail) ||
+    isReadableStream(tail) ||
+    isTransformStream(tail)
+  );
+
+  // TODO(ronag): Avoid double buffering.
+  // Implement Writable/Readable/Duplex traits.
+  // See, https://github.com/nodejs/node/pull/33515.
+  d = new Duplex({
+    // TODO (ronag): highWaterMark?
+    // TODO: A web stream has no writableObjectMode/readableObjectMode, so a
+    // composition is byte-mode on the side a web head or tail supplies: a
+    // TransformStream head that would take objects has the composed stream's
+    // write() refuse them with ERR_INVALID_ARG_TYPE. Upstream has the same
+    // gap.
+    writableObjectMode: !!head?.writableObjectMode,
+    readableObjectMode: !!tail?.readableObjectMode,
+    writable,
+    readable,
+  });
+
+  if (writable) {
+    if (isNodeStream(head)) {
+      d._write = function (chunk, encoding, callback) {
+        if (head.write(chunk, encoding)) {
+          callback();
+        } else {
+          ondrain = callback;
+        }
+      };
+
+      d._final = function (callback) {
+        head.end();
+        onfinish = callback;
+      };
+
+      head.on("drain", function () {
+        if (ondrain) {
+          const cb = ondrain;
+          ondrain = null;
+          cb();
+        }
+      });
+    } else if (isWebStream(head)) {
+      const writable = isTransformStream(head) ? head.writable : head;
+      const writer = writable.getWriter();
+
+      d._write = async function (chunk, encoding, callback) {
+        try {
+          await writer.ready;
+          writer.write(chunk).catch(() => {});
+          callback();
+        } catch (err) {
+          callback(err);
+        }
+      };
+
+      d._final = async function (callback) {
+        try {
+          await writer.ready;
+          writer.close().catch(() => {});
+          onfinish = callback;
+        } catch (err) {
+          callback(err);
+        }
+      };
+    }
+
+    const toRead = isTransformStream(tail) ? tail.readable : tail;
+
+    // The tail is finished once both its sides are: for a Duplex or a web
+    // transform tail that includes its readable side, which the bridge below
+    // drains into the composed stream's buffer on its own, so the writable
+    // side's completion does not wait for a consumer.
+    eos(toRead, () => {
+      tailFinished = true;
+      finishWritable();
+    });
+  }
+
+  if (readable) {
+    if (isNodeStream(tail)) {
+      d._read = function () {
+        tail.resume();
+      };
+
+      tail.on("data", function (chunk) {
+        if (!d.push(chunk)) {
+          tail.pause();
+        }
+      });
+
+      tail.on("end", function () {
+        d.push(null);
+      });
+    } else if (isWebStream(tail)) {
+      const readable = isTransformStream(tail) ? tail.readable : tail;
+      const reader = readable.getReader();
+      tailReader = reader;
+      let tailReading = false;
+
+      // Drains the tail into the composed stream's buffer as it is produced,
+      // as the node bridge above does through 'data': one read loop at a
+      // time, parked when push() reports backpressure and restarted from
+      // _read(). The latch matters because push() clears the composed
+      // stream's reading flag, which has _read() called again while this
+      // loop's read is still pending; a second loop would hold a second
+      // pending read, and so on with every chunk. Started at once rather
+      // than from the first _read(): a web transform's readable side pulls
+      // only when read, and its writable side takes the pipeline's writes
+      // only when the readable side has pulled, so a composition nobody is
+      // reading yet could not otherwise complete its end().
+      const readTail = async function () {
+        if (tailReading) {
+          return;
+        }
+        tailReading = true;
+        try {
+          while (true) {
+            let result;
+            try {
+              result = await reader.read();
+            } catch {
+              // The tail failed; the pipeline reports it.
+              return;
+            }
+            const { value, done } = result;
+            if (done) {
+              d.push(null);
+              return;
+            }
+            // A chunk the composed stream cannot take (a view over a detached
+            // ArrayBuffer) fails the composition; left to the promise, the
+            // throw would be lost and _read never called again.
+            try {
+              if (!d.push(value)) {
+                return;
+              }
+            } catch (err) {
+              d.destroy(err);
+              return;
+            }
+          }
+        } finally {
+          tailReading = false;
+        }
+      };
+
+      d._read = readTail;
+      readTail();
+    }
+  }
+
+  d._destroy = function (err, callback) {
+    if (!err && onclose !== null) {
+      err = new AbortError();
+    }
+
+    ondrain = null;
+    onfinish = null;
+
+    if (isNodeStream(tail)) {
+      destroyer(tail, err);
+    } else if (!d.readableEnded || !d.writableFinished) {
+      // A running composition is torn down. One whose sides have both
+      // completed (the automatic destroy that follows) is not: its pipeline
+      // is completing on its own — a web tail's readable side can close
+      // before the pipeline's last write into it settles — and the composed
+      // stream reports the pipeline's outcome, as with a node tail. The
+      // tail's reader is cancelled as well: a pipeline that had already
+      // completed still holds the tail's unread output.
+      teardownPipeline(err);
+      tailReader?.cancel(err).catch(() => {});
+    }
+
+    // Either way the pipeline reports `err` (or its own earlier error), and
+    // the composed stream reports what the pipeline does.
+    if (onclose === null) {
+      callback(err);
+    } else {
+      onclose = callback;
+    }
+  };
+
+  return d;
+}
+
+ReadableConstructor.prototype.compose = function (...streams) {
+  return compose(this, ...streams);
+};

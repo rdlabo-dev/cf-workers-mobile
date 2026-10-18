@@ -1,3 +1,4 @@
+import streams from "../../compat/stream-web/index.js";
 import { installAbortTimeout } from "../../browser/abort/index.js";
 import { installResourceSymbols } from "./symbols.js";
 import { Request } from "../../browser/request/index.js";
@@ -7,7 +8,33 @@ import { structuredClone } from "../../browser/structured-clone/index.js";
 
 import { Blob, File } from "../../compat/buffer/blob.js";
 
-const values = { Request, Response, Headers, structuredClone, Blob, File };
+import {
+  Performance,
+  PerformanceEntry,
+  PerformanceMark,
+  PerformanceMeasure,
+  PerformanceObserver,
+  PerformanceObserverEntryList,
+  PerformanceResourceTiming,
+  performance,
+} from "../../compat/perf-hooks/performance.js";
+const values = {
+  ...streams,
+  Request,
+  Response,
+  Headers,
+  structuredClone,
+  Blob,
+  File,
+  Performance,
+  PerformanceEntry,
+  PerformanceMark,
+  PerformanceMeasure,
+  PerformanceObserver,
+  PerformanceObserverEntryList,
+  PerformanceResourceTiming,
+  performance,
+};
 type Name = keyof typeof values;
 type Target = Record<string, unknown>;
 type Patch = {

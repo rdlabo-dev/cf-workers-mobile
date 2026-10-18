@@ -1,11 +1,29 @@
-import { cp, mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import assert from "node:assert/strict";
+import expectedCases from "../demo/tests/validation/expected-cases.json" with { type: "json" };
+const expectedNodeCases = Object.entries(expectedCases)
+  .filter(([feature]) => feature.startsWith("node."))
+  .sort();
+function checkNodeCases(reports) {
+  assert.deepEqual(
+    reports.map((r) => [r.feature, r.cases.map((c) => c.id)]).sort(),
+    expectedNodeCases,
+  );
+  assert.deepEqual(
+    reports.flatMap((r) => r.errors),
+    [],
+  );
+}
+import { cp, mkdtemp, writeFile, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { chromium } from "@playwright/test";
 
 const root = process.cwd();
-const temp = await mkdtemp(join(tmpdir(), "workers-capacitor-consumer-"));
+const previewPort = Number(process.env.CONSUMER_PREVIEW_PORT ?? 4189);
+const previewURL = `http://127.0.0.1:${previewPort}`;
+const temp = await mkdtemp(join(tmpdir(), "capacitor-workers-consumer-"));
 const pack = JSON.parse(
   execFileSync("npm", ["pack", "--json", "--pack-destination", temp], {
     encoding: "utf8",
@@ -17,12 +35,60 @@ for (const module of [
   "string-decoder",
   "buffer",
   "timers",
+  "url",
+  "os",
+  "tty",
+  "wasi",
+  "punycode",
+  "constants",
+  "v8",
+  "http2",
+  "vm",
+  "child-process",
+  "cluster",
+  "dgram",
+  "inspector",
+  "domain",
+  "readline",
+  "repl",
+  "sqlite",
+  "test",
+  "stream-consumers",
+  "dns",
+  "assert",
+  "perf-hooks",
+  "trace-events",
+  "https",
+  "worker-threads",
+  "http-agent",
+  "http-client",
+  "http-incoming",
+  "tls-common",
+  "util",
+  "diagnostics-channel",
+  "stream",
+  "stream-readable",
+  "stream-writable",
+  "stream-duplex",
+  "stream-transform",
+  "stream-passthrough",
+  "stream-promises",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
     if (!pack.files.some((file) => file.path === notice))
       throw new Error(`Missing upstream license notice in tarball: ${notice}`);
   }
+}
+for (const name of ["NOTICE.md", "LICENSE-APACHE"]) {
+  const notice = `dist/compat/async-hooks/${name}`;
+  if (!pack.files.some((file) => file.path === notice))
+    throw new Error(`Missing async hook license notice in tarball: ${notice}`);
+}
+for (const name of ["NOTICE.md", "LICENSE-MIT"]) {
+  const notice = `dist/compat/stream-web/${name}`;
+  if (!pack.files.some((file) => file.path === notice))
+    throw new Error(`Missing stream ponyfill notice in tarball: ${notice}`);
 }
 for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
   const notice = `dist/shared/brotli/${name}`;
@@ -60,12 +126,7 @@ for (const entry of [
 }
 // Candidate Web API contracts use internal modules from the installed tarball.
 // Never copy library implementation sources from the checkout.
-for (const domain of [
-  "compat",
-  "browser",
-  "cloudflare",
-  "shared",
-]) {
+for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
   await cp(
     join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
     join(temp, "src", domain),
@@ -76,34 +137,16 @@ await cp(
   join(temp, "node_modules/@rdlabo/workers-capacitor/dist/environment.js"),
   join(temp, "src/environment.js"),
 );
-// Copy module-owned contracts separately; these are not shipped.
-for (const module of [
-  "compat/path",
-  "compat/querystring",
-  "compat/string-decoder",
-  "compat/buffer",
-  "compat/http",
-  "compat/net",
-  "browser/headers",
-  "browser/request",
-  "browser/response",
-  "compat/immediate",
-  "browser/structured-clone",
-  "browser/encoding",
-  "browser/abort",
-  "compat/async-hooks",
-  "compat/timers",
-  "compat/fs",
-  "compat/module",
-  "compat/stream-web",
-  "compat/util",
-]) {
-  const directory = join("src", module);
-  await mkdir(join(temp, directory), { recursive: true });
-  await cp(
-    join(directory, "index.spec.ts"),
-    join(temp, directory, "index.spec.ts"),
-  );
+// Discover module-owned specs by convention. Only test sources come from the
+// checkout; every implementation above still comes from the installed tarball.
+for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
+  const directory = join("src", domain);
+  for (const file of await readdir(directory, { recursive: true })) {
+    if (!file.endsWith(".spec.ts")) continue;
+    const target = join(temp, directory, file);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(directory, file), target);
+  }
 }
 await writeFile(
   join(temp, "vite.config.mjs"),
@@ -201,6 +244,10 @@ execFileSync(
   ],
   { cwd: temp, stdio: "pipe" },
 );
+// Readiness must identify this consumer, not an unrelated preview on the
+// same port. Otherwise a stale server can supply passing historical results.
+const previewIdentity = randomUUID();
+await writeFile(join(temp, "build", "consumer-identity.txt"), previewIdentity);
 const child = spawn(
   process.execPath,
   [
@@ -209,7 +256,7 @@ const child = spawn(
     "--host",
     "127.0.0.1",
     "--port",
-    "4189",
+    String(previewPort),
     "--strictPort",
   ],
   { cwd: temp, stdio: "pipe" },
@@ -219,7 +266,13 @@ try {
   const deadline = Date.now() + 20000;
   while (true) {
     try {
-      if ((await fetch("http://127.0.0.1:4189")).ok) break;
+      const response = await fetch(`${previewURL}/consumer-identity.txt`);
+      if (
+        response.ok &&
+        (await response.text()) === previewIdentity &&
+        child.exitCode === null
+      )
+        break;
     } catch {}
     if (child.exitCode !== null || Date.now() > deadline)
       throw new Error("Consumer preview failed to start");
@@ -228,7 +281,7 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage();
   page.on("pageerror", (error) => console.error("Consumer page error:", error));
-  await page.goto("http://127.0.0.1:4189/");
+  await page.goto(`${previewURL}/`);
   await page.waitForFunction(() => window.pocDone);
   const results = await page.evaluate(() => window.pocResults);
   if (results?.length !== 26 || results.some((r) => !r.ok))
@@ -243,7 +296,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
     cwd: temp,
     stdio: "pipe",
   });
-  await page.goto("http://127.0.0.1:4189");
+  await page.goto(previewURL);
   await page.waitForFunction(
     () => typeof window.startExperiment === "function",
   );
@@ -292,8 +345,20 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
       throw new Error(JSON.stringify(result));
   }
   const features = await page.evaluate(() => window.runFeatures());
+  const expectedFeatures = Object.entries(expectedCases).flatMap(
+    ([feature, cases]) =>
+      (feature.startsWith("node.") || feature === "fetch.basic"
+        ? ["direct", "isolated"]
+        : ["webview"]
+      ).map((environment) => [environment, feature, cases]),
+  );
+  assert.deepEqual(
+    features
+      .map((r) => [r.environment, r.feature, r.cases.map((c) => c.id)])
+      .sort(),
+    expectedFeatures.sort(),
+  );
   if (
-    features.flatMap((report) => report.cases).length !== 326 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -318,7 +383,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
     "raw",
   ]) {
     for (const prefer of ["worker", "direct"]) {
-      await page.goto(`http://127.0.0.1:4189/build-tools/${build}/`);
+      await page.goto(`${previewURL}/build-tools/${build}/`);
       await page.waitForFunction(
         () => typeof window.runBuildTool === "function",
       );
@@ -326,16 +391,12 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
         (prefer) => window.runBuildTool(prefer),
         prefer,
       );
+      if (build !== "raw") checkNodeCases(report.node.direct);
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 149 ||
-          report.node.direct.some(
-            (r) =>
-              r.errors.length ||
-              r.cases.some(
-                (c) => c.status === "failed" || c.status === "unavailable",
-              ),
-          ))
+        report.node.direct.some(
+          (r) => r.errors.length || r.cases.some((c) => c.status !== "passed"),
+        )
       )
         throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
       if (
@@ -347,6 +408,32 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
     }
   }
   console.log("Packed consumer: Vite/esbuild/browser ESM 10/10 passed");
+  for (const build of ["vite-node", "esbuild-node"]) {
+    for (const prefer of ["worker", "direct"]) {
+      await page.goto(
+        `${previewURL}/build-tools/${build}/${build === "vite-node" ? "node.html" : ""}`,
+      );
+      await page.waitForFunction(
+        () => typeof window.runNodeBuild === "function",
+      );
+      const report = await page.evaluate(
+        (prefer) => window.runNodeBuild(prefer),
+        prefer,
+      );
+      checkNodeCases(report.contracts);
+      const cases = report.contracts.flatMap((result) => result.cases);
+      if (
+        report.execution !== prefer ||
+        cases.some((result) => result.status !== "passed") ||
+        JSON.stringify(report.commonJsAssertions) !==
+          JSON.stringify({ callable: true, sameDefault: true }) ||
+        JSON.stringify(report.commonJsStreams) !==
+          JSON.stringify(Array(7).fill(true))
+      )
+        throw new Error(`${build}/${prefer}: ${JSON.stringify(report)}`);
+    }
+  }
+  console.log("Packed consumer: configured Node/CommonJS entries 4/4 passed");
   // Installed package, cold Vite dev optimization, subpath-only application.
   const dev = spawn(
     process.execPath,

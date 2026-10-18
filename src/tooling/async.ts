@@ -34,7 +34,25 @@ export async function lowerAsync(
         ...(jsx ? ["jsx" as const] : []),
       ],
     },
-    plugins: [asyncGenerators, asyncFunctions],
+    plugins: [
+      () => ({
+        visitor: {
+          Program(path) {
+            // Type-only `this` parameters must not contribute to the wrapper
+            // arity computed by Babel before esbuild strips TypeScript syntax.
+            path.traverse({
+              Function(path) {
+                const first = path.node.params[0];
+                if (first?.type === "Identifier" && first.name === "this")
+                  path.node.params.shift();
+              },
+            });
+          },
+        },
+      }),
+      asyncGenerators,
+      asyncFunctions,
+    ],
   };
   let result;
   try {

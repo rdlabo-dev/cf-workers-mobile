@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { globalsPath } from "../../src/tooling/shared.js";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { workersCapacitorPlugin } from "../../src/tooling/vite.js";
 
 function names(plugins: ReturnType<typeof workersCapacitorPlugin>) {
@@ -57,16 +56,56 @@ it("does not install Web APIs in an unconfigured host bundle", () => {
   expect(result).not.toContain("globals/install.js");
 });
 
-it("uses the optimized Buffer constructors for the actual global installer", () => {
+it("resolves runtime constructors through public builtins without rewriting source", async () => {
   const plugin = workersCapacitorPlugin().find(
     (plugin) =>
       plugin &&
       typeof plugin === "object" &&
       "name" in plugin &&
       plugin.name === "workers-capacitor",
-  ) as unknown as { transform(code: string, id: string): string | undefined };
-  const source = readFileSync(resolve(globalsPath, "../web.ts"), "utf8");
-  const result = plugin.transform(source, resolve(globalsPath, "../web.js"));
-  expect(result).toContain('from "node:buffer"');
-  expect(result).not.toContain("buffer/blob.js");
+  ) as any;
+  const resolveImport = vi.fn(async (specifier: string) => ({
+    id: `optimized:${specifier}`,
+  }));
+  const importer = resolve(globalsPath, "../web.js");
+  expect(
+    await plugin.resolveId.call(
+      { resolve: resolveImport },
+      "../../compat/buffer/blob.js",
+      importer,
+      {},
+    ),
+  ).toEqual({ id: "optimized:node:buffer" });
+  expect(
+    await plugin.resolveId.call(
+      { resolve: resolveImport },
+      "../../compat/stream-web/index.js",
+      importer,
+      {},
+    ),
+  ).toEqual({ id: "optimized:node:stream/web" });
+  expect(
+    await plugin.resolveId.call(
+      { resolve: resolveImport },
+      "./blob.js",
+      resolve(globalsPath, "../../../compat/buffer/index.js"),
+      {},
+    ),
+  ).toBeUndefined();
+  expect(
+    await plugin.resolveId.call(
+      { resolve: resolveImport },
+      "../../compat/buffer/blob.js",
+      resolve(globalsPath, "../../../browser/structured-clone/index.js"),
+      {},
+    ),
+  ).toBeUndefined();
+  expect(
+    await plugin.resolveId.call(
+      { resolve: resolveImport },
+      "./blob.js",
+      "/consumer/index.js",
+      {},
+    ),
+  ).toBeUndefined();
 });
