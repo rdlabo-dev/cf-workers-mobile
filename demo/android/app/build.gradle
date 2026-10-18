@@ -5,10 +5,10 @@ android {
         excludes += 'META-INF/INDEX.LIST'
         merges += 'META-INF/io.netty.versions.properties'
     }
-    namespace = "jp.rdlabo.capacitorworkers.poc"
+    namespace = "jp.rdlabo.workerscapacitor.poc"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "jp.rdlabo.capacitorworkers.poc"
+        applicationId "jp.rdlabo.workerscapacitor.poc"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

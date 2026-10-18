@@ -2,5 +2,5 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-include ':rdlabo-capacitor-workers'
-project(':rdlabo-capacitor-workers').projectDir = new File('../node_modules/@rdlabo/capacitor-workers/native/android')
+include ':rdlabo-workers-capacitor'
+project(':rdlabo-workers-capacitor').projectDir = new File('../node_modules/@rdlabo/workers-capacitor/native/android')

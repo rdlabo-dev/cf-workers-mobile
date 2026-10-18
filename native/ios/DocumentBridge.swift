@@ -59,7 +59,7 @@ final class DocumentBridgeController: CAPBridgeViewController {
         actual.userContentController.addScriptMessageHandler(handler, contentWorld: .page, name: "documentFetch")
         let config = ["baseURL": settings["baseURL"]!, "assets": settings["assets"]!] as [String: Any]
         let json = String(data: try! JSONSerialization.data(withJSONObject: config), encoding: .utf8)!
-        let script = "globalThis.__capacitorWorkersDocuments = \(json);\n" + (settings["pageScript"] as? String ?? "")
+        let script = "globalThis.__workersCapacitorDocuments = \(json);\n" + (settings["pageScript"] as? String ?? "")
         actual.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         return super.webView(with: frame, configuration: actual)
     }
@@ -133,7 +133,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     }
     private func execute(_ request: [String: Any], completion: @escaping (Result<Any, Error>) -> Void) {
         guard !closed, let runtime = runtime else { completion(.failure(URLError(.cancelled))); return }
-        runtime.callAsyncJavaScript("return await window.__capacitorWorkersDispatch(request)", arguments: ["request": request], in: nil, in: .page, completionHandler: completion)
+        runtime.callAsyncJavaScript("return await window.__workersCapacitorDispatch(request)", arguments: ["request": request], in: nil, in: .page, completionHandler: completion)
     }
     func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
         guard handles(task) else { assets.webView(webView, start: task); return }

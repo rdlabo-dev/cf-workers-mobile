@@ -1,18 +1,18 @@
 // Native Android document transport. Bundled assets bypass the Worker router.
 // Persist shutdown across SW idle termination while an old page is still controlled.
-const lifecycleCache = "capacitor-workers-document-lifecycle";
-const disabledKey = new URL("/capacitor-workers-disabled", self.location.href)
+const lifecycleCache = "workers-capacitor-document-lifecycle";
+const disabledKey = new URL("/workers-capacitor-disabled", self.location.href)
   .href;
 let disabled = false;
 self.addEventListener("message", (event) => {
   if (
     ![
-      "capacitor-workers:disable-documents",
-      "capacitor-workers:enable-documents",
+      "workers-capacitor:disable-documents",
+      "workers-capacitor:enable-documents",
     ].includes(event.data)
   )
     return;
-  disabled = event.data === "capacitor-workers:disable-documents";
+  disabled = event.data === "workers-capacitor:disable-documents";
   const stopping = disabled;
   event.waitUntil(
     (async () => {
@@ -26,7 +26,7 @@ self.addEventListener("message", (event) => {
 const baseURL = new URL(self.location.href).searchParams.get("baseURL");
 // Read the current manifest: a previously installed SW can outlive an app update.
 function assets() {
-  return fetch("/capacitor-workers-assets.json", { cache: "no-store" }).then(
+  return fetch("/workers-capacitor-assets.json", { cache: "no-store" }).then(
     (response) => {
       if (!response.ok) throw new Error("Missing document assets manifest");
       return response.json();
@@ -65,7 +65,7 @@ async function dispatch(request) {
   let host = (
     await self.clients.matchAll({ type: "window", includeUncontrolled: true })
   ).find((client) =>
-    new URL(client.url).searchParams.has("__capacitor_workers_host"),
+    new URL(client.url).searchParams.has("__workers_capacitor_host"),
   );
   // An installed SW survives process restarts. Let the bundled entry restart the
   // native host before intercepting its first document, without a network server.
@@ -77,7 +77,7 @@ async function dispatch(request) {
     host = (
       await self.clients.matchAll({ type: "window", includeUncontrolled: true })
     ).find((client) =>
-      new URL(client.url).searchParams.has("__capacitor_workers_host"),
+      new URL(client.url).searchParams.has("__workers_capacitor_host"),
     );
     if (Date.now() > deadline) throw new Error("Worker host unavailable");
     if (!host) await new Promise((resolve) => setTimeout(resolve, 50));

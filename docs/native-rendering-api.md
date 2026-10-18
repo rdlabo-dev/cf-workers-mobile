@@ -1,4 +1,4 @@
-# Native document rendering through capacitorWorkers
+# Native document rendering through workersCapacitor
 
 The package includes the native connection for Capacitor 8 (verified with 8.5.3).
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
@@ -15,11 +15,11 @@ npm pack
 ```
 
 In a Capacitor application, install the resulting tarball, configure the Worker
-in the Vite/esbuild plugin, and call `capacitorWorkers({ baseURL, render: "/" })`.
+in the Vite/esbuild plugin, and call `workersCapacitor({ baseURL, render: "/" })`.
 Build the web assets before synchronizing:
 
 ```sh
-npm install /path/to/rdlabo-capacitor-workers-0.0.0-poc.1.tgz
+npm install /path/to/rdlabo-workers-capacitor-0.0.0-poc.1.tgz
 npm run build
 npx cap sync
 npx cap run ios # or android
@@ -33,9 +33,9 @@ installing Capacitor.
 ## Application entry
 
 ```ts
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
-const app = capacitorWorkers({
+const app = workersCapacitor({
   baseURL: "https://worker.invalid",
   render: "/",
 });
@@ -78,14 +78,14 @@ const config: CapacitorConfig = {
 
 Run `npx cap sync ios` after changing this setting. This default applies to the
 native Worker document view; the ordinary Fetch-only WebView retains Capacitor's
-normal behavior. No new `capacitorWorkers` option is required.
+normal behavior. No new `workersCapacitor` option is required.
 
 ## Build configuration
 
 The existing Vite or esbuild plugin automatically prepares document assets:
 
 ```ts
-capacitorWorkersPlugin({
+workersCapacitorPlugin({
   worker: "./workers/hono.tsx", // Or the Workers Express entry.
 });
 ```
@@ -102,9 +102,9 @@ next to its `outfile` or into `outdir` (in-memory `write: false` builds do not
 prepare native document assets). Place any separately copied static files in
 the output directory before building so they appear in the asset manifest.
 
-The generated `capacitor-workers-assets.json` identifies bundled assets, which
+The generated `workers-capacitor-assets.json` identifies bundled assets, which
 bypass the Worker router. All other local paths reach the Worker. Android uses
-`capacitor-workers-sw.js` for browser-native Request/Response and redirect
+`workers-capacitor-sw.js` for browser-native Request/Response and redirect
 handling. These filenames are implementation assets, not application imports.
 A raw-ESM setup must supply the equivalent SW file and asset manifest itself;
 the automated asset integration currently covers Vite and esbuild.

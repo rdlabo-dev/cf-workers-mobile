@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
-export const documentSW = "capacitor-workers-sw.js";
-export const documentManifest = "capacitor-workers-assets.json";
+export const documentSW = "workers-capacitor-sw.js";
+export const documentManifest = "workers-capacitor-assets.json";
 export async function listAssets(directory: string): Promise<string[]> {
   try {
     const entries = await readdir(directory, {

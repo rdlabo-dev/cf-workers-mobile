@@ -1,7 +1,7 @@
 import * as nodeHttp from "node:http";
 import * as localHttp from "../../../../../src/compat/http";
 import { nodeHttpNetworkContract } from "../../../../../src/compat/http/index.spec";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   FetchPolicyImplementation,
   fetchPolicyContract,

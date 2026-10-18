@@ -44,7 +44,7 @@ export interface RemoteWorkerOptions {
   getToken?(): string | undefined | Promise<string | undefined>;
 }
 
-export interface CapacitorWorkersOptions<Env> extends FetchRuntimeOptions<Env> {
+export interface WorkersCapacitorOptions<Env> extends FetchRuntimeOptions<Env> {
   /** Optional when configured by the Vite or esbuild plugin. */
   worker?: WorkerHandler<Env> | WorkerFactory | WorkerSource<Env>;
   /** Native document rendering: initial local path (for example "/"). Omit for Fetch-only use. */

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { CapacitorWorkersOptions, WorkerHandler } from "../../src/index";
+import type { WorkersCapacitorOptions, WorkerHandler } from "../../src/index";
 
 export type FetchContractOptions = Omit<
-  CapacitorWorkersOptions<Record<string, unknown>>,
+  WorkersCapacitorOptions<Record<string, unknown>>,
   "worker"
 > & {
   worker: WorkerHandler<Record<string, unknown>>;

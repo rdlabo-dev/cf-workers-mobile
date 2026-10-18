@@ -4,7 +4,7 @@ import {
   type FeatureScope,
 } from "./index.js";
 import { createFetchRuntime } from "../fetch/worker-runtime.js";
-import type { CapacitorWorkersOptions } from "../fetch/types.js";
+import type { WorkersCapacitorOptions } from "../fetch/types.js";
 
 /** A deliberately small portable HTTP profile, not the full fetch specification. */
 export const fetchFeature = defineFeature<typeof fetch>()("fetch.basic", [
@@ -18,7 +18,7 @@ export const fetchFeature = defineFeature<typeof fetch>()("fetch.basic", [
 export class FetchImplementation<Env> extends FeatureImplementation<
   typeof fetchFeature
 > {
-  constructor(private readonly options: CapacitorWorkersOptions<Env>) {
+  constructor(private readonly options: WorkersCapacitorOptions<Env>) {
     super(fetchFeature, {
       request: { status: "supported" },
       response: { status: "supported" },

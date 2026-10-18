@@ -1,7 +1,7 @@
 import kvWorker from "./kv";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
-import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
-import type { KVNamespace } from "@rdlabo/capacitor-workers/features/kv";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
+import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
+import type { KVNamespace } from "@rdlabo/workers-capacitor/features/kv";
 import { wasmContract } from "../../../validation/contracts/wasm";
 import {
   WorkersText,

@@ -32,7 +32,7 @@ function compatibilityPlugins(
   );
   return [
     {
-      name: "capacitor-workers-async-context",
+      name: "workers-capacitor-async-context",
       enforce: "post",
       transform(code, id) {
         if (/\.[cm]?[jt]sx?(?:\?|$)/.test(id)) return lowerAsync(code, id);
@@ -44,7 +44,7 @@ function compatibilityPlugins(
     ...(installGlobals
       ? [
           {
-            name: "capacitor-workers-global-install",
+            name: "workers-capacitor-global-install",
             enforce: "pre" as const,
             transform(code: string, id: string) {
               const path = normalizePath(id.split("?")[0]);
@@ -62,7 +62,7 @@ function compatibilityPlugins(
         ]
       : []),
     {
-      name: "capacitor-workers",
+      name: "workers-capacitor",
       enforce: "pre",
       transform(code, id) {
         if (
@@ -119,7 +119,7 @@ function compatibilityPlugins(
 
 // A real-looking absolute ID survives Vite's worker query stripping without
 // writing generated entry files into the consumer's project.
-const entrySuffix = ".capacitor-worker.js";
+const entrySuffix = ".workers-capacitor-worker.js";
 function virtualId(
   source: string,
   root: string,
@@ -144,7 +144,7 @@ function workerEntryPlugin(
   virtualFiles?: () => Promise<string>,
 ): Plugin {
   return {
-    name: "capacitor-workers-entry",
+    name: "workers-capacitor-entry",
     enforce: "pre",
     resolveId(source) {
       return virtualId(source, root(), (path) => entries.has(path));
@@ -161,7 +161,7 @@ function workerEntryPlugin(
 }
 
 /** Add only to the Capacitor/browser build, never the Cloudflare build. */
-export interface CapacitorWorkersPluginOptions extends ServerBuildOptions {
+export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
   /**
@@ -172,8 +172,8 @@ export interface CapacitorWorkersPluginOptions extends ServerBuildOptions {
    */
   workerFiles?: string[];
 }
-export function capacitorWorkersPlugin(
-  options: CapacitorWorkersPluginOptions = {},
+export function workersCapacitorPlugin(
+  options: WorkersCapacitorPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
   const virtualFiles = options.workerFiles?.length
@@ -192,7 +192,7 @@ export function capacitorWorkersPlugin(
   let publicDir: string;
   let server: ReturnType<typeof serverModules> | undefined;
   const serverPlugin = (): Plugin => ({
-    name: "capacitor-workers-server",
+    name: "workers-capacitor-server",
     enforce: "pre",
     resolveId(id) {
       return virtualId(id, root, (path) => server?.owns(path) ?? false);
@@ -220,10 +220,10 @@ export function capacitorWorkersPlugin(
   return [
     serverPlugin(),
     {
-      name: "capacitor-workers-source",
+      name: "workers-capacitor-source",
       enforce: "pre",
       config: () => ({
-        optimizeDeps: { exclude: ["@rdlabo/capacitor-workers"] },
+        optimizeDeps: { exclude: ["@rdlabo/workers-capacitor"] },
         worker: { format: "es" },
       }),
       configResolved(config) {
@@ -303,7 +303,7 @@ export default { createWorker: () => new Constructor(), ${compilation ? "needsRe
     },
     workerEntryPlugin(entries, () => root, virtualFiles),
     {
-      name: "capacitor-workers-worker-build",
+      name: "workers-capacitor-worker-build",
       config(config) {
         const previous = config.worker?.plugins;
         return {

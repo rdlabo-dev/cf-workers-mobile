@@ -1,13 +1,13 @@
 import {
-  capacitorWorkers,
+  workersCapacitor,
   type ExecutionPreference,
-} from "@rdlabo/capacitor-workers";
+} from "@rdlabo/workers-capacitor";
 
 // The configured worker is tests/fixtures/workers/compatibility/node-contracts.ts
 // for this build; direct executes it in-page, worker executes it as a
 // Dedicated Worker bundled by the same plugin.
 async function run(prefer: ExecutionPreference) {
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://node.invalid/",
     prefer,
   });

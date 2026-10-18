@@ -1,11 +1,11 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 import { workerEntry } from "../sample";
 
 export default defineConfig({
   root: fileURLToPath(new URL("./", import.meta.url)),
-  plugins: [capacitorWorkersPlugin({ worker: workerEntry })],
+  plugins: [workersCapacitorPlugin({ worker: workerEntry })],
   build: {
     outDir: fileURLToPath(
       new URL(

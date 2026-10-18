@@ -18,7 +18,7 @@ const artifacts = join(repo, "demo/artifacts");
 await mkdir(artifacts, { recursive: true });
 // Keep ancestor node_modules from masking missing package dependencies.
 const consumer = await realpath(
-  await mkdtemp(join(tmpdir(), "capacitor-workers-native-package-")),
+  await mkdtemp(join(tmpdir(), "workers-capacitor-native-package-")),
 );
 const packed = JSON.parse(
   execFileSync("npm", ["pack", "--json", "--pack-destination", consumer], {
@@ -29,9 +29,9 @@ const packed = JSON.parse(
 const files = packed.files.map((file) => file.path);
 for (const expected of [
   "Package.swift",
-  "native/ios/CapacitorWorkersPlugin.swift",
+  "native/ios/WorkersCapacitorPlugin.swift",
   "native/android/build.gradle",
-  "native/android/src/main/java/jp/rdlabo/capacitorworkers/CapacitorWorkersPlugin.java",
+  "native/android/src/main/java/jp/rdlabo/workerscapacitor/WorkersCapacitorPlugin.java",
 ])
   assert.ok(files.includes(expected), `Missing packed file: ${expected}`);
 assert.ok(
@@ -50,7 +50,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "@rdlabo/capacitor-workers": `file:./${packed.filename}`,
+        "@rdlabo/workers-capacitor": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -132,7 +132,7 @@ await writeFile(
   join(consumer, "capacitor.config.json"),
   JSON.stringify(
     {
-      appId: "jp.rdlabo.capacitorworkers.packaged",
+      appId: "jp.rdlabo.workerscapacitor.packaged",
       appName: "Packaged Workers",
       webDir: "dist",
       ios: { packageManager: "SPM" },
@@ -143,8 +143,8 @@ await writeFile(
 );
 run("npm", ["install"], consumer);
 assert.equal(
-  await realpath(join(consumer, "node_modules/@rdlabo/capacitor-workers")),
-  join(consumer, "node_modules/@rdlabo/capacitor-workers"),
+  await realpath(join(consumer, "node_modules/@rdlabo/workers-capacitor")),
+  join(consumer, "node_modules/@rdlabo/workers-capacitor"),
   "Must install tarball, not link repo",
 );
 // Bundle the installed package entry as a classic script so the Android
@@ -153,7 +153,7 @@ assert.equal(
 const { build } = await import("esbuild");
 const lifecycle = await build({
   entryPoints: [
-    join(consumer, "node_modules/@rdlabo/capacitor-workers/dist/index.js"),
+    join(consumer, "node_modules/@rdlabo/workers-capacitor/dist/index.js"),
   ],
   bundle: true,
   format: "iife",
@@ -184,7 +184,7 @@ run("npx", ["cap", "sync"], consumer);
 const ios = JSON.parse(
   await readFile(join(consumer, "ios/App/App/capacitor.config.json"), "utf8"),
 );
-assert.ok(ios.packageClassList.includes("CapacitorWorkersPlugin"));
+assert.ok(ios.packageClassList.includes("WorkersCapacitorPlugin"));
 const android = JSON.parse(
   await readFile(
     join(consumer, "android/app/src/main/assets/capacitor.plugins.json"),
@@ -194,7 +194,7 @@ const android = JSON.parse(
 assert.ok(
   android.some(
     (plugin) =>
-      plugin.classpath === "jp.rdlabo.capacitorworkers.CapacitorWorkersPlugin",
+      plugin.classpath === "jp.rdlabo.workerscapacitor.WorkersCapacitorPlugin",
   ),
 );
 await writeFile(

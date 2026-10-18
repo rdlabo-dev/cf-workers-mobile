@@ -9,10 +9,10 @@ or maintain a second router.
 
 ```ts
 // vite.config.ts — Capacitor build only
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 
 export default {
-  plugins: [capacitorWorkersPlugin({ worker: "worker/src/index.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],
 };
 ```
 
@@ -25,9 +25,9 @@ The esbuild plugin accepts the same options.
 
 ```ts
 // App startup — the business Worker remains unchanged
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://local.invalid/",
   remote: {
     origin: "https://existing-worker.example.com",
@@ -59,7 +59,7 @@ This also covers fallthrough and overlapping routes. Pure routes remain local.
 D1 bindings, server `env` values, unknown dependency behavior, dynamic property
 access, and mutable state shared with server operations widen the server boundary.
 An `env` binding may be explicitly kept local with the build option
-`localBindings: ["LABEL"]` when it is supplied through `capacitorWorkers({ env })`.
+`localBindings: ["LABEL"]` when it is supplied through `workersCapacitor({ env })`.
 A D1 binding cannot be declared local. Unknown top-level initialization, internal router dispatch, ambient global state
 and cookie/header state also keep the entire Worker on the server.
 The analysis is deliberately conservative;
@@ -73,7 +73,7 @@ This mode requires connectivity for every intercepted request; it does not make
 the existing application available offline. It is never selected by catching a
 D1 error after partly running an operation.
 
-For D1-only builds, both integrations emit `capacitor-workers-d1.json` describing the selected
+For D1-only builds, both integrations emit `workers-capacitor-d1.json` describing the selected
 mode and route/middleware registrations. This report is diagnostic metadata,
 not a second router maintained by application authors.
 

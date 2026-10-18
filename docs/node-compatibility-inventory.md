@@ -2,7 +2,7 @@
 
 ## Implementation status
 
-**`node:path`, `node:querystring`, and `node:string_decoder` are Complete at commit `b1a58d1`.** Their local contracts, native verification, manager/independent reviews and [remote CI](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/38999137150) have passed. Node/Web global installation and native Fetch transport are **Complete at `13261ce`** for the pinned profile below: manager/independent reviews and [CI passed](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/39007518228). The remaining **`node:http`, `cloudflare:node` and `node:net` units are Complete at `35316ae`**, including public TCP dispatch and both native transports. Their [CI run](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/39017343994) and acceptance evidence are recorded below. See the [merge and release acceptance gate](../CONTRIBUTING.md#acceptance-gate).
+**`node:path`, `node:querystring`, and `node:string_decoder` are Complete at commit `b1a58d1`.** Their local contracts, native verification, manager/independent reviews and [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/38999137150) have passed. Node/Web global installation and native Fetch transport are **Complete at `13261ce`** for the pinned profile below: manager/independent reviews and [CI passed](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39007518228). The remaining **`node:http`, `cloudflare:node` and `node:net` units are Complete at `35316ae`**, including public TCP dispatch and both native transports. Their [CI run](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39017343994) and acceptance evidence are recorded below. See the [merge and release acceptance gate](../CONTRIBUTING.md#acceptance-gate).
 
 The status column describes this repository. **Class A/B/C/D/U/S describes feasibility only.** Existing PoC implementations are completion work, not release-ready exceptions.
 
@@ -90,7 +90,7 @@ Final acceptance at `35316ae`:
 - Fresh packed consumers passed 50 Hono and 50 Express checks on each platform,
   including background/relaunch/update/reinitialization.
 - Manager and independent acceptance reviews have no outstanding required changes.
-  [All five CI jobs passed](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/39017343994).
+  [All five CI jobs passed](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39017343994).
 
 Native reports are generated under the consumer's `artifacts/network/` and
 `demo/artifacts/node-light/`; the reproducible commands are in the test guide.
@@ -311,7 +311,7 @@ Each compatibility module owns a directory under `src/compat/<module>/`, with `i
 
 The three module implementations have no declared exclusions and are **Complete
 at `b1a58d1`**. Manager and independent acceptance reviews have no outstanding
-code findings, and [all remote CI jobs passed](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/38999137150).
+code findings, and [all remote CI jobs passed](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/38999137150).
 The subsequent whole HTTP/net/bridge acceptance is recorded above; these three first-batch modules retain their earlier certification.
 
 Baseline: workerd **1.20261012.1**, compatibility date **2026-10-17**, no additional
@@ -357,7 +357,7 @@ Earlier global/transport verification at `13261ce` (historical evidence):
   validation, header arrays, no-Host behavior, path mutation and Agent options.
   Node/Web global review corrections include lazy-load disposal, pre-evaluation
   ordering and AbortSignal constructor/method ownership.
-- [Remote CI at `13261ce`](https://github.com/rdlabo-dev/capacitor-workers/actions/runs/39007518228) passed all five jobs. The earlier first-batch certification remains `b1a58d1`.
+- [Remote CI at `13261ce`](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39007518228) passed all five jobs. The earlier first-batch certification remains `b1a58d1`.
 
 Historical transport dependencies at `13261ce` (superseded by [the Web transport](native-boundary-audit.md)): iOS used AsyncHTTPClient 1.36.2 with Swift NIO;
 Android uses Netty 4.1.139.Final and requires the documented consumer Gradle
@@ -459,7 +459,7 @@ cleanup/result checks in `7a1d27e`:
 | Manager and independent acceptance review | Required code changes resolved |
 
 Both native runs used identical runtime assets: SHA-256 of
-`capacitor-workers-assets.json` is
+`workers-capacitor-assets.json` is
 `dcdc6cc5fe9163d167ba5e758dc0bbdf20c1f9e53fa987d9a68b1829a147cdde`;
 `index.html` is
 `d3f0e375076e8512d617eff8c975a249c914c1ac2b51e460f8132613e41a4dfb`.

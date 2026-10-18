@@ -2,8 +2,8 @@ import path from "node:path";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 
 /** node:path module contract, matching the Workers baseline. */
 export interface NodePathApi {

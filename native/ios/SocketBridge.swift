@@ -25,7 +25,7 @@ final class SocketBridge: @unchecked Sendable {
         init(_ id: String, _ transport: NWConnection) { self.id = id; self.transport = transport }
     }
     private enum Failure: Error { case closed, invalid, busy }
-    private let queue = DispatchQueue(label: "jp.rdlabo.capacitorworkers.sockets")
+    private let queue = DispatchQueue(label: "jp.rdlabo.workerscapacitor.sockets")
     private var values: [String: Connection] = [:]
     private var stopped = false
     typealias Completion = (Result<PluginCallResultData, Error>) -> Void

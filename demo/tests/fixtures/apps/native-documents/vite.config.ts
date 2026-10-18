@@ -1,10 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   root: here("."),
-  plugins: [capacitorWorkersPlugin()],
+  plugins: [workersCapacitorPlugin()],
   build: {
     outDir: here("../../../../artifacts/native-documents"),
     emptyOutDir: true,

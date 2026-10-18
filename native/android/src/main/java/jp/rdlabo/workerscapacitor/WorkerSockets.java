@@ -1,4 +1,4 @@
-package jp.rdlabo.capacitorworkers;
+package jp.rdlabo.workerscapacitor;
 
 import android.util.Base64;
 import com.getcapacitor.JSObject;

@@ -11,7 +11,7 @@ Fetch execution uses a single template, `FetchRuntime<Env>`. `DirectFetchRuntime
 | `src/isolated/`               | MessageChannel serialization, upload/response transport, body cancellation and Worker-side lifetime                                                                  |
 | `src/index.ts`                | Selecting the existing execution mode, single global installation and restoring the original fetch                                                                   |
 
-The public `capacitorWorkers({ baseURL, env })` setup uses the entry configured in the Vite or esbuild plugin. Explicit `worker` options remain supported. A function with a `fetch` method is still a direct handler; only a function without that method is a Worker factory. The base class is framework-independent; Hono and Workers Express continue using the same Fetch Handler interface.
+The public `workersCapacitor({ baseURL, env })` setup uses the entry configured in the Vite or esbuild plugin. Explicit `worker` options remain supported. A function with a `fetch` method is still a direct handler; only a function without that method is a Worker factory. The base class is framework-independent; Hono and Workers Express continue using the same Fetch Handler interface.
 
 ## Extension recipe
 
@@ -23,7 +23,7 @@ import {
   type FetchRuntimeOptions,
   type WorkerContext,
   type WorkerHandler,
-} from "@rdlabo/capacitor-workers";
+} from "@rdlabo/workers-capacitor";
 
 class ExampleRuntime<Env> extends FetchRuntime<Env> {
   constructor(
@@ -39,7 +39,7 @@ class ExampleRuntime<Env> extends FetchRuntime<Env> {
 }
 ```
 
-Constructing a runtime does not patch global fetch. Its bound `runtime.fetch` can be passed to a contract test or called directly. It captures the original network fetch and app origin at construction, as the existing installer did. `document.baseURI` is resolved per request. Existing application code should continue using `capacitorWorkers`; this class is the extension point for execution implementations, not an extra application setup requirement.
+Constructing a runtime does not patch global fetch. Its bound `runtime.fetch` can be passed to a contract test or called directly. It captures the original network fetch and app origin at construction, as the existing installer did. `document.baseURI` is resolved per request. Existing application code should continue using `workersCapacitor`; this class is the extension point for execution implementations, not an extra application setup requirement.
 
 If an implementation needs startup, override `ready` with its startup promise, observe rejection before the first request, and make `dispatch` wait for startup. If it owns resources, override the synchronous `close()` hook. `dispose()` calls that hook once after successful cleanup. Keep `fetch`, `drain` and `dispose` inherited. The isolated implementation demonstrates these hooks without moving its transport into the base class.
 
@@ -65,7 +65,7 @@ The template preserves existing behavior rather than emulating all browser netwo
 
 ## Execution preference
 
-`capacitorWorkersPlugin({ worker: "./src/worker.ts" })` in the Vite or esbuild configuration supplies a Worker factory and a lazy direct-module loader internally. Import `capacitorWorkers` from the ordinary package entry and call it with `baseURL` and optional `prefer: "worker" | "direct"` (default `worker`); no Worker import is needed. `new FetchImplementation({ baseURL, prefer })` uses the same configured entry without installing global fetch. Without a bundler, pass an explicit source with `createWorker` and `loadDirect`; see the [build setup examples](../README.md#supported-builds). `PreferredFetchRuntime` uses the existing FetchRuntime contract and transport; the feature host uses the same selection function.
+`workersCapacitorPlugin({ worker: "./src/worker.ts" })` in the Vite or esbuild configuration supplies a Worker factory and a lazy direct-module loader internally. Import `workersCapacitor` from the ordinary package entry and call it with `baseURL` and optional `prefer: "worker" | "direct"` (default `worker`); no Worker import is needed. `new FetchImplementation({ baseURL, prefer })` uses the same configured entry without installing global fetch. Without a bundler, pass an explicit source with `createWorker` and `loadDirect`; see the [build setup examples](../README.md#supported-builds). `PreferredFetchRuntime` uses the existing FetchRuntime contract and transport; the feature host uses the same selection function.
 
 Selection happens once, before dispatch. The worker preference falls back to direct if the Worker constructor is unavailable, the constructor reports platform SecurityError/NotSupportedError, or the initial env is not plain transportable data. Method-bearing bindings retain their identity in the direct environment. Accessors and custom prototypes are conservatively direct; this does not attempt to detect every Workers API or perfectly classify every structured-clone type. Direct code is not evaluated when worker execution is selected.
 

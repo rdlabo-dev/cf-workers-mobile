@@ -1,4 +1,4 @@
-# @rdlabo/capacitor-workers
+# @rdlabo/workers-capacitor
 
 Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. Local requests execute without an API server or socket listener. D1- and Hyperdrive-backed requests can reuse the existing deployed Worker through the build integration below. This executes JavaScript in the WebView; it does not compile Workers code to native code.
 
@@ -21,9 +21,9 @@ Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor W
 Configure your existing Worker entry with one of the [supported build setups](#build-setup), then initialize the runtime in your application:
 
 ```ts
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   prefer: "worker", // Default. Use "direct" to prefer the UI environment.
   baseURL: "https://api.example.com/api/",
 });
@@ -37,7 +37,7 @@ const response = await fetch("/api/hello");
 
 ## Native HTML rendering
 
-The source API also supports `capacitorWorkers({ baseURL: "https://worker.invalid", render: "/" })`.
+The source API also supports `workersCapacitor({ baseURL: "https://worker.invalid", render: "/" })`.
 The existing Worker returns complete HTML and owns page/API routing. The build
 plugin automatically emits the internal assets; no additional build option is needed.
 
@@ -56,8 +56,8 @@ Capacitor plugin access. Native rendering does not sandbox untrusted HTML.
 
 | Build              | Setup                                      | Input                                             |
 | ------------------ | ------------------------------------------ | ------------------------------------------------- |
-| Vite 7             | `@rdlabo/capacitor-workers/vite` plugin    | TypeScript / JavaScript, Workers Hono and Express |
-| esbuild 0.28       | `@rdlabo/capacitor-workers/esbuild` plugin | TypeScript / JavaScript, Workers Hono and Express |
+| Vite 7             | `@rdlabo/workers-capacitor/vite` plugin    | TypeScript / JavaScript, Workers Hono and Express |
+| esbuild 0.28       | `@rdlabo/workers-capacitor/esbuild` plugin | TypeScript / JavaScript, Workers Hono and Express |
 | Browser ES Modules | Explicit Worker source below               | Browser-compatible JavaScript only                |
 
 Other bundlers are not currently supported. Add these plugins only to the Capacitor/browser build, never the Cloudflare build.
@@ -68,10 +68,10 @@ Add the plugin to the Capacitor/browser Vite configuration:
 
 ```ts
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 
 export default defineConfig({
-  plugins: [capacitorWorkersPlugin({ worker: "./src/worker.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
 });
 ```
 
@@ -83,7 +83,7 @@ For esbuild, use the same application code with this build configuration:
 
 ```js
 import { build } from "esbuild";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/esbuild";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/esbuild";
 
 await build({
   entryPoints: ["src/main.ts"],
@@ -91,7 +91,7 @@ await build({
   bundle: true,
   format: "esm",
   platform: "browser",
-  plugins: [capacitorWorkersPlugin({ worker: "./src/worker.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
 });
 ```
 
@@ -103,9 +103,9 @@ Without a bundler, copy the package's `dist` directory to your public `lib` dire
 
 ```js
 // main.js (loaded with <script type="module">)
-import { capacitorWorkers } from "./lib/index.js";
+import { workersCapacitor } from "./lib/index.js";
 
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://api.example.com/api/",
   worker: {
     createWorker: () =>
@@ -125,7 +125,7 @@ import worker from "./worker.js";
 serve(worker);
 ```
 
-`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/worker.js` is `@rdlabo/capacitor-workers/worker`.
+`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/worker.js` is `@rdlabo/workers-capacitor/worker`.
 
 ## Runtime behavior
 
@@ -137,7 +137,7 @@ Await `runtime.ready` and inspect `runtime.execution` (`"worker"` or `"direct"`)
 
 ### Initialization and cleanup
 
-Installation synchronously intercepts fetch. Worker-mode requests wait for startup; matching requests during direct-module loading reject explicitly to prevent top-level-await deadlocks. Await `runtime.ready` before starting UI requests. The runtime cannot distinguish module-initialization calls from concurrent UI calls, so both reject while direct loading is in progress. `await runtime.ready` observes startup success/failure before rendering the UI. `await capacitorWorkers(...)` does **not** await Worker startup.
+Installation synchronously intercepts fetch. Worker-mode requests wait for startup; matching requests during direct-module loading reject explicitly to prevent top-level-await deadlocks. Await `runtime.ready` before starting UI requests. The runtime cannot distinguish module-initialization calls from concurrent UI calls, so both reject while direct loading is in progress. `await runtime.ready` observes startup success/failure before rendering the UI. `await workersCapacitor(...)` does **not** await Worker startup.
 
 Only one installation is supported; `runtime.dispose()` restores fetch and terminates the Dedicated Worker. Termination rejects unfinished local calls/body reads and releases background tracking.
 
@@ -151,7 +151,7 @@ If the Worker or any dependency uses Workers extensions (for example
 `Headers.getAll("set-cookie")` or `Request.cf`) during module evaluation, configure
 `worker` in the Vite/esbuild plugin as shown above. The runtime installs its Web
 APIs before loading that entry and its dependencies, in both execution modes.
-With a direct static import, module evaluation happens before `capacitorWorkers()`
+With a direct static import, module evaluation happens before `workersCapacitor()`
 can initialize those APIs; only calls made after initialization use the installed
 implementations. For plain JavaScript, use the `loadDirect` source shown above
 when initialization must precede module evaluation.
@@ -215,14 +215,14 @@ Use the plugin shown above only in the Capacitor/browser build, never the Cloudf
 The package provides the `cloudflare:node` type for its supported `httpServerHandler` adapter. For a browser build without existing Workers type declarations, add it to `compilerOptions.types` in `tsconfig.json`:
 
 ```json
-{ "compilerOptions": { "types": ["@rdlabo/capacitor-workers/cloudflare"] } }
+{ "compilerOptions": { "types": ["@rdlabo/workers-capacitor/cloudflare"] } }
 ```
 
 Keep any other types your project already uses. This is a type-only entry; do not import it at runtime. Projects with generated Workers types should keep those declarations instead. No application-owned `cloudflare.d.ts` or `client.d.ts` is needed.
 
 ## Local KV
 
-Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
+Use `LocalStorageKV` from `@rdlabo/workers-capacitor/features/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
 
 ## D1 and remote APIs
 
@@ -230,7 +230,7 @@ Hyperdrive-backed Workers use the same generated HTTP dispatch. The plugins dete
 
 Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.
 
-Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `capacitorWorkers`. The optional token callback connects existing bearer credentials. Native Capacitor also reuses server-managed Cookie sessions and same-origin redirects through the existing login UI; this package does not issue sessions or provide a login system. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
+Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `workersCapacitor`. The optional token callback connects existing bearer credentials. Native Capacitor also reuses server-managed Cookie sessions and same-origin redirects through the existing login UI; this package does not issue sessions or provide a login system. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
 
 ## Development and testing
 
@@ -272,7 +272,7 @@ demo/
 
 `demo/src/main.ts` initializes the runtime and displays the HTML returned by the Worker’s `/` route. Hono is selected by default; the commented Express entry in `demo/vite.config.ts` shows how to switch. Browser tests build and render the same demo with each Worker. The separate `demo/tests/validation/` page runs compatibility checks; it has its own build and is served separately by the browser tests. Application sources never import validation code. Its shared HTTP checks live in `demo/tests/validation/contracts/http.ts` and are reused by the build-tool and runtime tests.
 
-Application Workers are organized as `demo/src/workers/<framework>/<scenario>.ts`. The Hono and Express examples each render HTML at `/` and expose `/api/hello` as JSON. This Fetch-only example inserts the returned HTML into the existing page; it is not the native document rendering path and does not provide navigation, returned-script execution, or form handling. For Worker-owned documents on iOS/Android, `demo/rendering` uses `capacitorWorkers({ baseURL, render: "/" })` with the packaged native integration. Broader routing and error-handling cases live in `demo/tests/fixtures/workers/{hono,express}/standard.ts`; runtime and binding fixtures also live under `demo/tests/fixtures/workers/`.
+Application Workers are organized as `demo/src/workers/<framework>/<scenario>.ts`. The Hono and Express examples each render HTML at `/` and expose `/api/hello` as JSON. This Fetch-only example inserts the returned HTML into the existing page; it is not the native document rendering path and does not provide navigation, returned-script execution, or form handling. For Worker-owned documents on iOS/Android, `demo/rendering` uses `workersCapacitor({ baseURL, render: "/" })` with the packaged native integration. Broader routing and error-handling cases live in `demo/tests/fixtures/workers/{hono,express}/standard.ts`; runtime and binding fixtures also live under `demo/tests/fixtures/workers/`.
 
 ```sh
 cd demo
@@ -372,7 +372,7 @@ A typed feature definition connects implementations, coverage and contract tests
 
 ### Fetch implementation pattern
 
-Fetch implementations extend `FetchRuntime` and share one contract suite. See [the Fetch extension recipe](docs/fetch-pattern.md) for responsibilities, subclass hooks and required verification. Application setup uses `capacitorWorkers({ baseURL })` with a configured build plugin, or an explicit `worker` option.
+Fetch implementations extend `FetchRuntime` and share one contract suite. See [the Fetch extension recipe](docs/fetch-pattern.md) for responsibilities, subclass hooks and required verification. Application setup uses `workersCapacitor({ baseURL })` with a configured build plugin, or an explicit `worker` option.
 
 ## Roadmap
 
@@ -387,7 +387,7 @@ The Hono + Express compatibility test app currently includes broad Node polyfill
 The original Worker handler remains the Cloudflare entry. Install the Vite/esbuild
 plugin only in the Capacitor/browser build: its aliases select the local API
 implementations; the Cloudflare build retains native `node:*` and `cloudflare:*`.
-`getExecutionEnvironment()` (also available from `@rdlabo/capacitor-workers/environment`)
+`getExecutionEnvironment()` (also available from `@rdlabo/workers-capacitor/environment`)
 distinguishes Cloudflare Workers, native Capacitor hosts, browser workers, browsers,
 and unknown realms. A browser Dedicated Worker is not Cloudflare Workers.
 Installing the Capacitor runtime in Cloudflare Workers fails before changing globals.

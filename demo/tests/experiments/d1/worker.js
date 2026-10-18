@@ -1,4 +1,4 @@
-// An ordinary JavaScript Worker: no capacitor-workers import, annotations, or migration API.
+// An ordinary JavaScript Worker: no workers-capacitor import, annotations, or migration API.
 import { Hono } from "hono";
 
 const app = new Hono();

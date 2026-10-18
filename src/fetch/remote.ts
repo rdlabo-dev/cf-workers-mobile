@@ -119,7 +119,7 @@ export function createRemoteWorker(
           signal.throwIfAborted();
           if (native) {
             const cookie = (await wait(
-              native("CapacitorWorkers", "cookiesGet", { url: target.href }),
+              native("WorkersCapacitor", "cookiesGet", { url: target.href }),
             )) as { cookie?: string };
             headers.delete("cookie");
             if (cookie?.cookie) headers.set("cookie", cookie.cookie);
@@ -142,7 +142,7 @@ export function createRemoteWorker(
                 .flatMap((value) => scopedCookie(value, target));
               if (cookies.length)
                 await wait(
-                  native("CapacitorWorkers", "cookiesSet", {
+                  native("WorkersCapacitor", "cookiesSet", {
                     url: target.href,
                     cookies,
                   }),

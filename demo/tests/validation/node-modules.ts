@@ -8,13 +8,13 @@ import {
   TimersImplementation,
   timersContract,
 } from "../../../src/compat/timers/index.spec";
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 // Environment runners share module-owned contracts. The node:* imports in
 // their implementations resolve to workerd builtins or the bundler aliases.
 import {
   runContract,
   type ContractResult,
-} from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/testing";
 import {
   nodePathContract,
   BundledPath,
@@ -99,7 +99,7 @@ export async function runLocalNodeContracts(): Promise<ContractResult[]> {
   // Own the same Node bootstrap used by loadDirect(); build-tool tests exercise
   // that public configured-entry path separately.
   const restoreNode = installNodeGlobals();
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://node-contract.invalid",
     worker: { fetch: () => new Response(null, { status: 204 }) },
   });

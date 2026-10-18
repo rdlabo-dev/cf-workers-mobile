@@ -24,9 +24,9 @@ named environments). The Vite/esbuild plugin reads binding names only; IDs and
 
 ```ts
 // Capacitor's vite.config.ts
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 export default {
-  plugins: [capacitorWorkersPlugin({ worker: "worker/src/index.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],
 };
 ```
 
@@ -39,8 +39,8 @@ Hyperdrive can coexist. An explicit empty list disables discovery for that kind;
 do not disable it for server bindings the Worker actually uses.
 
 ```ts
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
-const runtime = capacitorWorkers({
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
+const runtime = workersCapacitor({
   baseURL: "https://local.invalid/",
   remote: {
     origin: "https://existing-worker.example",
@@ -75,8 +75,8 @@ use the same generated boundary.
 A top-level connection pool, shared mutable state, Cookie dependencies, unknown
 initialization or uncertain routing can require the entire Worker to stay remote.
 General Fetch handlers use whole-Worker delegation. The build warns about its
-decision and emits `capacitor-workers-server.json` with mode, reason and route
-registrations. D1-only builds retain `capacitor-workers-d1.json` for compatibility.
+decision and emits `workers-capacitor-server.json` with mode, reason and route
+registrations. D1-only builds retain `workers-capacitor-d1.json` for compatibility.
 Hyperdrive bindings cannot be declared in `localBindings`.
 
 Transactions and connection cleanup stay inside the existing server handler.

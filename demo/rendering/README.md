@@ -1,6 +1,6 @@
 # Worker-rendered native pages
 
-`main.ts` starts `capacitorWorkers({ baseURL, render: '/' })`. The selected Worker
+`main.ts` starts `workersCapacitor({ baseURL, render: '/' })`. The selected Worker
 returns the whole document. `workers/hono.tsx` and `workers/express.ts` each own
 page routes, POST/redirect handling and the JSON API.
 

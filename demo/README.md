@@ -1,4 +1,4 @@
-# Capacitor Workers demo
+# Workers Capacitor demo
 
 This demo shows the setup needed to run an existing Workers Fetch Handler inside Capacitor. Start with the application files below; compatibility tests have their own sources and build.
 
@@ -8,7 +8,7 @@ This demo shows the setup needed to run an existing Workers Fetch Handler inside
 
 ```ts
 plugins: [
-  capacitorWorkersPlugin({
+  workersCapacitorPlugin({
     worker: "./workers/hono/standard.ts",
     // To use Express, replace the line above with:
     // worker: "./workers/express/standard.ts",
@@ -23,9 +23,9 @@ The path is relative to the configured Vite root, `src/`. The example uses [the 
 [src/main.ts](src/main.ts) initializes the runtime and displays the HTML returned by `/`:
 
 ```ts
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
 });
 await runtime.ready;
@@ -41,7 +41,7 @@ The page content is defined in the Worker: Hono uses `c.html()`, and Express use
 
 This is the **Fetch-only** demo: it inserts the returned HTML into the existing page with `innerHTML`. That is only this example's minimal display step — it does not intercept navigation or form submissions, and scripts inside the returned HTML are not executed. It is not the native document rendering mechanism.
 
-For Worker-owned documents on iOS and Android — where the same Worker HTML, routes, API and forms drive real page navigation — use `capacitorWorkers({ baseURL, render: "/" })` as in [`rendering/`](rendering). That path uses the packaged native integration and needs no `innerHTML` replacement.
+For Worker-owned documents on iOS and Android — where the same Worker HTML, routes, API and forms drive real page navigation — use `workersCapacitor({ baseURL, render: "/" })` as in [`rendering/`](rendering). That path uses the packaged native integration and needs no `innerHTML` replacement.
 
 ## Run the demo
 
@@ -82,7 +82,7 @@ The [document-rendering experiment](../docs/document-rendering.md) is the earlie
 
 ## Worker-rendered native documents
 
-[`rendering/`](rendering) is a separate example using `capacitorWorkers({ render: "/" })`.
+[`rendering/`](rendering) is a separate example using `workersCapacitor({ render: "/" })`.
 It contains complete Hono/TSX and Workers Express pages. Native distribution
 packaging uses iOS Swift Package Manager and Android Gradle; see its README and
 the independent tarball-install tests.

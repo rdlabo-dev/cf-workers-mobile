@@ -2,13 +2,13 @@ import { defineConfig } from "cf/config";
 
 export const workers = {
   hono: {
-    name: "capacitor-workers-poc-hono",
+    name: "workers-capacitor-poc-hono",
     compatibilityDate: "2026-10-01",
     entrypoint: "src/workers/hono/standard.ts",
     compatibilityFlags: [],
   },
   express: {
-    name: "capacitor-workers-poc-express",
+    name: "workers-capacitor-poc-express",
     compatibilityDate: "2026-10-01",
     entrypoint: "src/workers/express/standard.ts",
     compatibilityFlags: ["nodejs_compat"],

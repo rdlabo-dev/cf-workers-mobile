@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { capacitorWorkers } from "../../src/index";
+import { workersCapacitor } from "../../src/index";
 import {
   createNativeNetwork,
   type NativeCall,
@@ -23,7 +23,7 @@ it("public disposal waits for native close before permitting a new runtime", asy
     baseURL: "https://worker.invalid",
     worker: { fetch: () => new Response("ok") },
   };
-  const runtime = capacitorWorkers(options);
+  const runtime = workersCapacitor(options);
   const connection = await createNativeNetwork().open({
     url: "https://upstream.invalid",
     method: "GET",
@@ -34,14 +34,14 @@ it("public disposal waits for native close before permitting a new runtime", asy
   const disposed = runtime.dispose();
   expect(disposed).toBeInstanceOf(Promise);
   expect(runtime.dispose()).toBe(disposed);
-  expect(() => capacitorWorkers(options)).toThrow("already installed");
+  expect(() => workersCapacitor(options)).toThrow("already installed");
   await rejected;
   release();
   await disposed;
   expect(
     call.mock.calls.filter(([, method]) => method === "socketClose"),
   ).toHaveLength(1);
-  const replacement = capacitorWorkers(options);
+  const replacement = workersCapacitor(options);
   await replacement.dispose();
 });
 
@@ -51,7 +51,7 @@ it("cleans native ownership even when the direct loader's disposal throws", asyn
     isNativePlatform: () => true,
     getPlatform: () => "ios",
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid",
     prefer: "direct",
     worker: {
@@ -70,7 +70,7 @@ it("cleans native ownership even when the direct loader's disposal throws", asyn
   });
   await runtime.ready;
   await expect(runtime.dispose()).rejects.toThrow("Runtime cleanup failed");
-  const replacement = capacitorWorkers({
+  const replacement = workersCapacitor({
     baseURL: "https://worker.invalid",
     worker: { fetch: () => new Response("ok") },
   });
@@ -84,7 +84,7 @@ it("accepts Requests created before installation and Responses from a saved cons
     method: "POST",
     body: "payload",
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid",
     worker: {
       async fetch(request) {
@@ -120,7 +120,7 @@ it("routes public native outbound fetch through the owned byte transport", async
     isNativePlatform: () => true,
     getPlatform: () => "ios",
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid",
     worker: { fetch: () => new Response("local") },
   });
@@ -149,7 +149,7 @@ it.each(["direct", "preferred"])(
     vi.stubGlobal("fetch", browser);
     vi.stubGlobal("location", new URL("capacitor://localhost/index.html"));
     const handler = { fetch: () => new Response("worker") };
-    const runtime = capacitorWorkers({
+    const runtime = workersCapacitor({
       baseURL: "https://worker.invalid/api",
       ...(mode === "direct"
         ? { worker: handler }
@@ -200,7 +200,7 @@ it("disposal joins an in-flight direct loader and its eventual cleanup", async (
     worker: { fetch: () => new Response("replacement") },
   };
   const NativeRequest = globalThis.Request;
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: options.baseURL,
     prefer: "direct",
     worker: {
@@ -216,7 +216,7 @@ it("disposal joins an in-flight direct loader and its eventual cleanup", async (
   });
   await Promise.resolve();
   expect(disposed).toBe(false);
-  expect(() => capacitorWorkers(options)).toThrow("already installed");
+  expect(() => workersCapacitor(options)).toThrow("already installed");
   finishLoad({
     handler: { fetch: () => new Response("late") },
     dispose: () => cleanup,
@@ -226,7 +226,7 @@ it("disposal joins an in-flight direct loader and its eventual cleanup", async (
   finishCleanup();
   await closing;
   expect(globalThis.Request).toBe(NativeRequest);
-  const replacement = capacitorWorkers(options);
+  const replacement = workersCapacitor(options);
   await replacement.dispose();
 });
 
@@ -241,7 +241,7 @@ it("propagates cleanup failure from a loader returned after disposal started", a
   }>((resolve) => {
     finishLoad = resolve;
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid",
     prefer: "direct",
     worker: {
@@ -260,7 +260,7 @@ it("propagates cleanup failure from a loader returned after disposal started", a
     },
   });
   await rejected;
-  const replacement = capacitorWorkers({
+  const replacement = workersCapacitor({
     baseURL: "https://worker.invalid",
     worker: { fetch: () => new Response("ok") },
   });

@@ -52,7 +52,7 @@ it("discovers JSON/JSONC/TOML Hyperdrive, named environments and mixed D1 withou
     expect(result.names).toEqual(
       name === "worker.jsonc" ? ["SQL"] : ["DB", "SQL", "PROD"],
     );
-    expect(result.reportFile).toBe("capacitor-workers-server.json");
+    expect(result.reportFile).toBe("workers-capacitor-server.json");
     expect(JSON.stringify(result)).not.toMatch(
       /private-id|private-user|private-password|private-name/,
     );

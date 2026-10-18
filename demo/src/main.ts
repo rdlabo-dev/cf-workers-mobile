@@ -1,7 +1,7 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
 // The Worker entry is configured in vite.config.ts.
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
 });
 await runtime.ready;

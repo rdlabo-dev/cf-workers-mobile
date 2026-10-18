@@ -1,4 +1,4 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import hono from "../fixtures/workers/hono/standard";
 import express from "../fixtures/workers/express/standard";
 import { runContract, type Result } from "./contracts/http";
@@ -16,7 +16,7 @@ declare global {
 window.runOfflineContract = async () => {
   const report: Result[] = [];
   for (const [name, worker] of Object.entries({ hono, express })) {
-    const runtime = capacitorWorkers({
+    const runtime = workersCapacitor({
       worker,
       baseURL: "https://worker.invalid/api/",
     });
@@ -35,7 +35,7 @@ window.runOfflineContract = async () => {
 };
 async function main() {
   for (const [name, worker] of Object.entries({ hono, express })) {
-    const runtime = capacitorWorkers({
+    const runtime = workersCapacitor({
       worker,
       baseURL: "https://worker.invalid/api/",
     });
@@ -68,7 +68,7 @@ async function main() {
   }
   const errors: unknown[] = [];
   let completed = false;
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid/api",
     env: { value: "injected" },
     onBackgroundError: (e) => errors.push(e),

@@ -18,12 +18,12 @@ test("Fetch adapter preserves browser Request semantics", async ({ page }) => {
   await page.waitForFunction(() => window.pocDone);
   const result = await page.evaluate(async () => {
     const moduleURL = "/runtime-under-test/index.js";
-    const { capacitorWorkers } = await import(moduleURL);
+    const { workersCapacitor } = await import(moduleURL);
     const base = document.createElement("base");
     base.href = "/api/";
     document.head.append(base);
     let calls = 0;
-    const runtime = capacitorWorkers({
+    const runtime = workersCapacitor({
       baseURL: "https://worker.invalid/api",
       worker: {
         async fetch(request: Request) {

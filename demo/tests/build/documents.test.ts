@@ -1,8 +1,8 @@
 import { afterAll, expect, it } from "vitest";
 import { build as viteBuild } from "vite";
 import { build as esbuildBuild } from "esbuild";
-import { capacitorWorkersPlugin as vitePlugin } from "@rdlabo/capacitor-workers/vite";
-import { capacitorWorkersPlugin as esbuildPlugin } from "@rdlabo/capacitor-workers/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "@rdlabo/workers-capacitor/vite";
+import { workersCapacitorPlugin as esbuildPlugin } from "@rdlabo/workers-capacitor/esbuild";
 import { mkdtemp, readFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -41,7 +41,7 @@ for (const framework of ["hono", "express"])
           logLevel: "silent",
         });
       const manifest = JSON.parse(
-        await readFile(join(outdir, "capacitor-workers-assets.json"), "utf8"),
+        await readFile(join(outdir, "workers-capacitor-assets.json"), "utf8"),
       );
       for (const file of await readdir(outdir, {
         recursive: true,
@@ -56,16 +56,16 @@ for (const framework of ["hono", "express"])
           );
       }
       expect(manifest).toContain("/index.html");
-      expect(manifest).toContain("/capacitor-workers-sw.js");
+      expect(manifest).toContain("/workers-capacitor-sw.js");
       expect(manifest).not.toContain("/");
       expect(
         manifest.some(
           (path: string) =>
-            path.endsWith(".js") && path !== "/capacitor-workers-sw.js",
+            path.endsWith(".js") && path !== "/workers-capacitor-sw.js",
         ),
       ).toBe(true);
       expect(
-        await readFile(join(outdir, "capacitor-workers-sw.js"), "utf8"),
-      ).toContain("__capacitor_workers_host");
+        await readFile(join(outdir, "workers-capacitor-sw.js"), "utf8"),
+      ).toContain("__workers_capacitor_host");
     }, 30000);
   }

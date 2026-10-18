@@ -1,8 +1,8 @@
 export const documentConfig = (
   globalThis as typeof globalThis & {
-    __capacitorWorkersDocuments: { baseURL: string; assets: string[] };
+    __workersCapacitorDocuments: { baseURL: string; assets: string[] };
   }
-).__capacitorWorkersDocuments;
+).__workersCapacitorDocuments;
 export function isDocumentURL(url: URL) {
   return (
     !documentConfig.assets.includes(url.pathname) &&

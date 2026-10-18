@@ -2,7 +2,7 @@
 
 ## Acceptance boundary
 
-The application entry remains `capacitorWorkers(...)`. Hono and Workers Express
+The application entry remains `workersCapacitor(...)`. Hono and Workers Express
 both expose `worker.fetch(request, env, ctx)`; their existing routers own HTML,
 API endpoints, and redirects. The adapter must not add a second application
 router. No native HTTP server, iframe, or persistent-window HTML replacement.
@@ -85,7 +85,7 @@ The iOS probe invokes the plugin through a JavaScript native Promise, then runs
 the existing document checks. Registration is test wiring in SceneDelegate; npm
 plugin auto-discovery and SPM packaging have **not** been validated by this probe.
 Android uses its normal plugin discovery list, populated by the test overlay.
-Neither probe is the final `capacitorWorkers()` implementation.
+Neither probe is the final `workersCapacitor()` implementation.
 
 ### Results on 2026-10-16
 
@@ -114,7 +114,7 @@ response/header/cache/body limits from the earlier experiment still apply.
 
 1. Move the selected connection behind a normal packaged Capacitor plugin, with
    automatic registration and no consumer Activity/ViewController modifications.
-2. Keep `capacitorWorkers(...)` as the single application startup API. Keep
+2. Keep `workersCapacitor(...)` as the single application startup API. Keep
    existing Fetch-only applications working; make document rendering an explicit
    configuration choice rather than automatically taking over their UI. Do not
    export separate application startup functions.
@@ -136,7 +136,7 @@ claim the packaged public integration or its lifecycle work is finished.
 
 ## Public API follow-up
 
-The public source integration is now implemented through `capacitorWorkers({ render })`;
+The public source integration is now implemented through `workersCapacitor({ render })`;
 see [native-rendering-api.md](native-rendering-api.md). The remaining packaging
 step is deliberately deferred. Earlier investigation results above describe the
 connection probes, not the later public-entry acceptance runs.

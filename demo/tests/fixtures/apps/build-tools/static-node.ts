@@ -1,8 +1,8 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import worker from "./static-node-worker";
 
 async function run() {
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://node.invalid/",
     worker,
   });
