@@ -30,7 +30,7 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:os`, `node:tty`, `node:wasi`, `node:punycode` | **Unverified (acceptance pending)** | Module-owned implementations and contracts pass workerd, browser and both native platforms. Review and remote CI remain pending. |
 | `node:constants`, `node:v8`, `node:http2`, `node:vm` | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Workerd, browser, packed-consumer and both native validations pass at `719b8fe`; review and remote CI remain pending. |
 | `node:child_process`, `node:cluster`, `node:dgram`, `node:domain`, `node:inspector` (+ promises), `node:readline` (+ promises) | **Unverified (acceptance pending)** | Pinned production behavior implemented with adjacent contracts. Workerd, browser, packed-consumer and both native checks pass at `5169e5e`; review and remote CI remain pending. |
-| `node:repl`, `node:sqlite`, `node:test` | **Unverified (acceptance pending)** | Pinned REPL/SQLite stub behavior and Workers MockTracker API implemented with adjacent contracts. Local browser/package/native acceptance and review/CI are pending. `node:test` is the Workers mock API, not Node's entire test runner. |
+| `node:repl`, `node:sqlite`, `node:test` | **Unverified (acceptance pending)** | Pinned REPL/SQLite stub behavior and Workers MockTracker API implemented with adjacent contracts. Local workerd/browser/package/native checks pass at `052647f`; independent review and remote CI remain pending. `node:test` is the Workers mock API, not Node's entire test runner. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Remaining implementation sequence
@@ -781,3 +781,32 @@ The SQLite contract matches the pinned profile: both exposed constructors throw
 `TypeError: Illegal constructor`, and backup throws synchronously. It does not
 create a local SQLite database and is separate from D1 support. Other dates/flags
 that expose functioning SQLite require a separate compatibility profile.
+
+### REPL, SQLite and mock tracking local acceptance
+
+At clean revision `052647f`, `repl` has 6 contract groups, `sqlite` 4, and
+`test` 14. The mock contracts cover calls, constructors, replacements, one-shot
+implementations, limits, descriptors, accessors, restoration and validation,
+including the pinned runtime's symbol-method restoration behavior. SQLite
+constructor names are explicitly retained after production minification.
+
+| Local check | Result |
+| --- | --- |
+| Build, root/demo typechecks | Passed |
+| Unit tests | 343 passed |
+| Fixed workerd suite | 93 passed |
+| Chromium/WebKit production / development | 66 / 20 passed |
+| Build-tool tests | 7 unit + 30 browser passed |
+| Fresh installed tarball | 588 common passed + 6 existing ALS exclusions; 26 direct / 22 isolated, 10 build/raw-ESM, 2 development, 2 preference cases |
+| iOS 26.1 | 724 passed + 6 existing ALS exclusions |
+| Android 16 | 724 passed + 6 existing ALS exclusions |
+
+Both native reports identify clean revision `052647f` and asset fingerprints.
+Every group in all 17 newly implemented families passes in direct and Dedicated
+Worker execution, without new exclusions or native plugin changes.
+
+**The overall Node compatibility task is not complete.** The remaining sequence
+still includes util/assert/events, stream, writable FS/module/process,
+HTTPS/TLS/DNS facades, crypto/zlib, async context/diagnostics, console/performance,
+and the remaining tracing/thread/stream-wrapper surfaces. Existing Complete
+certifications remain separate from these pending families and local candidates.
