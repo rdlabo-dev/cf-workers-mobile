@@ -97,8 +97,9 @@ test; a single passing “globals” result must not stand in for individual API
 
 ## CI and regression protection
 
-The required `CI` check aggregates library, compatibility, streams-fallback,
-package and upstream jobs. Every job must succeed; skipped or cancelled jobs
+The required `CI` check aggregates library, the compatibility matrix, bindings,
+streams-fallback, package and upstream jobs. Workers/browser, runtime/documents
+and build-tool checks run on separate runners; only the bindings job starts MySQL. Every job must succeed; skipped or cancelled jobs
 cannot satisfy the gate. Main requires a pull request, an up-to-date branch and
 this check, and blocks force pushes and deletion. Workflow configuration is in
 [ci.yml](.github/workflows/ci.yml); CodeQL is configured separately.
