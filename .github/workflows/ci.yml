@@ -53,6 +53,11 @@ jobs:
               npm run build:native-documents -- --mode express
           - suite: build-tools
             commands: npm run test:build-tools
+          - suite: opennext
+            commands: |
+              npm ci --prefix opennext
+              npm run build:worker --prefix opennext
+              npm run test:opennext
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

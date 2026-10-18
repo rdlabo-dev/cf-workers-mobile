@@ -35,7 +35,7 @@ const values = {
   PerformanceResourceTiming,
   performance,
 };
-type Name = keyof typeof values;
+type Name = keyof typeof values | "self";
 type Target = Record<string, unknown>;
 type Patch = {
   previous: PropertyDescriptor | undefined;
@@ -82,17 +82,24 @@ export function installWebGlobals(target: Target = globalThis) {
     installation.owners++;
   } else {
     const patches = new Map<Name, Patch>();
+    // Workers exposes a writable self alias. Web Worker hosts may inherit a
+    // getter-only self, which breaks generated Workers assigning this alias.
+    const replacements = { ...values, self: target };
     let restoreSymbols = () => {};
     let restoreAbort = () => {};
     try {
-      for (const name of Object.keys(values) as Name[]) {
+      for (const name of Object.keys(replacements) as Name[]) {
         const previous = Object.getOwnPropertyDescriptor(target, name);
-        if (previous?.value === values[name]) continue;
+        if (
+          previous?.value === replacements[name] &&
+          (name !== "self" || previous.writable)
+        )
+          continue;
         const installed = {
           configurable: true,
           enumerable: previous?.enumerable ?? false,
           writable: true,
-          value: values[name],
+          value: replacements[name],
         };
         Object.defineProperty(target, name, installed);
         patches.set(name, { previous, installed });

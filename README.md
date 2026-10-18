@@ -303,6 +303,10 @@ npm run test:build-tools
 
 Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`, run `npx cf build --mode hono` or `npx cf build --mode express` to build the corresponding Worker; use `npx cf dev --mode hono` (or `express`) for local development. The installed `cf` version is currently beta. Wrangler remains a development dependency for the CLI's bundler and the test harness; tests use the same compatibility settings, checking the example Workers as well as separate contract fixtures.
 
+### OpenNext + D1
+
+[`demo/opennext`](demo/opennext/README.md) is a standalone Next.js application with D1-backed sessions, ordinary forms and static assets. Its normal Capacitor build sends requests to the existing Worker. Separate tests exercise public pages locally, so remote success is not counted as local OpenNext support. See [OpenNext configuration and limits](docs/opennext.md).
+
 ### Native demo
 
 The native build requires Xcode 26 / Swift 6.2 or newer and Java 21.

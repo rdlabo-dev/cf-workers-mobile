@@ -136,6 +136,9 @@ Worker responses. External redirects are rejected. On iOS, the page-side Fetch
 bridge models redirect metadata with JavaScript properties rather than browser
 internal Response slots. The iOS multipart form supplement covers same-window
 local POST submissions; named windows and iframe targets are not supported.
+Native form navigation may omit the HTTP `Origin` header; the adapter does not
+synthesize it. Applications using Origin-only CSRF checks must adapt their
+protection, for example with a validated CSRF token.
 
 The native host/child lifecycle, pending-request timeouts and explicit disposal
 are implemented. App process termination/relaunch, background/foreground,

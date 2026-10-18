@@ -1,10 +1,10 @@
+import { readWorkerFiles } from "./files.js";
 import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
 import { serverModules } from "./server-modules.js";
 import type { ServerBuildOptions } from "./server.js";
 import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import {
   configuredPath,
   compatibilityAliases,
@@ -112,6 +112,15 @@ function compatibilityPlugins(
           return this.resolve(specifier, importer, { skipSelf: true });
       },
       config: () => ({
+        // Generated Workers (including OpenNext) can mix ESM exports with
+        // require() calls in .mjs files outside node_modules.
+        build: {
+          commonjsOptions: {
+            include: [/node_modules/, /\.[cm]?js$/],
+            extensions: [".js", ".cjs", ".mjs"],
+            transformMixedEsModules: true,
+          },
+        },
         // App globals and dependencies must share Buffer identity and the HTTP registry.
         optimizeDeps: {
           esbuildOptions: {
@@ -189,7 +198,7 @@ function virtualId(
 function workerEntryPlugin(
   entries: Map<string, string>,
   root: () => string,
-  virtualFiles?: () => Promise<string>,
+  virtualFiles?: () => Promise<string | undefined>,
 ): Plugin {
   return {
     name: "workers-capacitor-entry",
@@ -213,8 +222,10 @@ export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
   /**
-   * Files embedded into the worker's read-only virtual filesystem
-   * (node:fs compat). Paths resolve relative to the Vite root; the
+   * Additional files embedded into the worker's read-only virtual filesystem.
+   * OpenNext manifests and package metadata are collected automatically for
+   * a local generated worker.js entry. Application data files remain explicit.
+   * Paths resolve relative to the Vite root; the
    * normalized absolute path is the lookup key, with suffix matching so
    * bundled runtimes find entries regardless of their cwd assumptions.
    */
@@ -224,18 +235,14 @@ export function workersCapacitorPlugin(
   options: WorkersCapacitorPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
-  const virtualFiles = options.workerFiles?.length
-    ? async () => {
-        const map: Record<string, { base64: string }> = {};
-        for (const file of options.workerFiles!) {
-          const path = resolve(root, file);
-          map[normalizePath(path)] = {
-            base64: (await readFile(path)).toString("base64"),
-          };
-        }
-        return JSON.stringify(map);
-      }
-    : undefined;
+  const virtualFiles = async () =>
+    readWorkerFiles(
+      options.worker && !(await server?.get())
+        ? resolve(root, options.worker)
+        : undefined,
+      root,
+      options.workerFiles,
+    );
   let root: string;
   let publicDir: string;
   let server: ReturnType<typeof serverModules> | undefined;
@@ -315,19 +322,25 @@ export function workersCapacitorPlugin(
         )
           return;
         const path = resolve(root, options.worker);
-        const resolved = await this.resolve(path, undefined, {
-          skipSelf: true,
-        });
+        const compilation = await server?.get();
+        // Resolve only the selected graph: CommonJS resolution may eagerly load
+        // its target, and server source must never enter the client graph.
+        const resolved = await this.resolve(
+          compilation ? server!.localEntry : path,
+          undefined,
+          {
+            skipSelf: true,
+          },
+        );
         if (!resolved || resolved.external)
           this.error("Cannot resolve Worker entry: " + path);
-        const compilation = await server?.get();
         if (compilation)
           this.warn(
             compilation.mode === "worker"
               ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
               : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
           );
-        const entry = compilation ? server!.localEntry : resolved.id;
+        const entry = resolved.id;
         const generated = entry + entrySuffix;
         if (existsSync(generated))
           this.error(

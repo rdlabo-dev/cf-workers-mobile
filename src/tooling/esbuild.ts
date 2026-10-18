@@ -1,8 +1,9 @@
+import { readWorkerFiles } from "./files.js";
 import { asyncContextPlugin, lowerAsync } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
 import { serverModules } from "./server-modules.js";
 import type { ServerBuildOptions } from "./server.js";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { Plugin } from "esbuild";
@@ -60,6 +61,7 @@ export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
    * Files embedded into the worker's read-only virtual filesystem
    * (node:fs compat). Paths resolve relative to absWorkingDir.
    */
+  /** Additional runtime data files; local OpenNext manifests/package metadata are automatic. */
   workerFiles?: string[];
 }
 
@@ -151,15 +153,8 @@ export function workersCapacitorPlugin(
           };
       });
       await serverPlugin.setup(build);
-      const virtualFiles = async () => {
-        if (!options.workerFiles?.length) return undefined;
-        const map: Record<string, { base64: string }> = {};
-        for (const file of options.workerFiles)
-          map[resolve(root, file)] = {
-            base64: (await readFile(resolve(root, file))).toString("base64"),
-          };
-        return JSON.stringify(map);
-      };
+      const virtualFiles = () =>
+        readWorkerFiles(entry, root, options.workerFiles);
       await compatibilityPlugin().setup(build);
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;
@@ -207,7 +202,11 @@ export function workersCapacitorPlugin(
             conditions: config.conditions,
             mainFields: config.mainFields,
             loader: config.loader,
-            plugins: [serverPlugin, compatibilityPlugin(), asyncContextPlugin()],
+            plugins: [
+              serverPlugin,
+              compatibilityPlugin(),
+              asyncContextPlugin(),
+            ],
             logLevel: "silent",
           });
           const inputs = Object.keys(result.metafile.inputs)
