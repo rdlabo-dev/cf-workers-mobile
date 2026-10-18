@@ -175,8 +175,15 @@ export async function runNodeContracts(
         : new AsyncHooksImplementation(),
       asyncHooksContract,
     ),
-    await runContract(new FsImplementation(), fsContract),
-    await runContract(new ModuleImplementation(), moduleContract),
+    // These legacy VFS/module suites exercise local setup and do not yet
+    // supply equivalent workerd fixtures. Keep them as local smoke tests;
+    // never report them as successful comparisons with Workers builtins.
+    ...(profile === "workers"
+      ? []
+      : [
+          await runContract(new FsImplementation(), fsContract),
+          await runContract(new ModuleImplementation(), moduleContract),
+        ]),
     await runContract(new StreamWebImplementation(), streamWebContract),
     await runContract(new UtilImplementation(), utilContract),
   );

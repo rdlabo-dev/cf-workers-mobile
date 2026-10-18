@@ -800,3 +800,25 @@ still includes util/assert/events, stream, writable FS/module/process,
 HTTPS/TLS/DNS facades, crypto/zlib, async context/diagnostics, console/performance,
 and the remaining tracing/thread/stream-wrapper surfaces. Existing Complete
 certifications remain separate from these pending families and local candidates.
+
+## Shared util completion work and oracle correction
+
+The `util` contract now imports `node:util`, so the workerd runner executes the
+real builtin and Vite/esbuild resolve the same contract to the local adapter.
+Previously, the test imported the local source even in the workerd runner.
+The `stream/web` contract has received the same correction. Historical smoke
+results from those test paths must not be read as builtin parity evidence.
+
+`fs` and `module` still use local VFS setup and remain local smoke tests. They
+are no longer included in the workerd comparison report. Equivalent workerd
+fixtures and full module coverage remain required; they are not waived.
+
+The adjacent util contract now contains ten groups covering encoders, default
+export identity, promisify/custom promisification, callbackify and falsy
+rejections, dotenv parsing and malformed inputs, inheritance/extension helpers,
+and the pinned Workers unsupported operations. The implementation ports the
+fixed workerd source for these operations, including its custom argument-name
+symbol, microtask scheduling and parser edge cases. Original notices are shipped
+beside the module. This is development work: inspection, types, MIME, async abort,
+call sites, styling and the remaining util surface still prevent whole-module
+acceptance. No Complete status is assigned to util by these passing groups.

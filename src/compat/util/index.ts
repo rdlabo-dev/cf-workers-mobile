@@ -1,13 +1,11 @@
+import * as core from "./core.js";
+export * from "./core.js";
 // Vite dev cannot discover named exports through `export *` from CommonJS.
 // @ts-expect-error the polyfill ships CJS without declarations
 import util from "util/util.js";
 export const {
-  _extend,
-  callbackify,
   debuglog,
-  deprecate,
   format,
-  inherits,
   inspect,
   isArray,
   isBoolean,
@@ -25,9 +23,8 @@ export const {
   isSymbol,
   isUndefined,
   log,
-  promisify,
   types,
 } = util;
 export const TextEncoder = globalThis.TextEncoder;
 export const TextDecoder = globalThis.TextDecoder;
-export default { ...util, TextEncoder, TextDecoder };
+export default { ...util, ...core, TextEncoder, TextDecoder };

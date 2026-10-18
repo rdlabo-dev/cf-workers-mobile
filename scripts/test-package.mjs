@@ -2,9 +2,12 @@ import { cp, mkdtemp, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { chromium } from "@playwright/test";
 
 const root = process.cwd();
+const previewPort = Number(process.env.CONSUMER_PREVIEW_PORT ?? 4189);
+const previewURL = `http://127.0.0.1:${previewPort}`;
 const temp = await mkdtemp(join(tmpdir(), "capacitor-workers-consumer-"));
 const pack = JSON.parse(
   execFileSync("npm", ["pack", "--json", "--pack-destination", temp], {
@@ -35,6 +38,7 @@ for (const module of [
   "repl",
   "sqlite",
   "test",
+  "util",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -254,6 +258,10 @@ execFileSync(
   ],
   { cwd: temp, stdio: "pipe" },
 );
+// Readiness must identify this consumer, not an unrelated preview on the
+// same port. Otherwise a stale server can supply passing historical results.
+const previewIdentity = randomUUID();
+await writeFile(join(temp, "build", "consumer-identity.txt"), previewIdentity);
 const child = spawn(
   process.execPath,
   [
@@ -262,7 +270,7 @@ const child = spawn(
     "--host",
     "127.0.0.1",
     "--port",
-    "4189",
+    String(previewPort),
     "--strictPort",
   ],
   { cwd: temp, stdio: "pipe" },
@@ -272,7 +280,13 @@ try {
   const deadline = Date.now() + 20000;
   while (true) {
     try {
-      if ((await fetch("http://127.0.0.1:4189")).ok) break;
+      const response = await fetch(`${previewURL}/consumer-identity.txt`);
+      if (
+        response.ok &&
+        (await response.text()) === previewIdentity &&
+        child.exitCode === null
+      )
+        break;
     } catch {}
     if (child.exitCode !== null || Date.now() > deadline)
       throw new Error("Consumer preview failed to start");
@@ -281,7 +295,7 @@ try {
   browser = await chromium.launch();
   const page = await browser.newPage();
   page.on("pageerror", (error) => console.error("Consumer page error:", error));
-  await page.goto("http://127.0.0.1:4189/");
+  await page.goto(`${previewURL}/`);
   await page.waitForFunction(() => window.pocDone);
   const results = await page.evaluate(() => window.pocResults);
   if (results?.length !== 26 || results.some((r) => !r.ok))
@@ -296,7 +310,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     cwd: temp,
     stdio: "pipe",
   });
-  await page.goto("http://127.0.0.1:4189");
+  await page.goto(previewURL);
   await page.waitForFunction(
     () => typeof window.startExperiment === "function",
   );
@@ -346,7 +360,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 594 ||
+    features.flatMap((report) => report.cases).length !== 610 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -373,7 +387,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     "raw",
   ]) {
     for (const prefer of ["worker", "direct"]) {
-      await page.goto(`http://127.0.0.1:4189/build-tools/${build}/`);
+      await page.goto(`${previewURL}/build-tools/${build}/`);
       await page.waitForFunction(
         () => typeof window.runBuildTool === "function",
       );
@@ -383,7 +397,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 283 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 291 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||
