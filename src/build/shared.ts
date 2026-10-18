@@ -48,8 +48,6 @@ export function compatibilityAliases() {
     "util/util.js": polyfill("util/util.js"),
     "node:util": compatPath("util"),
     util: compatPath("util"),
-    "node:buffer": compatPath("buffer"),
-    buffer: compatPath("buffer"),
     "node:http": compatPath("http"),
     http: compatPath("http"),
     "node:net": compatPath("net"),
