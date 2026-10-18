@@ -65,43 +65,14 @@ npm run ios
 
 The preparation command builds the selected test app and replaces only the generated `dist/` directory. The normal Capacitor configuration does not change. Restore the example application with `npm run build`, then `npm run sync`.
 
-Native coverage and previous results are documented in [the runtime verification guide](../../docs/runtime-contract.md).
+## Document browser checks
 
-## Native document loading experiment
+`npm run test:documents` exercises the document Service Worker and injected iOS
+page script in Chromium/WebKit. Six WebKit Service Worker comparisons have
+expected failures for POST redirect replay and response metadata. Native iOS
+uses a scheme bridge, so these browser checks do not replace native validation.
 
-`fixtures/apps/native-documents/` hosts the existing Worker transport independently of the visible page. `native/documents/` contains temporary iOS/Android request bridges and a navigation test driver. Hono/TSX and Express generate the documents; the visible WebView performs normal document navigation without Turbo. iOS injects `page-fetch.ts` at document start to test JavaScript fetch separately from native document loading. `scripts/build-native-documents.mjs` bundles that experimental entry with esbuild; it is not application setup code.
-
-See [the native document investigation](../../docs/document-rendering.md) for setup, native source overlay/restoration, evidence, and unsupported behavior. Do not run the native experiment without its overlay, or leave the overlay applied to the ordinary demo.
-
-`documents/` tests the experimental Service Worker document path in Chromium and WebKit. Android uses that path; native iOS uses a custom-scheme handler instead. Six WebKit comparison cases currently have explicit expected-failure annotations, documented in the investigation. `native/documents/` tests must still be run on the native platforms.
-
-`page-fetch.spec.ts` verifies the injected iOS script through a mocked native message hop and the real Worker. `form-body.ts` supplies multipart bytes before starting a native POST navigation; it does not replace HTML. The native driver additionally verifies file-input form navigation, redirect replay and back history.
-
-### Ordinary-plugin document connection investigation
-
-See [the connection plan and results](../../docs/document-connection-plan.md).
-These probes compare connection mechanisms; they are not consumer setup steps.
-
-- `node tests/scripts/test-native-connection.mjs <iOS-simulator-UUID>` checks why
-  late scheme registration and `loadHTMLString` do not satisfy native document
-  history. It restores the original SceneDelegate in a `finally` block.
-- For the successful iOS plugin-owned view probe, prepare `native-documents` for
-  Hono or Express, run `cap copy ios`, apply `native-plugin-document-overlay.mjs`,
-  then run `run-plugin-document-probe.mjs <UUID> hono|express`. Always restore the
-  overlay afterwards. The parent remains the standard Capacitor controller.
-- For Android, prepare and copy the same assets, apply
-  `android-plugin-document-overlay.mjs`, build/install/launch, forward the app's
-  WebView CDP socket to port 9227, then run
-  `capture-plugin-document-android.mjs hono|express`. Restore the overlay and
-  remove the debug forward afterwards. MainActivity is never changed.
-- `node tests/experiments/document-replacement.mjs` reproduces the module-script
-  lifecycle limitation of persistent-window HTML replacement in both browsers.
-
-The overlay registrations and injected drivers belong only to these experiments.
-Automatic npm/SPM packaging and startup through the final public API remain a
-separate acceptance step.
-
-### Packaged native rendering API
+## Packaged native rendering API
 
 Build the library from the repository root, then from `demo/` run:
 

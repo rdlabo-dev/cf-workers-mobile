@@ -6,8 +6,8 @@
 The target is the Node API behavior exposed by the pinned Workers baseline,
 not every API of a standalone Node process.
 
-The [Node compatibility inventory](../../docs/node-compatibility-inventory.md)
-is the authoritative per-module status and acceptance record. Contracts remain
+The [compatibility guide](../../docs/compatibility.md)
+describes incomplete modules and runtime limitations. Contracts remain
 beside implementations. Moving a module here does not promote its status.
 
 `immediate` implements Node's setImmediate/clearImmediate; `stream-web` is the

@@ -55,8 +55,7 @@ adapter does not add an application router. Existing `worker`, `env`, `prefer`,
 
 `ready` means that the Worker and native connection are initialized. It does not
 mean all images or page scripts have finished loading. `await app.dispose()`
-releases the document connection and runtime. Fetch-only disposal remains synchronous except while Android is clearing a
-previous document registration. Document startup errors restore the original fetch
+releases the document connection and runtime. Fetch-only disposal may also be asynchronous while network resources, a lazy module, or a previous Android document registration are being released. Always use `await app.dispose()` when cleanup must finish before reinitialization. Document startup errors restore the original fetch
 implementation; Fetch-only Worker startup errors continue to reject local requests
 until explicit disposal.
 
@@ -141,9 +140,9 @@ local POST submissions; named windows and iframe targets are not supported.
 The native host/child lifecycle, pending-request timeouts and explicit disposal
 are implemented. App process termination/relaunch, background/foreground,
 asset-update reinstalls without data deletion, and shutdown followed by
-reinitialization are covered by the packaged acceptance below. Physical
+reinitialization are covered by the packaged native fixture. Physical
 devices, WebView crash recovery, memory pressure and arbitrary third-party
-plugin lifecycle behavior are not covered by the simulator/emulator results.
+plugin lifecycle behavior require separate validation.
 
 ## Demo and validation
 
@@ -161,39 +160,6 @@ calls the same public API. A test-only Worker wrapper adds the browser test driv
 to returned HTML. It is installed from a real tarball into an independent consumer,
 then uses ordinary `cap add`/`cap sync`. No native code or registration is patched.
 See `demo/tests/README.md` for reproduction commands.
-
-### Packaged installation results
-
-Verified on 2026-10-17 with Capacitor 8.5.3 (the 50-case suite also passed on
-2026-10-16 before the lifecycle stages were added):
-
-| Target                       | Hono                               | Workers Express                    |
-| ---------------------------- | ---------------------------------- | ---------------------------------- |
-| iOS 26.1 Simulator (SPM)     | 50/50 + lifecycle + public dispose | 50/50 + lifecycle + public dispose |
-| Android 16 emulator (Gradle) | 50/50 + lifecycle + native stop    | 50/50 + lifecycle + native stop    |
-
-These checks cover HTML, scripts/assets, local API calls, fresh documents,
-navigation/history, GET/POST forms, local redirects, multipart files and a native
-CapacitorCookies call after navigation. Each run then covers: rendering and API
-after background/foreground; fresh rendering and API after app
-termination/relaunch; updated Worker code and bundled static assets after an
-update install that preserves application data (on Android this exercises the
-persistent document Service Worker); and shutdown followed by reinitialization.
-iOS disposal and reinitialization use the public API from the retained runtime
-host. Android stop is invoked from the visible page and reinitialization goes
-through the Service Worker bootstrap path; the two are distinct and not claimed
-equivalent. The Android reinit stage repeats the Fetch-only migration,
-registration cleanup and current-client asset fallback assertions.
-
-CI verifies the tarball contents and automatic plugin discovery using a fresh
-consumer. Native compilation and simulator/emulator execution are local acceptance
-runs, not CI results. Reports and build/console logs are under the independent
-consumer's `artifacts/` directory outside the repository.
-
-The earlier source-integration probes included 15 extra iOS metadata/diagnostic
-checks requiring native script injection. Those results remain recorded in
-[the investigation](document-rendering.md); they are not counted as packaged
-installation checks.
 
 ### Shutdown and trust boundary
 
@@ -214,6 +180,3 @@ run at the Capacitor local origin and can access the application's native plugin
 just like bundled HTML. Rendering is not a sandbox for untrusted HTML; applications
 must escape untrusted values and must not render arbitrary remote HTML as trusted
 application pages. This trust model applies to both iOS and Android.
-
-Library tests 132/132 and the existing Fetch-only/browser and package suites
-remain regression checks. See the repository test scripts for their scope.

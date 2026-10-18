@@ -150,11 +150,3 @@ covered for compiler removal, not live PostgreSQL queries. The prior D1 native
 acceptance covers the shared transport; it is not a Hyperdrive native acceptance
 result. Server deployment, production credentials and physical devices are not
 part of this verification.
-
-On 2026-10-18, the candidate passed build and root/demo typechecks, 344 unit
-checks, 7 build-tool checks, and both the Hyperdrive and D1 browser matrices
-(16 production-build combinations plus development checks each). The fresh
-npm-tarball consumer passed Vite/esbuild/browser ESM 10/10, Vite dev 2/2,
-direct 26/26, isolated 22/22, 320 common checks with 6 declared unsupported,
-and preferences 2/2. These results have the local-server and device limitations
-above; they are not a production security certification.

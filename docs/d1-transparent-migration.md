@@ -190,13 +190,6 @@ consumer. Reports, logs, package integrity and server-side DB snapshots are in
 `demo/artifacts/d1-native/`. Browser reports and inspected bundles are in
 `demo/artifacts/d1-integration/`.
 
-On 2026-10-18, iOS 26.1 and Android 16 passed 20 checks each over real native HTTPS:
-both execution modes, local HTML/JSON, real D1 updates, authorization, HEAD,
-abort, disposal of in-flight requests and reinitialization. These are simulator
-and emulator results, not physical-device or production deployment evidence.
-The old standalone `/auth` helper and manual API-rewrite/schema-administration
-guides were removed; this unreleased API does not retain their compatibility.
-
 For rendered Cookie-session acceptance, use the same scripts with `--ui`:
 
 ```sh
@@ -215,13 +208,3 @@ restart, logout, and another restart remaining unauthenticated. Server-side D1
 snapshots, screenshots and reports are saved in `demo/artifacts/d1-native-ui/`.
 Run platforms sequentially. `native-prepare.mjs --ui --refresh` updates that
 consumer from a new package tarball.
-
-The review-cycle candidate on 2026-10-18 passed 332 unit tests, the browser D1
-matrix plus Vite development rebuild, and the fresh-package consumer suite.
-Both iOS 26.1 simulator and Android 16 emulator passed the rendered UI sequence
-above, including logout with the server session deliberately left valid: only
-Cookie deletion can make the subsequent restart unauthenticated. These UI
-results cover the default Dedicated Worker execution preference and native host
-transport. Browser/direct API combinations remain covered separately by the
-integration matrix; the UI sequence is not a claim about every authentication
-provider, browser privacy policy, or physical device.

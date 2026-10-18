@@ -52,8 +52,9 @@ A compatibility implementation is ready to merge only when all of these are true
 - Required CI passes. Manager and independent acceptance reviews have no
   outstanding required changes. Reviewers check coverage completeness as well as
   test results; CI cannot prove a missing contract exists.
-- Documentation records the completed unit, pinned baseline and verification
-  evidence without a partial-support qualifier.
+- Documentation describes current API behavior, the pinned baseline, limitations
+  and reproduction commands. Keep completion reports, review history and test-run
+  evidence in PRs and generated artifacts, not accumulating in README or docs.
 
 Only then may the inventory say **Complete**. Until then, use **In progress**,
 **Unverified**, or **Not implemented**, and identify the remaining work.
@@ -79,13 +80,12 @@ according to API ownership, with contracts/tests in the adjacent `index.spec.ts`
 Cloud resource adapters and execution policy belong in `src/cloudflare/bindings`; cross-domain
 installation/codecs belong in `src/shared`. Application execution belongs in
 `src/cloudflare/workers` and browser host mechanisms in `src/browser`, build tooling in `src/tooling`, and the reusable feature/contract host
-in `src/shared/contracts`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
+in `src/shared/contracts`. See the [source layout](src/README.md). Subpaths and dependency declarations belong to
 that module directory. `demo/tests/` owns environment runners, not copies of
 module behavior. Production compilation excludes specs. Consumer tests may copy
 test contracts, but must resolve implementations from the packed package.
 
-See the [compatibility inventory](docs/node-compatibility-inventory.md) for current
-work and the [CI guide](docs/ci.md) for required checks.
+See [compatibility limits](docs/compatibility.md) and the [contract API](docs/contracts.md).
 
 Global APIs follow the same module ownership rule: Fetch, Headers, Request,
 Response, AbortSignal, encoding and structuredClone keep their own behavior
@@ -94,3 +94,29 @@ and restoration, not a combined API behavior suite. API-specific installation
 regressions live beside that API (for example, `abort/installation.spec.ts`).
 Environment runners may share setup, but expose each API as a separate named
 test; a single passing “globals” result must not stand in for individual APIs.
+
+## CI and regression protection
+
+The required `CI` check aggregates library, the compatibility matrix, bindings,
+streams-fallback, package and upstream jobs. Workers/browser, runtime/documents
+and build-tool checks run on separate runners; only the bindings job starts MySQL. Every job must succeed; skipped or cancelled jobs
+cannot satisfy the gate. Main requires a pull request, an up-to-date branch and
+this check, and blocks force pushes and deletion. Workflow configuration is in
+[ci.yml](.github/workflows/ci.yml); CodeQL is configured separately.
+
+Library checks include types, adjacent contracts and reproducible URL generation.
+Integration checks use pinned local workerd, Chromium/WebKit, both build tools,
+forced stream fallbacks and a fresh installed tarball. The upstream job clones
+the pinned official Hono sample. Native plugin discovery runs in CI; native
+compilation and iOS/Android execution require the [native test procedure](demo/tests/README.md).
+The document suite's expected WebKit failures are documented in
+[compatibility limits](docs/compatibility.md); they are not successful behaviors.
+
+Require every case in a claimed-supported profile to pass, including cleanup.
+`assertContract` alone permits partial coverage and is insufficient for acceptance.
+The independent feature/case list in `demo/tests/validation/expected-cases.json`
+guards against silent case removal; changes require review. Shared builtin
+registration lives in `src/tooling/shared.ts`, not separate Vite/esbuild lists.
+Keep exploratory probes outside required acceptance; use `test:node-boundaries`
+in the demo when investigating engine differences. Never promote a probe result
+or a namespace match to full behavioral support.

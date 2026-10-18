@@ -13,4 +13,4 @@ adapters and contracts live with their owning implementation:
 
 Public `@rdlabo/workers-capacitor/shared/contracts` and `@rdlabo/workers-capacitor/shared/contracts/testing`
 resolve here. Imports use these role-based paths; old `features` and `testing`
-entry points are removed before release. See [the contract standard](../../../docs/feature-standard.md).
+entry points are removed before release. See [the contract standard](../../../docs/contracts.md).
