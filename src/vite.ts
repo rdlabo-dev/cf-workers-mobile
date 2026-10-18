@@ -1,4 +1,6 @@
 import { documentAssets, listAssets } from "./build/documents.js";
+import { d1Modules } from "./build/d1-modules.js";
+import type { D1BuildOptions } from "./build/d1.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -108,15 +110,34 @@ function compatibilityPlugins(
 // A real-looking absolute ID survives Vite's worker query stripping without
 // writing generated entry files into the consumer's project.
 const entrySuffix = ".capacitor-worker.js";
+function virtualId(
+  source: string,
+  root: string,
+  owns: (path: string) => boolean,
+) {
+  const [path, ...query] = source.split("?");
+  const candidates = [path];
+  if (path.startsWith("/@fs/"))
+    candidates.push(
+      /^[a-z]:/i.test(path.slice(5)) ? path.slice(5) : "/" + path.slice(5),
+    );
+  if (root && path.startsWith("/"))
+    candidates.push(normalizePath(resolve(root, "." + path)));
+  const match = candidates.find(owns);
+  return match
+    ? match + (query.length ? "?" + query.join("?") : "")
+    : undefined;
+}
 function workerEntryPlugin(
   entries: Map<string, string>,
+  root: () => string,
   virtualFiles?: () => Promise<string>,
 ): Plugin {
   return {
     name: "capacitor-workers-entry",
     enforce: "pre",
     resolveId(source) {
-      if (entries.has(source.split("?")[0])) return source;
+      return virtualId(source, root(), (path) => entries.has(path));
     },
     load(id) {
       const [path, query = ""] = id.split("?");
@@ -130,7 +151,7 @@ function workerEntryPlugin(
 }
 
 /** Add only to the Capacitor/browser build, never the Cloudflare build. */
-export interface CapacitorWorkersPluginOptions {
+export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
   /**
@@ -159,7 +180,35 @@ export function capacitorWorkersPlugin(
     : undefined;
   let root: string;
   let publicDir: string;
+  let d1: ReturnType<typeof d1Modules> | undefined;
+  const d1Plugin = (): Plugin => ({
+    name: "capacitor-workers-d1",
+    enforce: "pre",
+    resolveId(id) {
+      return virtualId(id, root, (path) => d1?.owns(path) ?? false);
+    },
+    async load(id) {
+      if (!d1) return;
+      const path = id.split("?")[0];
+      const generated = await d1.load(path);
+      if (generated) {
+        for (const input of generated.inputs) this.addWatchFile(input);
+        return { code: generated.code, map: null };
+      }
+      await d1.guard(path);
+    },
+    async handleHotUpdate(ctx) {
+      const previous = await d1?.get();
+      if (previous?.inputs.includes(ctx.file)) {
+        d1?.reset();
+        ctx.server.moduleGraph.invalidateAll();
+        ctx.server.ws.send({ type: "full-reload" });
+        return [];
+      }
+    },
+  });
   return [
+    d1Plugin(),
     {
       name: "capacitor-workers-source",
       enforce: "pre",
@@ -170,6 +219,8 @@ export function capacitorWorkersPlugin(
       configResolved(config) {
         root = config.root;
         publicDir = config.publicDir;
+        if (options.worker)
+          d1 = d1Modules(resolve(root, options.worker), root, options);
       },
       generateBundle: {
         order: "post",
@@ -178,6 +229,19 @@ export function capacitorWorkersPlugin(
             ...Object.keys(bundle),
             ...(publicDir ? await listAssets(publicDir) : []),
           ];
+          const compilation = await d1?.get();
+          if (compilation) {
+            const fileName = "capacitor-workers-d1.json";
+            if (files.includes(fileName))
+              this.error("D1 report asset collision: " + fileName);
+            const { mode, reason, routes } = compilation;
+            this.emitFile({
+              type: "asset",
+              fileName,
+              source: JSON.stringify({ mode, reason, routes }, null, 2),
+            });
+            files.push(fileName);
+          }
           const assets = await documentAssets(files);
           for (const [fileName, source] of Object.entries(assets)) {
             if (files.includes(fileName))
@@ -198,7 +262,14 @@ export function capacitorWorkersPlugin(
         });
         if (!resolved || resolved.external)
           this.error("Cannot resolve Worker entry: " + path);
-        const entry = resolved.id;
+        const compilation = await d1?.get();
+        if (compilation)
+          this.warn(
+            compilation.mode === "worker"
+              ? `D1: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+              : `D1: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+          );
+        const entry = compilation ? d1!.localEntry : resolved.id;
         const generated = entry + entrySuffix;
         if (existsSync(generated))
           this.error(
@@ -207,8 +278,9 @@ export function capacitorWorkersPlugin(
           );
         entries.set(generated, entry);
         return `import Constructor from ${JSON.stringify(generated + "?worker")};
+${compilation ? `import { needsRemote } from ${JSON.stringify(d1!.selectorEntry)};` : ""}
 import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
-export default { createWorker: () => new Constructor(), async loadDirect() {
+export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote," : ""} async loadDirect() {
   const dispose = installNodeGlobals();
   try {
     return { handler: (await import(${JSON.stringify(entry)})).default, dispose };
@@ -219,7 +291,7 @@ export default { createWorker: () => new Constructor(), async loadDirect() {
 } };`;
       },
     },
-    workerEntryPlugin(entries, virtualFiles),
+    workerEntryPlugin(entries, () => root, virtualFiles),
     {
       name: "capacitor-workers-worker-build",
       config(config) {
@@ -228,7 +300,8 @@ export default { createWorker: () => new Constructor(), async loadDirect() {
           worker: {
             plugins: () => [
               ...(previous?.() ?? []),
-              workerEntryPlugin(entries, virtualFiles),
+              d1Plugin(),
+              workerEntryPlugin(entries, () => root, virtualFiles),
               ...compatibilityPlugins("worker"),
             ],
           },
