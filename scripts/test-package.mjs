@@ -73,6 +73,7 @@ for (const module of [
   "structured-clone",
   "encoding",
   "abort",
+  "async-hooks",
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });
