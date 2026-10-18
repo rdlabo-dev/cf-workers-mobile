@@ -35,32 +35,22 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 
 ## Remaining implementation sequence
 
-The remaining work is tracked as whole modules. No new PR or release is created
-merely because one subset passes. Existing Complete modules retain their original
-acceptance records; extending a dependency requires regression verification.
+The scope is **all remaining Node compatibility modules**, including existing
+PoC shims and dependency polyfills. The recent seventeen families are not the
+completion boundary. No new PR or release is created merely because a subset
+passes. Existing Complete units retain their acceptance records; changing shared
+dependencies requires their regression checks.
 
-On 2026-10-18, the fixed runtime audit enumerated **70 builtins/subpaths and 1,597
-namespace export entries (including defaults and aliases)**. This is an export
-inventory, not a behavioral coverage count. The reproducible test and exact
-export manifest live in [`demo/tests/experiments/node-compat/`](../demo/tests/experiments/node-compat/inventory.test.mjs).
-Run `node --test tests/experiments/node-compat/inventory.test.mjs` from `demo`.
-Raw descriptor evidence is generated in `demo/artifacts/node-inventory/`.
+The fixed runtime audit enumerates **70 builtins/subpaths and 1,597 namespace
+export entries**. The whole-surface browser audit now checks every entry through
+the public esbuild plugin. **40 entries have import/export gaps in both Chromium
+and WebKit.** The other 30 only have matching export names, not automatic
+behavioral acceptance.
 
-| Order | Remaining whole-module units | Completion work |
-| --- | --- | --- |
-| 1 | `os`, `tty`, `wasi`, `punycode` | Fixed virtual platform and stub semantics; full export/prototype contracts, then all acceptance environments. |
-| 2 | `util`, `util/types`, `sys`, `assert`, `assert/strict`, `events` | Type-brand experiments and async-context dependency audit precede whole-module certification. |
-| 3 | `stream`, `stream/web`, `stream/promises`, `stream/consumers`, `_stream_*` | Public surface, backpressure, cancellation, adapters and Web/native brand interoperability. |
-| 4 | `fs`, `fs/promises`, `module`, `process`, `constants` | Shared VFS lifecycle, descriptors/devices, resolution and synchronous APIs; no implicit persistent device filesystem. |
-| 5 | `https`, `tls`, `dns`, `dns/promises`, `_http_*`, `_tls_*` | Reuse accepted transport; audit each facade, options, errors and cleanup against workerd. |
-| 6 | `crypto`, `zlib` | Algorithm/codec matrix and known-answer vectors; explicitly assess sync operations, opaque keys and dependency cost. |
-| 7 | `async_hooks`, `diagnostics_channel` | Finish engine-capability experiments; record architecture limits only with reproductions. Sticky context is not full support. |
-| 8 | `console`, `perf_hooks` | Global identity, time semantics, output behavior and complete export contracts. |
-| 9 | `child_process`, `cluster`, `dgram`, `domain`, `http2`, `inspector` (+ promises), `readline` (+ promises), `repl`, `sqlite`, `test`, `trace_events`, `v8`, `vm`, `worker_threads` | Verify actual behavior first, including non-throwing stub state and validation; documentation labels alone do not justify empty exports. |
-
-`os`, `tty`, `wasi`, and `punycode` now have module-owned implementations and shared contracts.
-Their workerd checks pass; full acceptance is pending. URL remains locally
-accepted with remote CI pending. No other row is promoted by the export audit.
+See the [complete 70-entry matrix and dependency order](node-compatibility-surface.md).
+Run `npm run test:node-inventory` from `demo` after building the library.
+Raw results are written to `demo/artifacts/node-inventory/`. Missing imports
+remain visible, and newly failing modules outside the recorded debt fail the audit.
 
 ## Scope and evidence
 
