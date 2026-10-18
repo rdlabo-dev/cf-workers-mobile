@@ -226,6 +226,10 @@ Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a pe
 
 ## D1 and remote APIs
 
+R2, cloud KV, Service Bindings and Queue producers use the same build-generated
+HTTP dispatch. See the [service binding guide](docs/remote-service-bindings.md)
+for configuration, upload limits and verification status.
+
 Hyperdrive-backed Workers use the same generated HTTP dispatch. The plugins detect Wrangler `hyperdrive` bindings, keeping database drivers, SQL and connection credentials on the existing Worker. See [transparent Hyperdrive migration](docs/hyperdrive-transparent-migration.md) for setup, security boundaries and verification.
 
 Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.

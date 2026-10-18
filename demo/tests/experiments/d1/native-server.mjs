@@ -1,3 +1,4 @@
+import { createBackend } from "../services/backend.mjs";
 import { createServer } from "node:https";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -5,9 +6,15 @@ import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 const ui = process.argv.includes("--ui");
+const services = process.argv.includes("--services");
+if (ui && services) throw new Error("Choose either --ui or --services");
 const root = fileURLToPath(
   new URL(
-    ui ? "../../../artifacts/d1-native-ui/" : "../../../artifacts/d1-native/",
+    services
+      ? "../../../artifacts/services-native/"
+      : ui
+        ? "../../../artifacts/d1-native-ui/"
+        : "../../../artifacts/d1-native/",
     import.meta.url,
   ),
 );
@@ -47,18 +54,21 @@ const result = await build({
   format: "esm",
   write: false,
 });
-const backend = new Miniflare(
-  convertV4MiniflareOptions({
-    modules: true,
-    script: result.outputFiles[0].text,
-    compatibilityDate: "2026-10-01",
-    d1Databases: ["DB"],
-  }),
-);
-const db = await backend.getD1Database("DB");
-await db.exec(
-  "CREATE TABLE private_counters (owner TEXT PRIMARY KEY, value INTEGER NOT NULL); INSERT INTO private_counters VALUES ('alice', 0), ('bob', 0);",
-);
+const backend = services
+  ? await createBackend()
+  : new Miniflare(
+      convertV4MiniflareOptions({
+        modules: true,
+        script: result.outputFiles[0].text,
+        compatibilityDate: "2026-10-01",
+        d1Databases: ["DB"],
+      }),
+    );
+const db = services ? undefined : await backend.getD1Database("DB");
+if (db)
+  await db.exec(
+    "CREATE TABLE private_counters (owner TEXT PRIMARY KEY, value INTEGER NOT NULL); INSERT INTO private_counters VALUES ('alice', 0), ('bob', 0);",
+  );
 if (ui)
   await db.exec(
     "CREATE TABLE ui_sessions (token TEXT PRIMARY KEY, owner TEXT NOT NULL); CREATE TABLE ui_notes (owner TEXT PRIMARY KEY, value INTEGER NOT NULL, writes INTEGER NOT NULL); INSERT INTO ui_notes VALUES ('alice',0,0);",
@@ -101,11 +111,17 @@ const server = createServer(
         res.end("ok");
         return;
       }
+      if (services && req.url.startsWith("/__queue/")) {
+        const results = await backend.getKVNamespace("RESULTS", "consumer");
+        res.end(JSON.stringify(await results.get(req.url.slice(9))));
+        return;
+      }
       if (req.url === "/__report") {
         const report = JSON.parse(body.toString());
-        report.database = await db
-          .prepare("SELECT owner, value FROM private_counters ORDER BY owner")
-          .all();
+        if (db)
+          report.database = await db
+            .prepare("SELECT owner, value FROM private_counters ORDER BY owner")
+            .all();
         reports.push(report);
         await writeFile(
           root + "reports.json",

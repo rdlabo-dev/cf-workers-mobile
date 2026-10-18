@@ -19,6 +19,10 @@ export interface ServerBuildOptions {
   d1Bindings?: string[];
   /** Hyperdrive binding names when configuration is supplied by another tool. */
   hyperdriveBindings?: string[];
+  r2Bindings?: string[];
+  kvBindings?: string[];
+  serviceBindings?: string[];
+  queueBindings?: string[];
   /** Names explicitly supplied through capacitorWorkers({ env }); other env access stays on the server. */
   localBindings?: string[];
 }
@@ -35,7 +39,15 @@ export async function serverBindings(
   root: string,
   options: ServerBuildOptions,
 ) {
-  for (const key of ["d1Bindings", "hyperdriveBindings"] as const) {
+  for (const key of [
+    "d1Bindings",
+    "hyperdriveBindings",
+    "r2Bindings",
+    "kvBindings",
+    "serviceBindings",
+    "queueBindings",
+    "localBindings",
+  ] as const) {
     const values = options[key];
     if (
       values !== undefined &&
@@ -74,10 +86,16 @@ export async function serverBindings(
     )
   )
     throw new Error(`Invalid Worker environments in ${file}`);
-  function configured(key: "d1_databases" | "hyperdrive") {
-    const groups = environments.map((environment) =>
-      environment[key] === undefined ? [] : environment[key],
-    );
+  function configured(key: string, child?: string) {
+    const groups = environments.map((environment) => {
+      let value = environment[key];
+      if (child && value !== undefined) {
+        if (!value || typeof value !== "object" || Array.isArray(value))
+          throw new Error(`Invalid ${key} in ${file}`);
+        value = value[child];
+      }
+      return value === undefined ? [] : value;
+    });
     if (
       groups.some(
         (bindings) =>
@@ -88,19 +106,52 @@ export async function serverBindings(
           ),
       )
     )
-      throw new Error(`Invalid ${key} in ${file}`);
+      throw new Error(`Invalid ${key}${child ? "." + child : ""} in ${file}`);
     return groups.flat().map((item: { binding: string }) => item.binding);
   }
-  // Overrides apply per binding kind: an explicit D1 list must not suppress
-  // Hyperdrive discovery (and vice versa). Only names leave this function.
+  // Each explicit list overrides only its own kind, without suppressing others.
   const d1 = options.d1Bindings ?? configured("d1_databases");
   const hyperdrive = options.hyperdriveBindings ?? configured("hyperdrive");
+  const r2 = options.r2Bindings ?? configured("r2_buckets");
+  const kv = options.kvBindings ?? configured("kv_namespaces");
+  const services = options.serviceBindings ?? configured("services");
+  const queues = options.queueBindings ?? configured("queues", "producers");
+  const consumers = environments.flatMap((environment) => {
+    const queues = environment.queues;
+    if (queues === undefined) return [];
+    if (!queues || typeof queues !== "object" || Array.isArray(queues))
+      throw new Error(`Invalid queues in ${file}`);
+    const consumers = queues.consumers === undefined ? [] : queues.consumers;
+    if (
+      !Array.isArray(consumers) ||
+      consumers.some(
+        (item) => typeof item?.queue !== "string" || !item.queue.trim(),
+      )
+    )
+      throw new Error(`Invalid queues.consumers in ${file}`);
+    return consumers;
+  });
+  const serverOnly = [...d1, ...hyperdrive, ...r2, ...services, ...queues];
+  if (options.localBindings?.some((name) => serverOnly.includes(name)))
+    throw new Error("A server binding cannot also be a local binding");
+  // Local KV is an existing, explicit local-storage profile. Cloud KV stays
+  // remote by default; a local override never synchronizes with the cloud.
+  const remoteKV = kv.filter((name) => !options.localBindings?.includes(name));
   return {
-    names: [...new Set<string>([...d1, ...hyperdrive])],
+    names: [...new Set<string>([...serverOnly, ...remoteKV])],
     config: file,
-    reportFile: hyperdrive.length
-      ? "capacitor-workers-server.json"
-      : "capacitor-workers-d1.json",
+    forceRemoteReason: consumers.length
+      ? "Queue consumers execute only on the deployed Worker"
+      : undefined,
+    reportFile:
+      consumers.length ||
+      hyperdrive.length ||
+      r2.length ||
+      remoteKV.length ||
+      services.length ||
+      queues.length
+        ? "capacitor-workers-server.json"
+        : "capacitor-workers-d1.json",
   };
 }
 
@@ -155,9 +206,9 @@ export async function compileServerWorker(
   options: Pick<
     BuildOptions,
     "alias" | "tsconfig" | "define" | "conditions"
-  > & { localBindings?: string[] } = {},
+  > & { localBindings?: string[]; forceRemoteReason?: string } = {},
 ): Promise<ServerCompilation> {
-  const { localBindings = [], ...buildOptions } = options;
+  const { localBindings = [], forceRemoteReason, ...buildOptions } = options;
   if (localBindings.some((name) => bindings.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
   const bundled = await build({
@@ -180,6 +231,7 @@ export async function compileServerWorker(
     resolve(dirname(entry), file),
   );
   try {
+    if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);
     return partition(source, bindings, inputs, localBindings);
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
@@ -332,6 +384,21 @@ function partition(
       );
     return false;
   }
+  // Direct operations on a configured server binding cannot be local Headers
+  // operations. Aliases and other unknown receivers retain the conservative check.
+  function serverBindingReceiver(node: Node): boolean {
+    if (
+      node.type !== "MemberExpression" ||
+      !bindings.includes(property(node) ?? "")
+    )
+      return false;
+    return (
+      (node.object.type === "MemberExpression" &&
+        property(node.object) === "env") ||
+      (node.object.type === "Identifier" &&
+        environmentImports.has(node.object.name))
+    );
+  }
   walk(program, (child, parent) => {
     if (
       child.type === "ImportDeclaration" &&
@@ -400,6 +467,7 @@ function partition(
       // here. Unknown collection keys therefore widen the boundary conservatively.
       if (
         (method === "header" || headerMethods.has(method ?? "")) &&
+        !serverBindingReceiver(child.callee.object) &&
         (child.arguments[0]?.type !== "Literal" ||
           typeof child.arguments[0].value !== "string")
       )

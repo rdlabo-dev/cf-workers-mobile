@@ -1,3 +1,4 @@
+import { config as serviceConfig } from "../services/backend.mjs";
 import { execFileSync } from "node:child_process";
 import {
   mkdtemp,
@@ -12,9 +13,15 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const ui = process.argv.includes("--ui");
+const services = process.argv.includes("--services");
+if (ui && services) throw new Error("Choose either --ui or --services");
 const artifacts = join(
   repo,
-  ui ? "demo/artifacts/d1-native-ui" : "demo/artifacts/d1-native",
+  services
+    ? "demo/artifacts/services-native"
+    : ui
+      ? "demo/artifacts/d1-native-ui"
+      : "demo/artifacts/d1-native",
 );
 const refreshing = process.argv.includes("--refresh");
 const consumer = refreshing
@@ -54,21 +61,39 @@ await writeFile(
   ),
 );
 await cp(
-  new URL(ui ? "ui-worker.js" : "worker.js", import.meta.url),
+  new URL(
+    services ? "../services/worker.js" : ui ? "ui-worker.js" : "worker.js",
+    import.meta.url,
+  ),
   join(consumer, "worker.js"),
 );
 await cp(
-  new URL(ui ? "ui-main.js" : "native-main.js", import.meta.url),
+  new URL(
+    services
+      ? "../services/native-main.js"
+      : ui
+        ? "ui-main.js"
+        : "native-main.js",
+    import.meta.url,
+  ),
   join(consumer, "main.js"),
 );
 await cp(join(artifacts, "server.json"), join(consumer, "server.json"));
 await writeFile(
   join(consumer, "wrangler.jsonc"),
-  JSON.stringify({
-    d1_databases: [
-      { binding: "DB", database_name: "existing", database_id: "server-only" },
-    ],
-  }),
+  JSON.stringify(
+    services
+      ? serviceConfig
+      : {
+          d1_databases: [
+            {
+              binding: "DB",
+              database_name: "existing",
+              database_id: "server-only",
+            },
+          ],
+        },
+  ),
 );
 await writeFile(
   join(consumer, "index.html"),

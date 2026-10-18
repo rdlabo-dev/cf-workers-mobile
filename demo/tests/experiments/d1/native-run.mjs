@@ -7,9 +7,15 @@ const [platform, device] = process.argv.slice(2);
 if (!["ios", "android"].includes(platform) || !device)
   throw new Error("native-run.mjs ios|android <device>");
 const ui = process.argv.includes("--ui");
+const services = process.argv.includes("--services");
+if (ui && services) throw new Error("Choose either --ui or --services");
 const artifacts = fileURLToPath(
   new URL(
-    ui ? "../../../artifacts/d1-native-ui/" : "../../../artifacts/d1-native/",
+    services
+      ? "../../../artifacts/services-native/"
+      : ui
+        ? "../../../artifacts/d1-native-ui/"
+        : "../../../artifacts/d1-native/",
     import.meta.url,
   ),
 );
@@ -262,9 +268,9 @@ try {
       report.cases.filter((test) => !test.passed),
       [],
     );
-    assert.equal(report.cases.length, 20);
+    assert.equal(report.cases.length, services ? 26 : 20);
     console.log(
-      `${platform}: ${report.cases.length} HTTPS/D1 native checks passed`,
+      `${platform}: ${report.cases.length} HTTPS/${services ? "services" : "D1"} native checks passed`,
     );
   }
 } catch (error) {

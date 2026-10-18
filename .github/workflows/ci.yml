@@ -84,6 +84,8 @@ jobs:
         working-directory: demo
       - run: npm run test:d1-migration
         working-directory: demo
+      - run: npm run test:service-bindings
+        working-directory: demo
       - run: npm run test:hyperdrive-migration
         working-directory: demo
         env:

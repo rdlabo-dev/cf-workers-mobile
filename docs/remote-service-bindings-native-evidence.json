@@ -1,0 +1,228 @@
+{
+  "date": "2026-10-18",
+  "base": "a803bf94d34258bb311a06506091681427a52b39",
+  "packageIntegrity": "sha512-241YRnbDjW70jQi3QjmiWG64cJGy8sehBVl15Lx4TvJdb/yHP+Dhne9hbT0+dIIjpc69+2gookAeswjPx16CpA==",
+  "iosDevice": "iPhone 17 Pro / iOS 26.1 simulator",
+  "androidDevice": "Android 16 / API 36 / emulator-5554",
+  "transport": "local HTTPS with test CA to real workerd, Vite production tarball consumer",
+  "results": {
+    "ios": {
+      "platform": "ios",
+      "cases": [
+        {
+          "name": "direct:execution",
+          "passed": true
+        },
+        {
+          "name": "direct:local",
+          "passed": true
+        },
+        {
+          "name": "direct:R2 put",
+          "passed": true
+        },
+        {
+          "name": "direct:R2 get",
+          "passed": true
+        },
+        {
+          "name": "direct:HEAD",
+          "passed": true
+        },
+        {
+          "name": "direct:range",
+          "passed": true
+        },
+        {
+          "name": "direct:KV put",
+          "passed": true
+        },
+        {
+          "name": "direct:KV metadata",
+          "passed": true
+        },
+        {
+          "name": "direct:HTTP/RPC",
+          "passed": true
+        },
+        {
+          "name": "direct:queue send/batch delivery",
+          "passed": true
+        },
+        {
+          "name": "direct:upload limit",
+          "passed": true
+        },
+        {
+          "name": "direct:unauthorized",
+          "passed": true
+        },
+        {
+          "name": "direct:delete and protected write",
+          "passed": true
+        },
+        {
+          "name": "worker:execution",
+          "passed": true
+        },
+        {
+          "name": "worker:local",
+          "passed": true
+        },
+        {
+          "name": "worker:R2 put",
+          "passed": true
+        },
+        {
+          "name": "worker:R2 get",
+          "passed": true
+        },
+        {
+          "name": "worker:HEAD",
+          "passed": true
+        },
+        {
+          "name": "worker:range",
+          "passed": true
+        },
+        {
+          "name": "worker:KV put",
+          "passed": true
+        },
+        {
+          "name": "worker:KV metadata",
+          "passed": true
+        },
+        {
+          "name": "worker:HTTP/RPC",
+          "passed": true
+        },
+        {
+          "name": "worker:queue send/batch delivery",
+          "passed": true
+        },
+        {
+          "name": "worker:upload limit",
+          "passed": true
+        },
+        {
+          "name": "worker:unauthorized",
+          "passed": true
+        },
+        {
+          "name": "worker:delete and protected write",
+          "passed": true
+        }
+      ]
+    },
+    "android": {
+      "platform": "android",
+      "cases": [
+        {
+          "name": "direct:execution",
+          "passed": true
+        },
+        {
+          "name": "direct:local",
+          "passed": true
+        },
+        {
+          "name": "direct:R2 put",
+          "passed": true
+        },
+        {
+          "name": "direct:R2 get",
+          "passed": true
+        },
+        {
+          "name": "direct:HEAD",
+          "passed": true
+        },
+        {
+          "name": "direct:range",
+          "passed": true
+        },
+        {
+          "name": "direct:KV put",
+          "passed": true
+        },
+        {
+          "name": "direct:KV metadata",
+          "passed": true
+        },
+        {
+          "name": "direct:HTTP/RPC",
+          "passed": true
+        },
+        {
+          "name": "direct:queue send/batch delivery",
+          "passed": true
+        },
+        {
+          "name": "direct:upload limit",
+          "passed": true
+        },
+        {
+          "name": "direct:unauthorized",
+          "passed": true
+        },
+        {
+          "name": "direct:delete and protected write",
+          "passed": true
+        },
+        {
+          "name": "worker:execution",
+          "passed": true
+        },
+        {
+          "name": "worker:local",
+          "passed": true
+        },
+        {
+          "name": "worker:R2 put",
+          "passed": true
+        },
+        {
+          "name": "worker:R2 get",
+          "passed": true
+        },
+        {
+          "name": "worker:HEAD",
+          "passed": true
+        },
+        {
+          "name": "worker:range",
+          "passed": true
+        },
+        {
+          "name": "worker:KV put",
+          "passed": true
+        },
+        {
+          "name": "worker:KV metadata",
+          "passed": true
+        },
+        {
+          "name": "worker:HTTP/RPC",
+          "passed": true
+        },
+        {
+          "name": "worker:queue send/batch delivery",
+          "passed": true
+        },
+        {
+          "name": "worker:upload limit",
+          "passed": true
+        },
+        {
+          "name": "worker:unauthorized",
+          "passed": true
+        },
+        {
+          "name": "worker:delete and protected write",
+          "passed": true
+        }
+      ]
+    }
+  }
+}
