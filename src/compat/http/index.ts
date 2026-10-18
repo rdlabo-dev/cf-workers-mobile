@@ -1426,6 +1426,9 @@ export class ClientRequest extends OutgoingMessage {
           new TypeError("options.path must be a path-only request target"),
           "ERR_INVALID_ARG_VALUE",
         );
+      // Some Android WebViews percent-encode host spaces instead of rejecting
+      // them. Preserve the pinned Workers URL validation before network I/O.
+      if (/ |%20/i.test(this.host)) throw new TypeError("Invalid URL");
       url = new URL(`${this.protocol}//${this.host}`);
       url.port = this.port;
       if (this.path.length > 0 && this.path !== "/")

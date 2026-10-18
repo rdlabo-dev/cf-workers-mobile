@@ -7,6 +7,12 @@ import {
   restoreStructuredCloneResponse,
 } from "../response/index.js";
 
+import {
+  Blob as WorkersBlob,
+  File as WorkersFile,
+  cloneBlob,
+} from "../buffer/blob.js";
+
 const platformStructuredClone = platform.structuredClone;
 const unsupported = new Map([
   [
@@ -55,6 +61,7 @@ type ResponseSnapshot = {
   hasBody: boolean;
 };
 type Metadata =
+  | { type: "blob"; value: WorkersBlob }
   | { type: "headers"; value: Headers }
   | { type: "request"; value: RequestSnapshot }
   | { type: "response"; value: ResponseSnapshot };
@@ -146,6 +153,17 @@ function encode(
     throw dataCloneError("[object Symbol] could not be cloned.");
   if (seen.has(value)) return seen.get(value);
 
+  if (value instanceof WorkersFile)
+    throw dataCloneError(
+      'Could not serialize object of type "File". This type does not support serialization.',
+    );
+  if (value instanceof WorkersBlob) {
+    const marker: Marker = { [tag]: metadata.length };
+    markers.push(marker);
+    seen.set(value, marker);
+    metadata.push({ type: "blob", value: cloneBlob(value) });
+    return marker;
+  }
   if (value instanceof Headers) {
     const marker: Marker = { [tag]: metadata.length };
     markers.push(marker);
@@ -487,6 +505,10 @@ function decode(
       return error;
     }
     const entry = metadata[Number(id)]!;
+    if (entry.type === "blob") {
+      seen.set(value, entry.value);
+      return entry.value;
+    }
     if (entry.type === "headers") {
       const headers = cloneHeaders(entry.value);
       seen.set(value, headers);

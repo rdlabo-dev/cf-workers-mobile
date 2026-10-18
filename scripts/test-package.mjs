@@ -64,6 +64,7 @@ for (const module of [
   "path",
   "querystring",
   "string-decoder",
+  "buffer",
   "http",
   "net",
   "headers",
@@ -198,6 +199,7 @@ try {
   }
   browser = await chromium.launch();
   const page = await browser.newPage();
+  page.on("pageerror", (error) => console.error("Consumer page error:", error));
   await page.goto("http://127.0.0.1:4189/");
   await page.waitForFunction(() => window.pocDone);
   const results = await page.evaluate(() => window.pocResults);
@@ -263,7 +265,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 162 ||
+    features.flatMap((report) => report.cases).length !== 210 ||
     features.some(
       (report) =>
         report.errors.length ||

@@ -1,3 +1,4 @@
+import { capacitorWorkers } from "@rdlabo/capacitor-workers";
 import { verifyKVPersistence } from "./kv";
 import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
 import { assertContract, runContract } from "@rdlabo/capacitor-workers/testing";
@@ -36,8 +37,16 @@ export async function runFeatures() {
     environment: "webview",
     ...(await runContract(new WasmValidation(), wasmContract)),
   });
-  for (const report of await runNodeContracts("bundled"))
-    reports.push({ environment: "direct", ...report });
+  const runtime = capacitorWorkers({
+    baseURL: "https://node-contract.invalid",
+    worker: { fetch: () => new Response(null, { status: 204 }) },
+  });
+  try {
+    for (const report of await runNodeContracts("bundled"))
+      reports.push({ environment: "direct", ...report });
+  } finally {
+    await runtime.dispose();
+  }
   for (const report of await runNodeContractsInWorker())
     reports.push({ environment: "isolated", ...report });
   for (const report of reports) assertContract(report);

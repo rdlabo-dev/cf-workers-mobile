@@ -48,9 +48,28 @@ function compatibilityPlugins(
       : []),
     {
       name: "capacitor-workers",
+      enforce: "pre",
+      transform(code, id) {
+        if (
+          normalizePath(id.split("?")[0]) !==
+          normalizePath(resolve(globalsPath, "../web.js"))
+        )
+          return;
+        // Vite's prebundled node:buffer and runtime globals must share Blob/File.
+        // Keep the distributed runtime's relative import usable as raw browser ESM.
+        return code.replace('from "../buffer/blob.js"', 'from "node:buffer"');
+      },
       config: () => ({
-        // Express and cloudflare:node must share one prebundled HTTP registry.
-        optimizeDeps: { include: ["cloudflare:node", "node:http", "http"] },
+        // App globals and dependencies must share Buffer identity and the HTTP registry.
+        optimizeDeps: {
+          include: [
+            "cloudflare:node",
+            "node:http",
+            "http",
+            "node:buffer",
+            "buffer",
+          ],
+        },
         resolve: {
           alias: compatibilityAliases(),
         },
