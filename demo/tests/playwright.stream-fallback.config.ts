@@ -2,6 +2,7 @@ import { defineConfig } from "@playwright/test";
 import production from "./playwright.runtime.config";
 export default defineConfig({
   ...production,
+  metadata: { streamsFallback: true },
   webServer: {
     ...production.webServer,
     command:

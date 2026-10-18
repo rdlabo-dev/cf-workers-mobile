@@ -6,7 +6,7 @@ import type { ContractResult } from "@rdlabo/capacitor-workers/testing";
 import type { WebApiName } from "../validation/web-api-contracts";
 
 let source: string;
-test.beforeAll(async () => {
+test.beforeAll(async ({}, testInfo) => {
   const root = fileURLToPath(new URL("../../../", import.meta.url));
   const result = await build({
     absWorkingDir: root,
@@ -24,7 +24,10 @@ test.beforeAll(async () => {
     target: "es2022",
     minify: true,
   });
-  source = result.outputFiles[0].text;
+  const fallback = testInfo.project.metadata.streamsFallback
+    ? "delete globalThis.ReadableByteStreamController; delete globalThis.ReadableStreamBYOBReader; delete globalThis.ReadableStreamBYOBRequest;\n"
+    : "";
+  source = fallback + result.outputFiles[0].text;
 });
 
 for (const [api, count] of Object.entries({
