@@ -4,8 +4,13 @@ import {
   FeatureImplementation,
 } from "@rdlabo/capacitor-workers/features";
 import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
-import { AsyncLocalStorage, AsyncResource } from "./index.js";
-const local = { AsyncLocalStorage, AsyncResource };
+import type { AsyncLocalStorage, AsyncResource } from "./index.js";
+// Resolve implementations through the environment alias: importing the local
+// implementation here would patch globals even in the workerd oracle realm.
+const local = nodeAsyncHooks as unknown as {
+  AsyncLocalStorage: typeof AsyncLocalStorage;
+  AsyncResource: typeof AsyncResource;
+};
 export const asyncHooksFeature = defineFeature<typeof local>()(
   "node.async-hooks",
   [
@@ -34,10 +39,14 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
     run(api) {
       const als = new api.AsyncLocalStorage<unknown>();
       equal(als.getStore(), undefined);
-      const result = als.run("store", (a: number) => {
-        equal(als.getStore(), "store");
-        return a + 1;
-      }, 1);
+      const result = als.run(
+        "store",
+        (a: number) => {
+          equal(als.getStore(), "store");
+          return a + 1;
+        },
+        1,
+      );
       equal(result, 2);
       equal(als.getStore(), undefined);
     },
@@ -229,10 +238,14 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
       const als = new api.AsyncLocalStorage<unknown>();
       const resource = als.run("store", () => new api.AsyncResource("TEST"));
       equal(
-        resource.runInAsyncScope((a: number) => {
-          equal(als.getStore(), "store");
-          return a + 1;
-        }, undefined, 1),
+        resource.runInAsyncScope(
+          (a: number) => {
+            equal(als.getStore(), "store");
+            return a + 1;
+          },
+          undefined,
+          1,
+        ),
         2,
       );
       const bound = resource.bind(() => als.getStore());

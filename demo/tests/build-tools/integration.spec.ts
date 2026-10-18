@@ -23,16 +23,15 @@ for (const build of [
         // node: and bare specifiers resolve to one profile per bundler.
         expect(report.resolved).toEqual(Array(11).fill(true));
         const cases = report.node.direct.flatMap((result) => result.cases);
-        expect(cases).toHaveLength(105);
+        expect(cases).toHaveLength(135);
         expect(
           cases.filter(
             (c) => c.status === "failed" || c.status === "unavailable",
           ),
         ).toEqual([]);
-        expect(cases.filter((c) => c.status === "unsupported").map((c) => c.id)).toEqual([
-          "settleRestore",
-          "concurrentIsolation",
-        ]);
+        expect(
+          cases.filter((c) => c.status === "unsupported").map((c) => c.id),
+        ).toEqual(["settleRestore", "concurrentIsolation"]);
       }
     });
   }
@@ -71,16 +70,15 @@ for (const build of ["vite-node", "esbuild-node"]) {
           cases: { id: string; status: string }[];
         }[]
       ).flatMap((result) => result.cases);
-      expect(cases).toHaveLength(105);
+      expect(cases).toHaveLength(135);
       expect(
         cases.filter(
           (c) => c.status === "failed" || c.status === "unavailable",
         ),
       ).toEqual([]);
-      expect(cases.filter((c) => c.status === "unsupported").map((c) => c.id)).toEqual([
-        "settleRestore",
-        "concurrentIsolation",
-      ]);
+      expect(
+        cases.filter((c) => c.status === "unsupported").map((c) => c.id),
+      ).toEqual(["settleRestore", "concurrentIsolation"]);
       expect(report.globals.unqualified).toEqual([true, true]);
       expect(report.globals.qualified).toEqual([true, true, true]);
       expect(report.globals.computed).toEqual([true, true, true]);

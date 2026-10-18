@@ -1,3 +1,4 @@
+import { contextAware, addCallbackBinding } from "./callbacks.js";
 // Scoped AsyncLocalStorage implementation. Exact within synchronous scopes.
 // For callbacks returning promises, run/exit install a "sticky" context
 // that survives settle until another scope overwrites it: awaits inside a
@@ -62,7 +63,20 @@ function scope<T, A extends unknown[]>(
 
 const capture = () => (current === undefined ? undefined : new Map(current));
 
+addCallbackBinding((callback) => {
+  const context = capture();
+  return function (this: unknown, ...args: unknown[]) {
+    return withContext(context, () => Reflect.apply(callback, this, args), []);
+  };
+});
+
 export class AsyncLocalStorage<Store = unknown> {
+  constructor() {
+    // An unused import must not mutate timer/global ownership. Install only
+    // when a Worker actually starts using context propagation.
+    if (typeof document === "undefined") installAsyncContextPropagation();
+  }
+
   static bind<Args extends unknown[], T>(
     callback: (...args: Args) => T,
   ): (...args: Args) => T {
@@ -133,8 +147,9 @@ export function installAsyncContextPropagation(): void {
       R1 | R2
     >;
   };
-  const wrapCallback =
-    <F extends (...args: never[]) => unknown>(schedule: F): F =>
+  const wrapCallback = <F extends (...args: never[]) => unknown>(
+    schedule: F,
+  ): F =>
     ((
       callback: ((...args: unknown[]) => unknown) | undefined,
       ...args: unknown[]
@@ -148,16 +163,17 @@ export function installAsyncContextPropagation(): void {
       ]);
     }) as unknown as F;
   globalThis.queueMicrotask = wrapCallback(globalThis.queueMicrotask);
-  globalThis.setTimeout = wrapCallback(
-    globalThis.setTimeout,
-  ) as typeof setTimeout;
-  globalThis.setInterval = wrapCallback(
-    globalThis.setInterval,
-  ) as typeof setInterval;
-  if (typeof globalThis.setImmediate === "function")
-    globalThis.setImmediate = wrapCallback(
-      globalThis.setImmediate,
-    ) as typeof setImmediate;
+  // Compat timers capture at scheduling time without changing global identity.
+  // Retain the host fallback for environments without the Node timer adapter.
+  for (const name of ["setTimeout", "setInterval", "setImmediate"] as const) {
+    const schedule = globalThis[name];
+    if (
+      typeof schedule === "function" &&
+      !(schedule as unknown as Record<symbol, unknown>)[contextAware]
+    )
+      (globalThis as unknown as Record<string, unknown>)[name] =
+        wrapCallback(schedule);
+  }
   // Stream pulls/writes run continuations after their creating scope
   // settled; wrap source/sink callbacks with the context at construction.
   const wrapMethods =
@@ -179,12 +195,10 @@ export function installAsyncContextPropagation(): void {
   const NativeReadableStream = globalThis.ReadableStream;
   if (typeof NativeReadableStream === "function") {
     const wrapSource = wrapMethods(["pull", "cancel", "start"]);
-    globalThis.ReadableStream = class extends (
-      NativeReadableStream as new (
-        source?: unknown,
-        strategy?: QueuingStrategy,
-      ) => ReadableStream
-    ) {
+    globalThis.ReadableStream = class extends (NativeReadableStream as new (
+      source?: unknown,
+      strategy?: QueuingStrategy,
+    ) => ReadableStream) {
       constructor(source?: unknown, strategy?: QueuingStrategy) {
         super(wrapSource(source) as UnderlyingSource | undefined, strategy);
       }
@@ -193,12 +207,10 @@ export function installAsyncContextPropagation(): void {
   const NativeWritableStream = globalThis.WritableStream;
   if (typeof NativeWritableStream === "function") {
     const wrapSink = wrapMethods(["write", "close", "abort", "start"]);
-    globalThis.WritableStream = class extends (
-      NativeWritableStream as new (
-        sink?: unknown,
-        strategy?: QueuingStrategy,
-      ) => WritableStream
-    ) {
+    globalThis.WritableStream = class extends (NativeWritableStream as new (
+      sink?: unknown,
+      strategy?: QueuingStrategy,
+    ) => WritableStream) {
       constructor(sink?: unknown, strategy?: QueuingStrategy) {
         super(wrapSink(sink) as UnderlyingSink | undefined, strategy);
       }
@@ -277,8 +289,6 @@ export function installAsyncContextPropagation(): void {
     } as unknown as typeof MessageChannel;
   }
 }
-if (typeof document === "undefined") installAsyncContextPropagation();
-
 // AsyncResource is intentionally minimal: bind/runInAsyncScope capture and
 // restore this implementation's context, matching Workers' synchronous
 // boundary. Hook ids, emitInit/emitBefore/emitAfter and real async tracking

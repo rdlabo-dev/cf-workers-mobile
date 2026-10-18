@@ -1,3 +1,13 @@
+import {
+  AsyncHooksImplementation,
+  asyncHooksContract,
+  NodeAsyncHooks,
+} from "../../../src/compat/async-hooks/index.spec";
+import { installNodeGlobals } from "../../../src/compat/globals/index";
+import {
+  TimersImplementation,
+  timersContract,
+} from "../../../src/compat/timers/index.spec";
 import { capacitorWorkers } from "@rdlabo/capacitor-workers";
 // Environment runners share module-owned contracts. The node:* imports in
 // their implementations resolve to workerd builtins or the bundler aliases.
@@ -30,11 +40,6 @@ import {
 } from "../../../src/compat/net/index.spec";
 
 import {
-  AsyncHooksImplementation,
-  asyncHooksContract,
-  NodeAsyncHooks,
-} from "../../../src/compat/async-hooks/index.spec";
-import {
   BufferImplementation,
   bufferContract,
 } from "../../../src/compat/buffer/index.spec";
@@ -44,7 +49,7 @@ export type NodeProfile = "bundled" | "workers";
 export async function runNodeContracts(
   profile: NodeProfile = "bundled",
 ): Promise<ContractResult[]> {
-  return [
+  const reports = [
     await runContract(
       profile === "workers" ? new WorkersPath() : new BundledPath(),
       nodePathContract,
@@ -54,24 +59,37 @@ export async function runNodeContracts(
     await runContract(new NodeHttp(), nodeHttpContract),
     await runContract(new NetImplementation(), netContract),
     await runContract(new BufferImplementation(), bufferContract),
+    await runContract(new TimersImplementation(), timersContract),
+  ];
+  reports.push(
     await runContract(
       profile === "workers"
         ? new NodeAsyncHooks()
         : new AsyncHooksImplementation(),
       asyncHooksContract,
     ),
-  ];
+  );
+  return reports;
 }
 
 /** Standalone host validation owns a direct runtime, even when the app prefers a Worker. */
 export async function runLocalNodeContracts(): Promise<ContractResult[]> {
+  // This standalone contract harness has no configured application entry.
+  // Own the same Node bootstrap used by loadDirect(); build-tool tests exercise
+  // that public configured-entry path separately.
+  const restoreNode = installNodeGlobals();
   const runtime = capacitorWorkers({
     baseURL: "https://node-contract.invalid",
     worker: { fetch: () => new Response(null, { status: 204 }) },
   });
   try {
-    return await runNodeContracts("bundled");
+    const reports = await runNodeContracts("bundled");
+    // Reacquiring ownership after ALS use must not conflict or replace timers.
+    const releaseAgain = installNodeGlobals();
+    releaseAgain();
+    return reports;
   } finally {
     await runtime.dispose();
+    restoreNode();
   }
 }

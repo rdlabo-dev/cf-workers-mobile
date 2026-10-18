@@ -11,7 +11,13 @@ const pack = JSON.parse(
     encoding: "utf8",
   }),
 )[0];
-for (const module of ["path", "querystring", "string-decoder", "buffer"]) {
+for (const module of [
+  "path",
+  "querystring",
+  "string-decoder",
+  "buffer",
+  "timers",
+]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
     if (!pack.files.some((file) => file.path === notice))
@@ -75,6 +81,7 @@ for (const module of [
   "encoding",
   "abort",
   "async-hooks",
+  "timers",
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });
@@ -266,7 +273,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 238 ||
+    features.flatMap((report) => report.cases).length !== 298 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -303,7 +310,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 105 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 135 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||
@@ -407,7 +414,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     ),
   );
   console.log(
-    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).length} passed, 0 exclusions, preferences 2/2 passed (${temp})`,
+    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).filter((c) => c.status === "passed").length} passed, ${features.flatMap((report) => report.cases).filter((c) => c.status === "unsupported").length} declared unsupported, preferences 2/2 passed (${temp})`,
   );
 } finally {
   await browser?.close();

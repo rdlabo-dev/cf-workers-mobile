@@ -7,6 +7,7 @@ import {
   globalsInstallPath,
   nodeGlobalsInstallPath,
   globalsPath,
+  globalsInjectPath,
   workerEntry,
 } from "./build/shared.js";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
@@ -22,7 +23,7 @@ function compatibilityPlugins(
   // the same module resolve to the shared compat profile.
   const overrides = Object.fromEntries(
     Object.entries(compatibilityAliases()).filter(
-      ([specifier]) => !specifier.includes(":") && !specifier.includes("/"),
+      ([specifier]) => !specifier.includes(":"),
     ),
   );
   return [
@@ -68,6 +69,10 @@ function compatibilityPlugins(
             "http",
             "node:buffer",
             "buffer",
+            "node:timers",
+            "timers",
+            "node:timers/promises",
+            "timers/promises",
           ],
         },
         resolve: {
@@ -81,13 +86,14 @@ function compatibilityPlugins(
     }),
     {
       ...inject({
-        Buffer: [globalsPath, "Buffer"],
-        process: [globalsPath, "process"],
-        global: [globalsPath, "global"],
-        setImmediate: [globalsPath, "setImmediate"],
-        clearImmediate: [globalsPath, "clearImmediate"],
+        Buffer: [globalsInjectPath, "Buffer"],
+        process: [globalsInjectPath, "process"],
+        global: [globalsInjectPath, "global"],
+        setImmediate: [globalsInjectPath, "setImmediate"],
+        clearImmediate: [globalsInjectPath, "clearImmediate"],
         exclude: [
           normalizePath(globalsPath),
+          normalizePath(globalsInjectPath),
           normalizePath(globalsInstallPath),
         ],
       }),
