@@ -184,9 +184,12 @@ export async function runNativeExperiment() {
   let featureTimer: ReturnType<typeof setTimeout> | undefined;
   try {
     const reports = await Promise.race([
-      Promise.all([window.runFeatures(), runWebApis()]).then((reports) =>
-        reports.flat(),
-      ),
+      // Both suites own the page's public Fetch adapter; run their lifetimes
+      // sequentially instead of installing two adapters in the same document.
+      (async () => [
+        ...(await window.runFeatures()),
+        ...(await runWebApis()),
+      ])(),
       new Promise<never>((_, reject) => {
         featureTimer = setTimeout(
           () => reject(new Error("Feature verification timed out")),

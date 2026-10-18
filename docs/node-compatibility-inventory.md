@@ -24,7 +24,8 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:fs` / `node:fs/promises`         | **Unverified**                    | Read-only VFS with `workerFiles` bundler embedding; verified against a re-bundled OpenNext handler locally. Write APIs, FileHandle, watch and realpath edge cases are unimplemented. |
 | `node:module` / `node:stream/web` / `node:util` | **Unverified**      | Scoped shims: `createRequire` (VFS `.json` only), platform stream constructors, util polyfill + `TextEncoder`/`TextDecoder`. Verified transitively by the OpenNext smoke. |
 | `node:async_hooks` / AsyncLocalStorage | **Unverified**                    | Scoped implementation at `src/compat/async-hooks/index.ts` with a 14-case contract compared against pinned workerd. Synchronous scopes, enterWith/disable, bind/snapshot, sticky single-context await propagation and AsyncResource boundaries pass locally; settle-restore and interleaved-context isolation are declared unsupported. A re-bundled OpenNext (Next 15.5) handler rendered static and dynamic routes locally with this approximation; full Workers parity is not established. |
-| `node:buffer` | **Unverified (CI pending)** | Whole-module implementation and local acceptance are recorded in [Buffer acceptance](#buffer-acceptance). Remote CI is required before marking Complete. |
+| `node:buffer` | **Complete** | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20). |
+| `node:timers` / `node:timers/promises` | **Unverified (CI pending)** | Whole-module implementation and shared 30-group contract are in `src/compat/timers/`. [Acceptance evidence](#timers-acceptance) records local verification; remote CI remains the merge gate. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Scope and evidence
@@ -155,7 +156,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Implementation status | Category             | API family                                                                         | Class                      | Implementation boundary / remaining check                                                                                                                                                            |
 | --------------------- | -------------------- | ---------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unverified            | Assertion testing    | `assert`, `assert/strict`, equality, throws/rejects                                | A                          | JS comparison and exception handling. Deep comparison involving engine-only inspection is U; test cross-realm values and error shapes.                                                               |
-| **Unverified (CI pending)** | Buffer | Entire pinned export/static/prototype surface, Blob/File and transcode | A | [Whole-module local acceptance](#buffer-acceptance); remote CI pending.                                                                                                                             |
+| **Complete** | Buffer | Entire pinned export/static/prototype surface, Blob/File and transcode | A | [Whole-module acceptance](#buffer-acceptance); PR #20 remote CI passed.                                                                                                                             |
 | **Complete**          | Buffer globals       | unqualified `Buffer`                                                               | B                          | Inject before application/dependency evaluation; imports and global must use the same implementation.                                                                                                |
 | Unverified            | Events               | `EventEmitter`, `once`, `on`, listener bookkeeping                                 | A                          | Preserve ordering, error events, cancellation and iterator cleanup.                                                                                                                                  |
 | Not implemented       | Events + context     | `EventEmitterAsyncResource` where exposed                                          | U                          | Depends on the async context decision; do not claim parity from EventEmitter alone.                                                                                                                  |
@@ -212,7 +213,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Not implemented       | Process           | cwd/chdir                                                         | A                                                    | Shared virtual cwd; validate against the virtual FS.                                                                                                                                                                                     |
 | Unverified            | Process           | hrtime, uptime and time-derived values                            | A/U                                                  | Implement documented compatibility behavior; native precision and matching timestamps are not the goal. Other process-v2 exports need baseline inspection.                                                                               |
 | Unverified            | Process           | exit, abort, fatal errors / runtime termination                   | U; D for uninstrumented direct execution             | Throwing an exception is catchable and is not proof of termination semantics. Inspect Workers behavior. Worker-host termination may cover isolated mode; an ordinary plugin cannot stop arbitrary main-realm JS while preserving the UI. |
-| Unverified            | Timers            | setTimeout/Interval/Immediate, clear variants, promises           | A+B                                                  | Host scheduling plus compatible handles/cancellation; confirm Workers ref/unref behavior and ordering. Background OS suspension is an execution limit, not fixed by a JS timer.                                                          |
+| Unverified            | Timers            | setTimeout/Interval/Immediate, clear variants, promises           | A+B                                                  | Whole-module Web implementation with compatible handles, cancellation, Promise helpers and scheduler. See [timers acceptance](#timers-acceptance). Background OS suspension remains an execution limit.                                                          |
 | Unverified            | Console           | log/info/warn/error, format, Console streams, groups/timers       | A+B                                                  | Capture original sinks to prevent recursion; decide which methods require global installation.                                                                                                                                           |
 | Unverified            | Errors            | classes, codes, causes, validation                                | A                                                    | JS construction and validation; don't rely on host-specific message text accidentally.                                                                                                                                                   |
 | Unverified            | Errors            | captureStackTrace, structured stack formatting and exact stacks   | U                                                    | Browser engines differ. Exact V8 frames/internal hooks are D without engine support; determine whether required Workers exports actually expose them.                                                                                    |
@@ -495,3 +496,68 @@ suite on iOS and Android and retain `FEATURE_REPORT` and `NATIVE_SUMMARY` logs.
 Both `node.buffer` reports must contain all 24 passing groups, and the final
 summary must contain no failures or exclusions. Do not accept only the Buffer
 subset while other runtime checks fail.
+
+## Timers acceptance
+
+The acceptance unit is `node:timers` together with `node:timers/promises`, using
+workerd `1.20261012.1`, compatibility date `2026-10-17`, and no additional flags.
+Both bare and `node:` imports resolve to the same implementation. Sources and the
+shared 30-group contract live in [`src/compat/timers/`](../src/compat/timers/index.spec.ts).
+
+The export audit covers `Timeout`, callback timers and all clear functions,
+`active`, `enroll`, `unenroll`, the `promises` namespace and both default exports.
+The Promise subpath covers timeout values, immediate values, interval iteration,
+`scheduler.wait()` and `scheduler.yield()`. Timeout prototype checks cover
+refresh, close, numeric conversion, disposal and ref state. Workers' deprecated
+`enroll()` rejection and inert ref/unref scheduling semantics are tested as
+expected results. Delays beyond the browser's signed 32-bit range are scheduled
+in chunks rather than accidentally firing immediately.
+
+Cancellation tests distinguish the JavaScript Promise helpers from Workers'
+native scheduler: the latter ignores shadowed signal properties and event
+propagation cancellation, and transports abort reasons rather than retaining
+object identity. Tests include errors, DOMException, non-cloneable values,
+throwing getters, null prototypes and spoofed tags. Host timer chunking and
+installation ownership/rollback have adjacent unit tests.
+
+Node timer globals are installed through the existing configured Worker bootstrap;
+raw browser ESM remains Web-only. Vite and esbuild inject only Node global values,
+separately from lifecycle installation. ALS callback capture preserves timer
+identity and ownership, including multiple independently loaded ALS modules.
+This does **not** certify async-hooks as a whole: its pre-existing settle-restore
+and interleaved-context exclusions remain visible in reports.
+
+No native plugin implementation is added. Local verification and review results
+are recorded below; remote CI must pass before this unit is marked Complete.
+
+Local acceptance on 2026-10-18 for implementation commit `4c73eb7`:
+
+| Gate | Result |
+| --- | --- |
+| Library build, root/demo typechecks and changed-source formatting | Passed |
+| Unit tests | 304 passed |
+| Fixed workerd | 93 passed, including all 30 timers contract groups |
+| Chromium/WebKit production runtime | 66 passed |
+| Vite development runtime | 20 passed |
+| Build tools | 7 build tests and 30 integration tests passed |
+| Independently installed npm tarball | Vite/esbuild/raw ESM 10/10, configured dev 2/2, direct 26/26, isolated 22/22, common features 294 passed + 4 existing ALS exclusions |
+| Hono/Express demo | 8 passed |
+| Document/form regression | 72 accepted results, including the 6 existing WebKit expected failures |
+| iOS 26.1 and Android 16 WebViews | Each: 430 passed + 4 existing ALS exclusions; timers 30 direct + 30 Dedicated Worker passed with no timer exclusions |
+| Manager and independent code reviews | Passed after correction and re-review |
+| Remote CI | Pending publication of this branch |
+
+Native runs used a separate test application ID to avoid overwriting another
+verification app. Their reports identify the platform, device and built-asset
+fingerprints. Local logs and native JSON are saved under
+`demo/artifacts/timers-acceptance/` (generated, not shipped). The native harness
+runs suites that own the page Fetch adapter sequentially, and each standalone
+Web API suite owns a runtime for the lifetime of its globals.
+
+After merging main at `b41b01c`, the combined contracts include the four new
+module suites and the existing `nestedAsyncRestore` exclusion. Revalidation
+passed: build and root/demo typechecks, 308 unit tests, 93 workerd tests,
+66 production browser tests, 20 Vite development tests, 7 build-tool unit tests,
+30 build-tool integration tests, and the packed consumer
+(320 feature passes + 6 declared async-hooks exclusions). The native results
+above remain evidence for `4c73eb7`; they do not claim a native rerun of the merge.

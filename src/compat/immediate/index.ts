@@ -1,3 +1,5 @@
+import { dispose } from "../globals/symbols.js";
+import { bindCallback, markContextAware } from "../async-hooks/callbacks.js";
 // Workers' global Immediate has inert ref/unref methods: requests own lifetime.
 const token = {};
 const brands = new WeakSet<object>();
@@ -17,20 +19,21 @@ class Immediate {
     if (!brands.has(this)) throw new TypeError("Illegal invocation");
     return false;
   }
-  [Symbol.dispose]() {
-    clearImmediate(this);
+  [dispose]() {
+    cancelImmediate(this);
   }
 }
 Object.defineProperty(Immediate.prototype, Symbol.toStringTag, {
   value: "Immediate",
   configurable: true,
 });
-export function setImmediate(
+function scheduleImmediate(
   callback: (...args: any[]) => void,
   ...args: any[]
 ): Immediate {
   if (typeof callback !== "function")
     throw new TypeError("Callback must be a function");
+  callback = bindCallback(callback);
   const handle = new Immediate(token);
   handles.set(
     handle,
@@ -41,7 +44,7 @@ export function setImmediate(
   );
   return handle;
 }
-export function clearImmediate(handle?: Immediate | null): void {
+function cancelImmediate(handle?: Immediate | null): void {
   if (arguments.length === 0)
     throw new TypeError("clearImmediate requires a handle");
   if (handle == null) return;
@@ -50,3 +53,6 @@ export function clearImmediate(handle?: Immediate | null): void {
   if (timer !== undefined) clearTimeout(timer);
   handles.delete(handle);
 }
+
+markContextAware(scheduleImmediate);
+export { scheduleImmediate as setImmediate, cancelImmediate as clearImmediate };
