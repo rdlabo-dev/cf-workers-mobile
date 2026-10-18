@@ -49,3 +49,13 @@ test CA; they do not certify physical devices or deployed Cloudflare resources.
 Queue completion tracking is application-owned. Required CI remains pending and
 must pass before leaving draft/merging. These reviews do not certify unrelated
 PoC compatibility units as complete.
+
+## Follow-up: remove Swift CodeQL
+
+At the user's explicit request, removed the Swift CodeQL matrix entry and its
+macOS-only preparation/build steps. Actions, JavaScript/TypeScript and Java/Kotlin
+analysis remain. Both independent reviewers approved this follow-up with no
+required changes; `actionlint .github/workflows/codeql.yml` passed. The active
+main ruleset requires the aggregate `CI` check, not a separate Swift check.
+Local iOS native acceptance remains required. The service-binding implementation
+reviewed above is unchanged.
