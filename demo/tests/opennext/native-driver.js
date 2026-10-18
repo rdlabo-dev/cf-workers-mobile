@@ -31,6 +31,10 @@
   };
   const heading = (text) => document.querySelector("h1")?.textContent === text;
   try {
+    await report("plugin", {
+      mode: config.mode,
+      ...(await window.checkNativePlugin()),
+    });
     if (config.mode !== "flow") {
       if (location.pathname !== "/account") {
         location.href = "/account";
@@ -65,6 +69,10 @@
       await report("hydrated");
       click('a[href="/details"]');
       await wait(() => heading("Details"));
+      await report("plugin", {
+        mode: config.mode,
+        ...(await window.checkNativePlugin()),
+      });
       await report("details");
       history.back();
       await wait(() => heading("OpenNext in Capacitor"));

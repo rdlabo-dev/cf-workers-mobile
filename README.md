@@ -20,6 +20,8 @@ Experimental compatibility library: run a Cloudflare Workers fetch handler in a 
 
 ## Quick start
 
+For existing applications and AI coding assistants, start with the [AI integration guide](docs/integration.md): a ready-to-use prompt, Capacitor installation, connection of the existing Worker with minimal code changes, security and native verification.
+
 Configure your existing Worker entry with one of the [supported build setups](#build-setup), then initialize the runtime in your application:
 
 ```ts
@@ -302,6 +304,10 @@ npm run test:build-tools
 ### Local Cloudflare development
 
 Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`, run `npx cf build --mode hono` or `npx cf build --mode express` to build the corresponding Worker; use `npx cf dev --mode hono` (or `express`) for local development. The installed `cf` version is currently beta. Wrangler remains a development dependency for the CLI's bundler and the test harness; tests use the same compatibility settings, checking the example Workers as well as separate contract fixtures.
+
+### Void React Pages + D1
+
+[Void integration](docs/void.md) uses its generated Worker and configuration with the existing remote execution path. The React/D1 sample covers Chromium/WebKit and local workerd; Void-specific native acceptance and local execution remain unverified.
 
 ### OpenNext + D1
 

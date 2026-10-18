@@ -68,7 +68,26 @@ test(
       }
       throw new Error(`No ${stage} report: ${JSON.stringify(backend.reports)}`);
     };
+    const configPath = join(root, "capacitor.config.ts");
+    const originalConfig = await readFile(configPath, "utf8");
     try {
+      if (!local) {
+        // Test-only packaged plugin: use Capacitor discovery, not native source patches.
+        await cp(
+          fileURLToPath(
+            new URL("../fixtures/plugins/bridge-probe", import.meta.url),
+          ),
+          join(root, "node_modules/@workers-capacitor-test/bridge-probe"),
+          { recursive: true },
+        );
+        await writeFile(
+          configPath,
+          originalConfig.replace(
+            'webDir: "www",',
+            'webDir: "www", includePlugins: ["@rdlabo/workers-capacitor", "@workers-capacitor-test/bridge-probe"],',
+          ),
+        );
+      }
       if (local) {
         await run(
           "npx",
@@ -221,6 +240,22 @@ test(
       backend.config.mode = "loggedout";
       await launch();
       await waitReport("loggedout");
+      const plugins = backend.reports.filter(
+        (report) => report.stage === "plugin",
+      );
+      for (const mode of ["flow", "restart", "logout", "loggedout"])
+        assert.ok(
+          plugins.some((report) => report.mode === mode),
+          `Missing plugin event in ${mode}`,
+        );
+      assert.ok(plugins.some((report) => report.path === "/details"));
+      assert.ok(plugins.some((report) => report.path === "/account"));
+      for (const report of plugins) {
+        assert.equal(report.platform, platform);
+        assert.equal(report.reply, true);
+        assert.equal(report.event, true);
+        assert.equal(report.rejected, true);
+      }
       assert.equal(
         (
           await backend.db
@@ -230,6 +265,7 @@ test(
         0,
       );
     } finally {
+      await writeFile(configPath, originalConfig);
       await writeFile(
         join(
           artifacts,

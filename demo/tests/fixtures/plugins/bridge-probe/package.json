@@ -1,0 +1,13 @@
+{
+  "name": "@workers-capacitor-test/bridge-probe",
+  "version": "0.0.0",
+  "private": true,
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  }
+}

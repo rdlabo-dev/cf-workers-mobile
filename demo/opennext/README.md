@@ -35,6 +35,10 @@ The build report is `www/workers-capacitor-server.json`.
 the HTML, navigation and client hydration. The small `capacitor/index.html` only
 starts the runtime.
 
+## Rendering examples
+
+The home page combines initial HTML and a hydrated counter with a `next/dynamic` component using `ssr: false`. That component loads its message through `/api/message`. `/details?q=...` renders request-dependent content; `/about` is prerendered at build time. The tests distinguish these behaviors using document elements before scripts execute, client results afterwards, and the Next.js prerender manifest. They do not use the presence of a string in serialized page data as evidence of SSR.
+
 ## Authentication
 
 The example uses the fixed credentials `alice` / `demo` solely to exercise
@@ -52,6 +56,8 @@ npm run test:opennext
 OPENNEXT_PLATFORM=ios OPENNEXT_DEVICE=<simulator-id> node --test tests/opennext/native.test.mjs
 OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=<emulator-id> node --test tests/opennext/native.test.mjs
 ```
+
+The native remote scenario also checks calls, native events and rejected calls from a test-only Capacitor plugin before and after navigation and process restart. The plugin and driver live under `../tests/`; they are not application dependencies.
 
 The browser integration uses workerd, a disposable D1 database and a local HTTPS
 endpoint. No Cloudflare account or deployed service is required. Native tests

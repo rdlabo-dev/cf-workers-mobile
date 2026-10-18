@@ -4,12 +4,28 @@ import { readFile, readdir } from "node:fs/promises";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium, webkit, expect } from "@playwright/test";
+import { assertInitialRendering } from "../rendering/assertions.ts";
 import { startBackend } from "./backend.mjs";
 
 test(
   "unchanged OpenNext app renders, hydrates, navigates and persists D1 sessions in workerd",
   { timeout: 180000 },
   async () => {
+    // Build metadata distinguishes prerendering from HTML produced on request.
+    const prerender = JSON.parse(
+      await readFile(
+        new URL(
+          "../../opennext/.next/prerender-manifest.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
+    assert.ok(
+      prerender.routes["/about"],
+      "About must exercise real prerendering",
+    );
+    assert.equal(prerender.routes["/details"], undefined);
     const backend = await startBackend();
     try {
       await build({
@@ -54,7 +70,40 @@ test(
         try {
           const context = await browser.newContext({ ignoreHTTPSErrors: true });
           const page = await context.newPage();
+          const about = await backend.fetch("/about");
+          assert.equal(about.status, 200);
+          await assertInitialRendering(browser, await about.text(), {
+            initial: { h1: "About this example" },
+            clientOnly: [],
+          });
+          for (const value of [crypto.randomUUID(), crypto.randomUUID()]) {
+            const response = await backend.fetch(`/details?q=${value}`);
+            assert.equal(response.status, 200);
+            await assertInitialRendering(browser, await response.text(), {
+              initial: { "#query": value },
+              clientOnly: [],
+            });
+          }
+          const initial = await backend.fetch("/");
+          assert.equal(initial.status, 200);
+          await assertInitialRendering(browser, await initial.text(), {
+            initial: {
+              h1: "OpenNext in Capacitor",
+              "#server-rendered": "Rendered by Next.js",
+              "#counter": "Count: 0",
+            },
+            clientOnly: ["#client-only"],
+          });
+          const apiResponse = page.waitForResponse(
+            (response) => new URL(response.url()).pathname === "/api/message",
+          );
           await page.goto(backend.url.href);
+          assert.deepEqual(await (await apiResponse).json(), {
+            message: "Next.js API ready",
+          });
+          await expect(page.locator("#client-only")).toHaveText(
+            "Next.js API ready",
+          );
           await expect(page.locator("h1")).toHaveText("OpenNext in Capacitor");
           await page.locator("#counter").click();
           await expect(page.locator("#counter")).toHaveText("Count: 1");

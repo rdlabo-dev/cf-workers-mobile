@@ -196,3 +196,15 @@ lookup, `onread` buffers, abort/timeout, paused payload preservation and FIN/res
 notification before and after data delivery. Both Cloudflare TCP helpers dispatch
 through a public `net.Server`, including drop, pause-on-connect and close ordering.
 The server registers a logical port; it does not open an OS listening socket.
+
+## Rendering checks
+
+`test:documents` checks Hono/TSX and Workers Express using the existing document fixtures. `test:opennext` checks Next.js/OpenNext in the existing browser integration and local Vite/esbuild builds. Both use `rendering/assertions.ts` to inspect initial HTML with page JavaScript disabled, then their integration scenarios check client interaction and API results. Scripts, serialized payloads and comments containing markup must not count as rendered elements.
+
+Initial HTML is not automatically request-time SSR. Fresh query values must appear in the returned document for the request-rendered cases; the OpenNext suite separately checks a prerendered route against Next.js build metadata. These are expected-region assertions for representative applications, not a universal SSR classifier or an input to remote dispatch. No application startup probes or additional CI jobs are installed.
+
+## Native plugin calls from remote pages
+
+The OpenNext native test installs `fixtures/plugins/bridge-probe` through Capacitor's normal package discovery. The test-only driver uses `@capacitor/core` to call the plugin, receive its delayed native event and observe a rejected call from the remote-rendered page. The same checks run after client navigation, full document navigation and app relaunch. The driver removes its listener after each check and registers again in each new document; old JavaScript listeners are not expected to survive document replacement. Run the existing OpenNext native commands sequentially because they share generated assets and a temporary Capacitor configuration override, restored in `finally`.
+
+This verifies an automatically registered package plugin. It does not verify manual host-controller registration, arbitrary third-party plugins or background lifecycle delivery. No production plugin or CI emulator job is added.
