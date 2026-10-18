@@ -19,11 +19,13 @@ import {
 
 it("fs contract", async () => {
   const report = await runContract(new FsImplementation(), fsContract);
-  expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+  expect(report.errors).toEqual([]);
+  expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
 });
 it("module contract", async () => {
   const report = await runContract(new ModuleImplementation(), moduleContract);
-  expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+  expect(report.errors).toEqual([]);
+  expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
 });
 it("stream-web contract", async () => {
   const nativeFile = Object.getOwnPropertyDescriptor(globalThis, "File")!;
@@ -38,7 +40,8 @@ it("stream-web contract", async () => {
       new StreamWebImplementation(localStreams),
       streamWebContract,
     );
-    expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+    expect(report.errors).toEqual([]);
+    expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
   } finally {
     Object.defineProperty(globalThis, "File", installedFile);
     release();
@@ -49,5 +52,6 @@ it("util contract", async () => {
     new UtilImplementation(localUtil),
     utilContract,
   );
-  expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+  expect(report.errors).toEqual([]);
+  expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
 });

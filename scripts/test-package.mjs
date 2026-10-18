@@ -457,10 +457,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
         (report.node.direct.flatMap((r) => r.cases).length !== 469 ||
           report.node.direct.some(
             (r) =>
-              r.errors.length ||
-              r.cases.some(
-                (c) => c.status === "failed" || c.status === "unavailable",
-              ),
+              r.errors.length || r.cases.some((c) => c.status !== "passed"),
           ))
       )
         throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
@@ -489,10 +486,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
       if (
         report.execution !== prefer ||
         cases.length !== 469 ||
-        cases.some(
-          (result) =>
-            result.status === "failed" || result.status === "unavailable",
-        ) ||
+        cases.some((result) => result.status !== "passed") ||
         JSON.stringify(report.commonJsAssertions) !==
           JSON.stringify({ callable: true, sameDefault: true }) ||
         JSON.stringify(report.commonJsStreams) !==

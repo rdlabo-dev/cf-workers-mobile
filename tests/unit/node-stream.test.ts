@@ -12,5 +12,6 @@ it("runs the pinned Workers stream contract", async () => {
     ),
     streamContract,
   );
+  expect(report.errors).toEqual([]);
   expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
 });

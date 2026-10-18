@@ -149,6 +149,8 @@ function compatibilityPlugins(
           },
           include: [
             "cloudflare:node",
+            "node:_tls_common",
+            "_tls_common",
             "node:_http_agent",
             "_http_agent",
             "node:_http_client",

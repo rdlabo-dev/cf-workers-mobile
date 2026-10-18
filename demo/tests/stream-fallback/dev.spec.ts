@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  page.on("pageerror", (error) => console.error("Fallback page error:", error));
   await page.addInitScript(() => {
     const removeByteStreams = `delete globalThis.ReadableByteStreamController; delete globalThis.ReadableStreamBYOBReader; delete globalThis.ReadableStreamBYOBRequest;`;
     const realm = globalThis as unknown as Record<string, unknown>;
@@ -37,11 +38,12 @@ test("Vite development shares fallback constructors across direct and isolated m
   await page.goto("/");
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
-  expect(reports.flatMap((report) => report.cases)).toHaveLength(950);
+  expect(reports.flatMap((report) => report.errors)).toEqual([]);
+  expect(reports.flatMap((report) => report.cases)).toHaveLength(966);
   expect(
     reports
       .flatMap((report) => report.cases)
-      .filter((c) => c.status === "failed" || c.status === "unavailable"),
+      .filter((c) => c.status !== "passed"),
   ).toEqual([]);
 });
 

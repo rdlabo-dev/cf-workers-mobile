@@ -26,6 +26,13 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import { NodeError, NodeRangeError, NodeTypeError } from "./error-base.js";
+export {
+  NodeErrorAbstraction,
+  NodeError,
+  NodeRangeError,
+  NodeTypeError,
+} from "./error-base.js";
 import { inspect } from "node:util";
 const classRegExp = /^([A-Z][a-z0-9]*)+$/;
 
@@ -40,46 +47,6 @@ const kTypes = [
   "bigint",
   "symbol",
 ];
-
-export class NodeErrorAbstraction extends Error {
-  code: string;
-
-  constructor(name: string, code: string, message: string) {
-    super(message);
-    this.code = code;
-    this.name = name;
-  }
-
-  override toString(): string {
-    return `${this.name} [${this.code}]: ${this.message}`;
-  }
-}
-
-export class NodeError extends NodeErrorAbstraction {
-  constructor(code: string, message: string) {
-    super(Error.prototype.name, code, message);
-  }
-}
-
-export class NodeRangeError extends NodeErrorAbstraction {
-  constructor(code: string, message: string) {
-    super(RangeError.prototype.name, code, message);
-    Object.setPrototypeOf(this, RangeError.prototype);
-    this.toString = function (): string {
-      return `${this.name} [${this.code}]: ${this.message}`;
-    };
-  }
-}
-
-export class NodeTypeError extends NodeErrorAbstraction implements TypeError {
-  constructor(code: string, message: string) {
-    super(TypeError.prototype.name, code, message);
-    Object.setPrototypeOf(this, TypeError.prototype);
-    this.toString = function (): string {
-      return `${this.name} [${this.code}]: ${this.message}`;
-    };
-  }
-}
 
 function createInvalidArgType(
   name: string,

@@ -12,9 +12,11 @@ async context and native transport still require the module-owned contracts.
 The test imports every builtin through the **public esbuild plugin** in a fresh
 browser realm. Missing imports and evaluation failures are recorded rather than
 silently filtered out. This does not stand in for Vite or native acceptance.
-The known gap list is explicit completion debt; a new failing module outside
-that list fails the audit. Fixing an existing gap is allowed. Remove its entry
-from the gap list once the repaired surface is verified, to prevent regressions.
+The known gap baseline records exact missing/extra names and import failures,
+including engine-specific console differences. Losing another export inside an
+already incomplete module, adding an unexpected export, or introducing a new
+import failure fails the audit. Improvements are allowed; shrink the baseline
+after verifying a repair so that the repaired behavior cannot regress.
 
 ```sh
 npm run build

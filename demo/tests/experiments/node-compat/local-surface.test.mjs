@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { assertNoSurfaceRegression } from "./surface-regressions.mjs";
 import assert from "node:assert/strict";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -108,11 +109,13 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         result.missing?.length ||
         result.extra?.length,
     );
-    assert.deepEqual(
-      gaps.map(([name]) => name).filter((name) => !knownGaps.includes(name)),
-      [],
-      "New import/export regressions outside recorded completion debt",
-    );
+    for (const [name, result] of gaps) {
+      assertNoSurfaceRegression(
+        name,
+        result,
+        knownGaps[engine][name] ?? knownGaps.common[name],
+      );
+    }
     console.log(
       `${engine}: ${gaps.length}/${Object.keys(modules).length} modules have export/import gaps (behavior not certified)`,
     );

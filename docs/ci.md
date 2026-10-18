@@ -9,7 +9,7 @@
 | package       | Fresh npm tarball consumer: exported types and direct/isolated/common-profile browser checks                                                                                              |
 | upstream      | Pinned official Hono source, clean-clone/version checks, local workerd baseline, Vite build and Chromium/WebKit Fetch-only checks in direct and Worker execution                          |
 
-`CI` aggregates all four jobs. It runs even if a dependency fails and accepts only `success` from every dependency; failed, cancelled and skipped jobs cannot produce a passing gate. Vitest rejects focused tests through `--allowOnly=false`; Playwright rejects them when `CI` is set. Playwright uses one worker on CI to limit resource contention. The demo remains an independent package, not an npm workspace.
+`CI` aggregates all five jobs. It runs even if a dependency fails and accepts only `success` from every dependency; failed, cancelled and skipped jobs cannot produce a passing gate. Vitest rejects focused tests through `--allowOnly=false`; Playwright rejects them when `CI` is set. Playwright uses one worker on CI to limit resource contention. The demo remains an independent package, not an npm workspace.
 
 The shared profile integrations require every declared case to pass. The generic `assertContract` intentionally permits explicit partial coverage; it alone is not proof of full profile compatibility. Removing cases or weakening assertions still requires human review.
 
@@ -39,3 +39,24 @@ The `upstream` job checks `honojs/examples/jsx-ssr` at the full commit SHA in `d
 Six shared status/content expectations run against the original entry in local workerd and against the Vite-built public adapter in Chromium/WebKit, with both `direct` and `worker` execution (24 browser checks). The test actually asserts which execution mode was selected, so fallback cannot masquerade as isolated execution. This browser gate exercises Fetch Handler compatibility, not native document navigation, Safe Area layout, or iOS/Android lifecycle behavior. Those remain covered by the separate local native procedure.
 
 The job uploads the source-pin metadata, JSON test reports, and failure screenshots/traces for seven days, including on failure. Build/clone failures are available in the Actions step logs. A failure, cancellation, or skipped upstream job prevents the aggregate `CI` check from passing. No secrets, deployments, or simulator jobs are added. The independent native consumer still resolves its own dependencies through `npm install`; it is separate from this lockfile-controlled CI gate.
+
+## Node compatibility test responsibilities
+
+- Adjacent `src/compat/*/*.spec.ts` contracts assert observable outputs, errors,
+  state and cleanup. Environment runners execute these same expectations against
+  pinned workerd and the public browser adapters, including installed packages.
+- `test:node-inventory` checks the pinned namespace inventory and prevents new
+  missing/extra exports or import failures, even within modules with known debt.
+  Its `*-boundaries.test.mjs` probes reproduce engine differences; passing these
+  probes is evidence about a limitation, not acceptance of our implementation.
+- Runtime and forced-stream-fallback acceptance require all declared cases to
+  pass, including disposal. Changing a case to `unsupported` must fail these
+  gates. Counts protect against accidental omission but do not prove coverage.
+- The library's Node 22 unit host supplies `Error.isError` using Node's intrinsic
+  `util.types.isNativeError`. This test-only setup is not bundled or used in
+  browser, workerd or packed-consumer tests. The target WebView must provide the
+  standard intrinsic; these unit results alone cannot establish engine support.
+- Ignored `demo/artifacts/` scripts and native logs are local investigation
+  evidence. They are not a reproducible CI gate. Native runs remain a separate
+  acceptance obligation; a one-off successful run must not be presented as
+  automatic protection for future changes.

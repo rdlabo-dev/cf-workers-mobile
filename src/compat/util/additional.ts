@@ -10,11 +10,10 @@ import {
   kValidateObjectAllowArray,
   kValidateObjectAllowFunction,
 } from "../net/validators.js";
-import { ERR_INVALID_ARG_TYPE, NodeError } from "../net/errors.js";
+import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
+import { NodeError } from "../net/error-base.js";
 import { inspect } from "./inspect.js";
 import { isDeepStrictEqual as compare } from "./comparisons.js";
-const kValidateObjectAllowObjects =
-  kValidateObjectAllowArray | kValidateObjectAllowFunction;
 class ERR_METHOD_NOT_IMPLEMENTED extends NodeError {
   constructor(name: string) {
     super(
@@ -44,7 +43,11 @@ export async function aborted(
   // this additional option. Unfortunately Node.js does not make this argument optional.
   // We'll just ignore it.
   validateAbortSignal(signal, "signal");
-  validateObject(resource, "resource", kValidateObjectAllowObjects);
+  validateObject(
+    resource,
+    "resource",
+    kValidateObjectAllowArray | kValidateObjectAllowFunction,
+  );
   if (signal.aborted) return Promise.resolve();
   const { promise, resolve } = (() => {
     let resolve!: (event: Event) => void;

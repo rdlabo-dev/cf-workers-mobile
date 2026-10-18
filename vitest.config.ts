@@ -20,6 +20,7 @@ export default defineConfig({
     },
   ],
   test: {
+    setupFiles: ["tests/setup/node-host.ts"],
     server: { deps: { inline: [/brotli-dec-wasm/] } },
     // Node module contract specs run via demo tests in workerd and WebViews.
     include: [

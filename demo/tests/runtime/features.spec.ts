@@ -7,27 +7,14 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
   const reports = await page.evaluate(() => window.runFeatures());
   expect(reports.map((report) => report.cases.length)).toEqual([
     4, 4, 18, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5,
-    6, 8, 6, 8, 6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 8, 22, 8, 2, 7, 28,
-    15, 25, 2, 2, 2, 2, 2, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11,
-    5, 10, 5, 5, 6, 8, 6, 8, 6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 8, 22,
-    8, 2, 7, 28, 15, 25, 2, 2, 2, 2, 2, 2,
+    6, 8, 6, 8, 6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 8, 22, 8, 2, 7,
+    28, 15, 25, 2, 2, 2, 2, 2, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3,
+    11, 5, 10, 5, 5, 6, 8, 6, 8, 6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2,
+    8, 22, 8, 2, 7, 28, 15, 25, 2, 2, 2, 2, 2, 2,
   ]);
   const cases = reports.flatMap((report) => report.cases);
   expect(reports.flatMap((report) => report.errors)).toEqual([]);
-  expect(
-    cases.filter(
-      (result) => result.status === "failed" || result.status === "unavailable",
-    ),
-  ).toEqual([]);
-  expect(
-    reports
-      .filter((report) => report.feature === "node.async-hooks")
-      .map((report) =>
-        report.cases
-          .filter((result) => result.status === "unsupported")
-          .map((result) => result.id),
-      ),
-  ).toEqual([[], []]);
+  expect(cases.filter((result) => result.status !== "passed")).toEqual([]);
 });
 
 test("KV survives a WebView document reload and remains namespace-isolated", async ({
