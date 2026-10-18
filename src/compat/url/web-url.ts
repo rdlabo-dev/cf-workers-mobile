@@ -1,4 +1,4 @@
-import { filePath, normalizeFile, prepareHost, prepareURL } from "./host.js";
+import { URL as StandardURL } from "./standard-url.js";
 import { platform } from "../globals/platform.js";
 const coerceString = String.prototype.concat;
 const nativeBlobSize = Object.getOwnPropertyDescriptor(
@@ -10,75 +10,67 @@ const NativeURL: typeof globalThis.URL =
   (globalThis.URL as unknown as Record<symbol, typeof globalThis.URL>)[
     hostKey
   ] ?? globalThis.URL;
-const forbiddenEscapedHost =
-  /%(?:00|09|0a|0d|20|23|25|2f|3a|3c|3e|3f|40|5b|5c|5d|5e|7c)/i;
-function invalid(url: globalThis.URL): boolean {
-  return (
-    /^(?:https?|wss?|ftp|file):$/.test(url.protocol) &&
-    forbiddenEscapedHost.test(url.hostname)
-  );
+const NativeParams = globalThis.URLSearchParams;
+// A native URL owns each exposed query list. This preserves BodyInit branding
+// and live updates even when applications borrow URLSearchParams.prototype methods.
+const queries = new WeakMap<URL, globalThis.URL>();
+const hrefDescriptor = Object.getOwnPropertyDescriptor(
+  StandardURL.prototype,
+  "href",
+)!;
+const searchDescriptor = Object.getOwnPropertyDescriptor(
+  StandardURL.prototype,
+  "search",
+)!;
+function queryOf(href: string): string {
+  const beforeHash = href.split("#", 1)[0]!;
+  const at = beforeHash.indexOf("?");
+  return at < 0 ? "" : beforeHash.slice(at);
 }
-/** Keep native URL internal slots; correct the permissive Chromium host parser. */
-export class URL extends NativeURL {
-  constructor(input: string | globalThis.URL, base?: string | globalThis.URL) {
-    if (!arguments.length)
-      throw new TypeError(
-        "Failed to construct 'URL': constructor parameter 1 is not of type 'USVString'.",
-      );
-    const value = `${input}`;
-    const baseValue = base === undefined ? undefined : prepareURL(`${base}`);
-    if (baseValue !== undefined && invalid(new NativeURL(baseValue)))
-      throw new TypeError("Invalid base URL string.");
-    super(prepareURL(value, baseValue), baseValue);
-    normalizeFile(this, prepareURL(value, baseValue), baseValue, NativeURL);
-    if (invalid(this)) throw new TypeError("Invalid URL string.");
+function refreshQuery(url: URL) {
+  const query = queries.get(url);
+  if (query) query.search = queryOf(hrefDescriptor.get!.call(url));
+}
+function serialized(url: URL): string {
+  // Also performs the standard parser's receiver brand check.
+  hrefDescriptor.get!.call(url);
+  const query = queries.get(url);
+  if (query) searchDescriptor.set!.call(url, queryOf(query.href));
+  return hrefDescriptor.get!.call(url);
+}
+const instanceKey = Symbol.for("@rdlabo/capacitor-workers/url-instance");
+/** JS URL Standard parser with the fixed Workers IDNA profile. */
+export class URL extends (StandardURL as typeof globalThis.URL) {
+  override get searchParams(): URLSearchParams {
+    hrefDescriptor.get!.call(this);
+    let query = queries.get(this);
+    if (!query) {
+      query = new NativeURL("query://url-compat.invalid/");
+      queries.set(this, query);
+      refreshQuery(this);
+    }
+    return query.searchParams;
   }
   override get href() {
-    return super.href;
+    return serialized(this);
   }
   override set href(value: string) {
-    const input = prepareURL(`${value}`);
-    const next = new NativeURL(input);
-    if (invalid(next)) throw new TypeError("Invalid URL string.");
-    super.href = next.href;
-    normalizeFile(this, input, undefined, NativeURL);
+    hrefDescriptor.set!.call(this, value);
+    refreshQuery(this);
   }
-  override get pathname() {
-    return super.pathname;
+  override get search() {
+    serialized(this);
+    return searchDescriptor.get!.call(this);
   }
-  override set pathname(value: string) {
-    const input = `${value}`;
-    super.pathname = super.protocol === "file:" ? filePath(input) : input;
+  override set search(value: string) {
+    searchDescriptor.set!.call(this, value);
+    refreshQuery(this);
   }
-  override get host() {
-    return super.host;
+  override toString() {
+    return serialized(this);
   }
-  override set host(value: string) {
-    const next = new NativeURL(super.href);
-    const input = `${value}`;
-    try {
-      next.host = prepareHost(input, next.protocol);
-    } catch {
-      return;
-    }
-    if (next.protocol === "file:" && next.hostname === "localhost")
-      next.hostname = "";
-    if (!invalid(next)) super.host = next.host;
-  }
-  override get hostname() {
-    return super.hostname;
-  }
-  override set hostname(value: string) {
-    const next = new NativeURL(super.href);
-    const input = `${value}`;
-    try {
-      next.hostname = prepareHost(input, next.protocol);
-    } catch {
-      return;
-    }
-    if (next.protocol === "file:" && next.hostname === "localhost")
-      next.hostname = "";
-    if (!invalid(next)) super.hostname = next.hostname;
+  override toJSON() {
+    return serialized(this);
   }
   static override canParse(
     input: string | globalThis.URL,
@@ -135,11 +127,32 @@ export class URL extends NativeURL {
     throw new Error("URL.revokeObjectURL() is not implemented");
   }
 }
+for (const key of Reflect.ownKeys(StandardURL.prototype)) {
+  if (key !== "constructor" && !Object.hasOwn(URL.prototype, key))
+    Object.defineProperty(
+      URL.prototype,
+      key,
+      Object.getOwnPropertyDescriptor(StandardURL.prototype, key)!,
+    );
+}
+Object.defineProperty(URL.prototype, instanceKey, {
+  get() {
+    Object.getOwnPropertyDescriptor(StandardURL.prototype, "href")!.get!.call(
+      this,
+    );
+    return true;
+  },
+});
 for (const fn of [URL, URL.canParse, URL.parse])
   Object.defineProperty(fn, "length", { value: 1 });
 Object.defineProperty(URL, hostKey, { value: NativeURL });
-export const URLSearchParams = globalThis.URLSearchParams;
+export const URLSearchParams = NativeParams;
 
 export function isURLInstance(value: unknown): value is globalThis.URL {
-  return value instanceof NativeURL;
+  return (
+    value instanceof NativeURL ||
+    (typeof value === "object" &&
+      value !== null &&
+      (value as Record<symbol, unknown>)[instanceKey] === true)
+  );
 }

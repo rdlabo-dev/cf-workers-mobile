@@ -574,10 +574,12 @@ URL/URLSearchParams, legacy Url, parse/format/resolve/resolveObject, domain
 conversion, file URL helpers, toPathIfFileURL and urlToHttpOptions.
 
 The configured runtime owns/restores the global URL constructor so global and
-module identity agree. It retains native URL internal slots, normalizes host
-parsing and file resolution differences, and matches Workers' unsupported
+module identity agree. It uses the pinned WHATWG URL JavaScript parser because iOS WebView rejects
+some ASCII IDNA output that Workers accepts. It matches Workers' unsupported
 createObjectURL/revokeObjectURL behavior. URLSearchParams uses the platform
-constructor, including live URL linkage and the full prototype contract.
+constructor and a native query owner, retaining live linkage, borrowed method
+behavior and native Request/Response BodyInit branding. The full prototype is
+audited.
 Pre-installation URLs and URLs created by separately loaded bundles remain valid
 inputs to Node helpers. Installation tests cover ownership, rollback, disposal
 and an application replacing the global.
@@ -587,7 +589,9 @@ Ada 4.0.0 archive pinned by workerd. Punycode is pure JavaScript; NFC uses
 String.prototype.normalize. The maintainer generator pins the archive SHA-256;
 its C++20 extraction step is not part of library builds or consumer requirements.
 No native plugin or Wasm runtime is added. Notices travel with the package.
-The generated tables occupy about 239 kB of source before bundling/compression.
+The generated IDNA tables occupy about 239 kB and the generated WHATWG parser
+about 114 kB of source before bundling/compression. The parser is regenerated
+from `whatwg-url` 17.3.0 and the lockfile; consumers do not install that package.
 
 The shared contract includes upstream modern/legacy URL vectors, 1,364 IDNA
 comparisons and 837 constructor/base/setter comparisons captured against the

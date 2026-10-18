@@ -1,3 +1,4 @@
+import { isURLInstance } from "../url/web-url.js";
 import { platform } from "../globals/platform.js";
 import { cloneHeaders, Headers } from "../headers/index.js";
 import { Request, structuredCloneRequestSnapshot } from "../request/index.js";
@@ -287,8 +288,8 @@ function encode(
     return marker;
   }
 
+  if (isURLInstance(value)) throw dataCloneError(unsupported.get("URL")!);
   for (const [type, Constructor] of [
-    ["URL", URL],
     ["URLSearchParams", URLSearchParams],
     ["TextEncoder", TextEncoder],
     ["TextDecoder", TextDecoder],

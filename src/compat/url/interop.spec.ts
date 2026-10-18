@@ -16,7 +16,9 @@ it("formats URLs created before installation and by a separate bundle", async ()
   const prior = new first.URL(before.href);
   vi.resetModules();
   const second = await import("./index.js");
-  for (const value of [before, prior])
+  const { structuredClone } = await import("../structured-clone/index.js");
+  for (const value of [before, prior]) {
+    expect(() => structuredClone(value)).toThrow();
     expect(
       second.format(value, {
         auth: false,
@@ -25,6 +27,7 @@ it("formats URLs created before installation and by a separate bundle", async ()
         unicode: true,
       }),
     ).toBe("https://例え.テスト/a");
+  }
 });
 it("loads after another bundle has installed a Blob subclass", async () => {
   class AdaptedBlob extends OriginalBlob {}

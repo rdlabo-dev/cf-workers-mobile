@@ -78,6 +78,45 @@ export const urlContract: ContractSuite<typeof urlFeature> = {
           .sort(),
         names.sort(),
       );
+      deepStrictEqual(
+        Object.getOwnPropertyNames(api.URL.prototype).sort(),
+        [
+          "origin",
+          "href",
+          "protocol",
+          "username",
+          "password",
+          "host",
+          "hostname",
+          "port",
+          "pathname",
+          "search",
+          "hash",
+          "searchParams",
+          "toJSON",
+          "toString",
+          "constructor",
+        ].sort(),
+      );
+      deepStrictEqual(
+        Object.getOwnPropertyNames(api.URLSearchParams.prototype).sort(),
+        [
+          "size",
+          "append",
+          "delete",
+          "get",
+          "getAll",
+          "has",
+          "set",
+          "sort",
+          "entries",
+          "keys",
+          "values",
+          "forEach",
+          "toString",
+          "constructor",
+        ].sort(),
+      );
       for (const name of names)
         strictEqual((api as any)[name], (api.default as any)[name]);
       deepStrictEqual(
@@ -210,7 +249,44 @@ export const urlContract: ContractSuite<typeof urlFeature> = {
       strictEqual(api.URL.canParse("https://a%20b"), false);
       strictEqual(api.URL.parse("https://a%20b"), null);
     },
-    searchParams(api) {
+    async searchParams(api) {
+      const queryURL = new api.URL("https://example.com/?q=a%20b");
+      const reference = queryURL.searchParams;
+      strictEqual(queryURL.href, "https://example.com/?q=a%20b");
+      api.URLSearchParams.prototype.sort.call(reference);
+      strictEqual(queryURL.href, "https://example.com/?q=a+b");
+      queryURL.href = "https://example.com/?c=3";
+      strictEqual(queryURL.searchParams, reference);
+      strictEqual(reference.get("c"), "3");
+      queryURL.search = "?c=4";
+      strictEqual(reference.get("c"), "4");
+      const linked = new api.URL("https://example.com/?a=1");
+      api.URLSearchParams.prototype.append.call(
+        linked.searchParams,
+        "b",
+        "x y",
+      );
+      strictEqual(linked.href, "https://example.com/?a=1&b=x+y");
+      for (const body of [
+        new api.URLSearchParams("a=1"),
+        linked.searchParams,
+      ]) {
+        const request = new Request("https://example.com", {
+          method: "POST",
+          body,
+        });
+        const response = new Response(body);
+        strictEqual(
+          request.headers.get("content-type"),
+          "application/x-www-form-urlencoded;charset=UTF-8",
+        );
+        strictEqual(
+          response.headers.get("content-type"),
+          "application/x-www-form-urlencoded;charset=UTF-8",
+        );
+        strictEqual(await request.text(), body.toString());
+        strictEqual(await response.text(), body.toString());
+      }
       const params = new api.URLSearchParams("a=1&a=2&b=x+y");
       deepStrictEqual(params.getAll("a"), ["1", "2"]);
       params.delete("a", "1");

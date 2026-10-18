@@ -78,7 +78,8 @@
     "prettier": "^3.8.4",
     "typescript": "^7.0.2",
     "vite": "^7.3.7",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "whatwg-url": "17.3.0"
   },
   "peerDependencies": {
     "@capacitor/core": "^8.0.0",

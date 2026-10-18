@@ -50,3 +50,14 @@ NFC normalization uses the Web standard String.prototype.normalize.
 
 Punycode encoding and decoding use the separately packaged `punycode` 2.3.1
 (MIT), whose license is included in that dependency.
+
+## WHATWG URL implementation (MIT)
+
+`standard-url.ts` is generated from `whatwg-url` 17.3.0 using
+`scripts/url-idna/bundle-url.mjs` and the root lockfile. Its license is reproduced
+in LICENSE-WHATWG-URL. The generator substitutes the pinned Workers IDNA module,
+the Web-standard USVString conversion and the UTF-8 encoding required by the
+public URL APIs. It excludes unused legacy HTML encoding tables and guards the
+upstream WebIDL utility's SharedArrayBuffer introspection when unavailable.
+Only URL construction/parsing is exposed through the facade; URLSearchParams
+retains its native brand and native URL query owner for BodyInit interoperability.

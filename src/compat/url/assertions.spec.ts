@@ -7,7 +7,7 @@ export function strictEqual(
 ) {
   if (!Object.is(actual, expected))
     throw new Error(
-      message ?? `Expected ${String(expected)}, got ${String(actual)}`,
+      `${message ? message + ": " : ""}Expected ${String(expected)}, got ${String(actual)}`,
     );
 }
 export function deepStrictEqual(
