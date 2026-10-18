@@ -1,5 +1,7 @@
 // @ts-expect-error This fixture deliberately exercises a CommonJS require entry.
 import commonJsAssertions from "./assert.cjs";
+// @ts-expect-error This fixture verifies CommonJS constructor exports.
+import commonJsStreams from "./stream.cjs";
 // Type-only views: execution must use the installed public globals.
 const { Headers, Request } = globalThis as unknown as {
   Headers: typeof import("../../../../../src/compat/headers").Headers;
@@ -21,6 +23,7 @@ export default {
     return Response.json({
       contracts: await runNodeContracts("bundled"),
       commonJsAssertions: commonJsAssertions(),
+      commonJsStreams: commonJsStreams(),
       webGlobals: {
         entry: topLevelWebGlobals,
         static: staticWebGlobals,

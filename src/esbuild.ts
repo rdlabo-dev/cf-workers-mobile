@@ -8,6 +8,7 @@ import type { Plugin } from "esbuild";
 import {
   configuredPath,
   compatibilityAliases,
+  commonJSCompatibilityAliases,
   globalsInjectPath,
   workerEntry,
   workerSource,
@@ -27,11 +28,18 @@ function compatibilityPlugin(): Plugin {
           .map((key) => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
           .join("|")})$`,
       );
+      const commonJS = commonJSCompatibilityAliases();
       const empty = require("node-stdlib-browser").fs;
-      build.onResolve({ filter }, ({ path }) =>
+      build.onResolve({ filter }, ({ path, kind }) =>
         aliases[path] === empty
           ? { path, namespace: "capacitor-workers-unavailable" }
-          : { path: require.resolve(aliases[path]) },
+          : {
+              path: require.resolve(
+                kind === "require-call"
+                  ? (commonJS[path] ?? aliases[path])
+                  : aliases[path],
+              ),
+            },
       );
       // Like Vite's browser external: importable, but no unsupported API is provided.
       build.onLoad(

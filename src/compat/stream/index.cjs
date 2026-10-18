@@ -1,0 +1,26 @@
+// Preserve the callable CommonJS Stream export.
+const api = require("./index.js").default;
+module.exports = api;
+module.exports.addAbortSignal = api.addAbortSignal;
+module.exports.compose = api.compose;
+module.exports.destroy = api.destroy;
+module.exports.finished = api.finished;
+module.exports.isReadable = api.isReadable;
+module.exports.isWritable = api.isWritable;
+module.exports.isErrored = api.isErrored;
+module.exports.isDisturbed = api.isDisturbed;
+module.exports.pipeline = api.pipeline;
+module.exports.Stream = api.Stream;
+module.exports.Writable = api.Writable;
+module.exports.Readable = api.Readable;
+module.exports.Duplex = api.Duplex;
+module.exports.Transform = api.Transform;
+module.exports.PassThrough = api.PassThrough;
+module.exports.promises = api.promises;
+module.exports.getDefaultHighWaterMark = api.getDefaultHighWaterMark;
+module.exports.setDefaultHighWaterMark = api.setDefaultHighWaterMark;
+module.exports.isDestroyed = api.isDestroyed;
+module.exports.duplexPair = api.duplexPair;
+module.exports._isArrayBufferView = api._isArrayBufferView;
+module.exports._isUint8Array = api._isUint8Array;
+module.exports._uint8ArrayToBuffer = api._uint8ArrayToBuffer;

@@ -92,10 +92,18 @@ it("runs the node module contracts against real workerd", async () => {
     "node.stream-web",
     "node.util",
     "node.diagnostics_channel",
+    "node.stream",
+    "node._stream_readable",
+    "node._stream_writable",
+    "node._stream_duplex",
+    "node._stream_transform",
+    "node._stream_passthrough",
+    "node.stream/promises",
   ]);
   expect(reports.map((report) => report.cases.length)).toEqual([
     14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5, 6, 8, 6, 8,
-    6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 22, 7, 28, 15,
+    6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 22, 7, 28, 15, 25, 2, 2, 2, 2,
+    2, 2,
   ]);
   for (const report of reports) assertContract(report);
   expect(

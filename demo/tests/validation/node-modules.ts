@@ -178,6 +178,36 @@ import {
   diagnosticsContract,
 } from "../../../src/compat/diagnostics-channel/index.spec";
 
+import {
+  StreamImplementation,
+  streamContract,
+} from "../../../src/compat/stream/index.spec";
+
+import {
+  StreamReadableImplementation,
+  streamReadableContract,
+} from "../../../src/compat/stream-readable/index.spec";
+import {
+  StreamWritableImplementation,
+  streamWritableContract,
+} from "../../../src/compat/stream-writable/index.spec";
+import {
+  StreamDuplexImplementation,
+  streamDuplexContract,
+} from "../../../src/compat/stream-duplex/index.spec";
+import {
+  StreamTransformImplementation,
+  streamTransformContract,
+} from "../../../src/compat/stream-transform/index.spec";
+import {
+  StreamPassthroughImplementation,
+  streamPassthroughContract,
+} from "../../../src/compat/stream-passthrough/index.spec";
+import {
+  StreamPromisesImplementation,
+  streamPromisesContract,
+} from "../../../src/compat/stream-promises/index.spec";
+
 export type NodeProfile = "bundled" | "workers";
 
 export async function runNodeContracts(
@@ -245,6 +275,28 @@ export async function runNodeContracts(
     await runContract(new StreamWebImplementation(), streamWebContract),
     await runContract(new UtilImplementation(), utilContract),
     await runContract(new DiagnosticsImplementation(), diagnosticsContract),
+    await runContract(new StreamImplementation(), streamContract),
+    await runContract(
+      new StreamReadableImplementation(),
+      streamReadableContract,
+    ),
+    await runContract(
+      new StreamWritableImplementation(),
+      streamWritableContract,
+    ),
+    await runContract(new StreamDuplexImplementation(), streamDuplexContract),
+    await runContract(
+      new StreamTransformImplementation(),
+      streamTransformContract,
+    ),
+    await runContract(
+      new StreamPassthroughImplementation(),
+      streamPassthroughContract,
+    ),
+    await runContract(
+      new StreamPromisesImplementation(),
+      streamPromisesContract,
+    ),
   );
   return reports;
 }

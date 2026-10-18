@@ -7,6 +7,7 @@ import { readFile } from "node:fs/promises";
 import {
   configuredPath,
   compatibilityAliases,
+  commonJSCompatibilityAliases,
   globalsInstallPath,
   nodeGlobalsInstallPath,
   globalsPath,
@@ -29,6 +30,13 @@ function compatibilityPlugins(
     "runtime.js",
   );
   const aliases = compatibilityAliases();
+  const commonJS = commonJSCompatibilityAliases();
+  const commonJSPaths = new Map(
+    Object.entries(commonJS).map(([specifier, path]) => [
+      normalizePath(aliases[specifier as keyof typeof aliases]!),
+      path,
+    ]),
+  );
   const overrides = Object.fromEntries(
     Object.entries(aliases).filter(([specifier]) => !specifier.includes(":")),
   );
@@ -66,6 +74,10 @@ function compatibilityPlugins(
     {
       name: "capacitor-workers",
       enforce: "pre",
+      resolveId(source, _importer, options) {
+        if (options.custom?.["node-resolve"]?.isRequire)
+          return commonJS[source] ?? commonJSPaths.get(normalizePath(source));
+      },
       transform(code, id) {
         const original = code;
         const path = normalizePath(id.split("?")[0]);
@@ -101,6 +113,25 @@ function compatibilityPlugins(
       config: () => ({
         // App globals and dependencies must share Buffer identity and the HTTP registry.
         optimizeDeps: {
+          esbuildOptions: {
+            plugins: [
+              {
+                name: "capacitor-workers-commonjs-builtins",
+                setup(build) {
+                  build.onResolve(
+                    {
+                      filter:
+                        /^(?:node:)?(?:stream|_stream_(?:readable|writable|duplex|transform|passthrough))$/,
+                    },
+                    ({ path, kind }) =>
+                      kind === "require-call"
+                        ? { path: commonJS[path]! }
+                        : undefined,
+                  );
+                },
+              },
+            ],
+          },
           include: [
             "cloudflare:node",
             "node:_http_agent",
@@ -113,6 +144,20 @@ function compatibilityPlugins(
             "diagnostics_channel",
             "node:async_hooks",
             "async_hooks",
+            "node:stream",
+            "stream",
+            "node:stream/promises",
+            "stream/promises",
+            "node:_stream_readable",
+            "_stream_readable",
+            "node:_stream_writable",
+            "_stream_writable",
+            "node:_stream_duplex",
+            "_stream_duplex",
+            "node:_stream_transform",
+            "_stream_transform",
+            "node:_stream_passthrough",
+            "_stream_passthrough",
             "node:stream/web",
             "stream/web",
             "node:stream/consumers",

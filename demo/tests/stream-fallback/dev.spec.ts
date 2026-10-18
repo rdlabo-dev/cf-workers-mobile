@@ -37,7 +37,7 @@ test("Vite development shares fallback constructors across direct and isolated m
   await page.goto("/");
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
-  expect(reports.flatMap((report) => report.cases)).toHaveLength(876);
+  expect(reports.flatMap((report) => report.cases)).toHaveLength(950);
   expect(
     reports
       .flatMap((report) => report.cases)

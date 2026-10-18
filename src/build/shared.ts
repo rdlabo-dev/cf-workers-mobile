@@ -64,6 +64,8 @@ export function compatibilityAliases() {
     readline: compatPath("readline"),
     "node:domain": compatPath("domain"),
     domain: compatPath("domain"),
+    "node:stream/promises": compatPath("stream-promises"),
+    "stream/promises": compatPath("stream-promises"),
     "node:stream/consumers": compatPath("stream-consumers"),
     "stream/consumers": compatPath("stream-consumers"),
     "node:dns/promises": compatPath("dns").replace("index.js", "promises.js"),
@@ -120,6 +122,16 @@ export function compatibilityAliases() {
     fs: compatPath("fs"),
     "node:module": compatPath("module"),
     module: compatPath("module"),
+    "node:_stream_readable": compatPath("stream-readable"),
+    _stream_readable: compatPath("stream-readable"),
+    "node:_stream_writable": compatPath("stream-writable"),
+    _stream_writable: compatPath("stream-writable"),
+    "node:_stream_duplex": compatPath("stream-duplex"),
+    _stream_duplex: compatPath("stream-duplex"),
+    "node:_stream_transform": compatPath("stream-transform"),
+    _stream_transform: compatPath("stream-transform"),
+    "node:_stream_passthrough": compatPath("stream-passthrough"),
+    _stream_passthrough: compatPath("stream-passthrough"),
     "node:stream/web": compatPath("stream-web"),
     "stream/web": compatPath("stream-web"),
     // The util compat reuses the npm package through its deep specifier,
@@ -139,8 +151,8 @@ export function compatibilityAliases() {
     http: compatPath("http"),
     "node:net": compatPath("net"),
     net: compatPath("net"),
-    "node:stream": polyfill("readable-stream/lib/ours/browser.js"),
-    stream: polyfill("readable-stream/lib/ours/browser.js"),
+    "node:stream": compatPath("stream"),
+    stream: compatPath("stream"),
     // Subpath aliases must precede their parents: object-form alias entries
     // also match an "<alias>/" prefix.
     "node:path/win32": compatPath("path/win32"),
@@ -177,3 +189,21 @@ export function workerSource(
 export const globalsInjectPath = fileURLToPath(
   new URL("../compat/globals/inject.js", import.meta.url),
 );
+
+/** CommonJS builtins return their default value; ESM keeps named helpers intact. */
+export function commonJSCompatibilityAliases(): Record<string, string> {
+  const entries: Record<string, string> = {};
+  for (const [name, directory] of [
+    ["stream", "stream"],
+    ["_stream_readable", "stream-readable"],
+    ["_stream_writable", "stream-writable"],
+    ["_stream_duplex", "stream-duplex"],
+    ["_stream_transform", "stream-transform"],
+    ["_stream_passthrough", "stream-passthrough"],
+  ]) {
+    const path = compatPath(directory!).replace("index.js", "index.cjs");
+    entries[name!] = path;
+    entries[`node:${name}`] = path;
+  }
+  return entries;
+}

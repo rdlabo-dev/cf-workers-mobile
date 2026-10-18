@@ -50,6 +50,14 @@ for (const module of [
   "http-incoming",
   "util",
   "diagnostics-channel",
+  "stream",
+  "stream-readable",
+  "stream-writable",
+  "stream-duplex",
+  "stream-transform",
+  "stream-passthrough",
+  "stream-promises",
+
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -182,6 +190,14 @@ for (const module of [
   "stream-web",
   "util",
   "diagnostics-channel",
+  "stream",
+  "stream-readable",
+  "stream-writable",
+  "stream-duplex",
+  "stream-transform",
+  "stream-passthrough",
+  "stream-promises",
+
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });
@@ -392,7 +408,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 876 ||
+    features.flatMap((report) => report.cases).length !== 950 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -429,7 +445,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 424 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 461 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||
