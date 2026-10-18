@@ -1,6 +1,6 @@
 # @rdlabo/capacitor-workers
 
-Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. No API server, socket listener, or remote fallback is used for intercepted requests. This executes JavaScript in the WebView; it does not compile Workers code to native code.
+Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. Local requests execute without an API server or socket listener. D1-backed requests can reuse the existing deployed Worker through the build integration below. This executes JavaScript in the WebView; it does not compile Workers code to native code.
 
 ## Contents
 
@@ -165,7 +165,7 @@ The adapter resolves the request URL, then checks both its address and path:
 1. The URL must match either the running app's **protocol and host** (including the port), or the origin configured in `baseURL`.
 2. Its path must equal the `baseURL` path boundary or be below it. For `/api/`, `/api` and `/api/hello` match; `/apiary` does not.
 
-Matching requests run in the local Worker. The adapter replaces the origin with the `baseURL` origin while preserving the path and query. The protocol alone does not select local execution: `capacitor://other-host/api/hello` does not match an app running at `capacitor://localhost`.
+Matching requests normally run in the local Worker. With D1 build integration, the generated selector can send them to the existing deployed Worker before local execution. The adapter replaces the origin with the `baseURL` origin while preserving the path and query. The protocol alone does not select local execution: `capacitor://other-host/api/hello` does not match an app running at `capacitor://localhost`.
 
 With default Capacitor settings, `fetch("/api/hello")` follows these paths (assuming no `<base>` override and `baseURL: "https://api.example.com/api/"`):
 
@@ -174,7 +174,7 @@ With default Capacitor settings, `fetch("/api/hello")` follows these paths (assu
 | iOS      | `capacitor://localhost/api/hello` | `https://api.example.com/api/hello` |
 | Android  | `https://localhost/api/hello`     | `https://api.example.com/api/hello` |
 
-The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. These are local JavaScript calls; neither row sends an HTTP request to `api.example.com`.
+The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. Without a generated remote boundary these are local JavaScript calls; neither row sends an HTTP request to `api.example.com`. D1-backed requests instead use the configured `remote.origin`.
 
 #### Endpoint examples
 
@@ -228,7 +228,7 @@ Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a pe
 
 Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.
 
-Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `capacitorWorkers`. The optional token callback connects your existing authentication to remote requests; this package does not provide login or session management. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
+Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `capacitorWorkers`. The optional token callback connects existing bearer credentials. Native Capacitor also reuses server-managed Cookie sessions and same-origin redirects through the existing login UI; this package does not issue sessions or provide a login system. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
 
 ## Development and testing
 

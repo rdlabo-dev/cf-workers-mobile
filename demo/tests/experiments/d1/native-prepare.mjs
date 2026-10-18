@@ -11,7 +11,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
-const artifacts = join(repo, "demo/artifacts/d1-native");
+const ui = process.argv.includes("--ui");
+const artifacts = join(
+  repo,
+  ui ? "demo/artifacts/d1-native-ui" : "demo/artifacts/d1-native",
+);
 const refreshing = process.argv.includes("--refresh");
 const consumer = refreshing
   ? JSON.parse(await readFile(join(artifacts, "consumer.json"), "utf8"))
@@ -49,8 +53,14 @@ await writeFile(
     2,
   ),
 );
-await cp(new URL("worker.js", import.meta.url), join(consumer, "worker.js"));
-await cp(new URL("native-main.js", import.meta.url), join(consumer, "main.js"));
+await cp(
+  new URL(ui ? "ui-worker.js" : "worker.js", import.meta.url),
+  join(consumer, "worker.js"),
+);
+await cp(
+  new URL(ui ? "ui-main.js" : "native-main.js", import.meta.url),
+  join(consumer, "main.js"),
+);
 await cp(join(artifacts, "server.json"), join(consumer, "server.json"));
 await writeFile(
   join(consumer, "wrangler.jsonc"),
@@ -72,7 +82,9 @@ await writeFile(
   join(consumer, "capacitor.config.json"),
   JSON.stringify(
     {
-      appId: "jp.rdlabo.capacitorworkers.d1test",
+      appId: ui
+        ? "jp.rdlabo.capacitorworkers.d1ui"
+        : "jp.rdlabo.capacitorworkers.d1test",
       appName: "D1 Migration",
       webDir: "dist",
       ios: { packageManager: "SPM" },
@@ -81,6 +93,26 @@ await writeFile(
     2,
   ),
 );
+if (ui) {
+  await mkdir(join(consumer, "public/ui"), { recursive: true });
+  await writeFile(
+    join(consumer, "public/ui/app.js"),
+    (await readFile(new URL("ui-app.js", import.meta.url), "utf8")) +
+      "\n" +
+      (await readFile(new URL("ui-acceptance.js", import.meta.url), "utf8")),
+  );
+  await writeFile(
+    join(consumer, "public/ui/app.css"),
+    "body{font:18px system-ui;background:#eef3f7;color:#123;padding:24px}main{max-width:480px;margin:auto}input,button{font:inherit;padding:12px;margin:12px 0;display:block}button{background:#174b75;color:white;border:0;border-radius:6px}",
+  );
+  const server = JSON.parse(
+    await readFile(join(artifacts, "server.json"), "utf8"),
+  );
+  await writeFile(
+    join(consumer, "public/acceptance-run.json"),
+    JSON.stringify({ port: server.port }),
+  );
+}
 run("npm", ["install"]);
 run("npm", ["run", "build"]);
 if (!refreshing) {

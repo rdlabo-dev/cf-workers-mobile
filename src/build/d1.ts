@@ -232,9 +232,8 @@ function partition(
       variables.set(declaration.id.name, declaration);
       if (
         !declaration.init ||
-        !["Literal", "ArrowFunctionExpression", "FunctionExpression"].includes(
-          declaration.init.type,
-        )
+        declaration.init.type !== "Literal" ||
+        "regex" in declaration.init
       )
         mutable.add(declaration.id.name);
     } else if (
@@ -242,7 +241,14 @@ function partition(
         statement.type === "ClassDeclaration") &&
       statement.id
     ) {
+      if (statement.type === "ClassDeclaration")
+        fail(
+          "class initialization and static state require a single Worker boundary",
+        );
       declarations.set(statement.id.name, statement);
+      // Functions are objects too: properties can be mutated directly, through
+      // aliases, or by Object.assign. Do not assume declaration syntax is immutable.
+      mutable.add(statement.id.name);
     } else if (statement.type === "ExportNamedDeclaration") {
       for (const specifier of statement.specifiers)
         if (
@@ -266,6 +272,113 @@ function partition(
     )
       fail(`unsupported top-level ${statement.type}`);
   }
+  // Cookie state belongs to the deployed origin's session jar. A Worker that
+  // touches it must not split login/logout/profile between two independent jars.
+  // Likewise, ambient global state cannot be shared with a local module instance.
+  const sharedGlobals = new Set([
+    "globalThis",
+    "global",
+    "self",
+    "window",
+    "document",
+    "process",
+  ]);
+  const headerMethods = new Set(["get", "has", "set", "append", "delete"]);
+  const cookieName = (value: unknown) =>
+    typeof value === "string" && /^(?:set-)?cookie2?$/i.test(value);
+  function staticHeaderNames(node: Node): boolean {
+    if (node.type === "ObjectExpression")
+      return node.properties.every(
+        (item) =>
+          item.type === "Property" &&
+          !item.computed &&
+          (item.key.type === "Identifier" || item.key.type === "Literal"),
+      );
+    if (node.type === "ArrayExpression")
+      return node.elements.every(
+        (item) =>
+          item?.type === "ArrayExpression" &&
+          item.elements[0]?.type === "Literal" &&
+          typeof item.elements[0].value === "string",
+      );
+    return false;
+  }
+  walk(program, (child, parent) => {
+    if (
+      child.type === "ImportDeclaration" &&
+      child.source.value === "hono/cookie"
+    )
+      fail("cookie helpers require a single Worker session boundary");
+    if (child.type === "Identifier" && sharedGlobals.has(child.name))
+      fail("ambient global state requires a single Worker boundary");
+    if (
+      (child.type === "Literal" && cookieName(child.value)) ||
+      (child.type === "Identifier" && cookieName(child.name))
+    )
+      fail(
+        "Cookie and Set-Cookie access require a single Worker session boundary",
+      );
+    if (
+      child.type === "MemberExpression" &&
+      (property(child) === "header" ||
+        headerMethods.has(property(child) ?? "")) &&
+      !(parent?.type === "CallExpression" && parent.callee === child)
+    )
+      fail(
+        "escaped header or collection methods may access Cookie session state",
+      );
+    if (
+      child.type === "Identifier" &&
+      child.name === "Headers" &&
+      !(parent?.type === "NewExpression" && parent.callee === child)
+    )
+      fail("an escaped Headers constructor may access Cookie session state");
+    if (
+      child.type === "MemberExpression" &&
+      property(child) === "headers" &&
+      !(
+        parent?.type === "MemberExpression" &&
+        parent.object === child &&
+        headerMethods.has(property(parent) ?? "")
+      )
+    )
+      fail("an escaped header collection may contain Cookie session state");
+    if (
+      child.type === "Property" &&
+      !child.computed &&
+      (child.key.type === "Identifier"
+        ? child.key.name
+        : child.key.type === "Literal"
+          ? child.key.value
+          : undefined) === "headers" &&
+      !staticHeaderNames(child.value)
+    )
+      fail("dynamic header collections may contain Cookie session state");
+    if (
+      child.type === "NewExpression" &&
+      child.callee.type === "Identifier" &&
+      child.callee.name === "Headers" &&
+      child.arguments.length &&
+      !staticHeaderNames(child.arguments[0])
+    )
+      fail("dynamic Headers initialization may contain Cookie session state");
+    if (
+      child.type === "CallExpression" &&
+      child.callee.type === "MemberExpression"
+    ) {
+      const method = property(child.callee);
+      // An aliased Headers receiver is indistinguishable from another collection
+      // here. Unknown collection keys therefore widen the boundary conservatively.
+      if (
+        (method === "header" || headerMethods.has(method ?? "")) &&
+        (child.arguments[0]?.type !== "Literal" ||
+          typeof child.arguments[0].value !== "string")
+      )
+        fail(
+          "dynamic header or collection access may contain Cookie session state",
+        );
+    }
+  });
   walk(program, (child) => {
     if (
       child.type !== "AssignmentExpression" &&
@@ -275,7 +388,7 @@ function partition(
     let target: Node =
       child.type === "AssignmentExpression" ? child.left : child.argument;
     while (target.type === "MemberExpression") target = target.object;
-    if (target.type === "Identifier" && variables.has(target.name)) {
+    if (target.type === "Identifier" && declarations.has(target.name)) {
       mutable.add(target.name);
       if (child.type === "AssignmentExpression")
         writes.set(target.name, [
@@ -345,6 +458,42 @@ function partition(
         );
     }
   }
+  // Removing an unused declaration is safe only when its initializer cannot
+  // execute application code. This intentionally excludes calls, property reads,
+  // spreads, computed keys and classes; preserving those in two graphs is unsafe.
+  function pureInitializer(node: Node): boolean {
+    switch (node.type) {
+      case "Literal":
+      case "Identifier":
+      case "ArrowFunctionExpression":
+      case "FunctionExpression":
+        return true;
+      case "ArrayExpression":
+        return node.elements.every((value) => !value || pureInitializer(value));
+      case "ObjectExpression":
+        return node.properties.every(
+          (value) =>
+            value.type === "Property" &&
+            !value.computed &&
+            value.kind === "init" &&
+            pureInitializer(value.value),
+        );
+      case "UnaryExpression":
+        return node.operator !== "delete" && node.argument.type === "Literal";
+      default:
+        return false;
+    }
+  }
+  for (const [name, declaration] of variables) {
+    if (
+      !routerNodes.has(name) &&
+      declaration.init &&
+      !pureInitializer(declaration.init)
+    )
+      fail(
+        `initializer for ${name} may execute application code before dispatch`,
+      );
+  }
   if (!routerNodes.size)
     fail("no statically constructed Hono router was found");
   function rootRouter(name: string, seen = new Set<string>()): string {
@@ -381,6 +530,12 @@ function partition(
         for (const dependency of names(value)) result.add(dependency);
     }
     return result;
+  }
+  function rejectRouterEscape(nodes: Node[]) {
+    if ([...closure(nodes)].some((name) => routerNodes.has(name)))
+      fail(
+        "router references inside application handlers require a single Worker boundary",
+      );
   }
   function server(nodes: Node[]) {
     const dependencies = closure(nodes);
@@ -461,6 +616,13 @@ function partition(
             !routerNodes.has(name) &&
             !remoteState.has(name)
           ) {
+            if (
+              declarations.get(name)?.type === "FunctionDeclaration" &&
+              writes.has(name)
+            )
+              fail(
+                `function object ${name} may share state across the Worker boundary`,
+              );
             remoteState.add(name);
             changed = true;
           }
@@ -508,6 +670,7 @@ function partition(
         continue;
       }
       if (method === "onError" || method === "notFound") {
+        rejectRouterEscape(call.arguments);
         const remote = server(call.arguments);
         remoteErrors ||= remote;
         if (!remote) {
@@ -536,6 +699,7 @@ function partition(
         fail(
           `dynamic path/method for ${router}.${method} cannot be matched before execution`,
         );
+      rejectRouterEscape(handlers);
       const remote = server(handlers);
       localRoots.push(...paths);
       if (!remote) localRoots.push(...handlers);

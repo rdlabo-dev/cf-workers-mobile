@@ -80,7 +80,8 @@ test("Vite development reads Wrangler, protects original sources, and rebuilds t
     await context.route("https://deployed-worker.invalid/**", async (route) => {
       const request = route.request();
       const headers = {
-        "access-control-allow-origin": "*",
+        "access-control-allow-origin": request.headers().origin,
+        "access-control-allow-credentials": "true",
         "access-control-allow-headers": "authorization,content-type",
         "access-control-allow-methods": "GET,POST,HEAD,OPTIONS",
       };
@@ -264,7 +265,8 @@ for (const tool of ["vite", "esbuild"])
                 async (route) => {
                   const request = route.request();
                   const cors = {
-                    "access-control-allow-origin": "*",
+                    "access-control-allow-origin": request.headers().origin,
+                    "access-control-allow-credentials": "true",
                     "access-control-allow-headers":
                       "authorization,content-type",
                     "access-control-allow-methods": "GET,POST,HEAD,OPTIONS",

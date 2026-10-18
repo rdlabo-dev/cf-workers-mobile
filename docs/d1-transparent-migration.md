@@ -60,7 +60,9 @@ D1 bindings, server `env` values, unknown dependency behavior, dynamic property
 access, and mutable state shared with server operations widen the server boundary.
 An `env` binding may be explicitly kept local with the build option
 `localBindings: ["LABEL"]` when it is supplied through `capacitorWorkers({ env })`.
-A D1 binding cannot be declared local. The analysis is deliberately conservative;
+A D1 binding cannot be declared local. Unknown top-level initialization, internal router dispatch, ambient global state
+and cookie/header state also keep the entire Worker on the server.
+The analysis is deliberately conservative;
 it can send more work to the server than a human could safely separate.
 
 When splitting cannot preserve dispatch semantics, the generated client delegates
@@ -91,15 +93,37 @@ The request goes directly through the existing outbound transport, even if the
 remote origin overlaps the local interception URL. No local fetch recursion is
 used. Native requests use the existing TCP/TLS transport and owned socket scopes.
 Browser requests retain CORS and buffer upload bodies for WebKit/HTTP/1 support.
+Native manual document requests retain streaming; Fetch follow mode buffers an
+upload so a same-origin 307/308 can replay its body.
 
-Path, query, method, body and response status/headers are preserved. An existing
+Path, query, method, body and response status are preserved. An existing
 Authorization header is reused unless `getToken` is supplied. In that case the
 current token replaces it on each request; an absent token removes stale bearer
-credentials. Cookies from the local document are not forwarded and browser
-credential cookies are omitted. Cookie login/session migration is not provided
-by this bearer connection. Redirect responses are rejected rather than forwarding
-credentials or replaying writes. A server that redirects to login must expose an
-appropriate non-redirecting API response for this connection.
+credentials.
+
+On native Capacitor, existing server-managed cookie sessions use the OS cookie
+store for the remote host. Set-Cookie is processed in the host before redirecting;
+HttpOnly cookies are not exposed to the rendered document. Path, expiry and
+persistent-cookie logout semantics are retained. Local document cookies are never
+blindly forwarded. Cookie-dependent Workers run entirely on the deployed Worker
+so login, profile and logout share one session boundary. Users sign in through
+the existing login page; cookies from a separate desktop browser are not imported.
+Use `render: "/"` alongside `remote: { origin }` to render the existing Worker UI.
+
+Native redirects within the configured remote origin retain HTTP semantics:
+303 changes POST to GET, 307/308 preserve method/body, and manual document
+redirects map back into the application's logical origin. Redirect chains are
+bounded. Redirects to a different origin are rejected before credentials are
+sent there. External OAuth/SSO flows need an explicit external-browser integration
+and are not supplied here. Client-side scripts depending on reading remote
+non-HttpOnly cookies through local `document.cookie` are also not bridged.
+
+In ordinary browsers, remote requests use `credentials: "include"`; the deployed
+Worker must allow the actual app Origin and credentials in CORS responses.
+Wildcard Access-Control-Allow-Origin is insufficient. Browser cookie privacy and
+SameSite rules still apply. Browsers hide manual redirect locations, so remote
+redirects report an explicit unsupported error there. Native document acceptance
+must therefore be run on iOS/Android, not inferred from browser API tests.
 
 401 and network failures are returned without automatic retries or local
 fallback. Abort and runtime disposal cancel pending credential lookup/transport;
@@ -150,3 +174,32 @@ abort, disposal of in-flight requests and reinitialization. These are simulator
 and emulator results, not physical-device or production deployment evidence.
 The old standalone `/auth` helper and manual API-rewrite/schema-administration
 guides were removed; this unreleased API does not retain their compatibility.
+
+For rendered Cookie-session acceptance, use the same scripts with `--ui`:
+
+```sh
+node demo/tests/experiments/d1/native-server.mjs --ui
+node demo/tests/experiments/d1/native-prepare.mjs --ui
+node demo/tests/experiments/d1/native-run.mjs ios <simulator-uuid> --ui
+node demo/tests/experiments/d1/native-run.mjs android <emulator-serial> --ui
+```
+
+The independent UI consumer uses `render: "/ui/account"` and an ordinary Worker
+with no Capacitor imports. A test-only DOM driver fills inputs and activates real
+forms/links in the rendered WebView; it does not replace navigation with API calls.
+The same Worker runs in workerd. Tests check CSS/JS assets, login, a single D1
+write through POST/303/GET, detail navigation, persistent session after process
+restart, logout, and another restart remaining unauthenticated. Server-side D1
+snapshots, screenshots and reports are saved in `demo/artifacts/d1-native-ui/`.
+Run platforms sequentially. `native-prepare.mjs --ui --refresh` updates that
+consumer from a new package tarball.
+
+The review-cycle candidate on 2026-10-18 passed 332 unit tests, the browser D1
+matrix plus Vite development rebuild, and the fresh-package consumer suite.
+Both iOS 26.1 simulator and Android 16 emulator passed the rendered UI sequence
+above, including logout with the server session deliberately left valid: only
+Cookie deletion can make the subsequent restart unauthenticated. These UI
+results cover the default Dedicated Worker execution preference and native host
+transport. Browser/direct API combinations remain covered separately by the
+integration matrix; the UI sequence is not a claim about every authentication
+provider, browser privacy policy, or physical device.

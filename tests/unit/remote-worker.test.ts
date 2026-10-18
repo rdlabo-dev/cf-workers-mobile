@@ -7,6 +7,7 @@ const cleanups: (() => unknown)[] = [];
 afterEach(async () => {
   for (const dispose of cleanups.splice(0)) await dispose();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 function setup(
   prefer: "direct" | "worker",
@@ -60,7 +61,8 @@ for (const prefer of ["direct", "worker"] as const) {
     expect(await request.text()).toBe("payload");
     expect(request.headers.get("authorization")).toBe("Bearer first");
     expect(request.headers.get("cookie")).toBeNull();
-    expect(request.redirect).toBe("error");
+    expect(request.redirect).toBe("manual");
+    expect(request.credentials).toBe("include");
     token = "second";
     await runtime.fetch("https://same.example/api/next");
     expect(send.mock.calls[1][0].headers.get("authorization")).toBe(
@@ -175,4 +177,240 @@ it("cannot dispatch locally after disposal while an async selector is pending", 
   selected(false);
   await expect(pending).rejects.toThrow("disposed");
   expect(handler.fetch).not.toHaveBeenCalled();
+});
+
+// Remote policy tests use the real dispatcher and cookie boundary with a fake
+// wire transport. Native acceptance exercises the same policy over actual TLS.
+import { createRemoteWorker } from "../../src/fetch/remote.js";
+import * as nativeNetwork from "../../src/compat/fetch/native-network.js";
+import * as nativeFetch from "../../src/compat/fetch/index.js";
+import { Response as WireResponse } from "../../src/compat/response/index.js";
+import { Request as WireRequest } from "../../src/compat/request/index.js";
+function nativeRemote(
+  send: (request: WireRequest) => Promise<WireResponse>,
+  cookies = vi.fn(
+    async (
+      _plugin: string,
+      _method: string,
+      _args: Record<string, unknown>,
+    ): Promise<unknown> => ({ cookie: "remote=session" }),
+  ),
+) {
+  vi.spyOn(nativeNetwork, "getNativeCall").mockReturnValue(cookies);
+  vi.spyOn(nativeFetch, "createFetch").mockReturnValue(
+    send as ReturnType<typeof nativeFetch.createFetch>,
+  );
+  const remote = createRemoteWorker(
+    { origin: "https://server.example" },
+    fetch,
+  );
+  cleanups.push(() => remote.dispose());
+  return { remote, cookies };
+}
+it("uses remote cookies, stores Set-Cookie on its origin, strips them from the document response", async () => {
+  const send = vi.fn(
+    async (_request: WireRequest) =>
+      new WireResponse("saved", {
+        headers: [
+          [
+            "set-cookie",
+            "session=new; Domain=server.example; Path=/account; Secure; HttpOnly; Max-Age=86400",
+          ],
+          ["set-cookie", "bad=other; Domain=attacker.example; Path=/"],
+        ],
+      }),
+  );
+  const { remote, cookies } = nativeRemote(send);
+  const response = await remote.fetch(
+    new Request("https://logical.example/account", {
+      headers: {
+        cookie: "local=private",
+        origin: "https://logical.example",
+        referer: "https://logical.example/form",
+      },
+    }),
+  );
+  expect(send.mock.calls[0][0].headers.get("cookie")).toBe("remote=session");
+  expect(send.mock.calls[0][0].headers.get("origin")).toBe(
+    "https://server.example",
+  );
+  expect(send.mock.calls[0][0].headers.get("referer")).toBe(
+    "https://server.example/form",
+  );
+  expect(cookies.mock.calls).toEqual([
+    [
+      "CapacitorWorkers",
+      "cookiesGet",
+      { url: "https://server.example/account" },
+    ],
+    [
+      "CapacitorWorkers",
+      "cookiesSet",
+      {
+        url: "https://server.example/account",
+        cookies: [
+          "session=new; Path=/account; Secure; HttpOnly; Max-Age=86400",
+        ],
+      },
+    ],
+  ]);
+  expect(response.headers.has("set-cookie")).toBe(false);
+});
+it("returns manual same-origin redirects in the logical origin for native document navigation", async () => {
+  const { remote } = nativeRemote(
+    async () =>
+      new WireResponse(null, {
+        status: 303,
+        headers: { location: "https://server.example/account?done=1#saved" },
+      }),
+  );
+  const response = await remote.fetch(
+    new Request("https://logical.example/save", {
+      method: "POST",
+      body: "a=1",
+      redirect: "manual",
+    }),
+  );
+  expect(response.status).toBe(303);
+  expect(response.headers.get("location")).toBe(
+    "https://logical.example/account?done=1#saved",
+  );
+});
+for (const status of [303, 307, 308])
+  it(`follows ${status} with correct method/body and the updated cookie jar`, async () => {
+    const requests: {
+      url: string;
+      method: string;
+      body: string;
+      cookie: string | null;
+      contentType: string | null;
+    }[] = [];
+    let cookie = "old=1";
+    const cookies = vi.fn(
+      async (
+        _plugin: string,
+        method: string,
+        _args: Record<string, unknown>,
+      ) => {
+        if (method === "cookiesSet") cookie = "new=2";
+        return { cookie };
+      },
+    );
+    const { remote } = nativeRemote(async (request) => {
+      requests.push({
+        url: request.url,
+        method: request.method,
+        body: await request.text(),
+        cookie: request.headers.get("cookie"),
+        contentType: request.headers.get("content-type"),
+      });
+      return requests.length === 1
+        ? new WireResponse(null, {
+            status,
+            headers: { location: "/saved", "set-cookie": "new=2;Secure" },
+          })
+        : new WireResponse("ok");
+    }, cookies);
+    const response = await remote.fetch(
+      new Request("https://logical.example/save", {
+        method: "POST",
+        body: "value=1",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+      }),
+    );
+    expect(requests).toHaveLength(2);
+    expect(requests[1]).toEqual({
+      url: "https://server.example/saved",
+      method: status === 303 ? "GET" : "POST",
+      body: status === 303 ? "" : "value=1",
+      cookie: "new=2",
+      contentType: status === 303 ? null : "application/x-www-form-urlencoded",
+    });
+    expect(response.redirected).toBe(true);
+    expect(response.url).toBe("https://logical.example/saved");
+  });
+it("rejects external redirects before sending credentials to a second origin", async () => {
+  const send = vi.fn(
+    async (_request: WireRequest) =>
+      new WireResponse(null, {
+        status: 307,
+        headers: { location: "https://other.example/steal" },
+      }),
+  );
+  const { remote } = nativeRemote(send);
+  await expect(
+    remote.fetch(
+      new Request("https://logical.example/save", {
+        headers: { authorization: "Bearer secret" },
+      }),
+    ),
+  ).rejects.toThrow("remote.origin");
+  expect(send).toHaveBeenCalledTimes(1);
+});
+it("bounds redirect loops", async () => {
+  const send = vi.fn(
+    async (_request: WireRequest) =>
+      new WireResponse(null, { status: 302, headers: { location: "/again" } }),
+  );
+  const { remote } = nativeRemote(send);
+  await expect(
+    remote.fetch(new Request("https://logical.example/again")),
+  ).rejects.toThrow("Too many");
+  expect(send).toHaveBeenCalledTimes(21);
+});
+it("disposal while reading the cookie jar prevents a late network send", async () => {
+  let resolve!: (value: unknown) => void;
+  const cookies = vi.fn(
+    (_plugin: string, _method: string, _args: Record<string, unknown>) =>
+      new Promise<unknown>((done) => {
+        resolve = done;
+      }),
+  );
+  const send = vi.fn(async (_request: WireRequest) => new WireResponse("no"));
+  const { remote } = nativeRemote(send, cookies);
+  const pending = remote.fetch(new Request("https://logical.example/account"));
+  await vi.waitFor(() => expect(cookies).toHaveBeenCalled());
+  const assertion = expect(pending).rejects.toThrow("disposed");
+  await remote.dispose();
+  await assertion;
+  resolve({ cookie: "session=late" });
+  await Promise.resolve();
+  expect(send).not.toHaveBeenCalled();
+});
+
+it("preserves logical origin even for a redirect with a double-slash pathname", async () => {
+  const { remote } = nativeRemote(
+    async () =>
+      new WireResponse(null, {
+        status: 303,
+        headers: { location: "https://server.example//other.example/path" },
+      }),
+  );
+  const response = await remote.fetch(
+    new Request("https://logical.example/save", { redirect: "manual" }),
+  );
+  expect(response.headers.get("location")).toBe(
+    "https://logical.example//other.example/path",
+  );
+});
+it("preserves an external Origin for the existing server CSRF check", async () => {
+  const send = vi.fn(
+    async (_request: WireRequest) =>
+      new WireResponse("denied", { status: 403 }),
+  );
+  const { remote } = nativeRemote(send);
+  await remote.fetch(
+    new Request("https://logical.example/save", {
+      headers: {
+        origin: "https://untrusted.example",
+        referer: "https://untrusted.example/form",
+      },
+    }),
+  );
+  expect(send.mock.calls[0][0].headers.get("origin")).toBe(
+    "https://untrusted.example",
+  );
+  expect(send.mock.calls[0][0].headers.get("referer")).toBe(
+    "https://untrusted.example/form",
+  );
 });

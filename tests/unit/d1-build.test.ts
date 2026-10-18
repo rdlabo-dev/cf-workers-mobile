@@ -166,3 +166,146 @@ it("keeps server environment and opaque package access remote unless a binding i
     compileD1Worker(entry, ["DATABASE"], { localBindings: ["DATABASE"] }),
   ).rejects.toThrow("cannot also be a local binding");
 });
+
+it("keeps initializer side effects and uncertain object construction in the existing Worker", async () => {
+  for (const initialize of [
+    `const boot = (() => { state.value = 7; return true; })();`,
+    `const boot = Object.assign(state, {value: 7});`,
+    `const boot = { ...state };`,
+    `class Boot { static { state.value = 7; } }`,
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono(); const state = {value: 0}; ${initialize}
+        app.get('/', c => c.json(state.value));
+        app.get('/db', c => c.json(c.env.DATABASE.prepare('SELECT initializer_secret'))); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    expect(result.local).not.toMatch(/initializer_secret|state|Boot/);
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/"))).toBe(true);
+  }
+});
+
+it("keeps nested router dispatch and escaped router aliases in the existing Worker", async () => {
+  for (const handler of [
+    `c => app.request('/db')`,
+    `c => dispatch()`,
+    `c => routerAlias.fetch(c.req.raw)`,
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono(); const routerAlias = app;
+        function dispatch() { return routerAlias.request('/db'); }
+        app.get('/proxy', ${handler});
+        app.get('/db', c => c.text(c.env?.DATABASE?.prepare('SELECT nested_secret') ?? 'remote fallback')); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    expect(result.reason).toMatch(/router references/);
+    expect(result.local).not.toContain("nested_secret");
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/proxy"))).toBe(
+      true,
+    );
+  }
+});
+
+it("keeps mutable function properties and class static state in one Worker", async () => {
+  for (const declaration of [
+    `function cache() {}`,
+    `class cache { static total = 0; }`,
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono(); ${declaration}
+        app.get('/count', c => c.json(cache.total ?? 0));
+        app.post('/db', c => { cache.total = 7; return c.json(c.env.DATABASE.prepare('SELECT state_secret')); }); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    expect(result.local).not.toContain("state_secret");
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/count"))).toBe(
+      true,
+    );
+  }
+});
+
+it("keeps ambient global reads and writes in the existing Worker", async () => {
+  for (const global of ["globalThis", "global", "self", "window"]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+        app.post('/db', c => { ${global}.counter = 7; return c.json(c.env.DATABASE.prepare('SELECT global_secret')); });
+        app.get('/count', c => c.json(${global}.counter ?? 0)); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/count"))).toBe(
+      true,
+    );
+    expect(result.local).not.toContain("global_secret");
+  }
+});
+
+it("keeps cookie login/logout/profile and D1 in a single session boundary", async () => {
+  for (const [imports, handler] of [
+    [
+      `import { deleteCookie } from 'hono/cookie';`,
+      `c => { deleteCookie(c, 'session'); return c.text('bye'); }`,
+    ],
+    [
+      `import { getCookie } from 'hono/cookie';`,
+      `c => c.text(getCookie(c, 'session') ?? '')`,
+    ],
+    [
+      "",
+      `c => { c.header('Set-Cookie', 'session=; Max-Age=0'); return c.text('bye'); }`,
+    ],
+    ["", `c => c.text(c.req.header('cookie') ?? '')`],
+    ["", `c => c.text(c.req.raw.headers.get('COOKIE') ?? '')`],
+    [
+      "",
+      `c => { const headers = new Headers(); headers.set(c.req.query('key'), 'session='); return new Response('', {headers}); }`,
+    ],
+    ["", `c => c.json(c.req.header())`],
+    [
+      "",
+      `c => { const get = c.req.header.bind(c.req); return c.text(get(c.req.query('key'))); }`,
+    ],
+    [
+      "",
+      `c => { const get = c.req.raw.headers.get.bind(c.req.raw.headers); return c.text(get(c.req.query('key'))); }`,
+    ],
+    [
+      "",
+      `c => { const HeaderCtor = Headers; return new Response('', {headers: new HeaderCtor(JSON.parse(c.req.query('headers')))}); }`,
+    ],
+    ["", `c => new Response('', {headers: c.req.raw.headers})`],
+    [
+      "",
+      `c => { const headers = c.req.raw.headers; return c.text(headers.get(c.req.query('key')) ?? ''); }`,
+    ],
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; ${imports} const app = new Hono();
+        app.get('/session', ${handler});
+        app.get('/db', c => c.json(c.env.DATABASE.prepare('SELECT cookie_secret'))); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    expect(result.reason).toMatch(/cookie|Cookie|session/i);
+    const { needsRemote } = await selector(result.selector);
+    expect(
+      await needsRemote(new Request("https://local.invalid/session")),
+    ).toBe(true);
+    expect(result.local).not.toContain("cookie_secret");
+  }
+});
+
+it("preserves local routes with statically named non-cookie headers", async () => {
+  const result = await compile({
+    "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+      app.get('/health', c => { c.header('x-worker', 'local'); return new Response(c.req.raw.headers.get('accept'), {headers: {'content-type': 'text/plain'}}); });
+      app.get('/db', c => c.json(c.env.DATABASE.prepare('SELECT header_secret'))); export default app;`,
+  });
+  expect(result.mode).toBe("routes");
+  const { needsRemote } = await selector(result.selector);
+  expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
+    false,
+  );
+});

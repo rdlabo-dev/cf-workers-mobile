@@ -4,8 +4,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
+const ui = process.argv.includes("--ui");
 const root = fileURLToPath(
-  new URL("../../../artifacts/d1-native/", import.meta.url),
+  new URL(
+    ui ? "../../../artifacts/d1-native-ui/" : "../../../artifacts/d1-native/",
+    import.meta.url,
+  ),
 );
 await mkdir(root, { recursive: true });
 execFileSync(
@@ -31,7 +35,9 @@ execFileSync(
   ],
   { cwd: root, stdio: "pipe" },
 );
-const fixture = fileURLToPath(new URL("worker.js", import.meta.url));
+const fixture = fileURLToPath(
+  new URL(ui ? "ui-worker.js" : "worker.js", import.meta.url),
+);
 const result = await build({
   stdin: {
     contents: `import app from ${JSON.stringify(fixture)}; let effects=0; export default { async fetch(req,env,ctx){effects++;const res=await app.fetch(req,env,ctx);res.headers.set('x-effect-total',String(effects));return res;} };`,
@@ -53,6 +59,10 @@ const db = await backend.getD1Database("DB");
 await db.exec(
   "CREATE TABLE private_counters (owner TEXT PRIMARY KEY, value INTEGER NOT NULL); INSERT INTO private_counters VALUES ('alice', 0), ('bob', 0);",
 );
+if (ui)
+  await db.exec(
+    "CREATE TABLE ui_sessions (token TEXT PRIMARY KEY, owner TEXT NOT NULL); CREATE TABLE ui_notes (owner TEXT PRIMARY KEY, value INTEGER NOT NULL, writes INTEGER NOT NULL); INSERT INTO ui_notes VALUES ('alice',0,0);",
+  );
 const reports = [];
 const server = createServer(
   {
@@ -70,6 +80,25 @@ const server = createServer(
       if (req.method === "OPTIONS") {
         res.writeHead(204);
         res.end();
+        return;
+      }
+      if (ui && req.url.startsWith("/__ui_config")) {
+        res.setHeader("content-type", "application/json");
+        res.setHeader("cache-control", "no-store");
+        res.end(await readFile(root + "ui-config.json"));
+        return;
+      }
+      if (ui && req.url === "/__ui_report") {
+        const report = JSON.parse(body.toString());
+        report.database = await db
+          .prepare("SELECT owner,value,writes FROM ui_notes ORDER BY owner")
+          .all();
+        reports.push(report);
+        await writeFile(
+          root + "ui-reports.json",
+          JSON.stringify(reports, null, 2),
+        );
+        res.end("ok");
         return;
       }
       if (req.url === "/__report") {
@@ -100,6 +129,8 @@ const server = createServer(
       );
       const bytes = Buffer.from(await response.arrayBuffer());
       const responseHeaders = Object.fromEntries(response.headers);
+      if (response.headers.getSetCookie().length)
+        responseHeaders["set-cookie"] = response.headers.getSetCookie();
       delete responseHeaders["transfer-encoding"];
       delete responseHeaders["content-length"];
       res.writeHead(response.status, {
