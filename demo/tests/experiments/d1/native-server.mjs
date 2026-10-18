@@ -1,3 +1,4 @@
+import { createBackend as createCloudflareBackend } from "../cloudflare/backend.mjs";
 import { createBackend } from "../services/backend.mjs";
 import { createServer } from "node:https";
 import { execFileSync } from "node:child_process";
@@ -7,14 +8,18 @@ import { build } from "esbuild";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 const ui = process.argv.includes("--ui");
 const services = process.argv.includes("--services");
-if (ui && services) throw new Error("Choose either --ui or --services");
+const cloudflare = process.argv.includes("--cloudflare");
+if ([ui, services, cloudflare].filter(Boolean).length > 1)
+  throw new Error("Choose one of --ui, --services or --cloudflare");
 const root = fileURLToPath(
   new URL(
-    services
-      ? "../../../artifacts/services-native/"
-      : ui
-        ? "../../../artifacts/d1-native-ui/"
-        : "../../../artifacts/d1-native/",
+    cloudflare
+      ? "../../../artifacts/cloudflare-native/"
+      : services
+        ? "../../../artifacts/services-native/"
+        : ui
+          ? "../../../artifacts/d1-native-ui/"
+          : "../../../artifacts/d1-native/",
     import.meta.url,
   ),
 );
@@ -54,17 +59,20 @@ const result = await build({
   format: "esm",
   write: false,
 });
-const backend = services
-  ? await createBackend()
-  : new Miniflare(
-      convertV4MiniflareOptions({
-        modules: true,
-        script: result.outputFiles[0].text,
-        compatibilityDate: "2026-10-01",
-        d1Databases: ["DB"],
-      }),
-    );
-const db = services ? undefined : await backend.getD1Database("DB");
+const backend = cloudflare
+  ? await createCloudflareBackend()
+  : services
+    ? await createBackend()
+    : new Miniflare(
+        convertV4MiniflareOptions({
+          modules: true,
+          script: result.outputFiles[0].text,
+          compatibilityDate: "2026-10-01",
+          d1Databases: ["DB"],
+        }),
+      );
+const db =
+  services || cloudflare ? undefined : await backend.getD1Database("DB");
 if (db)
   await db.exec(
     "CREATE TABLE private_counters (owner TEXT PRIMARY KEY, value INTEGER NOT NULL); INSERT INTO private_counters VALUES ('alice', 0), ('bob', 0);",

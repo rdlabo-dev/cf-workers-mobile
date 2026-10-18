@@ -100,14 +100,28 @@ Existing document asset hosting is a different feature and remains unchanged.
 
 ## Verification and limits
 
+The application-worker baseline is Miniflare `5.20261012.0-beta`, compatibility
+date `2026-10-01`, with no additional application compatibility flags. The named
+unit is build-generated HTTP dispatch, not local emulation of cloud binding APIs.
+
 - `npm test`: binding discovery, policy errors, unknown binding diagnostics,
   server code exclusion, remote routing precedence and upgrade rejection.
 - `npm run test:cloudflare-bindings` in `demo`: real workerd Durable Object HTTP,
   RPC and storage, authorization rejection without state changes, remote ASSETS,
-  Vite/esbuild artifact inspection, and Chromium/WebKit direct/Worker modes.
+  Vite/esbuild artifact inspection, Chromium/WebKit direct/Worker modes, both
+  worker-first and asset-first routing, and Vite development startup. Requests use
+  an actual local HTTPS server, not browser route interception. Conditional 304
+  responses are observed with browser HTTP caching disabled by the test server;
+  Range responses are compared with the same request sent directly to workerd.
+  This verifies forwarding, not a client recreation of Cloudflare cache behavior.
+- Fresh packed-consumer native runs pass 24 checks each on iOS and Android,
+  covering direct and Dedicated Worker execution, DO HTTP/RPC/state/authorization,
+  ASSETS GET/SPA/HEAD/304 and Range forwarding. See the
+  [native evidence](cloudflare-bindings-native-evidence.json) and
+  [review record](cloudflare-bindings-review.md).
 - Cloud AI, indexes and Workflows are verified as names for HTTP dispatch, not
   emulated APIs or paid live-service tests. Native transport contracts are shared
-  with existing remote services. Evidence and review scope are recorded separately.
+  with existing remote services.
 
 Cache API, HTMLRewriter and local ASSETS are separate unfinished compatibility
 units; this PR does not activate them in production aliases or exports.

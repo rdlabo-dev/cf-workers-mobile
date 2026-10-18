@@ -8,14 +8,18 @@ if (!["ios", "android"].includes(platform) || !device)
   throw new Error("native-run.mjs ios|android <device>");
 const ui = process.argv.includes("--ui");
 const services = process.argv.includes("--services");
-if (ui && services) throw new Error("Choose either --ui or --services");
+const cloudflare = process.argv.includes("--cloudflare");
+if ([ui, services, cloudflare].filter(Boolean).length > 1)
+  throw new Error("Choose one of --ui, --services or --cloudflare");
 const artifacts = fileURLToPath(
   new URL(
-    services
-      ? "../../../artifacts/services-native/"
-      : ui
-        ? "../../../artifacts/d1-native-ui/"
-        : "../../../artifacts/d1-native/",
+    cloudflare
+      ? "../../../artifacts/cloudflare-native/"
+      : services
+        ? "../../../artifacts/services-native/"
+        : ui
+          ? "../../../artifacts/d1-native-ui/"
+          : "../../../artifacts/d1-native/",
     import.meta.url,
   ),
 );
@@ -39,9 +43,11 @@ const run = (command, args, cwd = consumer) =>
         }
       : {}),
   });
-const app = ui
-  ? "jp.rdlabo.workerscapacitor.d1ui"
-  : "jp.rdlabo.workerscapacitor.d1test";
+const app = cloudflare
+  ? "jp.rdlabo.workerscapacitor.cloudflaretest"
+  : ui
+    ? "jp.rdlabo.workerscapacitor.d1ui"
+    : "jp.rdlabo.workerscapacitor.d1test";
 const runId = `${platform}-${Date.now()}`;
 const config = { id: runId, mode: "flow", value: platform === "ios" ? 17 : 23 };
 if (ui)
@@ -268,9 +274,9 @@ try {
       report.cases.filter((test) => !test.passed),
       [],
     );
-    assert.equal(report.cases.length, services ? 34 : 20);
+    assert.equal(report.cases.length, cloudflare ? 24 : services ? 34 : 20);
     console.log(
-      `${platform}: ${report.cases.length} HTTPS/${services ? "services" : "D1"} native checks passed`,
+      `${platform}: ${report.cases.length} HTTPS/${cloudflare ? "cloudflare" : services ? "services" : "D1"} native checks passed`,
     );
   }
 } catch (error) {
