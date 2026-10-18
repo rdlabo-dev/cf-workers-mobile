@@ -98,4 +98,11 @@ app.put("/settings/:key", async (c) => {
 app.get("/settings/:key", async (c) =>
   c.text((await c.env.CLOUD_KV.get(c.req.param("key"))) ?? "missing"),
 );
+app.put("/shared/:key", async (c) => {
+  await c.env.SHARED_KV.put(c.req.param("key"), await c.req.text());
+  return c.body(null, 204);
+});
+app.get("/shared/:key", async (c) =>
+  c.text((await c.env.SHARED_KV.get(c.req.param("key"))) ?? "missing"),
+);
 export default app;

@@ -22,6 +22,19 @@ try {
     try {
       await runtime.ready;
       check(`${prefer}:execution`, runtime.execution === prefer);
+      check(
+        `${prefer}:remote KV-only write`,
+        (
+          await fetch(`/shared/${key}`, {
+            method: "PUT",
+            body: "remote-config",
+          })
+        ).status === 204,
+      );
+      check(
+        `${prefer}:remote KV-only read`,
+        (await (await fetch(`/shared/${key}`)).text()) === "remote-config",
+      );
       check(`${prefer}:local`, (await (await fetch("/health")).json()).local);
       check(
         `${prefer}:R2 put`,

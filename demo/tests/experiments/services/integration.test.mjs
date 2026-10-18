@@ -64,7 +64,13 @@ for (const tool of ["vite", "esbuild"])
           root,
           publicDir: false,
           logLevel: "warn",
-          plugins: [vitePlugin({ worker, workerConfig: "wrangler.json" })],
+          plugins: [
+            vitePlugin({
+              worker,
+              workerConfig: "wrangler.json",
+              kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" },
+            }),
+          ],
           build: {
             outDir: out,
             emptyOutDir: true,
@@ -82,7 +88,13 @@ for (const tool of ["vite", "esbuild"])
           platform: "browser",
           outdir: out,
           sourcemap: true,
-          plugins: [esbuildPlugin({ worker, workerConfig: "wrangler.json" })],
+          plugins: [
+            esbuildPlugin({
+              worker,
+              workerConfig: "wrangler.json",
+              kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" },
+            }),
+          ],
         });
       const built = await files(out);
       for (const file of built)
@@ -180,6 +192,31 @@ for (const tool of ["vite", "esbuild"])
               assert.equal((await request("/health")).text, '{"local":true}');
               assert.equal(calls, mode === "split" ? 0 : 1);
               const key = `${tool}-${mode}-${engine}-${prefer}`;
+              const shared = await backend.getKVNamespace(
+                "SHARED_KV",
+                "application",
+              );
+              const sharedBefore = calls;
+              assert.equal(
+                (
+                  await request(`/shared/${key}`, {
+                    method: "PUT",
+                    body: "configured-remote",
+                  })
+                ).status,
+                204,
+              );
+              assert.equal(
+                (await request(`/shared/${key}`)).text,
+                "configured-remote",
+              );
+              assert.equal(
+                calls,
+                sharedBefore + 2,
+                "remote KV policy dispatches KV-only routes",
+              );
+              assert.equal(await shared.get(key), "configured-remote");
+
               let before = calls;
               const put = await request(`/api/objects/${key}`, {
                 method: "PUT",
@@ -405,7 +442,13 @@ test("Vite development dispatches service routes in both execution modes", async
     configFile: false,
     root,
     logLevel: "warn",
-    plugins: [vitePlugin({ worker: fixture, workerConfig: "wrangler.json" })],
+    plugins: [
+      vitePlugin({
+        worker: fixture,
+        workerConfig: "wrangler.json",
+        kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" },
+      }),
+    ],
     server: { host: "127.0.0.1", port: 0 },
   });
   await server.listen();

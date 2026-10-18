@@ -20,8 +20,10 @@ export interface ServerBuildOptions {
   /** Hyperdrive binding names when configuration is supplied by another tool. */
   hyperdriveBindings?: string[];
   r2Bindings?: string[];
-  /** KV names eligible for local execution; does not select remote dispatch. */
+  /** KV names when configuration is supplied by another tool. */
   kvBindings?: string[];
+  /** Required execution policy for every configured KV binding. */
+  kvExecution?: Record<string, "local" | "remote">;
   serviceBindings?: string[];
   queueBindings?: string[];
   /** Names explicitly supplied through capacitorWorkers({ env }); other env access stays on the server. */
@@ -115,6 +117,20 @@ export async function serverBindings(
   const hyperdrive = options.hyperdriveBindings ?? configured("hyperdrive");
   const r2 = options.r2Bindings ?? configured("r2_buckets");
   const kv = options.kvBindings ?? configured("kv_namespaces");
+  const policies = options.kvExecution === undefined ? {} : options.kvExecution;
+  if (!policies || typeof policies !== "object" || Array.isArray(policies))
+    throw new TypeError(
+      "kvExecution must map binding names to local or remote",
+    );
+  for (const [name, policy] of Object.entries(policies)) {
+    if (!kv.includes(name))
+      throw new Error(`Unknown KV binding in kvExecution: ${name}`);
+    if (policy !== "local" && policy !== "remote")
+      throw new TypeError(`kvExecution.${name} must be local or remote`);
+  }
+  for (const name of kv)
+    if (!Object.hasOwn(policies, name))
+      throw new Error(`Set kvExecution.${name} to local or remote`);
   const services = options.serviceBindings ?? configured("services");
   const queues = options.queueBindings ?? configured("queues", "producers");
   const consumers = environments.flatMap((environment) => {
@@ -132,12 +148,22 @@ export async function serverBindings(
       throw new Error(`Invalid queues.consumers in ${file}`);
     return consumers;
   });
-  const serverOnly = [...d1, ...hyperdrive, ...r2, ...services, ...queues];
+  const remoteKV = kv.filter((name) => policies[name] === "remote");
+  const serverOnly = [
+    ...d1,
+    ...hyperdrive,
+    ...r2,
+    ...services,
+    ...queues,
+    ...remoteKV,
+  ];
   if (options.localBindings?.some((name) => serverOnly.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
-  // KV does not require a network boundary. If another binding selects the
+  // Local KV does not require a network boundary. If another binding selects the
   // request for remote execution, the original Worker uses its cloud KV there.
-  const localKV = kv.filter((name) => !serverOnly.includes(name));
+  const localKV = kv.filter(
+    (name) => policies[name] === "local" && !serverOnly.includes(name),
+  );
   return {
     names: [...new Set<string>(serverOnly)],
     localBindings: [...new Set([...(options.localBindings ?? []), ...localKV])],
@@ -150,6 +176,7 @@ export async function serverBindings(
       consumers.length ||
       hyperdrive.length ||
       r2.length ||
+      remoteKV.length ||
       services.length ||
       queues.length
         ? "capacitor-workers-server.json"

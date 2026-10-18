@@ -227,7 +227,8 @@ Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a pe
 ## D1 and remote APIs
 
 R2, Service Bindings and Queue producers use the same build-generated HTTP
-dispatch. KV-only routes stay local; requests selected for remote execution use
+dispatch. KV-only routes follow the required per-binding `kvExecution` (`local`/`remote`)
+setting; requests selected for remote execution use
 the deployed Worker's cloud KV. See the [service binding guide](docs/remote-service-bindings.md)
 for configuration, upload limits and verification status.
 

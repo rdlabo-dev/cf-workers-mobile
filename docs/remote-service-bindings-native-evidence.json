@@ -1,7 +1,7 @@
 {
   "date": "2026-10-18",
   "base": "a803bf94d34258bb311a06506091681427a52b39",
-  "packageIntegrity": "sha512-wkTiubjSQWc9FDdQ5ErvyPhv75b7jWbq1VYwZcEmCX5keUN3o5180JHRlVyCqfgPfxixrFQ8qgeCKJb2rnKoLA==",
+  "packageIntegrity": "sha512-52joLQy30WkG42VWVCrtOjdAPGPJs68S1kiQHkxbkCMfhcRHg4BNSz/aCE4uVjD6tYU+yZiEHJPwJcoWCg6fwA==",
   "iosDevice": "iPhone 17 Pro / iOS 26.1 simulator",
   "androidDevice": "Android 16 / API 36 / emulator-5554",
   "transport": "local HTTPS with test CA to real workerd, Vite production tarball consumer",
@@ -11,6 +11,14 @@
       "cases": [
         {
           "name": "direct:execution",
+          "passed": true
+        },
+        {
+          "name": "direct:remote KV-only write",
+          "passed": true
+        },
+        {
+          "name": "direct:remote KV-only read",
           "passed": true
         },
         {
@@ -63,6 +71,14 @@
         },
         {
           "name": "worker:execution",
+          "passed": true
+        },
+        {
+          "name": "worker:remote KV-only write",
+          "passed": true
+        },
+        {
+          "name": "worker:remote KV-only read",
           "passed": true
         },
         {
@@ -139,6 +155,14 @@
           "passed": true
         },
         {
+          "name": "direct:remote KV-only write",
+          "passed": true
+        },
+        {
+          "name": "direct:remote KV-only read",
+          "passed": true
+        },
+        {
           "name": "direct:local",
           "passed": true
         },
@@ -188,6 +212,14 @@
         },
         {
           "name": "worker:execution",
+          "passed": true
+        },
+        {
+          "name": "worker:remote KV-only write",
+          "passed": true
+        },
+        {
+          "name": "worker:remote KV-only read",
           "passed": true
         },
         {
@@ -257,5 +289,5 @@
       ]
     }
   },
-  "change": "KV-only routes stay local by default; mixed R2/KV requests use cloud bindings before any local handler execution"
+  "change": "KV-only routes follow required per-binding kvExecution local/remote policies; mixed R2/KV requests and whole-Worker fallback use cloud bindings"
 }

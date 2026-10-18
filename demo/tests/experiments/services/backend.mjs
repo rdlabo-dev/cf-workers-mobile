@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 const fixture = fileURLToPath(new URL("worker.js", import.meta.url));
 export const config = {
   r2_buckets: [{ binding: "BUCKET", bucket_name: "private-bucket-name" }],
-  kv_namespaces: [{ binding: "CLOUD_KV", id: "private-kv-id" }],
+  kv_namespaces: [
+    { binding: "CLOUD_KV", id: "private-kv-id" },
+    { binding: "SHARED_KV", id: "private-shared-id" },
+  ],
   services: [
     { binding: "INTERNAL", service: "private-internal" },
     { binding: "RPC", service: "private-internal", entrypoint: "Calculator" },
@@ -31,7 +34,7 @@ export async function createBackend() {
           script: server.outputFiles[0].text,
           compatibilityDate: "2026-10-01",
           r2Buckets: ["BUCKET"],
-          kvNamespaces: ["CLOUD_KV"],
+          kvNamespaces: ["CLOUD_KV", "SHARED_KV"],
           serviceBindings: {
             INTERNAL: "internal",
             RPC: { name: "internal", entrypoint: "Calculator" },

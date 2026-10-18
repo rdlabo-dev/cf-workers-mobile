@@ -101,7 +101,7 @@ for (const [key, option, binding] of kinds) {
     ).rejects.toThrow(`Invalid ${key}`);
   });
 }
-it("keeps KV-only routes local by default and mixed R2/KV operations remote", async () => {
+it("keeps KV-only routes local when configured and mixed R2/KV operations remote", async () => {
   await writeFile(
     resolve(root, "local.json"),
     JSON.stringify({
@@ -109,7 +109,10 @@ it("keeps KV-only routes local by default and mixed R2/KV operations remote", as
       r2_buckets: [{ binding: "BUCKET" }],
     }),
   );
-  const config = await serverBindings(root, { workerConfig: "local.json" });
+  const config = await serverBindings(root, {
+    workerConfig: "local.json",
+    kvExecution: { KV: "local" },
+  });
   expect(config.names).toEqual(["BUCKET"]);
   expect(config.localBindings).toEqual(["KV"]);
   const entry = resolve(root, "worker.ts");
@@ -119,6 +122,7 @@ it("keeps KV-only routes local by default and mixed R2/KV operations remote", as
   );
   const compiled = await serverModules(entry, root, {
     workerConfig: "local.json",
+    kvExecution: { KV: "local" },
   }).get();
   expect(compiled?.mode).toBe("routes");
   const { needsRemote } = await selector(compiled!.selector);
@@ -136,12 +140,16 @@ it("does not create a remote boundary for a KV-only Worker", async () => {
     resolve(root, "kv.json"),
     JSON.stringify({ kv_namespaces: [{ binding: "KV" }] }),
   );
-  const config = await serverBindings(root, { workerConfig: "kv.json" });
+  const config = await serverBindings(root, {
+    workerConfig: "kv.json",
+    kvExecution: { KV: "local" },
+  });
   expect(config.names).toEqual([]);
   expect(config.localBindings).toEqual(["KV"]);
   expect(
     await serverModules(resolve(root, "worker.ts"), root, {
       workerConfig: "kv.json",
+      kvExecution: { KV: "local" },
     }).get(),
   ).toBeUndefined();
   expect(
@@ -149,6 +157,7 @@ it("does not create a remote boundary for a KV-only Worker", async () => {
       await serverBindings(root, {
         workerConfig: "kv.json",
         kvBindings: ["OVERRIDE"],
+        kvExecution: { OVERRIDE: "local" },
       })
     ).localBindings,
   ).toEqual(["OVERRIDE"]);
@@ -157,7 +166,12 @@ it("does not create a remote boundary for a KV-only Worker", async () => {
     '[[env.production.kv_namespaces]]\nbinding="NAMED_KV"',
   );
   expect(
-    (await serverBindings(root, { workerConfig: "kv.toml" })).localBindings,
+    (
+      await serverBindings(root, {
+        workerConfig: "kv.toml",
+        kvExecution: { NAMED_KV: "local" },
+      })
+    ).localBindings,
   ).toEqual(["NAMED_KV"]);
   await writeFile(
     resolve(root, "badkv.json"),
@@ -178,6 +192,7 @@ it("keeps mixed-kind names server-only even when the same name is also KV", asyn
   await expect(
     serverBindings(root, {
       workerConfig: "collision.json",
+      kvExecution: { SHARED: "local" },
       localBindings: ["SHARED"],
     }),
   ).rejects.toThrow("cannot also");
@@ -236,4 +251,55 @@ it("keeps consumer-only Workers and their fetch handlers on the server", async (
   expect(result?.reason).toContain("Queue consumers");
   expect(result?.local).not.toContain("consumer-private-code");
   expect(result?.reportFile).toBe("capacitor-workers-server.json");
+});
+
+it("requires explicit KV policy and rejects invalid or conflicting policies", async () => {
+  const workerConfig = "policy.json";
+  await writeFile(
+    resolve(root, workerConfig),
+    JSON.stringify({ kv_namespaces: [{ binding: "KV" }] }),
+  );
+  await expect(serverBindings(root, { workerConfig })).rejects.toThrow(
+    "Set kvExecution.KV",
+  );
+  for (const policy of [
+    null,
+    [],
+    "local",
+    { KV: "invalid" },
+    { KV: "local", TYPO: "remote" },
+  ])
+    await expect(
+      serverBindings(root, { workerConfig, kvExecution: policy as never }),
+    ).rejects.toThrow();
+  await expect(
+    serverBindings(root, {
+      workerConfig,
+      kvExecution: { KV: "remote" },
+      localBindings: ["KV"],
+    }),
+  ).rejects.toThrow("cannot also");
+  const found = await serverBindings(root, {
+    workerConfig,
+    kvExecution: { KV: "remote" },
+  });
+  expect(found.names).toEqual(["KV"]);
+  expect(found.localBindings).toEqual([]);
+  expect(found.reportFile).toBe("capacitor-workers-server.json");
+  const entry = resolve(root, "remote-kv.ts");
+  await writeFile(
+    entry,
+    `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('ok'));app.get('/kv/:key',async c=>c.text(await c.env.KV.get(c.req.param('key'))));export default app;`,
+  );
+  const result = await serverModules(entry, root, {
+    workerConfig,
+    kvExecution: { KV: "remote" },
+  }).get();
+  const { needsRemote } = await selector(result!.selector);
+  expect(await needsRemote(new Request("https://local.invalid/kv/a"))).toBe(
+    true,
+  );
+  expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
+    false,
+  );
 });
