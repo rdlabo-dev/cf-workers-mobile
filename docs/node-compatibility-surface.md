@@ -2,10 +2,10 @@
 
 This audit covers **all 70 builtin/subpath entries** of workerd `1.20261012.1`,
 compatibility date `2026-10-17`, with no extra flags. It does not reduce the scope
-to the recent seventeen module families. Initial baseline: `be4de58`; refreshed after the HTTPS and port adapter additions.
+to the recent seventeen module families. Initial baseline: `be4de58`; refreshed after the HTTPS, port, stream consumer and DNS additions.
 
-Both Chromium and WebKit report import/export gaps for **35 of 70 entries**.
-The other 35 have matching namespace export names; this is **not behavioral
+Both Chromium and WebKit report import/export gaps for **32 of 70 entries**.
+The other 38 have matching namespace export names; this is **not behavioral
 acceptance**. In particular, default exports, prototypes, validation, state,
 async context and native transport still require the module-owned contracts.
 
@@ -63,8 +63,8 @@ to compare, so it is never represented as zero missing exports.
 | `crypto`              |              76 | Export differences      |      40 |     4 |
 | `dgram`               |               3 | Export names match only |       0 |     0 |
 | `diagnostics_channel` |               8 | Build fails             |       — |     — |
-| `dns`                 |              50 | Export differences      |      49 |     0 |
-| `dns/promises`        |              49 | Build fails             |       — |     — |
+| `dns`                 |              50 | Export names match only |       0 |     0 |
+| `dns/promises`        |              49 | Export names match only |       0 |     0 |
 | `domain`              |               5 | Export names match only |       0 |     0 |
 | `events`              |              15 | Export differences      |      10 |     1 |
 | `fs`                  |             106 | Export differences      |      93 |     2 |
@@ -89,7 +89,7 @@ to compare, so it is never represented as zero missing exports.
 | `repl`                |               9 | Export names match only |       0 |     0 |
 | `sqlite`              |               5 | Export names match only |       0 |     0 |
 | `stream`              |              24 | Export differences      |       7 |     6 |
-| `stream/consumers`    |               6 | Build fails             |       — |     — |
+| `stream/consumers`    |               6 | Export names match only |       0 |     0 |
 | `stream/promises`     |               4 | Build fails             |       — |     — |
 | `stream/web`          |              18 | Export differences      |      10 |     0 |
 | `string_decoder`      |               2 | Export names match only |       0 |     0 |
