@@ -2,8 +2,8 @@ import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   headersContract,
   HeadersImplementation,
-} from "../../../../../src/compat/headers/index.spec";
-import { Headers as LocalHeaders } from "../../../../../src/compat/headers";
+} from "../../../../../src/compat/web/headers/index.spec";
+import { Headers as LocalHeaders } from "../../../../../src/compat/web/headers";
 
 export default {
   async fetch() {

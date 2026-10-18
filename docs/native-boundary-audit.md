@@ -7,8 +7,8 @@ byte I/O and WebView lifecycle integration. No local HTTP server is started.
 
 | Layer                       | Responsibility                                                                                                |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `src/compat/fetch`          | Fetch policy, request serialization, streaming, redirects, cookies, decompression, cancellation and ownership |
-| `src/compat/http-wire`      | Strict HTTP/1.1 response parsing using llhttp 9.3.0 WASM; bounded input; raw headers and bodies               |
+| `src/compat/web/fetch`          | Fetch policy, request serialization, streaming, redirects, cookies, decompression, cancellation and ownership |
+| `src/compat/shared/http-wire`      | Strict HTTP/1.1 response parsing using llhttp 9.3.0 WASM; bounded input; raw headers and bodies               |
 | iOS `SocketBridge`          | Network.framework TCP/TLS, OS certificate validation, bounded I/O, close completion and teardown              |
 | Android `WorkerSockets`     | Netty TCP/TLS, OS certificate validation, bounded I/O and teardown                                            |
 | `src/documents/host.ts`     | Document redirect method/body/header decisions and redirect limits                                            |
@@ -54,7 +54,7 @@ lines/comments), a reduction of 550 lines. This is a source measurement, not an
 IPA/APK saving. The embedded llhttp binary is 54,013 bytes and uses a 128 KiB
 initial WASM memory per parser instance; this is not a measurement of total
 WebView heap. Its module is compiled once per realm and parser state is separate
-per connection. See the [upstream notice](../src/compat/http-wire/NOTICE.md).
+per connection. See the [upstream notice](../src/compat/shared/http-wire/NOTICE.md).
 
 ## Why these native operations remain
 
@@ -80,9 +80,9 @@ References:
 
 ## Verification ownership
 
-`src/compat/http-wire/index.spec.ts` checks fragmented parsing, duplicate headers,
+`src/compat/shared/http-wire/index.spec.ts` checks fragmented parsing, duplicate headers,
 interim responses, body framing, malformed/truncated input and header bounds.
-`src/compat/fetch/native-network.spec.ts` checks serialization, raw bytes, reset
+`src/compat/web/fetch/native-network.spec.ts` checks serialization, raw bytes, reset
 handling, ownership and cleanup. Public Fetch and native lifecycle checks remain
 in their existing integration suites. The previous rejected parser experiment
 is not shipped or retained as an incomplete API.

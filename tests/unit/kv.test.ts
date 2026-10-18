@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { LocalStorageKV } from "../../src/features/kv/index";
+import { LocalStorageKV } from "../../src/bindings/kv/index";
 import { openFeature } from "../../src/features/index";
 function storage() {
   const data = new Map<string, string>();

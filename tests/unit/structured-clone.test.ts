@@ -4,7 +4,7 @@ import {
   localStructuredCloneApi,
   StructuredCloneImplementation,
   structuredCloneContract,
-} from "../../src/compat/structured-clone/index.spec.js";
+} from "../../src/compat/web/structured-clone/index.spec.js";
 
 it("runs the structuredClone contract against the browser candidate", async () => {
   const report = await runContract(

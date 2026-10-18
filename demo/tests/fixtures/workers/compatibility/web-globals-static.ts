@@ -1,7 +1,7 @@
 // Type-only views: execution must use the installed public globals.
 const { Headers, Request } = globalThis as unknown as {
-  Headers: typeof import("../../../../../src/compat/headers").Headers;
-  Request: typeof import("../../../../../src/compat/request").Request;
+  Headers: typeof import("../../../../../src/compat/web/headers").Headers;
+  Request: typeof import("../../../../../src/compat/web/request").Request;
 };
 // Evaluated before the configured Worker module body.
 export const staticWebGlobals = [

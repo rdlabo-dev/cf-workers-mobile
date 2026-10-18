@@ -1,14 +1,14 @@
 import { runContract } from "@rdlabo/workers-capacitor/testing";
-import { Request as LocalRequest } from "../../../../../src/compat/request";
-import { Response as LocalResponse } from "../../../../../src/compat/response";
+import { Request as LocalRequest } from "../../../../../src/compat/web/request";
+import { Response as LocalResponse } from "../../../../../src/compat/web/response";
 import {
   RequestImplementation,
   requestContract,
-} from "../../../../../src/compat/request/index.spec";
+} from "../../../../../src/compat/web/request/index.spec";
 import {
   ResponseImplementation,
   responseContract,
-} from "../../../../../src/compat/response/index.spec";
+} from "../../../../../src/compat/web/response/index.spec";
 export default {
   async fetch() {
     return Response.json({

@@ -1,13 +1,13 @@
 import * as nodeHttp from "node:http";
-import * as localHttp from "../../../../../src/compat/http";
-import { nodeHttpNetworkContract } from "../../../../../src/compat/http/index.spec";
+import * as localHttp from "../../../../../src/compat/node/http";
+import { nodeHttpNetworkContract } from "../../../../../src/compat/node/http/index.spec";
 import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   FetchPolicyImplementation,
   fetchPolicyContract,
-} from "../../../../../src/compat/fetch/policy.spec";
-import { createFetch } from "../../../../../src/compat/fetch";
-import { Request as LocalRequest } from "../../../../../src/compat/request";
+} from "../../../../../src/compat/web/fetch/policy.spec";
+import { createFetch } from "../../../../../src/compat/web/fetch";
+import { Request as LocalRequest } from "../../../../../src/compat/web/request";
 
 const localFetch = createFetch({
   async fetch(request) {

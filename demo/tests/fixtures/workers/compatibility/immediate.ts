@@ -2,7 +2,7 @@ import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   ImmediateImplementation,
   immediateContract,
-} from "../../../../../src/compat/immediate/index.spec";
+} from "../../../../../src/compat/node/immediate/index.spec";
 export default {
   async fetch() {
     return Response.json({

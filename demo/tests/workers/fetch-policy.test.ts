@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { Miniflare } from "miniflare";
 import { build } from "esbuild";
 import { readFile } from "node:fs/promises";
-import { fetchPolicyFeature } from "../../../src/compat/fetch/policy.spec";
+import { fetchPolicyFeature } from "../../../src/compat/web/fetch/policy.spec";
 import { createNetworkFixture } from "../fixtures/network/server.mjs";
 const server = createNetworkFixture();
 let harness: Miniflare;

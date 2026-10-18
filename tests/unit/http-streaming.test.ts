@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { request } from "../../src/compat/http/index";
+import { request } from "../../src/compat/node/http/index";
 afterEach(() => vi.unstubAllGlobals());
 it("starts sending before end and holds write callbacks until the consumer reads", async () => {
   let body!: ReadableStream<Uint8Array>;

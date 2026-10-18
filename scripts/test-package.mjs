@@ -19,13 +19,13 @@ for (const module of [
   "timers",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
-    const notice = `dist/compat/${module}/${name}`;
+    const notice = `dist/compat/node/${module}/${name}`;
     if (!pack.files.some((file) => file.path === notice))
       throw new Error(`Missing upstream license notice in tarball: ${notice}`);
   }
 }
 for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
-  const notice = `dist/compat/brotli/${name}`;
+  const notice = `dist/compat/shared/brotli/${name}`;
   if (!pack.files.some((file) => file.path === notice))
     throw new Error(
       `Missing bundled codec license notice in tarball: ${notice}`,
@@ -71,25 +71,25 @@ await cp(
 );
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
-  "path",
-  "querystring",
-  "string-decoder",
-  "buffer",
-  "http",
-  "net",
-  "headers",
-  "request",
-  "response",
-  "immediate",
-  "structured-clone",
-  "encoding",
-  "abort",
-  "async-hooks",
-  "timers",
-  "fs",
-  "module",
-  "stream-web",
-  "util",
+  "node/path",
+  "node/querystring",
+  "node/string-decoder",
+  "node/buffer",
+  "node/http",
+  "node/net",
+  "web/headers",
+  "web/request",
+  "web/response",
+  "node/immediate",
+  "web/structured-clone",
+  "web/encoding",
+  "web/abort",
+  "node/async-hooks",
+  "node/timers",
+  "node/fs",
+  "node/module",
+  "node/stream-web",
+  "node/util",
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });

@@ -2,11 +2,11 @@ import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   EncodingImplementation,
   encodingContract,
-} from "../../../../../src/compat/encoding/index.spec";
+} from "../../../../../src/compat/web/encoding/index.spec";
 import {
   AbortImplementation,
   abortContract,
-} from "../../../../../src/compat/abort/index.spec";
+} from "../../../../../src/compat/web/abort/index.spec";
 export default {
   async fetch(request: Request) {
     switch (new URL(request.url).pathname) {
