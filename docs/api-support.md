@@ -18,22 +18,24 @@ can establish Complete status. Existing evidence keeps its original tested
 revision and baseline; reorganizing source does not recertify it.
 
 `src/contracts` owns the typed feature/lifecycle and contract runner infrastructure.
-The concrete Fetch adapter and portable contract belong to `src/runtime/fetch`;
-the KV contract belongs to `src/cloudflare/bindings/kv`. `src/runtime/fetch`, `src/runtime/isolated` and `src/runtime/documents` own application
+The concrete Fetch adapter and portable contract belong to `src/cloudflare/workers`;
+the KV contract belongs to `src/cloudflare/bindings/kv`. `src/cloudflare/workers`, `src/browser/isolated` and `src/browser/documents` own application
 execution, isolation and document hosting; they are not API support categories.
-Public package subpaths and `node:*` / `cloudflare:*` aliases remain unchanged.
+Public package subpaths follow these roles (see [source roles](../src/README.md)).
+Old subpaths are removed before release. `node:*` / `cloudflare:*` aliases are unchanged.
 
 ## Role-based layout
 
 [Source roles](../src/README.md) describes build tooling, application execution,
-API implementations and contract infrastructure. Build tools remain in `src/build`;
-`src/runtime/{fetch,isolated,documents}` owns execution. Cloudflare APIs and bindings
-are grouped under `src/cloudflare`. Public package subpaths are unchanged.
+API implementations and contract infrastructure. Build tools remain in `src/tooling`;
+`src/cloudflare/workers` coordinates execution; `src/browser/isolated` and
+`src/browser/documents` own browser host mechanisms. Cloudflare APIs and bindings
+are grouped under `src/cloudflare`. Consumer imports and examples use the role-based public entry points.
 
 ## Verification
 
-This role-based reorganization preserves public export keys and validates every
-compiled export target. Root/demo typechecks and a clean build pass.
+At revision `5e28bd9`, the preceding role-based reorganization preserved public export keys and validates every
+compiled export target. Root/demo typechecks and a clean build passed.
 
 - Unit tests: 410 across 41 files.
 - Workerd contracts: 94; the standard suite was rerun after correcting demo entry paths.
@@ -48,3 +50,26 @@ compiled export target. Root/demo typechecks and a clean build pass.
 The preceding layout migration evidence retains its original revision. Native
 binaries are unchanged; native suites were not rerun for this source reorganization.
 No additional API is certified Complete by moving it.
+
+## Pre-release entry-point alignment
+
+Browser document hosting and Dedicated Worker transport now live under
+`src/browser`; Workers handler execution lives under `src/cloudflare/workers`.
+Build-time integrations and transforms live under `src/tooling`.
+
+Public paths follow these responsibilities. The old `features`, `testing`,
+`worker`, `vite`, `esbuild` and `cloudflare` entry points have been removed without
+compatibility aliases. See [the entry-point inventory](../src/README.md).
+This is a pre-release layout change; API behavior is unchanged.
+
+Validation for this pre-release alignment includes root/demo typechecks, a clean
+build, 410 unit tests, 94 workerd tests, 66 production runtime checks, 20 Vite
+development checks, 72 document checks (with existing expected failures), and
+12 build-unit plus 30 browser integration checks. Cloudflare binding and Service
+Binding integrations each pass five groups. Documentation links and all twelve
+public export targets are checked; obsolete compiled locations are absent.
+Native suites were not rerun for this path-only change.
+
+The final packed consumer passes 10 Vite/esbuild/raw ESM checks, two configured
+Fetch checks in Vite dev, 26 direct and 22 isolated checks, 326 shared feature
+cases, and two execution-preference checks using the new public paths.

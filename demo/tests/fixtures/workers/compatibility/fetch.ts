@@ -1,1 +1,1 @@
-export { fetchContractWorker as default } from "@rdlabo/workers-capacitor/testing/fetch";
+export { fetchContractWorker as default } from "@rdlabo/workers-capacitor/cloudflare/workers/testing";

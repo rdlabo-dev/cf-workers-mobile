@@ -1,7 +1,7 @@
-import { lowerAsync, asyncContextPlugin } from "./build/async.js";
-import { documentAssets, listAssets } from "./build/documents.js";
-import { serverModules } from "./build/server-modules.js";
-import type { ServerBuildOptions } from "./build/server.js";
+import { lowerAsync, asyncContextPlugin } from "./async.js";
+import { documentAssets, listAssets } from "./documents.js";
+import { serverModules } from "./server-modules.js";
+import type { ServerBuildOptions } from "./server.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -13,7 +13,7 @@ import {
   globalsPath,
   globalsInjectPath,
   workerEntry,
-} from "./build/shared.js";
+} from "./shared.js";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 import inject from "@rollup/plugin-inject";
 import type { Plugin, PluginOption } from "vite";

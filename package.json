@@ -16,44 +16,44 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./vite": {
-      "types": "./dist/vite.d.ts",
-      "import": "./dist/vite.js"
+    "./tooling/vite": {
+      "types": "./dist/tooling/vite.d.ts",
+      "import": "./dist/tooling/vite.js"
     },
-    "./features": {
+    "./contracts": {
       "types": "./dist/contracts/index.d.ts",
       "import": "./dist/contracts/index.js"
     },
-    "./testing": {
+    "./contracts/testing": {
       "types": "./dist/contracts/testing.d.ts",
       "import": "./dist/contracts/testing.js"
     },
-    "./features/fetch": {
-      "types": "./dist/runtime/fetch/feature.d.ts",
-      "import": "./dist/runtime/fetch/feature.js"
+    "./cloudflare/workers": {
+      "types": "./dist/cloudflare/workers/feature.d.ts",
+      "import": "./dist/cloudflare/workers/feature.js"
     },
-    "./features/kv": {
+    "./cloudflare/bindings/kv": {
       "types": "./dist/cloudflare/bindings/kv/index.d.ts",
       "import": "./dist/cloudflare/bindings/kv/index.js"
     },
-    "./testing/fetch": {
-      "types": "./dist/runtime/fetch/contract.d.ts",
-      "import": "./dist/runtime/fetch/contract.js"
+    "./cloudflare/workers/testing": {
+      "types": "./dist/cloudflare/workers/contract.d.ts",
+      "import": "./dist/cloudflare/workers/contract.js"
     },
-    "./testing/kv": {
+    "./cloudflare/bindings/kv/testing": {
       "types": "./dist/cloudflare/bindings/kv/contract.d.ts",
       "import": "./dist/cloudflare/bindings/kv/contract.js"
     },
-    "./esbuild": {
-      "types": "./dist/esbuild.d.ts",
-      "import": "./dist/esbuild.js"
+    "./tooling/esbuild": {
+      "types": "./dist/tooling/esbuild.d.ts",
+      "import": "./dist/tooling/esbuild.js"
     },
-    "./worker": {
-      "types": "./dist/worker.d.ts",
-      "import": "./dist/worker.js"
+    "./browser/isolated": {
+      "types": "./dist/browser/isolated/transport.d.ts",
+      "import": "./dist/browser/isolated/transport.js"
     },
-    "./cloudflare": {
-      "types": "./dist/cloudflare.d.ts"
+    "./cloudflare/apis/types": {
+      "types": "./dist/cloudflare/apis/types.d.ts"
     },
     "./environment": {
       "types": "./dist/environment.d.ts",

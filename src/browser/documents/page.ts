@@ -1,7 +1,7 @@
 import { readDocumentBody, encodeDocumentBytes } from "./body.js";
 import "./form-body.js";
 import { documentConfig, isDocumentURL } from "./page-config.js";
-import { FetchRuntime } from "../fetch/runtime.js";
+import { FetchRuntime } from "../../cloudflare/workers/runtime.js";
 
 // Experiment only: keep native document navigation, but carry fetch bytes and
 // redirect policy through a script-message bridge before WebKit serializes them.

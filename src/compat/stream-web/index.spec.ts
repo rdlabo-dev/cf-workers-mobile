@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
 import * as web from "./index.js";
 export const streamWebFeature = defineFeature<typeof web>()(
   "node.stream-web",

@@ -3,8 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as viteBuild } from "vite";
 import { build as esbuild } from "esbuild";
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "@rdlabo/workers-capacitor/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 // Dedicated Worker contract via the configured-worker route: the node
 // contract worker is the configured entry of these builds.

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createFetchRuntime } from "../../src/runtime/fetch/worker-runtime.js";
+import { createFetchRuntime } from "../../src/cloudflare/workers/worker-runtime.js";
 import { workerFor } from "../helpers/isolated-worker.js";
-import type { RemoteWorkerOptions } from "../../src/runtime/fetch/types.js";
+import type { RemoteWorkerOptions } from "../../src/cloudflare/workers/types.js";
 
 const cleanups: (() => unknown)[] = [];
 afterEach(async () => {

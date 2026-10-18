@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { globalsPath } from "../../src/build/shared.js";
+import { globalsPath } from "../../src/tooling/shared.js";
 import { expect, it } from "vitest";
-import { workersCapacitorPlugin } from "../../src/vite.js";
+import { workersCapacitorPlugin } from "../../src/tooling/vite.js";
 
 function names(plugins: ReturnType<typeof workersCapacitorPlugin>) {
   return plugins.flatMap((plugin) =>

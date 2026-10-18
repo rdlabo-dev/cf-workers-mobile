@@ -1,4 +1,4 @@
-import { lowerAsync } from "./src/build/async.js";
+import { lowerAsync } from "./src/tooling/async.js";
 import { readFile } from "node:fs/promises";
 import { defineConfig } from "vitest/config";
 export default defineConfig({

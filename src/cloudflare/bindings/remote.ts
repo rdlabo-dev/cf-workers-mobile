@@ -13,7 +13,7 @@ import {
 } from "../../browser/fetch/native-network.js";
 import { createNetworkScope } from "../../browser/fetch/scope.js";
 import { FetchTransport } from "../../browser/fetch/transport.js";
-import type { RemoteWorkerOptions } from "../../runtime/fetch/types.js";
+import type { RemoteWorkerOptions } from "../workers/types.js";
 
 /** Host-owned: credentials never cross the Dedicated Worker message boundary. */
 export function createRemoteWorker(

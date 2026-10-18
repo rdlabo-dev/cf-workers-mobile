@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createFetchRuntime } from "../../src/runtime/fetch/worker-runtime";
+import { createFetchRuntime } from "../../src/cloudflare/workers/worker-runtime";
 import { workerFor } from "../helpers/isolated-worker";
 const cleanups: (() => void)[] = [];
 afterEach(() => {

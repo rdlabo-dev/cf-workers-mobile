@@ -1,13 +1,13 @@
-import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
 import {
   FeatureImplementation,
   FeatureUnavailable,
   type FeatureScope,
-} from "@rdlabo/workers-capacitor/features";
+} from "@rdlabo/workers-capacitor/contracts";
 import {
   kvFeature,
   type KVNamespace,
-} from "@rdlabo/workers-capacitor/features/kv";
+} from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
 import { wasmFeature } from "./contracts/wasm";
 
 /** Test-only cleanup. Production feature disposal never clears application data. */

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { context, type BuildResult } from "esbuild";
 import { expect, it } from "vitest";
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/esbuild";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/esbuild";
 
 it("watches Worker dependencies and emits a new asset without writing output", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-watch-"));

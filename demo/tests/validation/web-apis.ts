@@ -1,4 +1,4 @@
-import type { ContractResult } from "@rdlabo/workers-capacitor/testing";
+import type { ContractResult } from "@rdlabo/workers-capacitor/contracts/testing";
 import { runWebApiContracts } from "./web-api-contracts";
 
 export async function runWebApis() {

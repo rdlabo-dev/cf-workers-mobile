@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import {
   registerDocumentWorker,
   stopDocumentWorker,
-} from "../../src/runtime/documents/registration";
+} from "../../src/browser/documents/registration";
 import { workersCapacitor } from "../../src/index";
 function setup() {
   const own = {

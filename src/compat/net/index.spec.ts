@@ -2,8 +2,8 @@ import net, * as netNamespace from "node:net";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
 import type localNet from "./index.js";
 
 export type NetApi = typeof localNet;

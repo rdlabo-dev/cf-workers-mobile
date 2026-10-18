@@ -1,5 +1,5 @@
-import { defineFeature } from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+import { defineFeature } from "@rdlabo/workers-capacitor/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected))
     throw new Error(`${JSON.stringify(actual)} != ${JSON.stringify(expected)}`);

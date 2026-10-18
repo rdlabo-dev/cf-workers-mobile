@@ -1,7 +1,7 @@
-import { asyncContextPlugin, lowerAsync } from "./build/async.js";
-import { documentAssets, listAssets } from "./build/documents.js";
-import { serverModules } from "./build/server-modules.js";
-import type { ServerBuildOptions } from "./build/server.js";
+import { asyncContextPlugin, lowerAsync } from "./async.js";
+import { documentAssets, listAssets } from "./documents.js";
+import { serverModules } from "./server-modules.js";
+import type { ServerBuildOptions } from "./server.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -12,7 +12,7 @@ import {
   globalsInjectPath,
   workerEntry,
   workerSource,
-} from "./build/shared.js";
+} from "./shared.js";
 
 const require = createRequire(import.meta.url);
 function compatibilityPlugin(): Plugin {

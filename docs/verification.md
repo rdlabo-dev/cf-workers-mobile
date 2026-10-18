@@ -161,7 +161,7 @@ This is a direct-execution, default-text subset. TTL, metadata, listing, binary/
 
 ### Reusable contracts and implementation guardrails
 
-HTTP/KV suites now ship through `testing/fetch` and `testing/kv`, with the HTTP Worker fixture exported alongside its contract. The demo imports these public subpaths for both WebView and actual workerd verification. KV runtime validation remains inside `LocalStorageKV`; implementation-specific rejection, persistence and quota tests remain separate from the portable Workers contract. A deliberately broken write implementation confirms that the published KV suite detects lost writes.
+HTTP/KV suites now ship through `cloudflare/workers/testing` and `cloudflare/bindings/kv/testing`, with the HTTP Worker fixture exported alongside its contract. The demo imports these public subpaths for both WebView and actual workerd verification. KV runtime validation remains inside `LocalStorageKV`; implementation-specific rejection, persistence and quota tests remain separate from the portable Workers contract. A deliberately broken write implementation confirms that the published KV suite detects lost writes.
 
 After extraction: library build, root/demo typecheck, 81 root tests, 26 local workerd tests, 26 Chromium/WebKit experiment tests and the fresh tarball consumer (direct 26, isolated 22, common 16) all pass. The consumer additionally typechecks both new public subpaths and rejects a KV implementation paired with the HTTP suite. Native binaries were not rebuilt for this test-module extraction; the 44/44 native results above describe the preceding KV implementation run.
 

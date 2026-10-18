@@ -38,7 +38,7 @@ assert.ok(
   !files.some(
     (file) =>
       /(?:^|\/)(?:build|\.gradle|tests|artifacts)\//.test(file) &&
-      !file.startsWith("dist/build/"),
+      !file.startsWith("dist/tooling/"),
   ),
 );
 await writeFile(

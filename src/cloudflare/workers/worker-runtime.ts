@@ -4,7 +4,7 @@ import { browserFetch, isRequest } from "../../browser/fetch/interop.js";
 import type { RequestInit as WorkerRequestInit } from "../../browser/request/index.js";
 import { installDirectNetworkScope } from "../../browser/fetch/scope.js";
 import configuredWorker from "../../configured.js";
-import { createIsolatedWorker } from "../isolated/bridge.js";
+import { createIsolatedWorker } from "../../browser/isolated/bridge.js";
 import { createRemoteWorker } from "../../cloudflare/bindings/remote.js";
 import { FetchRuntime, type FetchRuntimeOptions } from "./runtime.js";
 import type {

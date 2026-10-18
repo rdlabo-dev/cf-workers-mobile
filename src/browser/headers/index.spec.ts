@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
 import type { Headers as LocalHeaders } from "./index.js";
 
 type HeaderConstructor = typeof LocalHeaders;

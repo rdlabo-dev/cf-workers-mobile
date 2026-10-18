@@ -2,8 +2,8 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
-import { compileServerWorker, serverBindings } from "../../src/build/server.js";
-import { serverModules } from "../../src/build/server-modules.js";
+import { compileServerWorker, serverBindings } from "../../src/tooling/server.js";
+import { serverModules } from "../../src/tooling/server-modules.js";
 let root: string;
 beforeAll(async () => {
   await mkdir("demo/artifacts", { recursive: true });

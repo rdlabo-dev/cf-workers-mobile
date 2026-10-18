@@ -1,5 +1,5 @@
-import { createNetworkRelay } from "../../browser/fetch/relay.js";
-import type { WorkerHandler } from "../fetch/types.js";
+import { createNetworkRelay } from "../fetch/relay.js";
+import type { WorkerHandler } from "../../cloudflare/workers/types.js";
 import type { Command, Reply } from "./protocol.js";
 
 /** Internal Dedicated Worker transport. */

@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { WorkerHandler } from "../../src/index";
-import type { Invocation } from "../../src/runtime/isolated/protocol";
-import { serve } from "../../src/runtime/isolated/transport";
+import type { Invocation } from "../../src/browser/isolated/protocol";
+import { serve } from "../../src/browser/isolated/transport";
 
 // Exercise the actual two transport endpoints over native MessageChannels.
 // Browser/native suites separately verify real Dedicated Worker execution.

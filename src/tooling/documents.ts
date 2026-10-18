@@ -29,7 +29,7 @@ export async function documentAssets(files: string[]) {
       ),
     ),
     [documentSW]: await readFile(
-      new URL("../runtime/documents/service-worker.js", import.meta.url),
+      new URL("../browser/documents/service-worker.js", import.meta.url),
       "utf8",
     ),
   };

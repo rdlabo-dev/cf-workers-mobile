@@ -1,7 +1,7 @@
 import { setWorkerEnv } from "../../cloudflare/apis/cloudflare-workers/index.js";
-import { isResponse } from "../../browser/fetch/interop.js";
-import { Request as WorkerRequest } from "../../browser/request/index.js";
-import type { WorkerHandler } from "../fetch/types.js";
+import { isResponse } from "../fetch/interop.js";
+import { Request as WorkerRequest } from "../request/index.js";
+import type { WorkerHandler } from "../../cloudflare/workers/types.js";
 import type { Command, Invocation, Reply } from "./protocol.js";
 
 export function serve(worker: WorkerHandler<unknown>) {

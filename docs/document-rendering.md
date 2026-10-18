@@ -117,7 +117,7 @@ The Android probe unregisters its Service Worker after completing the report. If
 
 ## Current library transport update
 
-The current `src/runtime/documents` / `native/ios/DocumentBridge.swift` transport returns
+The current `src/browser/documents` / `native/ios/DocumentBridge.swift` transport returns
 headers before response EOF and pulls at most 64 KiB per native reply. Android's
 Service Worker uses the same host pull/cancel commands. Cancellation, disposal,
 and native navigation stop release response readers and abort request signals.

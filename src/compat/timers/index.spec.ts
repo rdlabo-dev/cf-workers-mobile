@@ -6,8 +6,8 @@ import * as barePromises from "timers/promises";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
 type Api = {
   t: typeof import("./index.js");
   p: typeof import("./promises.js");

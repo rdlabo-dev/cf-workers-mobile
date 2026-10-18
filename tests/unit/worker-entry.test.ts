@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { globalsInstallPath, workerEntry } from "../../src/build/shared.js";
+import { globalsInstallPath, workerEntry } from "../../src/tooling/shared.js";
 
 it("installs globals before evaluating a Worker entry without shared bootstrap exports", () => {
   const entry = "/consumer/worker.js";

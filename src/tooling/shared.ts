@@ -5,7 +5,7 @@ export const configuredPath = fileURLToPath(
   new URL("../configured.js", import.meta.url),
 );
 export const transportPath = fileURLToPath(
-  new URL("../runtime/isolated/transport.js", import.meta.url),
+  new URL("../browser/isolated/transport.js", import.meta.url),
 );
 export const globalsPath = fileURLToPath(
   new URL("../shared/globals/index.js", import.meta.url),

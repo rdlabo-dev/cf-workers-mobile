@@ -7,10 +7,10 @@ lifecycle host is also usable outside tests.
 This infrastructure has no Fetch, KV or Cloudflare-specific behavior. Concrete
 adapters and contracts live with their owning implementation:
 
-- Fetch runtime: `src/runtime/fetch/feature.ts` and `contract.ts`.
+- Fetch runtime: `src/cloudflare/workers/feature.ts` and `contract.ts`.
 - Local KV: `src/cloudflare/bindings/kv/`, including `contract.ts`.
 - API modules: adjacent module-owned contracts under `compat` and `browser`.
 
-Public `@rdlabo/workers-capacitor/features` and `@rdlabo/workers-capacitor/testing`
-resolve here. They remain stable package entry points; source folder names do not
-require consumer import changes. See [the contract standard](../../docs/feature-standard.md).
+Public `@rdlabo/workers-capacitor/contracts` and `@rdlabo/workers-capacitor/contracts/testing`
+resolve here. Imports use these role-based paths; old `features` and `testing`
+entry points are removed before release. See [the contract standard](../../docs/feature-standard.md).

@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
