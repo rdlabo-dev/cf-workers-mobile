@@ -13,7 +13,9 @@ const artifacts = new URL(
 );
 test("capture every builtin export from the pinned Workers profile", async () => {
   const require = createRequire(import.meta.url);
-  const workerdPackage = JSON.parse(await readFile(require.resolve("workerd/package.json"), "utf8"));
+  const workerdPackage = JSON.parse(
+    await readFile(require.resolve("workerd/package.json"), "utf8"),
+  );
   assert.equal(workerdPackage.version, profile.workerd);
   const runtime = new Miniflare(
     convertV4MiniflareOptions({

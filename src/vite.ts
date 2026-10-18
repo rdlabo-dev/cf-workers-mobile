@@ -78,6 +78,8 @@ function compatibilityPlugins(
             "wasi",
             "node:os",
             "os",
+            "node:net",
+            "net",
             "node:tty",
             "tty",
             "node:url",
