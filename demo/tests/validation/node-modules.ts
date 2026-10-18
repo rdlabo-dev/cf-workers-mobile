@@ -28,6 +28,12 @@ import {
   netContract,
 } from "../../../src/compat/net/index.spec";
 
+import {
+  AsyncHooksImplementation,
+  asyncHooksContract,
+  NodeAsyncHooks,
+} from "../../../src/compat/async-hooks/index.spec";
+
 export type NodeProfile = "bundled" | "workers";
 
 export async function runNodeContracts(
@@ -42,5 +48,11 @@ export async function runNodeContracts(
     await runContract(new NodeStringDecoder(), nodeStringDecoderContract),
     await runContract(new NodeHttp(), nodeHttpContract),
     await runContract(new NetImplementation(), netContract),
+    await runContract(
+      profile === "workers"
+        ? new NodeAsyncHooks()
+        : new AsyncHooksImplementation(),
+      asyncHooksContract,
+    ),
   ];
 }

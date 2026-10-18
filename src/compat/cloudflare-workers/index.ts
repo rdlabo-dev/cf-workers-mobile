@@ -6,3 +6,12 @@ export const env: Record<string, unknown> = new Proxy(Object.freeze({}), {
     );
   },
 });
+
+// Durable Object namespaces need stateful storage; bundles such as OpenNext
+// export subclass shells that must at least resolve and construct.
+export class DurableObject<Env = unknown> {
+  constructor(
+    protected readonly ctx: unknown,
+    protected readonly env: Env,
+  ) {}
+}
