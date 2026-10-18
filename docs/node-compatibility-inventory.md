@@ -916,3 +916,19 @@ These checks do not close the remaining Workers tee cancellation/pipeTo timing
 or async-context differences. Native code and the iOS deployment target remain
 unchanged. No additional whole-module completion, remote CI or release is
 claimed by this implementation evidence.
+
+### TLS context helpers candidate
+
+`node:_tls_common` now ports the pinned Workers SecureContext and legacy
+certificate translation helpers. Eight shared groups cover the complete module
+namespace, callable construction, ignored options and property access order,
+validation, certificate mutation, issuer references and malformed inputs.
+Workerd, Chromium and WebKit run the same contract. This does not certify the
+separate `node:tls` networking module or expose platform trust configuration.
+Whole-module review and native acceptance are still pending.
+
+The main merge retains the renamed `@rdlabo/workers-capacitor` package, API
+responsibility folders and async continuation lowering. Its installed-tarball
+validation passed 950 common cases with zero exclusions, including restoration,
+nested async scopes and concurrent ALS isolation. Native validation is rerun
+against that merged runtime rather than reusing pre-merge results.

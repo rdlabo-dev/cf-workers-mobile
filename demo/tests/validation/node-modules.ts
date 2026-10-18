@@ -1,4 +1,8 @@
 import {
+  TlsCommonImplementation,
+  tlsCommonContract,
+} from "../../../src/compat/tls-common/index.spec";
+import {
   AssertImplementation,
   assertContract,
 } from "../../../src/compat/assert/index.spec";
@@ -255,6 +259,7 @@ export async function runNodeContracts(
     await runContract(new HttpAgentImplementation(), httpAgentContract),
     await runContract(new HttpClientImplementation(), httpClientContract),
     await runContract(new HttpIncomingImplementation(), httpIncomingContract),
+    await runContract(new TlsCommonImplementation(), tlsCommonContract),
   ];
   reports.push(
     await runContract(

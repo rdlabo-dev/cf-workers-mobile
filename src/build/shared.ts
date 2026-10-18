@@ -114,6 +114,8 @@ export function compatibilityAliases() {
     url: nodeCompatPath("url"),
     "node:diagnostics_channel": nodeCompatPath("diagnostics-channel"),
     diagnostics_channel: nodeCompatPath("diagnostics-channel"),
+    "node:_tls_common": nodeCompatPath("tls-common"),
+    _tls_common: nodeCompatPath("tls-common"),
     "node:async_hooks": nodeCompatPath("async-hooks"),
     async_hooks: nodeCompatPath("async-hooks"),
     "node:timers/promises": fileURLToPath(

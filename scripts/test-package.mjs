@@ -48,6 +48,7 @@ for (const module of [
   "http-agent",
   "http-client",
   "http-incoming",
+  "tls-common",
   "util",
   "diagnostics-channel",
   "stream",
@@ -190,6 +191,7 @@ for (const module of [
   "compat/http-agent",
   "compat/http-client",
   "compat/http-incoming",
+  "compat/tls-common",
   "compat/fs",
   "compat/module",
   "compat/stream-web",
@@ -417,7 +419,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 950 ||
+    features.flatMap((report) => report.cases).length !== 966 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -452,7 +454,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 461 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 469 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||
@@ -486,7 +488,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
       const cases = report.contracts.flatMap((result) => result.cases);
       if (
         report.execution !== prefer ||
-        cases.length !== 461 ||
+        cases.length !== 469 ||
         cases.some(
           (result) =>
             result.status === "failed" || result.status === "unavailable",

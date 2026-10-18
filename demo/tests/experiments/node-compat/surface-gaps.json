@@ -3,7 +3,6 @@
   "_http_outgoing",
   "_http_server",
   "_stream_wrap",
-  "_tls_common",
   "_tls_wrap",
   "console",
   "crypto",

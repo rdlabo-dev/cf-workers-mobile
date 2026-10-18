@@ -4,8 +4,8 @@ This audit covers **all 70 builtin/subpath entries** of workerd `1.20261012.1`,
 compatibility date `2026-10-17`, with no extra flags. It does not reduce the scope
 to the recent seventeen module families. Initial baseline: `be4de58`; refreshed after the assertion, performance, utility, async-hook, diagnostics and Node Stream additions.
 
-Both Chromium and WebKit report import/export gaps for **18 of 70 entries**.
-The other 52 have matching namespace export names; this is **not behavioral
+Both Chromium and WebKit report import/export gaps for **17 of 70 entries**.
+The other 53 have matching namespace export names; this is **not behavioral
 acceptance**. In particular, default exports, prototypes, validation, state,
 async context and native transport still require the module-owned contracts.
 
@@ -50,7 +50,7 @@ to compare, so it is never represented as zero missing exports.
 | `_stream_transform`   |               2 | Export names match only |       0 |     0 |
 | `_stream_wrap`        |               1 | Build fails             |       — |     — |
 | `_stream_writable`    |               5 | Export names match only |       0 |     0 |
-| `_tls_common`         |               4 | Build fails             |       — |     — |
+| `_tls_common`         |               4 | Export names match only |       0 |     0 |
 | `_tls_wrap`           |               3 | Build fails             |       — |     — |
 | `assert`              |              21 | Export names match only |       0 |     0 |
 | `assert/strict`       |              21 | Export names match only |       0 |     0 |
