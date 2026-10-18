@@ -8,7 +8,8 @@ KV-only requests follow the binding execution policy. Remote binding methods
 execute unchanged inside the deployed Worker. This does not install local R2,
 KV synchronization, a client RPC proxy, or a queue consumer in Capacitor.
 
-Status: **In progress** pending independent review and CI.
+Status: **In progress** pending required CI. Independent manager and acceptance
+reviews approved the implementation; see the [review record](remote-service-bindings-review.md).
 The workerd integration baseline is Miniflare `5.20261012.0-beta`, compatibility
 date `2026-10-01`. Browser integration is supporting evidence, not native
 transport certification.
@@ -168,14 +169,16 @@ node demo/tests/experiments/d1/native-run.mjs android <emulator-id> --services
 Use `--refresh` with an existing services-native consumer to reuse its native
 build directories while installing a new tarball. The harness reuses the D1 test
 app ID; do not run D1 and service native tests concurrently on the same device.
-The full `npm run test:package` regression did not finish successfully locally.
-Its build-tools stage passed when rerun alone, but the full retry failed while
-the host exhausted disk space (`git commit` also reported `No space left on
-device`). This is not recorded as a package-suite pass; rerun with available
-disk space. The independent native tarball installation above did pass.
+The full `npm run test:package` regression passed on 2026-10-18 after disk space
+became available: Vite/esbuild/browser ESM 10/10, configured Fetch subpath in Vite
+dev 2/2, direct 26/26, isolated 22/22, common features 320 passed, and preferences
+2/2. The existing feature inventory also reports six declared unsupported cases;
+this change does not claim those unrelated features as complete. This successful
+run supersedes the earlier failed runs under disk pressure.
 
-Independent manager/acceptance review and required CI remain merge gates; do not
-mark this unit Complete based on these local results alone.
+Manager and independent acceptance reviews approved candidate `310479f` with no
+required changes. Required CI remains a merge gate; the PR stays draft until
+that gate passes.
 
 ## Platform references
 
