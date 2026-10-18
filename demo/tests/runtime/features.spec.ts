@@ -7,8 +7,8 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
   const reports = await page.evaluate(() => window.runFeatures());
   expect(reports.map((report) => report.cases.length)).toEqual([
     4, 4, 18, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5,
-    6, 8, 6, 8, 15, 8, 2, 1, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3,
-    11, 5, 10, 5, 5, 6, 8, 6, 8, 15, 8, 2, 1, 2,
+    6, 8, 6, 8, 6, 4, 14, 15, 8, 2, 1, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5,
+    8, 5, 3, 11, 5, 10, 5, 5, 6, 8, 6, 8, 6, 4, 14, 15, 8, 2, 1, 2,
   ]);
   const cases = reports.flatMap((report) => report.cases);
   expect(reports.flatMap((report) => report.errors)).toEqual([]);

@@ -1,4 +1,16 @@
 import {
+  TestImplementation,
+  testContract,
+} from "../../../src/compat/test/index.spec";
+import {
+  SqliteImplementation,
+  sqliteContract,
+} from "../../../src/compat/sqlite/index.spec";
+import {
+  ReplImplementation,
+  replContract,
+} from "../../../src/compat/repl/index.spec";
+import {
   DomainImplementation,
   domainContract,
 } from "../../../src/compat/domain/index.spec";
@@ -152,6 +164,9 @@ export async function runNodeContracts(
     await runContract(new InspectorImplementation(), inspectorContract),
     await runContract(new DomainImplementation(), domainContract),
     await runContract(new ReadlineImplementation(), readlineContract),
+    await runContract(new ReplImplementation(), replContract),
+    await runContract(new SqliteImplementation(), sqliteContract),
+    await runContract(new TestImplementation(), testContract),
   ];
   reports.push(
     await runContract(

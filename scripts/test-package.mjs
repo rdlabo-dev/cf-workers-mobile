@@ -32,6 +32,9 @@ for (const module of [
   "inspector",
   "domain",
   "readline",
+  "repl",
+  "sqlite",
+  "test",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -96,6 +99,14 @@ await cp(
   "src/compat/http2/values.spec.ts",
   join(temp, "src/compat/http2/values.spec.ts"),
 );
+await cp(
+  "src/compat/repl/values.spec.ts",
+  join(temp, "src/compat/repl/values.spec.ts"),
+);
+await cp(
+  "src/compat/sqlite/values.spec.ts",
+  join(temp, "src/compat/sqlite/values.spec.ts"),
+);
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
   "path",
@@ -128,6 +139,9 @@ for (const module of [
   "inspector",
   "domain",
   "readline",
+  "repl",
+  "sqlite",
+  "test",
   "fs",
   "module",
   "stream-web",
@@ -332,7 +346,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 546 ||
+    features.flatMap((report) => report.cases).length !== 594 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -369,7 +383,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 259 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 283 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

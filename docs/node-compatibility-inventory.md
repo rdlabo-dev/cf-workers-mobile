@@ -30,6 +30,7 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:os`, `node:tty`, `node:wasi`, `node:punycode` | **Unverified (acceptance pending)** | Module-owned implementations and contracts pass workerd, browser and both native platforms. Review and remote CI remain pending. |
 | `node:constants`, `node:v8`, `node:http2`, `node:vm` | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Workerd, browser, packed-consumer and both native validations pass at `719b8fe`; review and remote CI remain pending. |
 | `node:child_process`, `node:cluster`, `node:dgram`, `node:domain`, `node:inspector` (+ promises), `node:readline` (+ promises) | **Unverified (acceptance pending)** | Pinned production behavior implemented with adjacent contracts. Workerd, browser, packed-consumer and both native checks pass at `5169e5e`; review and remote CI remain pending. |
+| `node:repl`, `node:sqlite`, `node:test` | **Unverified (acceptance pending)** | Pinned REPL/SQLite stub behavior and Workers MockTracker API implemented with adjacent contracts. Local browser/package/native acceptance and review/CI are pending. `node:test` is the Workers mock API, not Node's entire test runner. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Remaining implementation sequence
@@ -314,7 +315,7 @@ A native transport must also work when the handler executes in a Dedicated Worke
 
 ## All documented non-functional stub modules
 
-The [official stub inventory](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#non-functional-stub-modules) contains these 16 modules. Each has a planned route of **S through A** for the applicable compatibility profile; this is not an implementation status. None has a verified stub-parity contract in this repository. Import availability, export shape, no-op vs throwing behavior and errors need per-export baseline tests; a blanket empty object is not enough.
+The [official stub inventory](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#non-functional-stub-modules) contains these 16 modules. Each has a planned route of **S through A** for the applicable compatibility profile; this is not an implementation status. Module-owned contracts now verify the implemented candidates listed in the status and local-acceptance sections. Independent review and remote CI are still required for Complete. `trace_events`, `_stream_wrap` and `worker_threads` remain pending implementation. Import availability alone is insufficient: contracts must cover export shape, no-op vs throwing behavior, state and errors.
 
 | Implementation status | Modules          | What is not required for Workers parity                                   |
 | --------------------- | ---------------- | ------------------------------------------------------------------------- |
@@ -765,3 +766,18 @@ from ordinary `inspector`; `readline` returns empty answers rather than throwing
 No new module is certified Complete by these local checks alone; independent
 review and remote CI are outstanding. Remaining functional families in the
 implementation sequence are still unfinished.
+
+### Mandatory-prefix module comparison
+
+The pinned workerd runtime exports `node:test` (`mock`, `MockTracker`,
+`MockFunctionContext`), while the installed Wrangler builtin resolver rejects
+its static import. The shared Node-contract Vitest test now bundles with esbuild,
+leaves `node:*` imports external, and runs the result in the same pinned workerd
+through Miniflare. Bare builtins are normalized to their `node:` form. This
+keeps the oracle as the real runtime; it does not substitute local compatibility
+implementations or claim that Wrangler's static resolver supports `node:test`.
+
+The SQLite contract matches the pinned profile: both exposed constructors throw
+`TypeError: Illegal constructor`, and backup throws synchronously. It does not
+create a local SQLite database and is separate from D1 support. Other dates/flags
+that expose functioning SQLite require a separate compatibility profile.
