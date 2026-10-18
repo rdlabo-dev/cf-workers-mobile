@@ -57,7 +57,6 @@ for (const module of [
   "stream-transform",
   "stream-passthrough",
   "stream-promises",
-
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -197,7 +196,6 @@ for (const module of [
   "stream-transform",
   "stream-passthrough",
   "stream-promises",
-
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });
@@ -464,6 +462,35 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     }
   }
   console.log("Packed consumer: Vite/esbuild/browser ESM 10/10 passed");
+  for (const build of ["vite-node", "esbuild-node"]) {
+    for (const prefer of ["worker", "direct"]) {
+      await page.goto(
+        `${previewURL}/build-tools/${build}/${build === "vite-node" ? "node.html" : ""}`,
+      );
+      await page.waitForFunction(
+        () => typeof window.runNodeBuild === "function",
+      );
+      const report = await page.evaluate(
+        (prefer) => window.runNodeBuild(prefer),
+        prefer,
+      );
+      const cases = report.contracts.flatMap((result) => result.cases);
+      if (
+        report.execution !== prefer ||
+        cases.length !== 461 ||
+        cases.some(
+          (result) =>
+            result.status === "failed" || result.status === "unavailable",
+        ) ||
+        JSON.stringify(report.commonJsAssertions) !==
+          JSON.stringify({ callable: true, sameDefault: true }) ||
+        JSON.stringify(report.commonJsStreams) !==
+          JSON.stringify(Array(7).fill(true))
+      )
+        throw new Error(`${build}/${prefer}: ${JSON.stringify(report)}`);
+    }
+  }
+  console.log("Packed consumer: configured Node/CommonJS entries 4/4 passed");
   // Installed package, cold Vite dev optimization, subpath-only application.
   const dev = spawn(
     process.execPath,
