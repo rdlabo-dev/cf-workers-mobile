@@ -96,3 +96,20 @@ it("rejects a new owner after the AbortSignal constructor is replaced", () => {
   expect(target.AbortSignal).toBe(Replacement);
   expect(Original.timeout).toBe(originalTimeout);
 });
+
+it("makes the inherited self alias writable and restores its descriptor", () => {
+  const prototype = Object.defineProperty({}, "self", {
+    get() {
+      return this;
+    },
+    configurable: true,
+  });
+  const target = Object.create(prototype);
+  const release = installWebGlobals(target);
+  target.self = target;
+  expect(target.self).toBe(target);
+  expect(Object.getOwnPropertyDescriptor(target, "self")?.writable).toBe(true);
+  release();
+  expect(Object.hasOwn(target, "self")).toBe(false);
+  expect(target.self).toBe(target);
+});

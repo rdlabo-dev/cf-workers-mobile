@@ -1,3 +1,5 @@
+// @ts-expect-error JavaScript fixture deliberately mixes module formats.
+import { mixedModule } from "./mixed.mjs";
 // @ts-expect-error This fixture deliberately exercises a CommonJS require entry.
 import commonJsAssertions from "./assert.cjs";
 // @ts-expect-error This fixture verifies CommonJS constructor exports.
@@ -24,6 +26,7 @@ export default {
       contracts: await runNodeContracts("bundled"),
       commonJsAssertions: commonJsAssertions(),
       commonJsStreams: commonJsStreams(),
+      mixedModule: mixedModule(),
       webGlobals: {
         entry: topLevelWebGlobals,
         static: staticWebGlobals,

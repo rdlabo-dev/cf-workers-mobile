@@ -1,0 +1,31 @@
+{
+  "name": "workers-capacitor-opennext-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "build:worker": "opennextjs-cloudflare build",
+    "build:capacitor": "vite build --config capacitor/vite.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@rdlabo/workers-capacitor": "file:../..",
+    "next": "15.5.28",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@cloudflare/workers-types": "5.20261018.1",
+    "@opennextjs/cloudflare": "1.20.12",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.7",
+    "wrangler": "4.151.1"
+  }
+}

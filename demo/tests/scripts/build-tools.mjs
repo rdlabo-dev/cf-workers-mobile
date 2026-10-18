@@ -18,12 +18,6 @@ await viteBuild({
   ],
   build: {
     outDir: resolve(root, "artifacts/build-tools/vite-node"),
-    commonjsOptions: {
-      include: [
-        /node_modules/,
-        /tests\/fixtures\/workers\/compatibility\/assert\.cjs$/,
-      ],
-    },
     emptyOutDir: true,
     target: "es2022",
     rollupOptions: {
