@@ -28,7 +28,10 @@
 /* eslint-disable */
 
 import { Buffer } from "node:buffer";
-const compare = Buffer.compare;
+// Resolve after module initialization: Buffer validation imports public util.
+function compare(a: Uint8Array, b: Uint8Array) {
+  return Buffer.compare(a, b);
+}
 
 import {
   isAnyArrayBuffer,

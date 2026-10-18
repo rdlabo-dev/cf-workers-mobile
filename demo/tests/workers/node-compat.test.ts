@@ -94,7 +94,7 @@ it("runs the node module contracts against real workerd", async () => {
   ]);
   expect(reports.map((report) => report.cases.length)).toEqual([
     14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5, 6, 8, 6, 8,
-    6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 15, 1, 10,
+    6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 15, 1, 28,
   ]);
   for (const report of reports) assertContract(report);
   expect(
