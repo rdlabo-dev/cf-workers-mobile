@@ -22,6 +22,10 @@ for (const module of [
   "tty",
   "wasi",
   "punycode",
+  "constants",
+  "v8",
+  "http2",
+  "vm",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -78,6 +82,14 @@ await cp(
   "src/compat/punycode/upstream.spec.ts",
   join(temp, "src/compat/punycode/upstream.spec.ts"),
 );
+await cp(
+  "src/compat/constants/values.spec.ts",
+  join(temp, "src/compat/constants/values.spec.ts"),
+);
+await cp(
+  "src/compat/http2/values.spec.ts",
+  join(temp, "src/compat/http2/values.spec.ts"),
+);
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
   "path",
@@ -100,6 +112,10 @@ for (const module of [
   "tty",
   "wasi",
   "punycode",
+  "constants",
+  "v8",
+  "http2",
+  "vm",
   "fs",
   "module",
   "stream-web",
@@ -304,7 +320,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 412 ||
+    features.flatMap((report) => report.cases).length !== 470 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -341,7 +357,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 192 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 221 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

@@ -24,10 +24,13 @@ function compatibilityPlugins(
 ): PluginOption[] {
   // Overrides take bare module names only; both bare and "node:" imports of
   // the same module resolve to the shared compat profile.
+  const globalsRuntimePath = globalsInjectPath.replace(
+    /inject\.js$/,
+    "runtime.js",
+  );
+  const aliases = compatibilityAliases();
   const overrides = Object.fromEntries(
-    Object.entries(compatibilityAliases()).filter(
-      ([specifier]) => !specifier.includes(":"),
-    ),
+    Object.entries(aliases).filter(([specifier]) => !specifier.includes(":")),
   );
   return [
     ...(installGlobals
@@ -74,6 +77,14 @@ function compatibilityPlugins(
             "buffer",
             "node:punycode",
             "punycode",
+            "node:constants",
+            "constants",
+            "node:v8",
+            "v8",
+            "node:http2",
+            "http2",
+            "node:vm",
+            "vm",
             "node:wasi",
             "wasi",
             "node:os",
@@ -91,7 +102,7 @@ function compatibilityPlugins(
           ],
         },
         resolve: {
-          alias: compatibilityAliases(),
+          alias: aliases,
         },
       }),
     },
@@ -102,13 +113,16 @@ function compatibilityPlugins(
     {
       ...inject({
         Buffer: [globalsInjectPath, "Buffer"],
-        process: [globalsInjectPath, "process"],
-        global: [globalsInjectPath, "global"],
-        setImmediate: [globalsInjectPath, "setImmediate"],
-        clearImmediate: [globalsInjectPath, "clearImmediate"],
+        // util reads process during Buffer initialization. Keep this import
+        // independent of the injector that also imports Buffer.
+        process: [aliases["process/"], "default"],
+        global: [globalsRuntimePath, "global"],
+        setImmediate: [globalsRuntimePath, "setImmediate"],
+        clearImmediate: [globalsRuntimePath, "clearImmediate"],
         exclude: [
           normalizePath(globalsPath),
           normalizePath(globalsInjectPath),
+          normalizePath(globalsRuntimePath),
           normalizePath(globalsInstallPath),
         ],
       }),

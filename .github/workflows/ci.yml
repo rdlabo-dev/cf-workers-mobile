@@ -53,6 +53,8 @@ jobs:
         working-directory: demo
       - run: npx playwright install --with-deps chromium webkit
         working-directory: demo
+      - run: npm run test:node-inventory
+        working-directory: demo
       - run: npm run test:workers -- --allowOnly=false
         working-directory: demo
       - run: npm run build

@@ -27,6 +27,8 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:buffer` | **Complete** | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20). |
 | `node:timers` / `node:timers/promises` | **Complete** | Whole-module implementation and shared 30-group contract in `src/compat/timers/`. [Acceptance](#timers-acceptance) and [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) passed at `c5fb8a4`; merged as `400d022`. |
 | `node:url` | **Unverified (CI pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
+| `node:os`, `node:tty`, `node:wasi`, `node:punycode` | **Unverified (acceptance pending)** | Module-owned implementations and contracts pass workerd, browser and both native platforms. Review and remote CI remain pending. |
+| `node:constants`, `node:v8`, `node:http2`, `node:vm` | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Native validation, review and CI remain pending. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Remaining implementation sequence
@@ -669,3 +671,33 @@ asset fingerprints. Logs and JSON evidence are retained locally under
 native test consumer was reused, with freshly packed library installation and
 runtime fixture assets. No URL case is excluded; the six exclusions belong to
 the existing async-hooks unit. Remote CI remains the merge/release gate.
+
+
+## Virtual platform and Punycode local acceptance
+
+`os`, `tty`, `wasi`, and `punycode` use the pinned workerd sources and keep their
+shared contracts next to their implementations. The contracts cover all named
+and default exports, fixed platform/constants behavior, class/prototype identity,
+input validation, callback order and the actual Workers unsupported operations.
+Punycode includes upstream RFC vectors and Unicode/surrogate cases. These units
+add no native implementation or runtime dependencies.
+
+At `8d4d508`, iOS 26.1 and Android 16 each passed **542 runtime checks**, with
+only the six pre-existing async-hooks exclusions. Each of the four new modules
+passed every group in both direct and Dedicated Worker execution (6 os, 5 tty,
+8 wasi, 5 punycode). Native reports identify clean revision `8d4d508` and artifact
+hashes; evidence is retained in `demo/artifacts/node-completion-acceptance/`.
+
+Local checks also passed: build/typechecks, 343 unit tests, 93 workerd tests,
+66 production Chromium/WebKit tests, 20 Vite development tests, 7 build-tool
+unit tests and 30 integration tests. The packed consumer passed 10 build-tool/raw
+ESM, 2 development, 26 direct, 22 isolated, 406 shared features plus the 6 existing
+ALS exclusions, and 2 preference checks. Vite development now optimizes net with
+tty to preserve Socket constructor identity. Remote CI and independent acceptance
+review remain pending, so these units are not marked Complete.
+
+The separate async-lowering experiment passes concurrent/nested restoration in
+Chromium and WebKit after esbuild converts async functions to explicit Promise
+continuations. This is only evidence for a possible build-time route. It does not
+certify async-hooks, dynamic imports, unhandled rejection, third-party native
+async callbacks or every build/runtime mode.

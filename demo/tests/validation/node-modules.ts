@@ -1,4 +1,20 @@
 import {
+  VmImplementation,
+  vmContract,
+} from "../../../src/compat/vm/index.spec";
+import {
+  Http2Implementation,
+  http2Contract,
+} from "../../../src/compat/http2/index.spec";
+import {
+  ConstantsImplementation,
+  constantsContract,
+} from "../../../src/compat/constants/index.spec";
+import {
+  V8Implementation,
+  v8Contract,
+} from "../../../src/compat/v8/index.spec";
+import {
   PunycodeImplementation,
   punycodeContract,
 } from "../../../src/compat/punycode/index.spec";
@@ -102,6 +118,10 @@ export async function runNodeContracts(
     await runContract(new TtyImplementation(), ttyContract),
     await runContract(new WasiImplementation(), wasiContract),
     await runContract(new PunycodeImplementation(), punycodeContract),
+    await runContract(new ConstantsImplementation(), constantsContract),
+    await runContract(new V8Implementation(), v8Contract),
+    await runContract(new Http2Implementation(), http2Contract),
+    await runContract(new VmImplementation(), vmContract),
   ];
   reports.push(
     await runContract(
