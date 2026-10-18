@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
-import { compileD1Worker, d1Bindings } from "../../src/build/d1.js";
+import { compileServerWorker, serverBindings } from "../../src/build/server.js";
 let root: string;
 beforeAll(async () => {
   await mkdir("demo/artifacts", { recursive: true });
@@ -14,7 +14,7 @@ afterAll(async () => {
 async function compile(files: Record<string, string>) {
   for (const [name, content] of Object.entries(files))
     await writeFile(resolve(root, name), content);
-  return compileD1Worker(resolve(root, "worker.ts"), ["DATABASE"]);
+  return compileServerWorker(resolve(root, "worker.ts"), ["DATABASE"]);
 }
 async function selector(source: string) {
   const result = await build({
@@ -122,27 +122,27 @@ it("reads existing Wrangler JSONC/TOML and explicit binding settings without ser
     resolve(root, "wrangler.jsonc"),
     '{ // comment\n "d1_databases": [{ "binding": "DATABASE", "database_id": "not-a-client-setting" }], }',
   );
-  expect((await d1Bindings(root, {})).names).toEqual(["DATABASE"]);
+  expect((await serverBindings(root, {})).names).toEqual(["DATABASE"]);
   await writeFile(
     resolve(root, "production.jsonc"),
     '{"env":{"production":{"d1_databases":[{"binding":"PRODUCTION_DB"}]}}}',
   );
   expect(
-    (await d1Bindings(root, { workerConfig: "production.jsonc" })).names,
+    (await serverBindings(root, { workerConfig: "production.jsonc" })).names,
   ).toEqual(["PRODUCTION_DB"]);
   await writeFile(
     resolve(root, "wrangler.toml"),
     '[[d1_databases]]\nbinding = "OTHER"\ndatabase_id = "server-only"',
   );
   expect(
-    (await d1Bindings(root, { workerConfig: "wrangler.toml" })).names,
+    (await serverBindings(root, { workerConfig: "wrangler.toml" })).names,
   ).toEqual(["OTHER"]);
-  expect((await d1Bindings(root, { d1Bindings: ["DB"] })).names).toEqual([
+  expect((await serverBindings(root, { d1Bindings: ["DB"] })).names).toEqual([
     "DB",
   ]);
   await writeFile(resolve(root, "broken.jsonc"), '{"d1_databases": [');
   await expect(
-    d1Bindings(root, { workerConfig: "broken.jsonc" }),
+    serverBindings(root, { workerConfig: "broken.jsonc" }),
   ).rejects.toThrow("Invalid Worker configuration");
 });
 it("keeps server environment and opaque package access remote unless a binding is explicitly local", async () => {
@@ -151,7 +151,7 @@ it("keeps server environment and opaque package access remote unless a binding i
     entry,
     `import { Hono } from 'hono'; const app = new Hono(); app.get('/secret', c => c.text(c.env.API_SECRET)); app.get('/local', c => c.text(c.env.LABEL)); export default app;`,
   );
-  const result = await compileD1Worker(entry, ["DATABASE"], {
+  const result = await compileServerWorker(entry, ["DATABASE"], {
     localBindings: ["LABEL"],
   });
   expect(result.local).not.toContain("API_SECRET");
@@ -163,7 +163,7 @@ it("keeps server environment and opaque package access remote unless a binding i
     false,
   );
   await expect(
-    compileD1Worker(entry, ["DATABASE"], { localBindings: ["DATABASE"] }),
+    compileServerWorker(entry, ["DATABASE"], { localBindings: ["DATABASE"] }),
   ).rejects.toThrow("cannot also be a local binding");
 });
 

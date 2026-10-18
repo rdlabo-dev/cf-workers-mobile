@@ -1,6 +1,6 @@
 import { documentAssets, listAssets } from "./build/documents.js";
-import { d1Modules } from "./build/d1-modules.js";
-import type { D1BuildOptions } from "./build/d1.js";
+import { serverModules } from "./build/server-modules.js";
+import type { ServerBuildOptions } from "./build/server.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -149,7 +149,7 @@ function workerEntryPlugin(
 }
 
 /** Add only to the Capacitor/browser build, never the Cloudflare build. */
-export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
+export interface CapacitorWorkersPluginOptions extends ServerBuildOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
   /**
@@ -178,27 +178,27 @@ export function capacitorWorkersPlugin(
     : undefined;
   let root: string;
   let publicDir: string;
-  let d1: ReturnType<typeof d1Modules> | undefined;
-  const d1Plugin = (): Plugin => ({
-    name: "capacitor-workers-d1",
+  let server: ReturnType<typeof serverModules> | undefined;
+  const serverPlugin = (): Plugin => ({
+    name: "capacitor-workers-server",
     enforce: "pre",
     resolveId(id) {
-      return virtualId(id, root, (path) => d1?.owns(path) ?? false);
+      return virtualId(id, root, (path) => server?.owns(path) ?? false);
     },
     async load(id) {
-      if (!d1) return;
+      if (!server) return;
       const path = id.split("?")[0];
-      const generated = await d1.load(path);
+      const generated = await server.load(path);
       if (generated) {
         for (const input of generated.inputs) this.addWatchFile(input);
         return { code: generated.code, map: null };
       }
-      await d1.guard(path);
+      await server.guard(path);
     },
     async handleHotUpdate(ctx) {
-      const previous = await d1?.get();
+      const previous = await server?.get();
       if (previous?.inputs.includes(ctx.file)) {
-        d1?.reset();
+        server?.reset();
         ctx.server.moduleGraph.invalidateAll();
         ctx.server.ws.send({ type: "full-reload" });
         return [];
@@ -206,7 +206,7 @@ export function capacitorWorkersPlugin(
     },
   });
   return [
-    d1Plugin(),
+    serverPlugin(),
     {
       name: "capacitor-workers-source",
       enforce: "pre",
@@ -218,7 +218,7 @@ export function capacitorWorkersPlugin(
         root = config.root;
         publicDir = config.publicDir;
         if (options.worker)
-          d1 = d1Modules(resolve(root, options.worker), root, options);
+          server = serverModules(resolve(root, options.worker), root, options);
       },
       generateBundle: {
         order: "post",
@@ -227,11 +227,11 @@ export function capacitorWorkersPlugin(
             ...Object.keys(bundle),
             ...(publicDir ? await listAssets(publicDir) : []),
           ];
-          const compilation = await d1?.get();
+          const compilation = await server?.get();
           if (compilation) {
-            const fileName = "capacitor-workers-d1.json";
+            const fileName = compilation.reportFile;
             if (files.includes(fileName))
-              this.error("D1 report asset collision: " + fileName);
+              this.error("Server report asset collision: " + fileName);
             const { mode, reason, routes } = compilation;
             this.emitFile({
               type: "asset",
@@ -260,14 +260,14 @@ export function capacitorWorkersPlugin(
         });
         if (!resolved || resolved.external)
           this.error("Cannot resolve Worker entry: " + path);
-        const compilation = await d1?.get();
+        const compilation = await server?.get();
         if (compilation)
           this.warn(
             compilation.mode === "worker"
-              ? `D1: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
-              : `D1: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+              ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+              : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
           );
-        const entry = compilation ? d1!.localEntry : resolved.id;
+        const entry = compilation ? server!.localEntry : resolved.id;
         const generated = entry + entrySuffix;
         if (existsSync(generated))
           this.error(
@@ -276,7 +276,7 @@ export function capacitorWorkersPlugin(
           );
         entries.set(generated, entry);
         return `import Constructor from ${JSON.stringify(generated + "?worker")};
-${compilation ? `import { needsRemote } from ${JSON.stringify(d1!.selectorEntry)};` : ""}
+${compilation ? `import { needsRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
 import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
 export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote," : ""} async loadDirect() {
   const dispose = installNodeGlobals();
@@ -298,7 +298,7 @@ export default { createWorker: () => new Constructor(), ${compilation ? "needsRe
           worker: {
             plugins: () => [
               ...(previous?.() ?? []),
-              d1Plugin(),
+              serverPlugin(),
               workerEntryPlugin(entries, () => root, virtualFiles),
               ...compatibilityPlugins("worker"),
             ],

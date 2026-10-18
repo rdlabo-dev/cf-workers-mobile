@@ -1,20 +1,24 @@
 import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
-import { compileD1Worker, d1Bindings, type D1BuildOptions } from "./d1.js";
+import {
+  compileServerWorker,
+  serverBindings,
+  type ServerBuildOptions,
+} from "./server.js";
 
 /** Shared virtual graph for the UI and Dedicated Worker builds. */
-export function d1Modules(
+export function serverModules(
   entry: string,
   root: string,
-  options: D1BuildOptions,
+  options: ServerBuildOptions,
 ) {
   const normalize = (path: string) => path.replaceAll("\\", "/");
-  const localEntry = normalize(entry) + ".capacitor-d1-local.js";
-  const selectorEntry = normalize(entry) + ".capacitor-d1-selector.js";
+  const localEntry = normalize(entry) + ".capacitor-server-local.js";
+  const selectorEntry = normalize(entry) + ".capacitor-server-selector.js";
   let pending: ReturnType<typeof prepare> | undefined;
   async function prepare() {
     let configurationRoot = root;
-    if (!options.workerConfig && !options.d1Bindings) {
+    if (!options.workerConfig) {
       for (let directory = dirname(entry); ; directory = dirname(directory)) {
         if (
           ["wrangler.jsonc", "wrangler.json", "wrangler.toml"].some((name) =>
@@ -31,13 +35,14 @@ export function d1Modules(
           break;
       }
     }
-    const bindings = await d1Bindings(configurationRoot, options);
+    const bindings = await serverBindings(configurationRoot, options);
     if (!bindings.names.length) return;
-    const compilation = await compileD1Worker(entry, bindings.names, {
+    const compilation = await compileServerWorker(entry, bindings.names, {
       localBindings: options.localBindings,
     });
     return {
       ...compilation,
+      reportFile: bindings.reportFile,
       inputs: [
         ...compilation.inputs,
         ...(bindings.config ? [bindings.config] : []),
@@ -60,7 +65,7 @@ export function d1Modules(
       const result = await get();
       if (!result)
         throw new Error(
-          "D1 build configuration disappeared; restart the build",
+          "Server build configuration disappeared; restart the build",
         );
       return {
         code: id === localEntry ? result.local : result.selector,
@@ -72,7 +77,7 @@ export function d1Modules(
       const result = await get();
       if (result?.inputs.includes(normalize(resolve(id))))
         throw new Error(
-          `Server source ${id} was imported outside the generated Worker graph. Importing original server modules into the client would bypass D1 removal.`,
+          `Server source ${id} was imported outside the generated Worker graph. Importing original server modules into the client would bypass server code removal.`,
         );
     },
   };

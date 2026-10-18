@@ -12,15 +12,17 @@ import type {
   VariableDeclarator,
 } from "estree";
 
-export interface D1BuildOptions {
+export interface ServerBuildOptions {
   /** Existing Wrangler JSON, JSONC or TOML configuration. Auto-detected in the build root. */
   workerConfig?: string;
   /** Binding names when configuration is supplied by another tool. No route annotations. */
   d1Bindings?: string[];
+  /** Hyperdrive binding names when configuration is supplied by another tool. */
+  hyperdriveBindings?: string[];
   /** Names explicitly supplied through capacitorWorkers({ env }); other env access stays on the server. */
   localBindings?: string[];
 }
-export interface D1Compilation {
+export interface ServerCompilation {
   mode: "routes" | "worker";
   reason?: string;
   local: string;
@@ -29,49 +31,76 @@ export interface D1Compilation {
   routes: { router: string; method: string; path: string; remote: boolean }[];
 }
 class WiderServerBoundary extends Error {}
-export async function d1Bindings(root: string, options: D1BuildOptions) {
-  if (options.d1Bindings) {
-    if (options.d1Bindings.some((name) => !name || typeof name !== "string"))
-      throw new TypeError("d1Bindings must contain nonempty binding names");
-    return { names: [...new Set(options.d1Bindings)], config: undefined };
+export async function serverBindings(
+  root: string,
+  options: ServerBuildOptions,
+) {
+  for (const key of ["d1Bindings", "hyperdriveBindings"] as const) {
+    const values = options[key];
+    if (
+      values !== undefined &&
+      (!Array.isArray(values) ||
+        values.some((name) => typeof name !== "string" || !name.trim()))
+    )
+      throw new TypeError(`${key} must contain nonempty binding names`);
   }
   const file = options.workerConfig
     ? resolve(root, options.workerConfig)
     : ["wrangler.jsonc", "wrangler.json", "wrangler.toml"]
         .map((name) => resolve(root, name))
         .find(existsSync);
-  if (!file) return { names: [], config: undefined };
-  const source = await readFile(file, "utf8");
-  const errors: ParseError[] = [];
-  const config = file.endsWith(".toml")
-    ? parseTOML(source)
-    : parseJSON(source, errors, { allowTrailingComma: true });
-  if (errors.length) throw new Error(`Invalid Worker configuration: ${file}`);
-  const typed = config as {
-    d1_databases?: { binding: string }[];
-    env?: Record<string, { d1_databases?: { binding: string }[] }>;
-  };
-  if (!typed || typeof typed !== "object")
-    throw new Error(`Invalid Worker configuration: ${file}`);
-  const groups = [
-    typed.d1_databases ?? [],
-    ...Object.values(typed.env ?? {}).map(
-      (environment) => environment.d1_databases ?? [],
-    ),
-  ];
+  let config: Record<string, unknown> = {};
+  if (file) {
+    const source = await readFile(file, "utf8");
+    const errors: ParseError[] = [];
+    config = file.endsWith(".toml")
+      ? parseTOML(source)
+      : parseJSON(source, errors, { allowTrailingComma: true });
+    if (
+      errors.length ||
+      !config ||
+      typeof config !== "object" ||
+      Array.isArray(config)
+    )
+      throw new Error(`Invalid Worker configuration: ${file}`);
+  }
+  const env = config.env === undefined ? {} : config.env;
+  if (!env || typeof env !== "object" || Array.isArray(env))
+    throw new Error(`Invalid Worker environments in ${file}`);
+  const environments = [config, ...Object.values(env)];
   if (
-    groups.some(
-      (bindings) =>
-        !Array.isArray(bindings) ||
-        bindings.some(
-          (item) => typeof item?.binding !== "string" || !item.binding,
-        ),
+    environments.some(
+      (value) => !value || typeof value !== "object" || Array.isArray(value),
     )
   )
-    throw new Error(`Invalid d1_databases in ${file}`);
+    throw new Error(`Invalid Worker environments in ${file}`);
+  function configured(key: "d1_databases" | "hyperdrive") {
+    const groups = environments.map((environment) =>
+      environment[key] === undefined ? [] : environment[key],
+    );
+    if (
+      groups.some(
+        (bindings) =>
+          !Array.isArray(bindings) ||
+          bindings.some(
+            (item: { binding?: unknown } | null) =>
+              typeof item?.binding !== "string" || !item.binding.trim(),
+          ),
+      )
+    )
+      throw new Error(`Invalid ${key} in ${file}`);
+    return groups.flat().map((item: { binding: string }) => item.binding);
+  }
+  // Overrides apply per binding kind: an explicit D1 list must not suppress
+  // Hyperdrive discovery (and vice versa). Only names leave this function.
+  const d1 = options.d1Bindings ?? configured("d1_databases");
+  const hyperdrive = options.hyperdriveBindings ?? configured("hyperdrive");
   return {
-    names: [...new Set(groups.flat().map((item) => item.binding))],
+    names: [...new Set<string>([...d1, ...hyperdrive])],
     config: file,
+    reportFile: hyperdrive.length
+      ? "capacitor-workers-server.json"
+      : "capacitor-workers-d1.json",
   };
 }
 
@@ -120,17 +149,17 @@ const routeMethods = new Set([
 ]);
 
 /** Bundle local modules first so imported/re-exported helpers share one dependency graph. */
-export async function compileD1Worker(
+export async function compileServerWorker(
   entry: string,
   bindings: string[],
   options: Pick<
     BuildOptions,
     "alias" | "tsconfig" | "define" | "conditions"
   > & { localBindings?: string[] } = {},
-): Promise<D1Compilation> {
+): Promise<ServerCompilation> {
   const { localBindings = [], ...buildOptions } = options;
   if (localBindings.some((name) => bindings.includes(name)))
-    throw new Error("A D1 binding cannot also be a local binding");
+    throw new Error("A server binding cannot also be a local binding");
   const bundled = await build({
     ...buildOptions,
     absWorkingDir: dirname(entry),
@@ -170,7 +199,7 @@ function partition(
   bindings: string[],
   inputs: string[],
   localBindings: string[],
-): D1Compilation {
+): ServerCompilation {
   const program = parseAst(source);
   const text = (node: Node) => {
     const span = node as Node & { start: number; end: number };
@@ -632,7 +661,7 @@ function partition(
   const selectorRoots: Node[] = [];
   const localRegistrations = new Map<Node, string[]>();
   const selectorRegistrations = new Map<Node, string[]>();
-  const routes: D1Compilation["routes"] = [];
+  const routes: ServerCompilation["routes"] = [];
   let remoteErrors = false;
   const emit = (map: Map<Node, string[]>, statement: Node, code: string) =>
     map.set(statement, [...(map.get(statement) ?? []), code]);
@@ -753,7 +782,7 @@ function partition(
   }
   const hasRemote = remoteErrors || routes.some((route) => route.remote);
   if (remoteErrors)
-    fail("D1-backed error/not-found handling can apply to every request");
+    fail("Server-backed error/not-found handling can apply to every request");
   return {
     mode: "routes",
     local: generate(needed, localRegistrations) + `\nexport default ${root};\n`,
