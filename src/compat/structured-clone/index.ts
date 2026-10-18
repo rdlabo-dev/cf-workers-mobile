@@ -1,4 +1,4 @@
-import { isURLInstance } from "../url/web-url.js";
+import { isURLInstance } from "../url/brand.js";
 import { platform } from "../globals/platform.js";
 import { cloneHeaders, Headers } from "../headers/index.js";
 import { Request, structuredCloneRequestSnapshot } from "../request/index.js";

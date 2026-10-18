@@ -1,3 +1,5 @@
+import { NativeURL, hostKey, instanceKey } from "./brand.js";
+export { isURLInstance } from "./brand.js";
 import { URL as StandardURL } from "./standard-url.js";
 import { platform } from "../globals/platform.js";
 const coerceString = String.prototype.concat;
@@ -5,11 +7,6 @@ const nativeBlobSize = Object.getOwnPropertyDescriptor(
   platform.Blob.prototype,
   "size",
 )!.get!;
-const hostKey = Symbol.for("@rdlabo/capacitor-workers/native-url");
-const NativeURL: typeof globalThis.URL =
-  (globalThis.URL as unknown as Record<symbol, typeof globalThis.URL>)[
-    hostKey
-  ] ?? globalThis.URL;
 const NativeParams = globalThis.URLSearchParams;
 // A native URL owns each exposed query list. This preserves BodyInit branding
 // and live updates even when applications borrow URLSearchParams.prototype methods.
@@ -38,7 +35,6 @@ function serialized(url: URL): string {
   if (query) searchDescriptor.set!.call(url, queryOf(query.href));
   return hrefDescriptor.get!.call(url);
 }
-const instanceKey = Symbol.for("@rdlabo/capacitor-workers/url-instance");
 /** JS URL Standard parser with the fixed Workers IDNA profile. */
 export class URL extends (StandardURL as typeof globalThis.URL) {
   override get searchParams(): URLSearchParams {
@@ -147,12 +143,3 @@ for (const fn of [URL, URL.canParse, URL.parse])
   Object.defineProperty(fn, "length", { value: 1 });
 Object.defineProperty(URL, hostKey, { value: NativeURL });
 export const URLSearchParams = NativeParams;
-
-export function isURLInstance(value: unknown): value is globalThis.URL {
-  return (
-    value instanceof NativeURL ||
-    (typeof value === "object" &&
-      value !== null &&
-      (value as Record<symbol, unknown>)[instanceKey] === true)
-  );
-}
