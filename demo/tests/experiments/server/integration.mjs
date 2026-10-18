@@ -152,8 +152,9 @@ export function databaseIntegration(kind) {
       },
     });
     await server.listen();
-    const browser = await chromium.launch();
+    let browser;
     try {
+      browser = await chromium.launch();
       const context = await browser.newContext();
       await context.route(
         "https://deployed-worker.invalid/**",
@@ -228,7 +229,7 @@ export function databaseIntegration(kind) {
       });
       await context.close();
     } finally {
-      await browser.close();
+      await browser?.close();
       await server.close();
     }
   });
