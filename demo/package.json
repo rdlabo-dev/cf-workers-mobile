@@ -42,7 +42,10 @@
     "test:cloudflare-bindings": "node --test tests/experiments/cloudflare/integration.test.mjs",
     "test:node-boundaries": "node --test tests/experiments/node-compat/*.probe.mjs",
     "test:opennext": "node --test tests/opennext/integration.test.mjs && vite build --config tests/opennext/local/vite.config.ts && node tests/opennext/local/esbuild.mjs && node --test tests/opennext/local.test.mjs",
-    "test:void": "node --test tests/void/integration.test.mjs"
+    "test:void": "node --test tests/void/integration.test.mjs",
+    "test:upstream:opennext:prepare": "node tests/upstream/opennext/prepare.mjs",
+    "test:upstream:opennext": "node --test tests/upstream/opennext/acceptance.test.mjs",
+    "test:upstream:opennext:native": "node --test tests/upstream/opennext/native.test.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

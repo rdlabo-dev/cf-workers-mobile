@@ -198,3 +198,26 @@ it("preserves asset-first routing remotely and selectively dispatches worker-fir
     }),
   ).rejects.toThrow("cannot also");
 });
+
+it("remote assets can import server WASM and binary files without shipping them or bypassing the source guard", async () => {
+  await configuration({ assets: { binding: "ASSETS", directory: "public" } });
+  const entry = resolve(root, "binary-worker.js");
+  await writeFile(
+    entry,
+    `import wasm from './renderer.wasm?module'; import font from './font.bin'; export default {fetch() { return new Response(String(wasm) + font + 'private-renderer'); }};`,
+  );
+  await writeFile(resolve(root, "renderer.wasm"), "private-wasm");
+  await writeFile(resolve(root, "font.bin"), "private-font");
+  const graph = serverModules(entry, root, { assetsExecution: "remote" });
+  const compiled = await graph.get();
+  expect(compiled?.mode).toBe("worker");
+  expect(compiled?.local).not.toMatch(/private-|renderer|font/);
+  expect(compiled?.inputs).toContain(entry);
+  expect(
+    compiled?.inputs.some((path) => path.endsWith("renderer.wasm?module")),
+  ).toBe(true);
+  expect(compiled?.inputs).toContain(resolve(root, "font.bin"));
+  await expect(graph.guard(entry)).rejects.toThrow(
+    "outside the generated Worker graph",
+  );
+});

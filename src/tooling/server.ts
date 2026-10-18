@@ -94,6 +94,12 @@ export async function compileServerWorker(
     entryPoints: [entry],
     bundle: true,
     packages: "external",
+    // Remote-only applications may import Cloudflare WASM modules and binary
+    // assets (for example next/og). Keep these files in the dependency graph
+    // for the client-import guard, without embedding unused server data.
+    loader: forceRemoteReason
+      ? { ".wasm": "empty", ".bin": "empty" }
+      : undefined,
     format: "esm",
     platform: "neutral",
     write: false,

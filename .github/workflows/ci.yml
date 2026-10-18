@@ -59,6 +59,10 @@ jobs:
               npm ci --prefix void
               npm run build --prefix void
               npm run test:void
+          - suite: upstream-opennext
+            commands: |
+              npm run test:upstream:opennext:prepare
+              npm run test:upstream:opennext
           - suite: opennext
             commands: |
               npm ci --prefix opennext

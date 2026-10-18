@@ -76,6 +76,10 @@ resolve regardless of the bundle's build-time directory.
   ALS-dependent applications. Full OpenNext native acceptance remains separate
   from the shared ALS contract.
 
+## Upstream application acceptance
+
+The [official App Router acceptance fixture](../demo/tests/upstream/opennext/README.md) pins an upstream OpenNext application and preserves its application source and configuration. It covers hydrated Server Actions, form actions with redirects/query parameters, and delayed SSR with a Suspense loading fallback. Native tests exercise remote Worker execution and WebView hydration through the public API; they do not establish local Server Action support. The browser baseline runs separately in CI. See the fixture for reproduction commands and proxy/streaming test boundaries.
+
 ## Current gaps
 
 - The sample's native scenarios cover public pages and remote D1/session flows,
