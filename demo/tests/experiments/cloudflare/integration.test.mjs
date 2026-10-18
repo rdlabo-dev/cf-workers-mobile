@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { build } from "esbuild";
 import { build as viteBuild } from "vite";
 import { chromium, webkit } from "@playwright/test";
-import { Miniflare, convertV4MiniflareOptions } from "miniflare";
+import { config, createBackend } from "./backend.mjs";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -23,70 +23,24 @@ async function files(dir) {
   ).flat();
 }
 for (const tool of ["vite", "esbuild"])
-  test(`${tool}: local ASSETS and real Durable Object HTTP/RPC in Chromium/WebKit`, async () => {
+  test(`${tool}: remote ASSETS and real Durable Object HTTP/RPC in Chromium/WebKit`, async () => {
     const root = join(artifacts, tool);
     await mkdir(root, { recursive: true });
-    const backendBuild = await build({
-      entryPoints: [worker],
-      bundle: true,
-      format: "esm",
-      write: false,
-    });
-    const backend = new Miniflare(
-      convertV4MiniflareOptions({
-        workers: [
-          {
-            name: "app",
-            modules: true,
-            script: backendBuild.outputFiles[0].text,
-            compatibilityDate: "2026-10-01",
-            durableObjects: {
-              OBJECTS: { className: "Counter", scriptName: "objects" },
-            },
-          },
-          {
-            name: "objects",
-            modules: true,
-            compatibilityDate: "2026-10-01",
-            durableObjects: { SELF: { className: "Counter", useSQLite: true } },
-            script: `import {DurableObject} from 'cloudflare:workers';export class Counter extends DurableObject {async increment(){const n=(await this.ctx.storage.get('n')??0)+1;await this.ctx.storage.put('n',n);return n;}async fetch(){return Response.json({count:await this.ctx.storage.get('n')??0});}}export default {fetch(){return new Response('objects')}};`,
-          },
-        ],
-      }),
-    );
+    const backend = await createBackend();
     let server;
     try {
       await backend.ready;
-      await writeFile(
-        join(root, "wrangler.json"),
-        JSON.stringify({
-          durable_objects: {
-            bindings: [
-              {
-                name: "OBJECTS",
-                class_name: "Counter",
-                script_name: "objects",
-              },
-            ],
-          },
-          assets: {
-            binding: "ASSETS",
-            run_worker_first: true,
-            html_handling: "none",
-            not_found_handling: "single-page-application",
-          },
-        }),
-      );
+      await writeFile(join(root, "wrangler.json"), JSON.stringify(config));
       const main = join(root, "main.js");
       await writeFile(
         main,
-        `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};import {LocalAssets} from ${JSON.stringify(join(repo, "dist/features/assets/index.js"))};let runtime,token='owner';window.start=async(prefer,assets)=>{runtime=workersCapacitor({baseURL:'https://local.invalid',prefer,...(assets?{env:{ASSETS:new LocalAssets({'/assets':'/static/index.html','/index.html':'/static/index.html'},{baseURL:location.href,notFoundHandling:'single-page-application'})}}:{}),remote:{origin:'https://deployed.invalid',getToken:()=>token}});await runtime.ready;return runtime.execution;};window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const r=await fetch(path,init);return {status:r.status,body:await r.text()}};`,
+        `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};let runtime,token='owner';window.start=async(prefer)=>{runtime=workersCapacitor({baseURL:'https://local.invalid',prefer,remote:{origin:'https://deployed.invalid',getToken:()=>token}});await runtime.ready;return runtime.execution;};window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const r=await fetch(path,init);return {status:r.status,body:await r.text(),etag:r.headers.get('etag')}};`,
       );
       const out = join(root, "dist");
       const opts = {
         worker,
         workerConfig: "wrangler.json",
-        assetsExecution: "local",
+        assetsExecution: "remote",
       };
       if (tool === "vite")
         await viteBuild({
@@ -125,17 +79,10 @@ for (const tool of ["vite", "esbuild"])
         out,
         built.find((f) => /\/main(?:-[\w-]+)?\.js$/.test(f)),
       );
-      let assetReads = 0;
       server = createServer(async (req, res) => {
         if (req.url === "/") {
           res.setHeader("content-type", "text/html");
           res.end(`<script type="module" src="/${entry}"></script>`);
-          return;
-        }
-        if (req.url === "/static/index.html") {
-          assetReads++;
-          res.setHeader("content-type", "text/html");
-          res.end(req.method === "HEAD" ? undefined : "packaged-assets");
           return;
         }
         try {
@@ -196,7 +143,7 @@ for (const tool of ["vite", "esbuild"])
               await page.goto(`http://127.0.0.1:${server.address().port}/`);
               await page.waitForFunction(() => !!window.start);
               assert.equal(
-                await page.evaluate((p) => window.start(p, false), prefer),
+                await page.evaluate((p) => window.start(p), prefer),
                 prefer,
               );
               assert.equal(
@@ -249,28 +196,21 @@ for (const tool of ["vite", "esbuild"])
                 ).count,
                 2,
               );
-              await page.evaluate(() => window.stop());
-              const beforeReads = assetReads;
-              assert.equal(
-                await page.evaluate((p) => window.start(p, true), prefer),
-                "direct",
-              );
-              assert.equal(assetReads, beforeReads);
               const beforeRemote = remoteCalls;
               assert.equal(
                 (await page.evaluate(() => window.request("/assets"))).body,
-                "packaged-assets",
+                "cloud-assets",
               );
               assert.equal(
                 (await page.evaluate(() => window.request("/spa/deep"))).body,
-                "packaged-assets",
+                "cloud-assets",
               );
               const head = await page.evaluate(() =>
                 window.request("/assets", { method: "HEAD" }),
               );
               assert.equal(head.status, 200);
               assert.equal(head.body, "");
-              assert.equal(remoteCalls, beforeRemote);
+              assert.equal(remoteCalls, beforeRemote + 3);
               await page.evaluate(() => window.stop());
             } finally {
               await context.close();

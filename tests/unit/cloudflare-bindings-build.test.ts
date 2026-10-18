@@ -142,94 +142,59 @@ it("keeps exported cloud classes and scheduled handlers wholly remote even witho
     expect(compiled?.local).not.toContain("private-code");
   }
 });
-const assets = {
-  binding: "ASSETS",
-  run_worker_first: true,
-  html_handling: "none",
-};
-it("requires an assets execution policy and rejects unsupported local routing profiles", async () => {
+
+const assets = { binding: "ASSETS", run_worker_first: true };
+it("requires explicit remote ASSETS policy and rejects local policies", async () => {
   await configuration({ assets });
   await expect(serverBindings(root, {})).rejects.toThrow("Set assetsExecution");
-  expect(
-    (await serverBindings(root, { assetsExecution: "local" })).localBindings,
-  ).toEqual(["ASSETS"]);
+  await expect(
+    serverBindings(root, { assetsExecution: "local" as never }),
+  ).rejects.toThrow("local ASSETS compatibility is not implemented");
   expect(
     (await serverBindings(root, { assetsExecution: "remote" })).names,
   ).toEqual(["ASSETS"]);
-  for (const patch of [
-    { run_worker_first: false },
-    { run_worker_first: ["/api/*"] },
-    { html_handling: "auto-trailing-slash" },
-    { not_found_handling: "404-page" },
-    { binding: undefined },
-  ]) {
-    await configuration({ assets: { ...assets, ...patch } });
-    await expect(
-      serverBindings(root, { assetsExecution: "local" }),
-    ).rejects.toThrow("Local assets require");
-  }
   await configuration({});
   await expect(
-    serverBindings(root, { assetsExecution: "local" }),
+    serverBindings(root, { assetsExecution: "remote" }),
   ).rejects.toThrow("requires assets");
 });
-it("preserves asset-first routing remotely and remote priority over local ASSETS", async () => {
-  await configuration({ assets: { binding: "ASSETS" } });
-  expect(
-    (await serverBindings(root, { assetsExecution: "remote" }))
-      .forceRemoteReason,
-  ).toContain("Asset-first");
+it("preserves asset-first routing remotely and selectively dispatches worker-first asset calls", async () => {
+  for (const config of [
+    { binding: "ASSETS" },
+    { run_worker_first: ["/api/*"], binding: "ASSETS" },
+    { directory: "public" },
+  ]) {
+    await configuration({ assets: config });
+    expect(
+      (await serverBindings(root, { assetsExecution: "remote" }))
+        .forceRemoteReason,
+    ).toContain("Asset-first");
+  }
   await configuration({ assets, ai: { binding: "AI" } });
   const entry = resolve(root, "assets.ts");
   await writeFile(
     entry,
-    `import {Hono} from 'hono';const app=new Hono();app.get('/local',c=>c.env.ASSETS.fetch(c.req.raw));app.get('/cloud',async c=>{await c.env.AI.run('private-model');return c.env.ASSETS.fetch(c.req.raw)});export default app;`,
+    `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('ok'));app.get('/assets',c=>c.env.ASSETS.fetch(c.req.raw));app.get('/cloud',async c=>{await c.env.AI.run('private-model');return c.env.ASSETS.fetch(c.req.raw)});export default app;`,
   );
   const compiled = await serverModules(entry, root, {
-    assetsExecution: "local",
+    assetsExecution: "remote",
   }).get();
   const { needsRemote } = await selector(compiled!.selector);
-  expect(await needsRemote(new Request("https://local.invalid/local"))).toBe(
+  expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
     false,
+  );
+  expect(await needsRemote(new Request("https://local.invalid/assets"))).toBe(
+    true,
   );
   expect(await needsRemote(new Request("https://local.invalid/cloud"))).toBe(
     true,
   );
   expect(compiled?.local).not.toContain("private-model");
+  expect(compiled?.local).not.toContain("ASSETS.fetch");
   await expect(
     serverBindings(root, {
-      assetsExecution: "local",
-      remoteBindings: ["ASSETS"],
+      assetsExecution: "remote",
+      localBindings: ["ASSETS"],
     }),
   ).rejects.toThrow("cannot also");
-});
-
-it("rejects incompatible local asset environments and unsupported control files", async () => {
-  await configuration({
-    assets,
-    env: {
-      production: {
-        assets: { ...assets, not_found_handling: "single-page-application" },
-      },
-    },
-  });
-  await expect(
-    serverBindings(root, { assetsExecution: "local" }),
-  ).rejects.toThrow("Conflicting local assets routing");
-  await configuration({ assets, kv_namespaces: [{ binding: "ASSETS" }] });
-  await expect(
-    serverBindings(root, {
-      assetsExecution: "local",
-      kvExecution: { ASSETS: "local" },
-    }),
-  ).rejects.toThrow("KV binding cannot also");
-  for (const control of ["_headers", "_redirects"]) {
-    const directory = resolve(root, control + "-public");
-    await mkdir(directory);
-    await writeFile(resolve(directory, control), "/*\n X-Test: value");
-    await configuration({ assets: { ...assets, directory } });
-    await expect(
-      serverBindings(root, { assetsExecution: "local" }),
-    ).rejects.toThrow(control);
-  }
 });

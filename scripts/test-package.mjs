@@ -129,13 +129,10 @@ import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/testi
 import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
 import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/testing/fetch";
 import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
-import { LocalAssets } from "@rdlabo/workers-capacitor/features/assets";
 import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/vite";
-const assets = new LocalAssets({ "/": "/index.html" }, { baseURL: "capacitor://localhost/" });
-const assetResponse: Promise<Response> = assets.fetch(new Request("https://worker.invalid/"));
-buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "local" });
-// @ts-expect-error Asset policies must be explicit local or remote.
-buildPlugin({ worker: "worker.ts", assetsExecution: "automatic" });
+buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
+// @ts-expect-error Local ASSETS is not a completed compatibility unit.
+buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
 import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();

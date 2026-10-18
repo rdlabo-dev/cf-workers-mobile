@@ -59,7 +59,7 @@ secrets configured only in the dashboard still require explicit names. `vars`
 and `define` values are not interpreted as binding declarations or copied into env.
 
 A request using any remote binding executes entirely remotely, even when the
-same handler also reads local-configured KV or ASSETS. Cloud instances are used
+same handler also reads local-configured KV. Cloud instances are used
 for the entire request. Conservative whole-Worker fallback preserves shared
 state, additional exports, middleware and error handling. Review the generated
 `workers-capacitor-server.json` report.
@@ -75,110 +75,42 @@ The client does not simulate scheduled events, alarms, Workflow steps or queue
 consumption. An Email handler or other server event without a discoverable
 configuration declaration is not automatically detected merely from its purpose.
 
-## Local ASSETS binding
+## Remote ASSETS binding
 
-`assetsExecution` is required when Wrangler has an `assets` section. Choose
-`remote` for Cloudflare's complete asset routing semantics. Asset-first routing
-(or configuration without a binding name) keeps the whole Worker remote so local
-handlers cannot bypass the deployed routing order.
-
-Choose `local` for this explicitly supported profile:
-
-```jsonc
-// wrangler.jsonc
-{
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-    "run_worker_first": true,
-    "html_handling": "none",
-    "not_found_handling": "single-page-application",
-  },
-}
-```
+`assetsExecution: "remote"` is required when Wrangler declares an `assets`
+section. All asset processing remains on the deployed Worker, including HTML
+handling, SPA/404 routing, control files, range/conditional requests and cache
+semantics. The client does not implement these APIs.
 
 ```ts
-// Vite or esbuild plugin
-workersCapacitorPlugin({ worker: "src/worker.ts", assetsExecution: "local" });
+workersCapacitorPlugin({ worker: "src/worker.ts", assetsExecution: "remote" });
 ```
 
-```ts
-// Capacitor bootstrap; public/app-shell.html must be included in the app build.
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
-import { LocalAssets } from "@rdlabo/workers-capacitor/features/assets";
+Asset-first or pattern-based routing (and declarations without a binding name)
+keeps every request remote so client code cannot bypass the deployed routing
+order. With `run_worker_first: true` and a binding name, the normal conservative
+analysis can keep independent routes local; any handler using `env.ASSETS` runs
+remotely. Nothing from the asset directory is automatically copied into Capacitor.
 
-const assets = new LocalAssets(
-  {
-    "/": "/app-shell.html",
-    "/index.html": "/app-shell.html",
-    "/logo.svg": "/logo.svg",
-  },
-  {
-    baseURL: window.location.href,
-    notFoundHandling: "single-page-application",
-  },
-);
-const runtime = workersCapacitor({
-  baseURL: "https://app.example",
-  env: { ASSETS: assets },
-  // Add remote: { origin: "https://app.example" } if the build selects remote routes.
-});
-await runtime.ready;
-```
-
-The existing Worker still calls `env.ASSETS.fetch(request)` unchanged. As with
-local KV, the app supplies the runtime instance; the build does not automatically
-copy an arbitrary Wrangler directory into the mobile app. Vite public assets or
-explicitly emitted esbuild assets can supply these URLs. Keep the app bootstrap
-and Worker-rendered HTML separate to avoid recursively bootstrapping the runtime.
-
-The manifest maps literal URL pathnames (percent-encoded where appropriate) to
-packaged asset URLs. The request hostname and query do not choose a backend.
-Only same-app-origin manifest URLs are accepted; caller cookies and Authorization
-are not forwarded and redirects are rejected. Files are fetched on demand through
-the captured platform fetch, bypassing Worker routing. Bodies stream without a
-whole-directory preload, base64 embedding, or an in-memory asset cache. Local
-responses use `Cache-Control: no-store` and omit validators/range advertising
-because this profile does not implement conditional or range requests.
-
-Supported behavior is exact paths, GET/HEAD, 404, 405 and optional SPA fallback to
-`/index.html`. Set `notFoundHandling` to match Wrangler's `not_found_handling`.
-For exact-path routing without SPA, map `/` explicitly if it should serve an
-index page. The manifest is authoritative; a listed but missing packaged file
-raises an error instead of silently returning the app host's missing response.
-Ensure the host does not turn a missing listed file into a status-200 SPA page.
-
-Automatic HTML canonicalization, asset-first/pattern routing, `_headers`,
-`_redirects`, `404-page`, range/conditional requests and Cloudflare cache semantics
-are outside this local profile. Unsupported configured routing profiles fail the
-build; `_headers`/`_redirects` found in a configured directory also fail the build.
-Do not supply equivalent unhandled control files through another packaging path.
-Conditional/range requests fail explicitly at runtime. Manifest membership
-is explicit and does not evaluate `.assetsignore`. Use remote assets when these
-features are required. Packaged resources are public client data, never a location
-for secrets or server source.
-
-Function-bearing `env.ASSETS` selects direct execution even with `prefer: "worker"`;
-there is no binding RPC bridge into a Dedicated Worker. Adding a remote dependency
-does not invoke the local asset binding before forwarding. Existing document
-asset hosting/service-worker precaching is independent from this API.
+**Local ASSETS is not implemented or exported by this change.** A future local
+implementation must satisfy the complete ASSETS contract, including HTML handling,
+control files, conditional/range behavior and workerd/native parity.
+`assetsExecution: "local"` fails explicitly rather than enabling a partial implementation.
+Existing document asset hosting is a different feature and remains unchanged.
 
 ## Verification and limits
 
-- `npm test`: discovery, explicit-policy errors, unknown binding diagnostics,
-  server code exclusion, routing precedence, local streaming/cancellation and
-  upgrade rejection.
-- `npm run test:cloudflare-bindings` in `demo`: real workerd Durable Object storage,
-  HTTP and RPC calls, authorization rejection without state changes, Vite/esbuild
-  artifact inspection (including source maps), Chromium/WebKit, direct/Worker
-  modes, and lazy local ASSETS GET/HEAD/SPA behavior. Local binding injection
-  selects direct mode as documented.
-- Cloud AI, indexes and Workflows are covered by discovery/dispatch analysis, not
-  paid live-service tests. Local workerd and browser tests do not certify deployed
-  Cloudflare resources, physical devices or native WebSocket support.
+- `npm test`: binding discovery, policy errors, unknown binding diagnostics,
+  server code exclusion, remote routing precedence and upgrade rejection.
+- `npm run test:cloudflare-bindings` in `demo`: real workerd Durable Object HTTP,
+  RPC and storage, authorization rejection without state changes, remote ASSETS,
+  Vite/esbuild artifact inspection, and Chromium/WebKit direct/Worker modes.
+- Cloud AI, indexes and Workflows are verified as names for HTTP dispatch, not
+  emulated APIs or paid live-service tests. Native transport contracts are shared
+  with existing remote services. Evidence and review scope are recorded separately.
 
-Cache API and HTMLRewriter compatibility are separate runtime work; this change
-does not add them.
+Cache API, HTMLRewriter and local ASSETS are separate unfinished compatibility
+units; this PR does not activate them in production aliases or exports.
 
 ## References
 

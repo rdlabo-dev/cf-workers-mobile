@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { parse as parseJSON, type ParseError } from "jsonc-parser";
 import { parse as parseTOML } from "smol-toml";
 
@@ -20,8 +20,8 @@ export interface ServerBuildOptions {
   queueBindings?: string[];
   /** Additional server-only names, including secrets and bindings supplied by other tools. */
   remoteBindings?: string[];
-  /** Required for configured assets. Local requires the explicit LocalAssets runtime binding. */
-  assetsExecution?: "local" | "remote";
+  /** Explicit acknowledgement that configured assets execute on the deployed Worker. */
+  assetsExecution?: "remote";
   /** Names explicitly supplied through workersCapacitor({ env }); other env access stays on the server. */
   localBindings?: string[];
 }
@@ -230,17 +230,17 @@ export async function serverBindings(
       if (!known.has(key)) unknown(value, key);
 
   const assetNames: string[] = [];
-  const localAssetProfiles = new Map<string, string>();
   let assetRoutingRemote = false;
   const assetConfigs = environments
     .map((e) => e.assets)
     .filter((v) => v !== undefined);
   if (
     options.assetsExecution !== undefined &&
-    options.assetsExecution !== "local" &&
     options.assetsExecution !== "remote"
   )
-    throw new TypeError("assetsExecution must be local or remote");
+    throw new TypeError(
+      "Only assetsExecution: remote is supported; local ASSETS compatibility is not implemented",
+    );
   if (options.assetsExecution !== undefined && !assetConfigs.length)
     throw new Error(
       "assetsExecution requires assets in the Worker configuration",
@@ -249,53 +249,20 @@ export async function serverBindings(
     if (!assets || typeof assets !== "object" || Array.isArray(assets))
       throw new Error(`Invalid assets in ${file}`);
     if (!options.assetsExecution)
-      throw new Error("Set assetsExecution to local or remote");
+      throw new Error(
+        "Set assetsExecution to remote; local ASSETS compatibility is not implemented",
+      );
     if (
       assets.binding !== undefined &&
       (typeof assets.binding !== "string" || !assets.binding.trim())
     )
       throw new Error(`Invalid assets.binding in ${file}`);
     if (typeof assets.binding === "string") assetNames.push(assets.binding);
-    if (options.assetsExecution === "local") {
-      // No implicit asset-first bypass of application middleware. Unsupported
-      // routing profiles must remain remote until they have matching adapters.
-      if (
-        !assets.binding ||
-        assets.run_worker_first !== true ||
-        assets.html_handling !== "none" ||
-        ![undefined, "none", "single-page-application"].includes(
-          assets.not_found_handling,
-        )
-      )
-        throw new Error(
-          'Local assets require binding, run_worker_first: true, html_handling: "none", and not_found_handling: "none" or "single-page-application"',
-        );
-      const profile = assets.not_found_handling ?? "none";
-      if (
-        localAssetProfiles.has(assets.binding) &&
-        localAssetProfiles.get(assets.binding) !== profile
-      )
-        throw new Error(
-          `Conflicting local assets routing for ${assets.binding} across Worker environments`,
-        );
-      localAssetProfiles.set(assets.binding, profile);
-      if (assets.directory !== undefined) {
-        if (typeof assets.directory !== "string" || !assets.directory.trim())
-          throw new Error(`Invalid assets.directory in ${file}`);
-        const directory = resolve(
-          file ? dirname(file) : root,
-          assets.directory,
-        );
-        for (const control of ["_headers", "_redirects"])
-          if (existsSync(resolve(directory, control)))
-            throw new Error(
-              `Local assets do not implement ${control}; use assetsExecution: "remote"`,
-            );
-      }
-    } else if (assets.run_worker_first !== true || !assets.binding) {
+    if (assets.run_worker_first !== true || !assets.binding) {
       assetRoutingRemote = true;
     }
   }
+
   const scheduled = environments.some((environment) => {
     const triggers = environment.triggers;
     if (triggers === undefined) return false;
@@ -352,20 +319,9 @@ export async function serverBindings(
   const localKV = kv.filter(
     (name) => policies[name] === "local" && !serverOnly.includes(name),
   );
-  const localAssets = options.assetsExecution === "local" ? assetNames : [];
-  if (localAssets.some((name) => kv.includes(name)))
-    throw new Error("A KV binding cannot also be a local assets binding");
-  if (localAssets.some((name) => serverOnly.includes(name)))
-    throw new Error("A server binding cannot also be a local assets binding");
   return {
     names: [...new Set<string>(serverOnly)],
-    localBindings: [
-      ...new Set([
-        ...(options.localBindings ?? []),
-        ...localKV,
-        ...localAssets,
-      ]),
-    ],
+    localBindings: [...new Set([...(options.localBindings ?? []), ...localKV])],
     kvBindings: localKV,
     config: file,
     forceRemoteReason,

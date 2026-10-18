@@ -416,9 +416,9 @@ Durable Objects, Workers AI, Vectorize, AI Search, Workflows and other cloud
 bindings are discovered for whole-request remote dispatch. `remoteBindings`
 adds server-only names (including secrets and future bindings); unrecognized
 binding-shaped configuration requires explicit acknowledgement. ASSETS uses an
-explicit `assetsExecution` policy, with a bounded local profile through
-`LocalAssets` and full cloud behavior through remote execution. See
-[Cloudflare bindings and local ASSETS](docs/cloudflare-bindings.md) for the
+explicit `assetsExecution: "remote"` acknowledgement and retains its cloud routing
+behavior. Local ASSETS compatibility remains unimplemented. See
+[Cloudflare bindings and remote ASSETS](docs/cloudflare-bindings.md) for the
 configuration, supported scope and verification commands. WebSocket upgrades
 remain outside the remote HTTP transport.
 
