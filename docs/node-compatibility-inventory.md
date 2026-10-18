@@ -43,8 +43,8 @@ dependencies requires their regression checks.
 
 The fixed runtime audit enumerates **70 builtins/subpaths and 1,597 namespace
 export entries**. The whole-surface browser audit now checks every entry through
-the public esbuild plugin. **40 entries have import/export gaps in both Chromium
-and WebKit.** The other 30 only have matching export names, not automatic
+the public esbuild plugin. **27 entries have import/export gaps in both Chromium
+and WebKit.** The other 43 only have matching export names, not automatic
 behavioral acceptance.
 
 See the [complete 70-entry matrix and dependency order](node-compatibility-surface.md).

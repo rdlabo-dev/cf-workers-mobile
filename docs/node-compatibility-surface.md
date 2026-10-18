@@ -2,10 +2,10 @@
 
 This audit covers **all 70 builtin/subpath entries** of workerd `1.20261012.1`,
 compatibility date `2026-10-17`, with no extra flags. It does not reduce the scope
-to the recent seventeen module families. Initial baseline: `be4de58`; refreshed after the HTTPS, port, stream consumer and DNS additions.
+to the recent seventeen module families. Initial baseline: `be4de58`; refreshed after the assertion, performance, utility and stream constructor additions.
 
-Both Chromium and WebKit report import/export gaps for **32 of 70 entries**.
-The other 38 have matching namespace export names; this is **not behavioral
+Both Chromium and WebKit report import/export gaps for **27 of 70 entries**.
+The other 43 have matching namespace export names; this is **not behavioral
 acceptance**. In particular, default exports, prototypes, validation, state,
 async context and native transport still require the module-owned contracts.
 
@@ -52,8 +52,8 @@ to compare, so it is never represented as zero missing exports.
 | `_stream_writable`    |               5 | Export differences      |       3 |    11 |
 | `_tls_common`         |               4 | Build fails             |       — |     — |
 | `_tls_wrap`           |               3 | Build fails             |       — |     — |
-| `assert`              |              21 | Export differences      |       1 |     0 |
-| `assert/strict`       |              21 | Build fails             |       — |     — |
+| `assert`              |              21 | Export names match only |       0 |     0 |
+| `assert/strict`       |              21 | Export names match only |       0 |     0 |
 | `async_hooks`         |               8 | Export differences      |       5 |     1 |
 | `buffer`              |              15 | Export names match only |       0 |     0 |
 | `child_process`       |              10 | Export names match only |       0 |     0 |
@@ -80,7 +80,7 @@ to compare, so it is never represented as zero missing exports.
 | `path`                |              17 | Export names match only |       0 |     0 |
 | `path/posix`          |              17 | Export names match only |       0 |     0 |
 | `path/win32`          |              17 | Export names match only |       0 |     0 |
-| `perf_hooks`          |              14 | Build fails             |       — |     — |
+| `perf_hooks`          |              14 | Export names match only |       0 |     0 |
 | `process`             |              97 | Export differences      |      74 |    12 |
 | `punycode`            |               7 | Export names match only |       0 |     0 |
 | `querystring`         |               8 | Export names match only |       0 |     0 |
@@ -91,17 +91,17 @@ to compare, so it is never represented as zero missing exports.
 | `stream`              |              24 | Export differences      |       7 |     6 |
 | `stream/consumers`    |               6 | Export names match only |       0 |     0 |
 | `stream/promises`     |               4 | Build fails             |       — |     — |
-| `stream/web`          |              18 | Export differences      |      10 |     0 |
+| `stream/web`          |              18 | Export names match only |       0 |     0 |
 | `string_decoder`      |               2 | Export names match only |       0 |     0 |
 | `sys`                 |              48 | Export differences      |      22 |     0 |
 | `test`                |               4 | Export names match only |       0 |     0 |
 | `timers`              |              12 | Export names match only |       0 |     0 |
 | `timers/promises`     |               5 | Export names match only |       0 |     0 |
 | `tls`                 |              18 | Export differences      |      17 |     0 |
-| `trace_events`        |               3 | Build fails             |       — |     — |
+| `trace_events`        |               3 | Export names match only |       0 |     0 |
 | `tty`                 |               4 | Export names match only |       0 |     0 |
 | `url`                 |              14 | Export names match only |       0 |     0 |
-| `util`                |              48 | Export differences      |      13 |     0 |
+| `util`                |              48 | Export differences      |       2 |     0 |
 | `util/types`          |              44 | Build fails             |       — |     — |
 | `v8`                  |              23 | Export names match only |       0 |     0 |
 | `vm`                  |              11 | Export names match only |       0 |     0 |
