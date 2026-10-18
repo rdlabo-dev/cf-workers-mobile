@@ -65,6 +65,10 @@ await cp(
   join(temp, "src/compat"),
   { recursive: true },
 );
+await cp(
+  join(temp, "node_modules/@rdlabo/capacitor-workers/dist/environment.js"),
+  join(temp, "src/environment.js"),
+);
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
   "path",
@@ -96,8 +100,9 @@ for (const module of [
 }
 await writeFile(
   join(temp, "vite.config.mjs"),
-  `import { capacitorWorkersPlugin } from '@rdlabo/capacitor-workers/vite';
-export default {root:'demo/tests/validation',plugins:[capacitorWorkersPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
+  `import { readFile } from 'node:fs/promises';
+import { capacitorWorkersPlugin } from '@rdlabo/capacitor-workers/vite';
+export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},capacitorWorkersPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
 );
 execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
   cwd: temp,
@@ -281,9 +286,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     features.some(
       (report) =>
         report.errors.length ||
-        report.cases.some(
-          (test) => test.status === "failed" || test.status === "unavailable",
-        ),
+        report.cases.some((test) => test.status !== "passed"),
     )
   )
     throw new Error(JSON.stringify(features));

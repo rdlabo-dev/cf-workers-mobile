@@ -1,7 +1,15 @@
+import { lowerAsync } from "./src/build/async.js";
 import { readFile } from "node:fs/promises";
 import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
+    {
+      name: "test-async-context",
+      enforce: "post",
+      transform(code, id) {
+        if (/\.[cm]?[jt]sx?$/.test(id)) return lowerAsync(code, id);
+      },
+    },
     {
       name: "test-brotli-binary",
       async load(id) {

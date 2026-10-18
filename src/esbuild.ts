@@ -1,3 +1,4 @@
+import { asyncContextPlugin } from "./build/async.js";
 import { documentAssets, listAssets } from "./build/documents.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -147,7 +148,7 @@ export function capacitorWorkersPlugin(
             conditions: config.conditions,
             mainFields: config.mainFields,
             loader: config.loader,
-            plugins: [compatibilityPlugin()],
+            plugins: [compatibilityPlugin(), asyncContextPlugin()],
             logLevel: "silent",
           });
           const inputs = Object.keys(result.metafile.inputs)
@@ -169,6 +170,7 @@ export function capacitorWorkersPlugin(
           };
         },
       );
+      await asyncContextPlugin().setup(build);
     },
   };
 }

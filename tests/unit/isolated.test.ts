@@ -186,7 +186,9 @@ it("reports response reconstruction failure and releases the call", async () => 
 it.each(["dispose", "crash", "abort"] as const)(
   "settles a paused upload and cancels its source on %s",
   async (action) => {
-    const fetchHandler = vi.fn(() => new Response("unexpected"));
+    const fetchHandler = vi.fn(
+      async (request: Request) => new Response(await request.text()),
+    );
     const { client, isolated, ctx, pending } = setup({ fetch: fetchHandler });
     const cancel = vi.fn(() => new Promise<void>(() => {}));
     const controller = new AbortController();
@@ -216,7 +218,7 @@ it.each(["dispose", "crash", "abort"] as const)(
     await Promise.all(pending);
     expect(cancel).toHaveBeenCalledOnce();
     expect(isolated.activeCalls).toBe(0);
-    expect(fetchHandler).not.toHaveBeenCalled();
+    expect(fetchHandler).toHaveBeenCalledOnce();
   },
 );
 
@@ -242,4 +244,44 @@ it("tracks a call waiting for startup and releases it on disposal", async () => 
   await Promise.all(pending);
   expect(isolated.activeCalls).toBe(0);
   expect(worker.postMessage).not.toHaveBeenCalled();
+});
+
+it("streams uploads before EOF and transfers bounded chunks", async () => {
+  let source!: ReadableStreamDefaultController<Uint8Array>;
+  let received!: () => void;
+  const first = new Promise<void>((resolve) => {
+    received = resolve;
+  });
+  const sizes: number[] = [];
+  const { isolated, ctx } = setup({
+    async fetch(request) {
+      const reader = request.body!.getReader();
+      for (;;) {
+        const next = await reader.read();
+        if (next.done) break;
+        sizes.push(next.value.length);
+        received();
+      }
+      return new Response("ok");
+    },
+  });
+  const result = isolated.handler.fetch(
+    new Request("https://test/upload", {
+      method: "POST",
+      duplex: "half",
+      body: new ReadableStream({
+        start(controller) {
+          source = controller;
+          controller.enqueue(new Uint8Array(200000));
+        },
+      }),
+    } as RequestInit),
+    {},
+    ctx,
+  );
+  await first;
+  source.close();
+  expect(await (await result).text()).toBe("ok");
+  expect(sizes.reduce((a, b) => a + b, 0)).toBe(200000);
+  expect(Math.max(...sizes)).toBeLessThanOrEqual(65536);
 });

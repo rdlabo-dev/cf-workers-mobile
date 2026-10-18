@@ -28,6 +28,8 @@ function setup(cache = new Map<string, Response>()) {
     Response,
     Headers,
     MessageChannel,
+    ReadableStream,
+    atob,
     setTimeout,
     clearTimeout,
     fetch: nativeFetch,
@@ -190,4 +192,29 @@ it("keeps shutdown across a SW restart and explicitly enables a new rendering se
   expect(restarted.dispatch).not.toHaveBeenCalled();
   await restarted.disable(false);
   expect(await (await restarted.fetch(request))!.text()).toBe("worker");
+});
+
+it("pulls streamed document bytes only when consumed and cancels the host stream", async () => {
+  const sw = setup();
+  sw.dispatch.mockImplementation(async (request: any) => {
+    if (request.action === "pull")
+      return { body: btoa("chunk"), done: false } as any;
+    if (request.action === "cancel") return { done: true, body: "" } as any;
+    return {
+      url: "https://worker.example/live",
+      status: 200,
+      headers: {},
+      body: "",
+      streamId: "live",
+    } as any;
+  });
+  const response = (await sw.fetch(new Request("https://localhost/live")))!;
+  expect(sw.dispatch).toHaveBeenCalledTimes(1);
+  const reader = response.body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe("chunk");
+  await reader.cancel();
+  expect(sw.dispatch).toHaveBeenLastCalledWith({
+    action: "cancel",
+    streamId: "live",
+  });
 });

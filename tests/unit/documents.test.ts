@@ -282,3 +282,45 @@ it.each([301, 302, 303, 307, 308])(
     );
   },
 );
+
+it("returns document headers before EOF and reads bounded chunks on demand", async () => {
+  const cancel = vi.fn();
+  let source!: ReadableStreamDefaultController<Uint8Array>;
+  runtime = capacitorWorkers({
+    ...options,
+    worker: {
+      fetch: () =>
+        new Response(
+          new ReadableStream(
+            {
+              start(controller) {
+                source = controller;
+              },
+              cancel,
+            },
+            { highWaterMark: 0 },
+          ),
+        ),
+    },
+  });
+  await runtime.ready;
+  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const result = await dispatch({
+    url: "capacitor://localhost/live",
+    method: "GET",
+    headers: {},
+    stream: true,
+  });
+  expect(result.status).toBe(200);
+  expect(result.streamId).toBeTypeOf("string");
+  source.enqueue(new Uint8Array(100000));
+  const first = await dispatch({ action: "pull", streamId: result.streamId });
+  expect(atob(first.body).length).toBe(65536);
+  const second = await dispatch({ action: "pull", streamId: result.streamId });
+  expect(atob(second.body).length).toBe(34464);
+  await dispatch({ action: "cancel", streamId: result.streamId });
+  expect(cancel).toHaveBeenCalledOnce();
+  await expect(
+    dispatch({ action: "pull", streamId: result.streamId }),
+  ).rejects.toThrow("closed");
+});

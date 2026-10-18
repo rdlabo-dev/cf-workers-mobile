@@ -1,3 +1,8 @@
+import { assertLocalRuntime } from "./environment.js";
+export {
+  getExecutionEnvironment,
+  type ExecutionEnvironment,
+} from "./environment.js";
 import {
   clearPreviousRendering,
   startRendering,
@@ -22,6 +27,7 @@ let installed = false;
 export function capacitorWorkers<Env = Record<string, unknown>>(
   options: CapacitorWorkersOptions<Env>,
 ) {
+  assertLocalRuntime();
   if (installed)
     throw new Error("capacitorWorkers is already installed; dispose it first.");
   if (options.render !== undefined)
