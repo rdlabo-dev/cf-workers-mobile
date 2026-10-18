@@ -2,8 +2,8 @@ import {
   defineFeature,
   FeatureImplementation,
   openFeature,
-} from "../../src/contracts/index";
-import { runContract, type ContractSuite } from "../../src/contracts/testing";
+} from "../../src/shared/contracts/index";
+import { runContract, type ContractSuite } from "../../src/shared/contracts/testing";
 const text = defineFeature<{ read(key: string): Promise<string | null> }>()(
   "text",
   ["read"],

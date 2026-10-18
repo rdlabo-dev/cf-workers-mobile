@@ -5,12 +5,12 @@ import {
   FeatureUnavailable,
   openFeature,
   type FeatureScope,
-} from "../../src/contracts/index";
+} from "../../src/shared/contracts/index";
 import {
   assertContract,
   runContract,
   type ContractSuite,
-} from "../../src/contracts/testing";
+} from "../../src/shared/contracts/testing";
 const feature = defineFeature<{ read(): number }>()("probe", [
   "value",
   "fresh",

@@ -20,12 +20,12 @@ import {
   FeatureImplementation,
   openFeature,
   type FeatureScope,
-} from "@rdlabo/workers-capacitor/contracts";
+} from "@rdlabo/workers-capacitor/shared/contracts";
 import {
   runContract,
   assertContract,
   type ContractSuite,
-} from "@rdlabo/workers-capacitor/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 interface TextAPI {
   read(key: string): Promise<string | null>;
@@ -110,7 +110,7 @@ Runtime checks belong to implementations. Validate inputs, reject unsupported op
 Published contract suites check the portable behavior promised by a profile. Implementations and their real Workers references run the same suite. Implementation rejection tests (for example unknown option fields) remain separate from shared compatibility assertions. Do not impose an implementation-specific rejection on a Workers reference that accepts the operation. Backend persistence, quota and namespace isolation are also verified separately.
 
 ```ts
-import { runContract, assertContract } from "@rdlabo/workers-capacitor/contracts/testing";
+import { runContract, assertContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
 
 // implementation is your FeatureImplementation<typeof kvFeature>.

@@ -79,7 +79,7 @@ according to API ownership, with contracts/tests in the adjacent `index.spec.ts`
 Cloud resource adapters and execution policy belong in `src/cloudflare/bindings`; cross-domain
 installation/codecs belong in `src/shared`. Application execution belongs in
 `src/cloudflare/workers` and browser host mechanisms in `src/browser`, build tooling in `src/tooling`, and the reusable feature/contract host
-in `src/contracts`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
+in `src/shared/contracts`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
 that module directory. `demo/tests/` owns environment runners, not copies of
 module behavior. Production compilation excludes specs. Consumer tests may copy
 test contracts, but must resolve implementations from the packed package.

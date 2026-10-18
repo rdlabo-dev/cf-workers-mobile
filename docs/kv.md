@@ -4,7 +4,7 @@
 
 ```ts
 import { workersCapacitor } from "@rdlabo/workers-capacitor";
-import { openFeature } from "@rdlabo/workers-capacitor/contracts";
+import { openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
 import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
 import worker from "./worker";
 

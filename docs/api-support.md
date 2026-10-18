@@ -17,7 +17,7 @@ locally implemented compatible API. Only the full [acceptance gate](../CONTRIBUT
 can establish Complete status. Existing evidence keeps its original tested
 revision and baseline; reorganizing source does not recertify it.
 
-`src/contracts` owns the typed feature/lifecycle and contract runner infrastructure.
+`src/shared/contracts` owns the typed feature/lifecycle and contract runner infrastructure.
 The concrete Fetch adapter and portable contract belong to `src/cloudflare/workers`;
 the KV contract belongs to `src/cloudflare/bindings/kv`. `src/cloudflare/workers`, `src/browser/isolated` and `src/browser/documents` own application
 execution, isolation and document hosting; they are not API support categories.
@@ -73,3 +73,9 @@ Native suites were not rerun for this path-only change.
 The final packed consumer passes 10 Vite/esbuild/raw ESM checks, two configured
 Fetch checks in Vite dev, 26 direct and 22 isolated checks, 326 shared feature
 cases, and two execution-preference checks using the new public paths.
+
+The generic contract/lifecycle infrastructure lives in `src/shared/contracts`,
+with public `shared/contracts` and `shared/contracts/testing` entry points.
+Its implementation is unchanged by relocation. Root/demo typechecks, clean build,
+410 unit tests, 94 workerd tests and the complete packed-consumer verification
+were repeated successfully after this final move.

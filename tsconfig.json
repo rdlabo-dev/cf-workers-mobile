@@ -9,8 +9,8 @@
     "esModuleInterop": true,
     "types": ["node"],
     "paths": {
-      "@rdlabo/workers-capacitor/contracts": ["./src/contracts/index.ts"],
-      "@rdlabo/workers-capacitor/contracts/testing": ["./src/contracts/testing.ts"]
+      "@rdlabo/workers-capacitor/shared/contracts": ["./src/shared/contracts/index.ts"],
+      "@rdlabo/workers-capacitor/shared/contracts/testing": ["./src/shared/contracts/testing.ts"]
     }
   },
   "include": ["src", "tests", "*.ts"]

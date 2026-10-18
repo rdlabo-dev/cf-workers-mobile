@@ -1,6 +1,6 @@
 import { verifyKVPersistence } from "./kv";
 import { FetchImplementation } from "@rdlabo/workers-capacitor/cloudflare/workers";
-import { assertContract, runContract } from "@rdlabo/workers-capacitor/contracts/testing";
+import { assertContract, runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import worker from "../fixtures/workers/compatibility/fetch";
 const isolated = () =>
   new Worker(new URL("./entries/fetch.ts", import.meta.url), {

@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import * as fs from "./index.js";
 export const fsFeature = defineFeature<typeof fs>()("node.fs", [
   "readFileSync",

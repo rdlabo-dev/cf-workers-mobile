@@ -1,5 +1,5 @@
 import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
-import { openFeature } from "@rdlabo/workers-capacitor/contracts";
+import { openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
 import { FetchImplementation } from "@rdlabo/workers-capacitor/cloudflare/workers";
 import worker from "../fixtures/workers/compatibility/kv";
 export async function kvRequest(

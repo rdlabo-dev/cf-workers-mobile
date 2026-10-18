@@ -3,7 +3,7 @@ import {
   FeatureImplementation,
   FeatureUnavailable,
   type FeatureScope,
-} from "@rdlabo/workers-capacitor/contracts";
+} from "@rdlabo/workers-capacitor/shared/contracts";
 import {
   kvFeature,
   type KVNamespace,

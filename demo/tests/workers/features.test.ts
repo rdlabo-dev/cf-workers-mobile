@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createTestHarness } from "wrangler";
-import { FeatureImplementation } from "@rdlabo/workers-capacitor/contracts";
+import { FeatureImplementation } from "@rdlabo/workers-capacitor/shared/contracts";
 import { fetchFeature } from "@rdlabo/workers-capacitor/cloudflare/workers";
 import {
   assertContract,
   runContract,
   type ContractResult,
-} from "@rdlabo/workers-capacitor/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import { fetchContract } from "@rdlabo/workers-capacitor/cloudflare/workers/testing";
 const http = createTestHarness({
   workers: [

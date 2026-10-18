@@ -2,7 +2,7 @@ import {
   defineFeature,
   FeatureImplementation,
   type FeatureScope,
-} from "../../contracts/index.js";
+} from "../../shared/contracts/index.js";
 import { createFetchRuntime } from "./worker-runtime.js";
 import type { WorkersCapacitorOptions } from "./types.js";
 

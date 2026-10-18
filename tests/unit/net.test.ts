@@ -1,5 +1,5 @@
 import { it } from "vitest";
-import { assertContract, runContract } from "../../src/contracts/testing.js";
+import { assertContract, runContract } from "../../src/shared/contracts/testing.js";
 import {
   NetImplementation,
   netContract,

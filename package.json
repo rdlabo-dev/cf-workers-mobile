@@ -20,13 +20,13 @@
       "types": "./dist/tooling/vite.d.ts",
       "import": "./dist/tooling/vite.js"
     },
-    "./contracts": {
-      "types": "./dist/contracts/index.d.ts",
-      "import": "./dist/contracts/index.js"
+    "./shared/contracts": {
+      "types": "./dist/shared/contracts/index.d.ts",
+      "import": "./dist/shared/contracts/index.js"
     },
-    "./contracts/testing": {
-      "types": "./dist/contracts/testing.d.ts",
-      "import": "./dist/contracts/testing.js"
+    "./shared/contracts/testing": {
+      "types": "./dist/shared/contracts/testing.d.ts",
+      "import": "./dist/shared/contracts/testing.js"
     },
     "./cloudflare/workers": {
       "types": "./dist/cloudflare/workers/feature.d.ts",

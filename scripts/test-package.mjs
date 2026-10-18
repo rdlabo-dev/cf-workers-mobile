@@ -65,7 +65,6 @@ for (const domain of [
   "browser",
   "cloudflare",
   "shared",
-  "contracts",
 ]) {
   await cp(
     join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
@@ -132,8 +131,8 @@ class ExampleRuntime extends FetchRuntime<{ label: string }> {
     return new Response(env.label + request.method);
   }
 }
-import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/contracts";
-import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/contracts/testing";
+import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
+import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
 import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/cloudflare/workers/testing";
 import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
