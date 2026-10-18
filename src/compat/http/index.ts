@@ -1302,10 +1302,12 @@ export class ClientRequest extends OutgoingMessage {
         "boolean",
         "joinDuplicateHeaders",
       );
+    const defaultAgent =
+      (values._defaultAgent as Agent | undefined) || globalAgent;
     const agent =
       values.agent === false
-        ? new Agent()
-        : ((values.agent as Agent | undefined) ?? globalAgent);
+        ? new (defaultAgent.constructor as typeof Agent)()
+        : ((values.agent as Agent | undefined) ?? defaultAgent);
     if (agent && typeof agent.addRequest !== "function")
       throw coded(
         new TypeError(
@@ -1314,7 +1316,7 @@ export class ClientRequest extends OutgoingMessage {
         "ERR_INVALID_ARG_TYPE",
       );
     this.agent = agent;
-    this.protocol = values.protocol || agent.protocol;
+    this.protocol = values.protocol || defaultAgent.protocol;
     if (this.protocol !== agent.protocol)
       throw coded(
         new TypeError(

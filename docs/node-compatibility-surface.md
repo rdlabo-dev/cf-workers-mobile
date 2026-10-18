@@ -2,10 +2,10 @@
 
 This audit covers **all 70 builtin/subpath entries** of workerd `1.20261012.1`,
 compatibility date `2026-10-17`, with no extra flags. It does not reduce the scope
-to the recent seventeen module families. Baseline library revision: `be4de58`.
+to the recent seventeen module families. Initial baseline: `be4de58`; refreshed after the HTTPS and port adapter additions.
 
-Both Chromium and WebKit report import/export gaps for **40 of 70 entries**.
-The other 30 have matching namespace export names; this is **not behavioral
+Both Chromium and WebKit report import/export gaps for **35 of 70 entries**.
+The other 35 have matching namespace export names; this is **not behavioral
 acceptance**. In particular, default exports, prototypes, validation, state,
 async context and native transport still require the module-owned contracts.
 
@@ -38,10 +38,10 @@ to compare, so it is never represented as zero missing exports.
 
 | Builtin/subpath       | Workers exports | Local discovery         | Missing | Extra |
 | --------------------- | --------------: | ----------------------- | ------: | ----: |
-| `_http_agent`         |               3 | Build fails             |       — |     — |
-| `_http_client`        |               2 | Build fails             |       — |     — |
+| `_http_agent`         |               3 | Export names match only |       0 |     0 |
+| `_http_client`        |               2 | Export names match only |       0 |     0 |
 | `_http_common`        |               9 | Build fails             |       — |     — |
-| `_http_incoming`      |               2 | Build fails             |       — |     — |
+| `_http_incoming`      |               2 | Export names match only |       0 |     0 |
 | `_http_outgoing`      |               7 | Build fails             |       — |     — |
 | `_http_server`        |              10 | Build fails             |       — |     — |
 | `_stream_duplex`      |               5 | Export differences      |       2 |    10 |
@@ -71,7 +71,7 @@ to compare, so it is never represented as zero missing exports.
 | `fs/promises`         |              34 | Export differences      |      27 |     0 |
 | `http`                |              21 | Export names match only |       0 |     0 |
 | `http2`               |              12 | Export names match only |       0 |     0 |
-| `https`               |               7 | Export differences      |       0 |    14 |
+| `https`               |               7 | Export names match only |       0 |     0 |
 | `inspector`           |               8 | Export names match only |       0 |     0 |
 | `inspector/promises`  |               8 | Export names match only |       0 |     0 |
 | `module`              |              32 | Export differences      |      28 |     0 |
@@ -101,12 +101,12 @@ to compare, so it is never represented as zero missing exports.
 | `trace_events`        |               3 | Build fails             |       — |     — |
 | `tty`                 |               4 | Export names match only |       0 |     0 |
 | `url`                 |              14 | Export names match only |       0 |     0 |
-| `util`                |              48 | Export differences      |      20 |     0 |
+| `util`                |              48 | Export differences      |      13 |     0 |
 | `util/types`          |              44 | Build fails             |       — |     — |
 | `v8`                  |              23 | Export names match only |       0 |     0 |
 | `vm`                  |              11 | Export names match only |       0 |     0 |
 | `wasi`                |               2 | Export names match only |       0 |     0 |
-| `worker_threads`      |              20 | Build fails             |       — |     — |
+| `worker_threads`      |              20 | Export names match only |       0 |     0 |
 | `zlib`                |             186 | Export differences      |     122 |     6 |
 
 ## Completion order and dependencies
@@ -128,3 +128,23 @@ to compare, so it is never represented as zero missing exports.
 6. Run whole-module behavioral contracts, build integrations, packaged-consumer
    and both native execution modes, then the required reviews and CI. This audit
    cannot promote any module to Complete on its own.
+
+## Port and Web Streams counterexamples
+
+The adapter adds HTTPS and three HTTP reference facades, plus a local port
+implementation for `worker_threads`. Their export-name gaps are closed; this
+alone does not establish whole-module acceptance. The latter still has event
+branding, host-object serialization and global-identity differences to resolve.
+
+`stream-boundaries.test.mjs` records two differences in unmodified host streams:
+Workers uses the last branch's reason for `tee()` cancellation and delays
+`pipeTo()` abort while an input read is pending. Chromium/WebKit use both branch
+reasons and abort immediately. These are implementation gaps, not evidence that
+stream compatibility is impossible.
+
+`message-port-boundaries.test.mjs` demonstrates that native browser ports deliver
+on tasks, whereas Workers delivers on microtasks. Synthetic browser events
+cannot redefine their `isTrusted` flag. The local adapter implements microtask
+delivery, so it cannot currently provide the native trusted-event brand. This
+bounded observation does not waive the remaining implementable port semantics
+or prove that every alternative runtime design is impossible.

@@ -38,6 +38,11 @@ for (const module of [
   "repl",
   "sqlite",
   "test",
+  "https",
+  "worker-threads",
+  "http-agent",
+  "http-client",
+  "http-incoming",
   "util",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
@@ -146,6 +151,11 @@ for (const module of [
   "repl",
   "sqlite",
   "test",
+  "https",
+  "worker-threads",
+  "http-agent",
+  "http-client",
+  "http-incoming",
   "fs",
   "module",
   "stream-web",
@@ -360,7 +370,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 610 ||
+    features.flatMap((report) => report.cases).length !== 666 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -397,7 +407,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 291 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 319 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

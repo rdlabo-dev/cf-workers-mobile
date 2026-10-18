@@ -1,4 +1,24 @@
 import {
+  HttpsImplementation,
+  httpsContract,
+} from "../../../src/compat/https/index.spec";
+import {
+  WorkerThreadsImplementation,
+  workerThreadsContract,
+} from "../../../src/compat/worker-threads/index.spec";
+import {
+  HttpAgentImplementation,
+  httpAgentContract,
+} from "../../../src/compat/http-agent/index.spec";
+import {
+  HttpClientImplementation,
+  httpClientContract,
+} from "../../../src/compat/http-client/index.spec";
+import {
+  HttpIncomingImplementation,
+  httpIncomingContract,
+} from "../../../src/compat/http-incoming/index.spec";
+import {
   TestImplementation,
   testContract,
 } from "../../../src/compat/test/index.spec";
@@ -167,6 +187,11 @@ export async function runNodeContracts(
     await runContract(new ReplImplementation(), replContract),
     await runContract(new SqliteImplementation(), sqliteContract),
     await runContract(new TestImplementation(), testContract),
+    await runContract(new HttpsImplementation(), httpsContract),
+    await runContract(new WorkerThreadsImplementation(), workerThreadsContract),
+    await runContract(new HttpAgentImplementation(), httpAgentContract),
+    await runContract(new HttpClientImplementation(), httpClientContract),
+    await runContract(new HttpIncomingImplementation(), httpIncomingContract),
   ];
   reports.push(
     await runContract(

@@ -71,6 +71,14 @@ function compatibilityPlugins(
         optimizeDeps: {
           include: [
             "cloudflare:node",
+            "node:_http_agent",
+            "_http_agent",
+            "node:_http_client",
+            "_http_client",
+            "node:_http_incoming",
+            "_http_incoming",
+            "node:https",
+            "https",
             "node:http",
             "http",
             "node:buffer",
@@ -99,6 +107,8 @@ function compatibilityPlugins(
             "readline",
             "node:domain",
             "domain",
+            "node:worker_threads",
+            "worker_threads",
             "node:test",
             "node:sqlite",
             "node:repl",

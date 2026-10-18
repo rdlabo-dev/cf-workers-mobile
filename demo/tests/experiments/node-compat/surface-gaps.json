@@ -1,8 +1,5 @@
 [
-  "_http_agent",
-  "_http_client",
   "_http_common",
-  "_http_incoming",
   "_http_outgoing",
   "_http_server",
   "_stream_duplex",
@@ -24,7 +21,6 @@
   "events",
   "fs",
   "fs/promises",
-  "https",
   "module",
   "perf_hooks",
   "process",
@@ -37,6 +33,5 @@
   "trace_events",
   "util",
   "util/types",
-  "worker_threads",
   "zlib"
 ]
