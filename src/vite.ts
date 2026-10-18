@@ -3,6 +3,7 @@ import { d1Modules } from "./build/d1-modules.js";
 import type { D1BuildOptions } from "./build/d1.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import {
   configuredPath,
   compatibilityAliases,
@@ -122,6 +123,7 @@ function virtualId(
 function workerEntryPlugin(
   entries: Map<string, string>,
   root: () => string,
+  virtualFiles?: () => Promise<string>,
 ): Plugin {
   return {
     name: "capacitor-workers-entry",
@@ -133,7 +135,8 @@ function workerEntryPlugin(
       const [path, query = ""] = id.split("?");
       if (entries.has(path) && !new URLSearchParams(query).has("worker")) {
         const original = entries.get(path)!;
-        return workerEntry(original);
+        if (!virtualFiles) return workerEntry(original);
+        return virtualFiles().then((files) => workerEntry(original, files));
       }
     },
   };
@@ -143,11 +146,30 @@ function workerEntryPlugin(
 export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
+  /**
+   * Files embedded into the worker's read-only virtual filesystem
+   * (node:fs compat). Paths resolve relative to the Vite root; the
+   * normalized absolute path is the lookup key, with suffix matching so
+   * bundled runtimes find entries regardless of their cwd assumptions.
+   */
+  workerFiles?: string[];
 }
 export function capacitorWorkersPlugin(
   options: CapacitorWorkersPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
+  const virtualFiles = options.workerFiles?.length
+    ? async () => {
+        const map: Record<string, { base64: string }> = {};
+        for (const file of options.workerFiles!) {
+          const path = resolve(root, file);
+          map[normalizePath(path)] = {
+            base64: (await readFile(path)).toString("base64"),
+          };
+        }
+        return JSON.stringify(map);
+      }
+    : undefined;
   let root: string;
   let publicDir: string;
   let d1: ReturnType<typeof d1Modules> | undefined;
@@ -261,7 +283,7 @@ export default { createWorker: () => new Constructor(), ${compilation ? "needsRe
 } };`;
       },
     },
-    workerEntryPlugin(entries, () => root),
+    workerEntryPlugin(entries, () => root, virtualFiles),
     {
       name: "capacitor-workers-worker-build",
       config(config) {
@@ -271,7 +293,7 @@ export default { createWorker: () => new Constructor(), ${compilation ? "needsRe
             plugins: () => [
               ...(previous?.() ?? []),
               d1Plugin(),
-              workerEntryPlugin(entries, () => root),
+              workerEntryPlugin(entries, () => root, virtualFiles),
               ...compatibilityPlugins("worker"),
             ],
           },

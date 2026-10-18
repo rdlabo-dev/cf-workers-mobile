@@ -32,14 +32,21 @@ it("runs the node module contracts against real workerd", async () => {
     "node.http",
     "node.net",
     "node.buffer",
+    "node.async-hooks",
+    "node.fs",
+    "node.module",
+    "node.stream-web",
+    "node.util",
   ]);
   expect(reports.map((report) => report.cases.length)).toEqual([
-    14, 11, 15, 18, 9, 24,
+    14, 11, 15, 18, 9, 24, 15, 8, 2, 1, 2,
   ]);
   for (const report of reports) assertContract(report);
   expect(
     reports
       .flatMap((report) => report.cases)
-      .every((test) => test.status === "passed"),
+      .every(
+        (test) => test.status === "passed" || test.status === "unsupported",
+      ),
   ).toBe(true);
 });

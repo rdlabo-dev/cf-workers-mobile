@@ -30,9 +30,31 @@ import {
 } from "../../../src/compat/net/index.spec";
 
 import {
+  AsyncHooksImplementation,
+  asyncHooksContract,
+  NodeAsyncHooks,
+} from "../../../src/compat/async-hooks/index.spec";
+import {
   BufferImplementation,
   bufferContract,
 } from "../../../src/compat/buffer/index.spec";
+
+import {
+  FsImplementation,
+  fsContract,
+} from "../../../src/compat/fs/index.spec";
+import {
+  ModuleImplementation,
+  moduleContract,
+} from "../../../src/compat/module/index.spec";
+import {
+  StreamWebImplementation,
+  streamWebContract,
+} from "../../../src/compat/stream-web/index.spec";
+import {
+  UtilImplementation,
+  utilContract,
+} from "../../../src/compat/util/index.spec";
 
 export type NodeProfile = "bundled" | "workers";
 
@@ -49,6 +71,16 @@ export async function runNodeContracts(
     await runContract(new NodeHttp(), nodeHttpContract),
     await runContract(new NetImplementation(), netContract),
     await runContract(new BufferImplementation(), bufferContract),
+    await runContract(
+      profile === "workers"
+        ? new NodeAsyncHooks()
+        : new AsyncHooksImplementation(),
+      asyncHooksContract,
+    ),
+    await runContract(new FsImplementation(), fsContract),
+    await runContract(new ModuleImplementation(), moduleContract),
+    await runContract(new StreamWebImplementation(), streamWebContract),
+    await runContract(new UtilImplementation(), utilContract),
   ];
 }
 

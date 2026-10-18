@@ -35,6 +35,19 @@ export function compatibilityAliases() {
     "cloudflare:workers": compatPath("cloudflare-workers"),
     "node:async_hooks": compatPath("async-hooks"),
     async_hooks: compatPath("async-hooks"),
+    "node:fs/promises": compatPath("fs/promises"),
+    "fs/promises": compatPath("fs/promises"),
+    "node:fs": compatPath("fs"),
+    fs: compatPath("fs"),
+    "node:module": compatPath("module"),
+    module: compatPath("module"),
+    "node:stream/web": compatPath("stream-web"),
+    "stream/web": compatPath("stream-web"),
+    // The util compat reuses the npm package through its deep specifier,
+    // which must precede the bare "util" alias.
+    "util/util.js": polyfill("util/util.js"),
+    "node:util": compatPath("util"),
+    util: compatPath("util"),
     "node:buffer": compatPath("buffer"),
     buffer: compatPath("buffer"),
     "node:http": compatPath("http"),
@@ -60,10 +73,13 @@ export function compatibilityAliases() {
     string_decoder: compatPath("string-decoder"),
   };
 }
-export function workerEntry(entry: string) {
+export function workerEntry(entry: string, virtualFiles?: string) {
   // WebKit can evaluate a Worker entry twice when a dynamic child imports its
   // exports. Keep the bootstrap free of exports and all shared code in children.
-  return `const { initializeWorkerNetwork } = await import(${JSON.stringify(networkRelayPath)});\nawait initializeWorkerNetwork();\nawait import(${JSON.stringify(globalsInstallPath)});\nconst { default: worker } = await import(${JSON.stringify(entry)});\nconst { serve } = await import(${JSON.stringify(transportPath)});\nserve(worker);`;
+  const files = virtualFiles
+    ? `const { registerVirtualFiles } = await import(${JSON.stringify(compatPath("fs"))});\nregisterVirtualFiles(${virtualFiles});\n`
+    : "";
+  return `const { initializeWorkerNetwork } = await import(${JSON.stringify(networkRelayPath)});\nawait initializeWorkerNetwork();\nawait import(${JSON.stringify(globalsInstallPath)});\n${files}const { default: worker } = await import(${JSON.stringify(entry)});\nconst { serve } = await import(${JSON.stringify(transportPath)});\nserve(worker);`;
 }
 export function workerSource(
   entry: string,

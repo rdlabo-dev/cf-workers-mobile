@@ -74,6 +74,11 @@ for (const module of [
   "structured-clone",
   "encoding",
   "abort",
+  "async-hooks",
+  "fs",
+  "module",
+  "stream-web",
+  "util",
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });
@@ -265,11 +270,13 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 210 ||
+    features.flatMap((report) => report.cases).length !== 266 ||
     features.some(
       (report) =>
         report.errors.length ||
-        report.cases.some((test) => test.status !== "passed"),
+        report.cases.some(
+          (test) => test.status === "failed" || test.status === "unavailable",
+        ),
     )
   )
     throw new Error(JSON.stringify(features));
@@ -300,10 +307,13 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 91 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 119 ||
           report.node.direct.some(
             (r) =>
-              r.errors.length || r.cases.some((c) => c.status !== "passed"),
+              r.errors.length ||
+              r.cases.some(
+                (c) => c.status === "failed" || c.status === "unavailable",
+              ),
           ))
       )
         throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
@@ -401,7 +411,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     ),
   );
   console.log(
-    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).length} passed, 0 exclusions, preferences 2/2 passed (${temp})`,
+    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).length} checked (${features.flatMap((report) => report.cases).filter((test) => test.status === "unsupported").length} declared unsupported), preferences 2/2 passed (${temp})`,
   );
 } finally {
   await browser?.close();

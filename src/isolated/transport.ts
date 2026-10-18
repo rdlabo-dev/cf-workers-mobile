@@ -1,3 +1,4 @@
+import { setWorkerEnv } from "../compat/cloudflare-workers/index.js";
 import { isResponse } from "../compat/fetch/interop.js";
 import { Request as WorkerRequest } from "../compat/request/index.js";
 import type { WorkerHandler } from "../fetch/types.js";
@@ -58,6 +59,7 @@ export function serve(worker: WorkerHandler<unknown>) {
     const pending: Promise<unknown>[] = [];
     const errors: string[] = [];
     try {
+      setWorkerEnv(env);
       const request = new WorkerRequest(url, {
         method,
         headers,
