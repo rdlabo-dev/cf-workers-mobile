@@ -1,8 +1,8 @@
 # Integrate an existing Workers application with Capacitor
 
-Give this guide to an AI coding assistant with access to your application repository. It describes the work from installing Capacitor to configuring `@rdlabo/workers-capacitor`, adapting unsupported application behavior and verifying the native app. Preserve the existing Workers application and cloud build, making only the changes required by the chosen integration.
+Give this guide to an AI coding assistant with access to your application repository. The goal is to run the existing Workers application in Capacitor with the fewest application-code changes. Start by adding Capacitor and connecting the existing Worker entry; preserve the cloud build, rendering, routes, business logic and authentication.
 
-Preserve the application's rendering and navigation model. A Worker can return a complete HTML document for each page, with ordinary links and forms handled through native document rendering. Integration does not require a SPA, a client-side router, or hydration; add client interaction only where the application needs it. In this guide, “App Shell” describes locally available interface structure, not a requirement for a single persistent document.
+The primary success criterion is a working native application with minimal integration effort, not a new application architecture. Keep ordinary HTML documents, links and forms where the application uses them. SPA conversion, a new client router, App Shell redesign, SSR/API separation and adding hydration are not prerequisites.
 
 ## Prompt to give your AI assistant
 
@@ -12,8 +12,8 @@ Follow docs/integration.md from rdlabo-dev/workers-capacitor to integrate this a
 Inspect the existing code first, then install/configure the required dependencies, connect the existing Worker entry and verify the app on the target platforms.
 Preserve the cloud build and existing authentication. Keep changes minimal.
 
-Identify what runs locally and what must remain on the Worker. If a page depends on D1 or another unsupported local service, explain the boundary and implement only the necessary migration.
-Preserve local SSR where it helps initial display; do not automatically rewrite the app as a SPA or require an App Shell redesign.
+First attempt integration without changing the Worker application code. For D1 and other cloud dependencies, configure the supported remote dispatch to the existing Worker and inspect its build report. Preserve SSR, routing and authentication, including when the whole request must execute remotely.
+Only change application code after identifying a specific incompatibility that configuration cannot resolve. Explain that incompatibility and make the smallest correction. Do not redesign the application as an App Shell or SPA, split SSR into APIs, or replace authentication merely to integrate Capacitor.
 
 Follow the security section.
 Report files changed, verification results and remaining limitations, distinguishing local execution from remote execution.
@@ -27,7 +27,7 @@ Provide the target platforms, app ID/name, and an existing test Worker origin if
 1. Inspect the application and select native HTML rendering or Fetch-only integration.
 2. Install Capacitor and this package in the application.
 3. Configure the native build and connect the existing Worker.
-4. Adapt server-dependent behavior only where necessary.
+4. Verify unchanged behavior; fix only demonstrated incompatibilities.
 5. Check security and verify the actual application flow.
 
 ## 1. Inspect the application and choose the integration
@@ -36,7 +36,7 @@ Read the Worker entry, build scripts, Wrangler configuration, page routes, middl
 
 - Which routes produce HTML, JSON and static assets?
 - Which pages require D1, other bindings, secrets or a session before rendering?
-- Can the initial layout and navigation render without a network response?
+- Which dependencies can execute locally, and which require the existing deployed Worker?
 - What authenticates API calls, and where is ownership/authorization enforced?
 - Does navigation request more server-rendered content? Include nested layouts, redirects, framework data requests and mutations, not just the first page.
 - Which assets and runtime APIs must be available locally?
@@ -47,7 +47,7 @@ Choose the smallest integration that preserves the application:
 
 - **Existing frontend calling Worker APIs:** keep that frontend and initialize the Fetch-only runtime before mounting it. No rendering migration is required.
 - **Worker returning HTML (Hono/TSX, Workers Express, OpenNext):** use native document rendering with `render`. Preserve its router and rendering where supported.
-- **Cloud-dependent requests:** configure remote execution and inspect the build report. If local initial display is required, use the migration options below.
+- **Cloud-dependent requests:** configure remote execution and inspect the build report. Keep the existing handler unchanged; a whole-Worker remote result is acceptable when needed to preserve behavior.
 
 ## 2. Install Capacitor and this package
 
@@ -55,9 +55,11 @@ Use Capacitor 8 and compatible platform packages. Prepare the platform SDKs usin
 
 ```sh
 npm install @capacitor/core@8 @capacitor/ios@8 @capacitor/android@8
-npm install -D @capacitor/cli@8 vite@7 typescript
+npm install -D @capacitor/cli@8 typescript
 npx cap init
 ```
+
+For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
 Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Until a package release is available, build and pack this repository with `npm ci`, `npm run build`, `npm pack`, then install the resulting `.tgz` in the application. Do not assume an npm release exists. In the application, install the actual file:
 
@@ -129,7 +131,7 @@ await runtime.ready;
 
 `baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](../README.md#url-contract).
 
-`render` selects native document rendering, including links and forms; it is not an option specifically for forms. For an already bundled SPA/static App Shell, omit `render`, initialize the Fetch-only runtime before mounting the UI, and use an API-only `baseURL` boundary such as `https://your-worker.example.com/api/`. Keep the shell itself outside that API boundary. The plugin entry must be the corresponding API Worker; inspect its remote-dispatch report too.
+`render` selects native document rendering, including links and forms; it is not an option specifically for forms. For an existing separately built frontend, omit `render`, initialize the Fetch-only runtime before mounting the UI, and use an API-only `baseURL` boundary such as `https://your-worker.example.com/api/`. Keep that frontend outside the API boundary. The plugin entry must be the corresponding API Worker; inspect its remote-dispatch report too.
 
 Build and install (add each native platform only once):
 
@@ -144,62 +146,38 @@ npx cap run ios
 
 Build before every sync. Document rendering uses bundled assets, not the Vite dev server. See [native rendering](native-rendering-api.md) for lifecycle and assets.
 
-## 4. Adapt server-dependent behavior when needed
+## 4. Preserve behavior and fix only actual incompatibilities
 
-| Existing behavior                       | Migration option                                                                    | Current library boundary                                                            |
-| --------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| HTML/TSX without cloud dependencies     | Keep rendering locally; bundle its scripts, styles and images                       | Compatible Fetch handlers can render native documents                               |
-| D1 query followed by SSR                | Separate the shell from authenticated JSON reads/writes                             | D1 cannot execute locally; unchanged dependent requests execute remotely            |
-| Cookie/session middleware on every page | Make the shell public and fetch private data through protected APIs, if appropriate | Cookie-dependent/shared middleware can keep the whole Worker remote                 |
-| Next.js Server Components reading D1    | Move request-time data access behind APIs; keep presentation reusable               | Adding `use client` alone does not create a local application                       |
-| Cloud ASSETS routing                    | Decide which assets to package and which stay remote                                | Local ASSETS is not implemented; `assetsExecution: "remote"` retains cloud behavior |
+Build and run the existing entry before proposing an application refactor. Configure its bindings and connection to the existing Worker using the [remote binding guide](cloudflare-bindings.md). `remote.origin` supplies the destination; it does not itself classify routes. The build plugin generates dispatch from the application and its configuration.
 
-**Remote SSR is a valid integration choice**, with minimal source changes, but it requires connectivity to generate the page. Do not report it as a local App Shell. The [OpenNext sample](../demo/opennext/README.md) normally uses this configuration: D1 and asset-first routing select the whole remote Worker.
+| Existing application                | First integration approach                                                             | Boundary to verify                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Hono / TSX returning HTML           | Keep `export default app`, templates, routes and forms; use `render`                   | Compatible handlers render locally without a listening HTTP server               |
+| Workers Express                     | Keep the Workers Fetch Handler entry and existing routes                               | Supported Workers Express is distinct from arbitrary Node.js server applications |
+| D1 query followed by SSR            | Keep the query and HTML response together; dispatch the request to the existing Worker | D1 remains remote; no SQL-to-fetch rewrite or new JSON endpoint is required      |
+| Session middleware protecting pages | Keep middleware and server-managed sessions                                            | Cookie/shared-state dependencies can select whole-Worker remote execution        |
+| Next.js / OpenNext                  | Build the existing cloud output and select `.open-next/worker.js`                      | Cloud dependencies can keep the entire generated Worker remote                   |
+| Cloud ASSETS                        | Configure `assetsExecution: "remote"`                                                  | Local ASSETS is not implemented; retain the existing cloud asset behavior        |
 
-For analyzable Hono routes the plugin may separate local pages and remote APIs. General handlers, Workers Express and generated framework entries can fall back to whole-Worker remote execution. Inspect `workers-capacitor-d1.json` or `workers-capacitor-server.json` in the output. A successful build alone does not prove the shell is local. Do not hide bindings or remove authentication to force a favorable report. If splitting is unsafe, use an explicit application-owned shell entry and a separate remote API boundary, or retain remote SSR.
+For statically analyzable Hono applications, the build may keep independent routes local. If it cannot safely separate requests, it selects whole-Worker remote execution, including for general Fetch handlers and Workers Express. Inspect `workers-capacitor-d1.json` or `workers-capacitor-server.json` in the output. Do not remove bindings, bypass authentication or create another router to force local execution.
 
-### Preserve SSR when separating cloud data
+For example, a page that authenticates the user, queries D1 and returns SSR HTML can retain that entire sequence on the deployed Worker. The device renders the response and uses the application's existing interaction model. This requires connectivity; it does not make D1 available locally. See [D1 dispatch](d1-transparent-migration.md) and the [OpenNext sample](../demo/opennext/README.md). Remote execution is a supported way to preserve the application, not an incomplete migration requiring a subsequent redesign.
 
-When a page waits for D1 before producing HTML, local execution cannot preserve that database access. Keep the request remote for minimum changes, or separate local rendering from remote data to improve initial display:
+### When configuration is insufficient
 
-```text
-Local Worker SSR → HTML display → hydration / client interaction
-                                → authenticated remote data → screen update
-```
+Reproduce the failure and identify whether it comes from configuration, the library's documented limits or the application's assumptions. Correct configuration first. If an application change is necessary, keep it scoped to the failing behavior and verify that cloud behavior is preserved.
 
-This is the App Shell approach: reuse the Worker's rendering to generate layout, navigation and initial states on the device without waiting for cloud data. SSR is useful here; it does not have to run on a remote server. Retain templates and presentation components rather than rewriting everything as client-only rendering. Hydration and data requests may overlap. Plain HTML can use small client scripts without framework hydration.
+- **Origin-only CSRF checks:** native forms may omit `Origin`. Adapt the application's CSRF protection, such as by validating a token; do not disable protection.
+- **External authentication redirects:** the remote transport rejects redirects to another origin. Use an explicit external-browser authentication integration if the application requires it; do not replace its identity provider just to avoid this boundary.
+- **Unsupported runtime or framework behavior:** consult the [compatibility inventory](compatibility.md) and [OpenNext limits](opennext.md). Demonstrate the failing feature before replacing dependencies or changing rendering. A successful import or SSR response does not establish complete framework support.
 
-The library does not automate this application refactor. Use it where it improves the user experience, not as a prerequisite for every integration. Keep the shell independent of authentication restoration; show scoped loading, empty, signed-out and failure states, retain recoverable input and keep navigation responsive. Do not add generic caching, an offline queue or a new design system for this task. Local SSR still incurs startup, rendering and hydration costs: measure useful content and usable controls, not just an earlier spinner. Offline data and writes remain separate features.
+Report unresolved limits explicitly. Do not hide them with empty data, mocked success or automatic retries that could repeat writes.
 
-### Hono / TSX
+### Optional later optimization: local initial rendering
 
-The conceptual change is:
+Only pursue this when the application requires local startup or a measured improvement after basic integration works. Compatible existing SSR can execute in the local Worker, yielding HTML before client interaction or hydration. SSR is worth preserving; local execution does not imply client-only rendering.
 
-```text
-Before: GET /notes → remote authenticate → D1 query → SSR HTML
-After:  GET /notes → local Worker SSR → shell HTML + bundled client script
-        GET /api/notes → remote authentication → D1 query → JSON
-        POST /api/notes → remote authentication/authorization → D1 update
-```
-
-Reuse existing API routes when present. Otherwise extract the existing server operation into a narrow application endpoint; keep SQL, validation and access control on the Worker. Return only fields needed by the screen, never a generic SQL or arbitrary binding RPC endpoint. The cloud website can continue SSR using the same server service and presentation components.
-
-Keep the HTML/TSX rendering route: it now renders the shell using locally available inputs, with a placeholder for private data. The local shell must not query D1 or require a server cookie to produce its initial HTML. Its client code fetches data after startup and implements loading, empty, failure and signed-out states. A failed request must not become an empty successful result. Cancel obsolete reads during navigation and prevent duplicate writes. Do not automatically replay mutations after a connection failure.
-
-Package the shell's client JavaScript and CSS as browser assets. Returning TSX HTML does not automatically bundle client interaction code. Use the existing framework's client build rather than a second custom renderer.
-
-### Next.js / OpenNext
-
-Hydration attaches interactivity to generated content; it does not remove the server dependency that produced it. Client Components can be prerendered, and navigation can need additional RSC payloads. See the official [Server and Client Components guide](https://nextjs.org/docs/app/getting-started/server-and-client-components).
-
-Start with one screen. Preserve compatible local server rendering of its layout and initial HTML. Replace its request-time database-derived props with a client data boundary calling an authenticated API; do not move the entire page into client-only rendering merely because D1 remains remote. Check parent layouts, `cookies()`/`headers()`, middleware and Server Actions as well. Preserve server validation when moving a mutation behind an HTTP endpoint. Reuse display components without importing database modules into the client graph.
-
-Then choose the build appropriate to that screen:
-
-- A local OpenNext Worker can generate compatible public pages, but cloud dependencies may still select whole-Worker remote execution. Follow the [OpenNext limitations](opennext.md); this is not automatic Next.js route splitting.
-- A separate static shell build can avoid request-time rendering entirely when its routes fit [Next.js static export](https://nextjs.org/docs/app/guides/static-exports). Dynamic server features need redesign or remote endpoints. This is an application migration option, not an integrated Next.js export adapter in this package. Test exported paths and reloads in Capacitor; do not assume that copying `out/` preserves every routing behavior.
-
-Keep the cloud OpenNext build independent. Do not switch the deployed site's configuration to static export merely to make the native build pass. Neither path provides automatic offline data synchronization or full Next.js compatibility.
+If that renderer waits for remote data, separating a locally rendered App Shell from authenticated data requests is a possible application refactor. It is not automatic and is outside the default integration work. Preserve templates, navigation and authorization, and measure useful content and usable controls before claiming a speed improvement. For Next.js, hydration alone does not remove server dependencies; see [OpenNext limitations](opennext.md). Do not switch the cloud application to static export or add new APIs solely to complete this guide.
 
 ## 5. Security: the device is not a trusted server
 
@@ -232,7 +210,11 @@ remote: {
 }
 ```
 
-This is connection pseudocode, not a bundled Firebase adapter. Initialize the host-side SDK synchronously, then start the local runtime and render the public shell without awaiting session restoration or network sign-in. Restore the session asynchronously; only create an anonymous account if restoration finds none. Gate protected API requests on authentication readiness and show authentication progress, failure and retry inside the shell. A first launch without connectivity can show the shell but cannot create a guest account or access protected data. Keep token retrieval in the host, not in the isolated Worker. In native document mode the host and rendered page have separate JavaScript contexts: application code must coordinate authentication state explicitly, without exposing tokens to the page. Do not assume a page-side Firebase instance is the host instance. Android may bootstrap the host separately; avoid duplicate sign-in side effects in the bootstrap. This guide does not supply that application-specific coordination. The server must verify the signature, expiry, issuer and project audience using Firebase's [ID token verification requirements](https://firebase.google.com/docs/auth/admin/verify-id-tokens) and a Workers-compatible verifier; decoding JWT claims alone is insufficient. Firebase Security Rules do not protect D1: implement authorization in the Worker.
+This is connection pseudocode, not a bundled Firebase adapter. Use it only when the application has no existing authentication and guest identity fits its access policy. Restore the existing session before deciding whether anonymous sign-in is needed; gate protected requests on authentication readiness and handle failure explicitly. If the application already has a public local loading screen, authentication need not block it. This does not require adding a new App Shell.
+
+Keep token retrieval in the host, not in the isolated Worker. Native document pages and the runtime host have separate JavaScript contexts; a page-side Firebase instance is not automatically the host instance. Android may bootstrap the host separately. Coordinate auth readiness without duplicate sign-in or exposing host credentials to pages. That application-specific coordination is not supplied by this guide.
+
+The server must verify the signature, expiry, issuer and project audience using Firebase's [ID token verification requirements](https://firebase.google.com/docs/auth/admin/verify-id-tokens) and a Workers-compatible verifier; decoding JWT claims alone is insufficient. Firebase Security Rules do not protect D1: implement authorization in the Worker.
 
 Anonymous identity does not prove a real person, a trusted device or an official app installation. Anyone may create a guest account. Limit guest privileges, request rates and costly operations; provide account linking if data must survive loss of local credentials. Consider [App Check](https://firebase.google.com/docs/app-check) for abuse protection separately from user authentication. This library does not supply native attestation or App Check validation.
 
@@ -246,19 +228,18 @@ User credentials need expiration, revocation/logout handling and platform-approp
 
 Native documents have Capacitor plugin access: escape untrusted content and do not render arbitrary HTML as application code. For cookie authentication retain CSRF protection. Native forms may omit `Origin`; do not disable CSRF validation or treat rewritten Origin as proof of trust. External-origin redirects are rejected; OAuth/SSO requires an explicit external-browser integration. See the [remote transport boundaries](d1-transparent-migration.md).
 
-## 6. Acceptance checks for the migrated application
+## 6. Verify the existing application in Capacitor
 
-Compare the existing flow and the native flow on the same device and data, with normal connectivity, delayed responses and a disconnected backend. Record cold launch to usable navigation, time to useful data, and navigation response; choose acceptance targets appropriate to the application before measuring. Separate simulator observations from physical-device measurements. Do not claim an improvement from an HTTP 200 response or an earlier loading indicator alone.
+Acceptance means the existing application works through the new entry and configuration, with every application-code change justified by a demonstrated incompatibility. Compare the native flow with the existing cloud application; do not make a rendering redesign or a performance improvement a condition of integration.
 
-Test an actual application flow on both iOS and Android:
+Test the target iOS and Android platforms using an actual user flow:
 
-- For a local App Shell, launch with the backend unavailable: navigation and a useful failure state still appear. For remote SSR, verify a clear connection failure instead of claiming offline startup. Never embed private data in distributed assets.
-- Delay or fail data requests: navigation remains usable, loading is scoped to content, and failure/retry is distinguishable from an empty result. Restoring authentication must not block the public shell or expose private content.
-- Fail a submission and navigate back: recoverable input and appropriate screen state remain available, duplicate writes are prevented, and success is not shown without confirmation. Check keyboard/focus behavior as well.
-- Load a deep link, navigate forward/back and reload. Check scripts, styles, images, hydration and framework data requests.
-- Authenticate, read private data, update once, relaunch, then sign out. Verify the database state and that cached data from the previous account is absent.
-- Reject missing/expired/forged tokens and cross-user access. Test CSRF for cookie mutations. Do not add automatic write retries to mask a failure.
-- Inspect the build report and packaged contents: the intended local paths stay local, server-dependent paths execute remotely, and excluded server SQL/helpers/secrets are absent.
-- Confirm browser/cloud behavior remains intact. Browser CORS/cookie tests do not replace native navigation/session tests.
+- Launch the app and check the existing initial page, scripts, styles, images and interaction. Check hydration only if the application uses it.
+- Follow links, navigate back, submit forms and follow same-origin redirects. Test the application's existing deep-link behavior where applicable.
+- Authenticate, read private data, update once, relaunch and sign out. Verify the database state and session behavior, including isolation from a previous account.
+- Reject missing/expired/forged credentials and cross-user access. Verify CSRF protection for cookie-authenticated mutations.
+- Disconnect or delay the backend. Report the chosen execution mode's dependency on connectivity and verify explicit failures without false success or repeated writes. Local startup is not required for a whole-Worker remote application.
+- Inspect build reports and packaged assets: local/remote dispatch matches the selected configuration, excluded server SQL/helpers are absent, and no privileged credentials were embedded.
+- Run the application's existing cloud tests to check that integration has not changed its server behavior. Browser tests do not replace native navigation/session tests.
 
-Report the implemented boundary, executed commands, tested platforms and remaining limitations. State which integration was chosen and why. Do not describe remote SSR as offline support, anonymous identity as app attestation, or an untested migration recipe as supported framework behavior.
+Report the integration files added, each necessary application change and its reason, commands executed, tested platforms, execution boundaries and remaining limitations. Distinguish simulator/emulator checks from physical-device checks, and remote execution from local compatibility. If there is no deployed test backend or native SDK available, state what could and could not be verified rather than claiming completion.
