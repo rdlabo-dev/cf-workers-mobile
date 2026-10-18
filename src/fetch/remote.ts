@@ -68,6 +68,10 @@ export function createRemoteWorker(
   }
   return {
     async fetch(request: Request): Promise<Response> {
+      if (request.headers.has("upgrade"))
+        throw new TypeError(
+          "Remote WebSocket/HTTP upgrades are not supported; use a separate WebSocket connection to the deployed Worker.",
+        );
       const signal = AbortSignal.any([request.signal, lifetime.signal]);
       signal.throwIfAborted();
       const source = new URL(request.url);
@@ -145,6 +149,10 @@ export function createRemoteWorker(
           const response = await wait(send(outgoing, body));
           try {
             signal.throwIfAborted();
+            if (response.status === 101)
+              throw new TypeError(
+                "Remote WebSocket/HTTP upgrades are not supported",
+              );
             const responseHeaders = new WorkerHeaders(response.headers);
             if (native) {
               const cookies = responseHeaders

@@ -562,3 +562,20 @@ for (const redirect of ["manual", "error"] as const)
     );
     expect(await response.text()).toBe("streamed");
   });
+
+it("rejects WebSocket upgrades before requesting credentials or sending HTTP", async () => {
+  const getToken = vi.fn(() => "secret");
+  const { runtime, handler, send } = setup("direct", {
+    origin: "https://remote.example",
+    getToken,
+  });
+  await runtime.ready;
+  await expect(
+    runtime.fetch("https://same.example/api/socket", {
+      headers: { upgrade: "websocket" },
+    }),
+  ).rejects.toThrow("upgrades are not supported");
+  expect(handler.fetch).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+  expect(getToken).not.toHaveBeenCalled();
+});

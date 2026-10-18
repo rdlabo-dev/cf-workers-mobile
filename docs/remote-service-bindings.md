@@ -14,6 +14,9 @@ The workerd integration baseline is Miniflare `5.20261012.0-beta`, compatibility
 date `2026-10-01`. Browser integration is supporting evidence, not native
 transport certification.
 
+See [additional Cloudflare bindings and remote ASSETS](cloudflare-bindings.md) for
+Durable Objects, AI, Workflows, generic remote names and asset execution policies.
+
 ## Configuration
 
 Use the existing Worker entry and its Wrangler configuration with either the

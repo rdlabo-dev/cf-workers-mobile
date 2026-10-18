@@ -35,7 +35,8 @@
     "test:native:network:server": "node tests/scripts/network-server.mjs",
     "test:native:network": "node tests/scripts/run-native-network.mjs",
     "test:workers:tls": "vitest run --config tests/vitest.tls.config.ts",
-    "test:service-bindings": "node --test tests/experiments/services/integration.test.mjs"
+    "test:service-bindings": "node --test tests/experiments/services/integration.test.mjs",
+    "test:cloudflare-bindings": "node --test tests/experiments/cloudflare/integration.test.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

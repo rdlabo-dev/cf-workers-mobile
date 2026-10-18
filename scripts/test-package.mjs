@@ -129,6 +129,10 @@ import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/testi
 import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
 import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/testing/fetch";
 import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
+import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/vite";
+buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
+// @ts-expect-error Local ASSETS is not a completed compatibility unit.
+buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
 import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();
