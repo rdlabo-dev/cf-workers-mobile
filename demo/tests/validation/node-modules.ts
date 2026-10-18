@@ -1,4 +1,28 @@
 import {
+  DomainImplementation,
+  domainContract,
+} from "../../../src/compat/domain/index.spec";
+import {
+  ReadlineImplementation,
+  readlineContract,
+} from "../../../src/compat/readline/index.spec";
+import {
+  InspectorImplementation,
+  inspectorContract,
+} from "../../../src/compat/inspector/index.spec";
+import {
+  ChildProcessImplementation,
+  childProcessContract,
+} from "../../../src/compat/child-process/index.spec";
+import {
+  ClusterImplementation,
+  clusterContract,
+} from "../../../src/compat/cluster/index.spec";
+import {
+  DgramImplementation,
+  dgramContract,
+} from "../../../src/compat/dgram/index.spec";
+import {
   VmImplementation,
   vmContract,
 } from "../../../src/compat/vm/index.spec";
@@ -122,6 +146,12 @@ export async function runNodeContracts(
     await runContract(new V8Implementation(), v8Contract),
     await runContract(new Http2Implementation(), http2Contract),
     await runContract(new VmImplementation(), vmContract),
+    await runContract(new ChildProcessImplementation(), childProcessContract),
+    await runContract(new ClusterImplementation(), clusterContract),
+    await runContract(new DgramImplementation(), dgramContract),
+    await runContract(new InspectorImplementation(), inspectorContract),
+    await runContract(new DomainImplementation(), domainContract),
+    await runContract(new ReadlineImplementation(), readlineContract),
   ];
   reports.push(
     await runContract(

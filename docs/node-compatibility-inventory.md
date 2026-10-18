@@ -28,7 +28,8 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:timers` / `node:timers/promises` | **Complete** | Whole-module implementation and shared 30-group contract in `src/compat/timers/`. [Acceptance](#timers-acceptance) and [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) passed at `c5fb8a4`; merged as `400d022`. |
 | `node:url` | **Unverified (CI pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
 | `node:os`, `node:tty`, `node:wasi`, `node:punycode` | **Unverified (acceptance pending)** | Module-owned implementations and contracts pass workerd, browser and both native platforms. Review and remote CI remain pending. |
-| `node:constants`, `node:v8`, `node:http2`, `node:vm` | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Native validation, review and CI remain pending. |
+| `node:constants`, `node:v8`, `node:http2`, `node:vm` | **Unverified (acceptance pending)** | Whole pinned Workers surfaces implemented with adjacent contracts. Includes Workers stub semantics and argument validation; this does not enable V8 access or HTTP/2 networking. Workerd, browser, packed-consumer and both native validations pass at `719b8fe`; review and remote CI remain pending. |
+| `node:child_process`, `node:cluster`, `node:dgram`, `node:domain`, `node:inspector` (+ promises), `node:readline` (+ promises) | **Unverified (acceptance pending)** | Pinned production behavior implemented with adjacent contracts. Workerd and browser checks pass; native acceptance, review and CI remain pending. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Remaining implementation sequence
@@ -701,3 +702,42 @@ Chromium and WebKit after esbuild converts async functions to explicit Promise
 continuations. This is only evidence for a possible build-time route. It does not
 certify async-hooks, dynamic imports, unhandled rejection, third-party native
 async callbacks or every build/runtime mode.
+
+### Constants, V8, HTTP/2 and VM local acceptance
+
+At `719b8fe`, shared contracts cover `constants` (3 groups), `v8` (11),
+`http2` (5), and `vm` (10), alongside the earlier platform modules.
+The full suite passed 343 unit tests, the fixed-workerd Node contract,
+20 Vite development tests, 7 build tests and 30 Vite/esbuild browser tests.
+The fresh installed tarball passed 464 common contracts with the same 6
+pre-existing ALS exclusions, 26 direct / 22 isolated cases, 10 build/raw-ESM
+cases, 2 development cases and 2 preference cases.
+
+iOS 26.1 and Android 16 each passed **600 runtime checks plus 6 existing ALS
+exclusions** from clean revision `719b8fe`. Every new module group passed in
+both direct and Dedicated Worker execution. Evidence is retained under
+`demo/artifacts/node-completion-acceptance/` locally.
+This is local validation, not completed remote CI or independent review.
+
+Vite development verification caught a circular dependency caused by injecting
+`global`/`process` through a module that also imports Buffer. Non-Buffer globals
+now have an independent injection source; production, development, esbuild and
+installed-package regressions passed after this correction.
+
+### Async transform boundary experiments
+
+The ES2016 lowering prototype restores concurrent/nested context in Chromium
+and WebKit only for the instrumented code. Two additional counterexamples are
+covered by `async-transform.test.mjs`:
+
+- An untransformed native async callback still loses context even when its caller
+  was transformed. Ordinary raw JavaScript, separately loaded dependencies and
+  code produced at runtime cannot be certified by transforming just the entry.
+- esbuild's ordinary async lowering observes a Promise's overridden `then` getter
+  where native `await` does not, introducing a rejection. Lowering is not an
+  observationally equivalent replacement for native async semantics.
+
+These experiments do not prove every possible compiler/runtime design impossible.
+They rule out advertising the current monkeypatch or ordinary esbuild lowering
+as complete `async_hooks` compatibility. Full support requires a different
+execution contract or engine capability; the six existing ALS exclusions remain.

@@ -42,6 +42,13 @@ it("runs the node module contracts against real workerd", async () => {
     "node.v8",
     "node.http2",
     "node.vm",
+    "node.child_process",
+    "node.cluster",
+    "node.dgram",
+    "node.inspector",
+    "node.domain",
+    "node.readline",
+
     "node.async-hooks",
     "node.fs",
     "node.module",
@@ -49,7 +56,8 @@ it("runs the node module contracts against real workerd", async () => {
     "node.util",
   ]);
   expect(reports.map((report) => report.cases.length)).toEqual([
-    14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 15, 8, 2, 1, 2,
+    14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5, 6, 8, 6, 8,
+    15, 8, 2, 1, 2,
   ]);
   for (const report of reports) assertContract(report);
   expect(
