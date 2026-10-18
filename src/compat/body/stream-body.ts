@@ -1,5 +1,7 @@
+import { Blob, File } from "../buffer/blob.js";
 import { platform } from "../globals/platform.js";
-import { ReadableStream, disturbed } from "../stream-web/runtime.js";
+import { disturbed } from "../stream-web/runtime.js";
+import { ReadableStream } from "../stream-web/index.js";
 import { readable } from "../stream-web/interop.js";
 
 /** Body ownership for the BYOB-capable JS streams used by iOS 26.1. */
@@ -61,13 +63,18 @@ export class StreamBody {
     return bytes.buffer;
   }
   async blob() {
-    return new platform.Response(await this.arrayBuffer(), {
+    const blob = await new platform.Response(await this.arrayBuffer(), {
       headers: this.headers,
     }).blob();
+    return Object.setPrototypeOf(blob, Blob.prototype) as Blob;
   }
   async formData() {
-    return new platform.Response(await this.arrayBuffer(), {
+    const data = await new platform.Response(await this.arrayBuffer(), {
       headers: this.headers,
     }).formData();
+    for (const value of data.values())
+      if (typeof value !== "string")
+        Object.setPrototypeOf(value, File.prototype);
+    return data;
   }
 }

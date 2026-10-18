@@ -12,6 +12,7 @@ export const streamWebFeature = defineFeature<typeof web>()("node.stream-web", [
   "encoding",
   "compression",
   "bodyInterop",
+  "bodyFiles",
 ]);
 export const streamWebContract: ContractSuite<typeof streamWebFeature> = {
   feature: streamWebFeature,
@@ -85,6 +86,36 @@ export const streamWebContract: ContractSuite<typeof streamWebFeature> = {
         .pipeThrough(new api.DecompressionStream("gzip"));
       if ((await new Response(result).text()) !== "compress this payload")
         throw Error("Compression stream roundtrip failed");
+    },
+    async bodyFiles(api) {
+      const blob = await new Response("hello").blob();
+      const multipart =
+        '--boundary\r\nContent-Disposition: form-data; name="file"; filename="example.txt"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--boundary--\r\n';
+      const file = (
+        await new Response(multipart, {
+          headers: { "content-type": "multipart/form-data; boundary=boundary" },
+        }).formData()
+      ).get("file");
+      if (
+        !(file instanceof File) ||
+        file.name !== "example.txt" ||
+        file.type !== "text/plain"
+      )
+        throw Error("Parsed file metadata mismatch");
+      for (const value of [blob, file]) {
+        const stream = value.stream();
+        if (!(stream instanceof api.ReadableStream))
+          throw Error("Body file stream identity mismatch");
+        const reader = stream.getReader({ mode: "byob" });
+        try {
+          const result = await reader.read(new Uint8Array(16));
+          if (new TextDecoder().decode(result.value) !== "hello")
+            throw Error("Body file BYOB mismatch");
+        } finally {
+          await reader.cancel();
+          reader.releaseLock();
+        }
+      }
     },
     async bodyInterop(api) {
       const stream = new api.ReadableStream<Uint8Array>({
@@ -214,6 +245,7 @@ export class StreamWebImplementation extends FeatureImplementation<
       encoding: { status: "supported" },
       compression: { status: "supported" },
       bodyInterop: { status: "supported" },
+      bodyFiles: { status: "supported" },
     });
   }
   create() {

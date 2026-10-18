@@ -1,5 +1,5 @@
 import { contextConstructor } from "./context.js";
-import * as ponyfill from "web-streams-polyfill";
+import * as ponyfill from "./ponyfill.js";
 import { nativeStreams } from "../globals/platform.js";
 // iOS 26.1 has default streams but no readable byte streams or BYOB readers.
 export const usesPonyfill =

@@ -67,11 +67,27 @@ function compatibilityPlugins(
       name: "capacitor-workers",
       enforce: "pre",
       transform(code, id) {
+        const original = code;
+        const path = normalizePath(id.split("?")[0]);
+        const compatRoot = normalizePath(resolve(globalsPath, "../.."));
+        if (path.startsWith(`${compatRoot}/`)) {
+          if (path === `${compatRoot}/body/stream-body.js`)
+            code = code.replace(
+              'from "../buffer/blob.js"',
+              'from "node:buffer"',
+            );
+          code = code.replace(
+            'from "../stream-web/index.js"',
+            'from "node:stream/web"',
+          );
+          if (path === `${compatRoot}/stream-web/interop.js`)
+            code = code.replace('from "./index.js"', 'from "node:stream/web"');
+        }
         if (
           normalizePath(id.split("?")[0]) !==
           normalizePath(resolve(globalsPath, "../web.js"))
         )
-          return;
+          return code === original ? undefined : code;
         // Prebundled Node modules and runtime globals must share constructor identity.
         // Keep the distributed runtime's relative import usable as raw browser ESM.
         return code
@@ -93,6 +109,8 @@ function compatibilityPlugins(
             "_http_client",
             "node:_http_incoming",
             "_http_incoming",
+            "node:stream/web",
+            "stream/web",
             "node:stream/consumers",
             "stream/consumers",
             "node:dns",

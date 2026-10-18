@@ -1,5 +1,6 @@
 import { nativeStreams } from "../globals/platform.js";
-import { ReadableStream, WritableStream, usesPonyfill } from "./runtime.js";
+import { usesPonyfill } from "./runtime.js";
+import { ReadableStream, WritableStream } from "./index.js";
 /** Convert host byte streams without buffering the entire body or pre-reading it. */
 export function readable<T extends Uint8Array>(
   source: globalThis.ReadableStream<T>,

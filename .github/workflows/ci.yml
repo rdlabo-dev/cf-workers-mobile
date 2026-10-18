@@ -98,6 +98,8 @@ jobs:
         working-directory: demo
       - run: npm run test:runtime:fallback
         working-directory: demo
+      - run: npm run test:runtime:fallback:dev
+        working-directory: demo
 
   package:
     runs-on: ubuntu-24.04

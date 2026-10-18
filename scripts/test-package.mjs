@@ -61,6 +61,11 @@ for (const name of ["NOTICE.md", "LICENSE-APACHE"]) {
   if (!pack.files.some((file) => file.path === notice))
     throw new Error(`Missing async hook license notice in tarball: ${notice}`);
 }
+for (const name of ["NOTICE.md", "LICENSE-MIT"]) {
+  const notice = `dist/compat/stream-web/${name}`;
+  if (!pack.files.some((file) => file.path === notice))
+    throw new Error(`Missing stream ponyfill notice in tarball: ${notice}`);
+}
 for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
   const notice = `dist/compat/brotli/${name}`;
   if (!pack.files.some((file) => file.path === notice))
@@ -385,7 +390,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 844 ||
+    features.flatMap((report) => report.cases).length !== 846 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -422,7 +427,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 408 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 409 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

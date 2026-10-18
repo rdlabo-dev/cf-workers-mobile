@@ -26,7 +26,13 @@ it("module contract", async () => {
   expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
 });
 it("stream-web contract", async () => {
+  const nativeFile = Object.getOwnPropertyDescriptor(globalThis, "File")!;
   const release = installWebGlobals();
+  const installedFile = Object.getOwnPropertyDescriptor(globalThis, "File")!;
+  // Undici's multipart parser constructs global File and then validates its
+  // private native brand. Keep that Node-only codec dependency for this test;
+  // the browser and workerd contracts exercise the installed File constructor.
+  Object.defineProperty(globalThis, "File", nativeFile);
   try {
     const report = await runContract(
       new StreamWebImplementation(localStreams),
@@ -34,6 +40,7 @@ it("stream-web contract", async () => {
     );
     expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
   } finally {
+    Object.defineProperty(globalThis, "File", installedFile);
     release();
   }
 });

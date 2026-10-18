@@ -1,5 +1,6 @@
 import { StreamBody } from "./stream-body.js";
-import { usesPonyfill, ReadableStream } from "../stream-web/runtime.js";
+import { usesPonyfill } from "../stream-web/runtime.js";
+import { ReadableStream } from "../stream-web/index.js";
 import { platform, nativeStreams } from "../globals/platform.js";
 import type { Headers } from "../headers/index.js";
 

@@ -8,3 +8,12 @@ await build({
   target: "es2022",
   loader: { ".wasm": "binary" },
 });
+
+// Web Streams must also be loadable by the raw browser-ESM entry.
+await build({
+  entryPoints: ["src/compat/stream-web/ponyfill.ts"],
+  outfile: "dist/compat/stream-web/ponyfill.js",
+  bundle: true,
+  format: "esm",
+  target: "es2022",
+});

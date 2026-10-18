@@ -35,7 +35,8 @@
     "test:native:network": "node tests/scripts/run-native-network.mjs",
     "test:workers:tls": "vitest run --config tests/vitest.tls.config.ts",
     "test:node-inventory": "node --test tests/experiments/node-compat/*.test.mjs",
-    "test:runtime:fallback": "vite build --config tests/fixtures/apps/runtime/vite.stream-fallback.config.ts && playwright test --config tests/playwright.stream-fallback.config.ts"
+    "test:runtime:fallback": "vite build --config tests/fixtures/apps/runtime/vite.stream-fallback.config.ts && playwright test --config tests/playwright.stream-fallback.config.ts",
+    "test:runtime:fallback:dev": "playwright test --config tests/playwright.stream-fallback-dev.config.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
