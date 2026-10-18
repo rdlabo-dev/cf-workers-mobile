@@ -822,3 +822,26 @@ symbol, microtask scheduling and parser edge cases. Original notices are shipped
 beside the module. This is development work: inspection, types, MIME, async abort,
 call sites, styling and the remaining util surface still prevent whole-module
 acceptance. No Complete status is assigned to util by these passing groups.
+
+Local validation for the util core changes at `42399b6`:
+
+- Root and demo typechecks pass; 343 unit tests pass.
+- The corrected pinned-workerd Node contract passes, including ten util groups.
+  The two local-only VFS/module smoke suites are excluded from that oracle report,
+  rather than counted as builtin comparisons.
+- Chromium/WebKit production tests pass (66); Vite development tests pass (20).
+- The installed tarball consumer passes 26 direct and 22 isolated checks,
+  604 common cases plus the existing six ALS exclusions, ten Vite/esbuild/raw ESM
+  checks, two configured Vite development checks and both preference checks.
+  After disk exhaustion during the build-tools stage, the same installed consumer
+  was reused to rerun the consumer tests successfully.
+- iOS 26.1 and Android 16 each pass 740 runtime checks with the six existing ALS
+  exclusions. The ten util groups pass in both direct and Dedicated Worker modes.
+  Both reports record clean revision `42399b6`; local evidence is retained in
+  `demo/artifacts/util-core-acceptance/`.
+
+The package runner now verifies a unique identity file before using its preview
+server, preventing a stale server on the configured port from supplying another
+build's results. The default port remains 4189 and can be overridden using
+`CONSUMER_PREVIEW_PORT` for independent local runs. No new module has received
+whole-module acceptance, independent review or remote CI from this work.
