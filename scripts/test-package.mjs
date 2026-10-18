@@ -82,6 +82,10 @@ for (const module of [
   "abort",
   "async-hooks",
   "timers",
+  "fs",
+  "module",
+  "stream-web",
+  "util",
 ]) {
   const directory = join("src", "compat", module);
   await mkdir(join(temp, directory), { recursive: true });
@@ -273,7 +277,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 298 ||
+    features.flatMap((report) => report.cases).length !== 326 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -310,7 +314,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 135 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 149 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

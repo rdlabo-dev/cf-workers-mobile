@@ -24,6 +24,7 @@ export const asyncHooksFeature = defineFeature<typeof local>()(
     "throwRestore",
     "awaitPropagation",
     "settleRestore",
+    "nestedAsyncRestore",
     "concurrentIsolation",
     "microtaskTimer",
     "resourceScope",
@@ -186,6 +187,16 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
       }
       equal(als.getStore(), undefined);
     },
+    async nestedAsyncRestore(api) {
+      const als = new api.AsyncLocalStorage<unknown>();
+      await als.run("outer", async () => {
+        await als.run("inner", async () => {
+          equal(als.getStore(), "inner");
+        });
+        equal(als.getStore(), "outer");
+      });
+      equal(als.getStore(), undefined);
+    },
     async concurrentIsolation(api) {
       const als = new api.AsyncLocalStorage<unknown>();
       const gate = () => {
@@ -227,10 +238,17 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
           }),
         );
         await new Promise<void>((resolve) =>
-          setTimeout(() => {
-            equal(als.getStore(), "store");
-            resolve();
-          }),
+          setTimeout(
+            (a: number, b: string) => {
+              equal(als.getStore(), "store");
+              equal(a, 1);
+              equal(b, "x");
+              resolve();
+            },
+            0,
+            1,
+            "x",
+          ),
         );
       });
     },
@@ -283,6 +301,11 @@ export class AsyncHooksImplementation extends FeatureImplementation<
         reason:
           "Sticky approximation keeps the last context installed after the callback promise settles, so getStore returns a stale store instead of undefined.",
       },
+      nestedAsyncRestore: {
+        status: "unsupported",
+        reason:
+          "Sticky contexts are not restored between nested async runs; inner store stays visible where outer should resume.",
+      },
       concurrentIsolation: {
         status: "unsupported",
         reason:
@@ -320,6 +343,7 @@ export class NodeAsyncHooks extends FeatureImplementation<
       throwRestore: { status: "supported" },
       awaitPropagation: { status: "supported" },
       settleRestore: { status: "supported" },
+      nestedAsyncRestore: { status: "supported" },
       concurrentIsolation: { status: "supported" },
       microtaskTimer: { status: "supported" },
       resourceScope: { status: "supported" },

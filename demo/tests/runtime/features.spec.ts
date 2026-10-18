@@ -6,13 +6,14 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
   expect(reports.map((report) => report.cases.length)).toEqual([
-    4, 4, 18, 2, 14, 11, 15, 18, 9, 24, 30, 14, 14, 11, 15, 18, 9, 24, 30, 14,
+    4, 4, 18, 2, 14, 11, 15, 18, 9, 24, 30, 15, 8, 2, 1, 2, 14, 11, 15, 18, 9,
+    24, 30, 15, 8, 2, 1, 2,
   ]);
   const cases = reports.flatMap((report) => report.cases);
   expect(reports.flatMap((report) => report.errors)).toEqual([]);
   expect(
     cases.filter(
-      (test) => test.status === "failed" || test.status === "unavailable",
+      (result) => result.status === "failed" || result.status === "unavailable",
     ),
   ).toEqual([]);
   expect(
@@ -24,8 +25,8 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
           .map((result) => result.id),
       ),
   ).toEqual([
-    ["settleRestore", "concurrentIsolation"],
-    ["settleRestore", "concurrentIsolation"],
+    ["settleRestore", "nestedAsyncRestore", "concurrentIsolation"],
+    ["settleRestore", "nestedAsyncRestore", "concurrentIsolation"],
   ]);
 });
 
