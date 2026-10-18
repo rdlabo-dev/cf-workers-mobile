@@ -59,3 +59,16 @@ required changes; `actionlint .github/workflows/codeql.yml` passed. The active
 main ruleset requires the aggregate `CI` check, not a separate Swift check.
 Local iOS native acceptance remains required. The service-binding implementation
 reviewed above is unchanged.
+
+## Integration with updated main
+
+Before merge, strict branch protection required incorporating main `583a544`
+(PR #24, async context isolation and bounded streaming lifetimes). Merge commit
+`e45bd3f` integrated it without conflicts. Both reviewers approved the combined
+source wiring with no required changes: server partition/guards precede async
+lowering, and remote dispatch still precedes local/isolated execution. Root
+verification after installing the new main dependencies passed typecheck, build
+and 385 unit tests. The native evidence above remains tied to its recorded
+package integrity; it is not relabeled as a new native run of the integration.
+The service workerd/browser integration also passed all five groups after this
+integration, including Vite development startup, with no skips.
