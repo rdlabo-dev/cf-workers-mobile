@@ -21,8 +21,8 @@ Experimental compatibility library: run a Cloudflare Workers fetch handler in a 
 ## Quick start
 
 For existing applications and AI coding assistants, start with the
-[App Shell integration and migration guide](docs/integration.md): Capacitor setup,
-local SSR for fast initial display, remote data boundaries, authentication and security checks.
+[AI integration guide](docs/integration.md): a ready-to-use prompt, Capacitor
+installation, Worker setup, migration options, security and native verification.
 
 Configure your existing Worker entry with one of the [supported build setups](#build-setup), then initialize the runtime in your application:
 
