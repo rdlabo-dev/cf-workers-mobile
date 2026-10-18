@@ -58,9 +58,11 @@ resolve regardless of the bundle's build-time directory.
   (transport-level serialization deadlocks against nested worker
   subrequests). `settleRestore` and nested-async restore semantics also
   diverge from real ALS (`nestedAsyncRestore`). All are declared unsupported
-  cases in the module contract, verified against workerd. Direct-mode note:
-  propagation patching rewrites realm globals, so the isolated Worker is the
-  supported execution mode for ALS-dependent code.
+  cases in the module contract, verified against workerd. Scheduler
+  propagation patches install only inside worker realms. They are deliberately
+  absent from the WebView document because its fetch transport also uses
+  MessageChannel; direct-mode SSR has no async propagation guarantee.
+  Use an isolated Worker for ALS-dependent code.
 
 ## Current gaps
 
