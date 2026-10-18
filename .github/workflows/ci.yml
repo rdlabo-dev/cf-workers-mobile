@@ -53,6 +53,12 @@ jobs:
               npm run build:native-documents -- --mode express
           - suite: build-tools
             commands: npm run test:build-tools
+          - suite: void
+            node: 24.21.0
+            commands: |
+              npm ci --prefix void
+              npm run build --prefix void
+              npm run test:void
           - suite: opennext
             commands: |
               npm ci --prefix opennext
@@ -64,7 +70,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          node-version: ${{ matrix.node || '22' }}
           cache: npm
           cache-dependency-path: |
             package-lock.json
