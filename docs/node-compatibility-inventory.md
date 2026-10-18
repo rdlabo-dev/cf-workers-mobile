@@ -925,10 +925,14 @@ namespace, callable construction, ignored options and property access order,
 validation, certificate mutation, issuer references and malformed inputs.
 Workerd, Chromium and WebKit run the same contract. This does not certify the
 separate `node:tls` networking module or expose platform trust configuration.
-Whole-module review and native acceptance are still pending.
+Whole-module review remains pending. At `61c4b3f`, native iOS 26.1 and Android 16
+ran all eight groups in direct and Worker execution. The full native report
+passed 1,102 checks on each platform, with zero exclusions or failures. Raw
+reports and revision/asset fingerprints are retained locally under
+`demo/artifacts/main-merge-native-acceptance/`.
 
 The main merge retains the renamed `@rdlabo/workers-capacitor` package, API
 responsibility folders and async continuation lowering. Its installed-tarball
 validation passed 950 common cases with zero exclusions, including restoration,
-nested async scopes and concurrent ALS isolation. Native validation is rerun
-against that merged runtime rather than reusing pre-merge results.
+nested async scopes and concurrent ALS isolation. The native results above rerun that merged runtime rather than reusing
+pre-merge results.
