@@ -1,5 +1,7 @@
-import { asyncContextPlugin } from "./build/async.js";
+import { asyncContextPlugin, lowerAsync } from "./build/async.js";
 import { documentAssets, listAssets } from "./build/documents.js";
+import { serverModules } from "./build/server-modules.js";
+import type { ServerBuildOptions } from "./build/server.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -43,7 +45,7 @@ function compatibilityPlugin(): Plugin {
     },
   };
 }
-export interface CapacitorWorkersPluginOptions {
+export interface CapacitorWorkersPluginOptions extends ServerBuildOptions {
   /** Workers entry relative to absWorkingDir (or cwd), or an absolute path. */
   worker: string;
   /**
@@ -78,6 +80,14 @@ export function capacitorWorkersPlugin(
         const outdir = resolve(root, config.outdir ?? dirname(config.outfile!));
         build.onEnd(async (result) => {
           if (result.errors.length) return;
+          const compilation = await server.get();
+          if (compilation) {
+            const { mode, reason, routes } = compilation;
+            await writeFile(
+              resolve(outdir, compilation.reportFile),
+              JSON.stringify({ mode, reason, routes }, null, 2),
+            );
+          }
           const assets = await documentAssets(
             (await listAssets(outdir)).filter(
               (file) =>
@@ -91,7 +101,48 @@ export function capacitorWorkersPlugin(
             await writeFile(resolve(outdir, file), source);
         });
       }
-      const entry = resolve(root, options.worker);
+      const originalEntry = resolve(root, options.worker);
+      const server = serverModules(originalEntry, root, options);
+      let entry = originalEntry;
+      let selector: string | undefined;
+      const serverPlugin: Plugin = {
+        name: "capacitor-workers-server",
+        setup(build) {
+          build.onResolve(
+            { filter: /\.capacitor-server-(local|selector)\.js$/ },
+            ({ path }) => (server.owns(path) ? { path } : undefined),
+          );
+          build.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, async ({ path }) => {
+            const generated = await server.load(path);
+            if (generated)
+              return {
+                contents: (await lowerAsync(generated.code, path, "js")).code,
+                loader: "js",
+                resolveDir: dirname(originalEntry),
+                watchFiles: generated.inputs,
+              };
+            await server.guard(path);
+          });
+        },
+      };
+      build.onStart(async () => {
+        server.reset();
+        const compilation = await server.get();
+        entry = compilation ? server.localEntry : originalEntry;
+        selector = compilation ? server.selectorEntry : undefined;
+        if (compilation)
+          return {
+            warnings: [
+              {
+                text:
+                  compilation.mode === "worker"
+                    ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+                    : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+              },
+            ],
+          };
+      });
+      await serverPlugin.setup(build);
       const virtualFiles = async () => {
         if (!options.workerFiles?.length) return undefined;
         const map: Record<string, { base64: string }> = {};
@@ -105,7 +156,7 @@ export function capacitorWorkersPlugin(
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;
         return {
-          contents: workerSource(entry, "capacitor-workers:factory"),
+          contents: workerSource(entry, "capacitor-workers:factory", selector),
           loader: "js",
           resolveDir: root,
         };
@@ -148,7 +199,7 @@ export function capacitorWorkersPlugin(
             conditions: config.conditions,
             mainFields: config.mainFields,
             loader: config.loader,
-            plugins: [compatibilityPlugin(), asyncContextPlugin()],
+            plugins: [serverPlugin, compatibilityPlugin(), asyncContextPlugin()],
             logLevel: "silent",
           });
           const inputs = Object.keys(result.metafile.inputs)

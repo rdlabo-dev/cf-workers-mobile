@@ -1,6 +1,6 @@
 # @rdlabo/capacitor-workers
 
-Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. No API server, socket listener, or remote fallback is used for intercepted requests. This executes JavaScript in the WebView; it does not compile Workers code to native code.
+Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor WebView. Local requests execute without an API server or socket listener. D1- and Hyperdrive-backed requests can reuse the existing deployed Worker through the build integration below. This executes JavaScript in the WebView; it does not compile Workers code to native code.
 
 ## Contents
 
@@ -10,6 +10,7 @@ Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor W
 - [Runtime behavior](#runtime-behavior)
 - [Workers Express](#workers-express)
 - [Local KV](#local-kv)
+- [D1 and remote APIs](#d1-and-remote-apis)
 - [Development and testing](#development-and-testing)
 - [Compatibility and limitations](#compatibility-and-limitations)
 - [Extending the library](#extending-the-library)
@@ -164,7 +165,7 @@ The adapter resolves the request URL, then checks both its address and path:
 1. The URL must match either the running app's **protocol and host** (including the port), or the origin configured in `baseURL`.
 2. Its path must equal the `baseURL` path boundary or be below it. For `/api/`, `/api` and `/api/hello` match; `/apiary` does not.
 
-Matching requests run in the local Worker. The adapter replaces the origin with the `baseURL` origin while preserving the path and query. The protocol alone does not select local execution: `capacitor://other-host/api/hello` does not match an app running at `capacitor://localhost`.
+Matching requests normally run in the local Worker. With D1 build integration, the generated selector can send them to the existing deployed Worker before local execution. The adapter replaces the origin with the `baseURL` origin while preserving the path and query. The protocol alone does not select local execution: `capacitor://other-host/api/hello` does not match an app running at `capacitor://localhost`.
 
 With default Capacitor settings, `fetch("/api/hello")` follows these paths (assuming no `<base>` override and `baseURL: "https://api.example.com/api/"`):
 
@@ -173,7 +174,7 @@ With default Capacitor settings, `fetch("/api/hello")` follows these paths (assu
 | iOS      | `capacitor://localhost/api/hello` | `https://api.example.com/api/hello` |
 | Android  | `https://localhost/api/hello`     | `https://api.example.com/api/hello` |
 
-The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. These are local JavaScript calls; neither row sends an HTTP request to `api.example.com`.
+The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. Without a generated remote boundary these are local JavaScript calls; neither row sends an HTTP request to `api.example.com`. D1-backed requests instead use the configured `remote.origin`.
 
 #### Endpoint examples
 
@@ -222,6 +223,14 @@ Keep any other types your project already uses. This is a type-only entry; do no
 ## Local KV
 
 Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
+
+## D1 and remote APIs
+
+Hyperdrive-backed Workers use the same generated HTTP dispatch. The plugins detect Wrangler `hyperdrive` bindings, keeping database drivers, SQL and connection credentials on the existing Worker. See [transparent Hyperdrive migration](docs/hyperdrive-transparent-migration.md) for setup, security boundaries and verification.
+
+Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.
+
+Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `capacitorWorkers`. The optional token callback connects existing bearer credentials. Native Capacitor also reuses server-managed Cookie sessions and same-origin redirects through the existing login UI; this package does not issue sessions or provide a login system. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
 
 ## Development and testing
 
@@ -368,7 +377,7 @@ Fetch implementations extend `FetchRuntime` and share one contract suite. See [t
 ## Roadmap
 
 1. Keep the runtime small and validate Hono/Workers Express against real WebViews.
-2. Add binding adapters: D1 → Capacitor SQLite, KV → local storage provider, R2 → Capacitor Filesystem; compare API behaviour against Workers. Local data is independent of cloud data; sync is separate.
+2. Reuse existing D1-backed Workers through build-generated remote execution boundaries, preserving their HTTP contracts and removing server-only implementations from Capacitor bundles. Keep local KV independent. See the [D1 migration](docs/d1-transparent-migration.md).
 3. Expand setup automation, compatibility and browser/Electron/Tauri execution. Keep Worker entry configuration and application initialization simple.
 
 The Hono + Express compatibility test app currently includes broad Node polyfills; bundle size is a PoC finding, not an optimized release. See [verification results](docs/verification.md) for measured results and limitations.

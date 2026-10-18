@@ -34,6 +34,19 @@ jobs:
   compatibility:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: hyperdrive-test-only
+          MYSQL_DATABASE: hyperdrive_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -phyperdrive-test-only"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,6 +82,12 @@ jobs:
         working-directory: demo
       - run: npm run test:build-tools
         working-directory: demo
+      - run: npm run test:d1-migration
+        working-directory: demo
+      - run: npm run test:hyperdrive-migration
+        working-directory: demo
+        env:
+          HYPERDRIVE_TEST_MYSQL_URL: mysql://root:hyperdrive-test-only@127.0.0.1:3306/hyperdrive_test
 
   package:
     runs-on: ubuntu-24.04

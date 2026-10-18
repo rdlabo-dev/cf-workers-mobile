@@ -18,6 +18,7 @@ export type {
   LoadedWorker,
   ExecutionPreference,
   WorkerHandler,
+  RemoteWorkerOptions,
 } from "./fetch/types.js";
 export { FetchRuntime, type FetchRuntimeOptions } from "./fetch/runtime.js";
 
