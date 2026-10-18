@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 import { Headers } from "../headers/index.js";
 import { Request } from "../request/index.js";
 import { Response } from "../response/index.js";
@@ -77,7 +77,7 @@ export const structuredCloneContract: ContractSuite<
     },
     graphs(api) {
       const markerLike = {
-        __capacitor_workers_clone__: 0,
+        __workers_capacitor_clone__: 0,
         headers: "user data",
       };
       equal(api.structuredClone(markerLike), markerLike);

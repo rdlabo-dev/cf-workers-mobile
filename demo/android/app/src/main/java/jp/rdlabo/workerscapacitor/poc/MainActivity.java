@@ -1,4 +1,4 @@
-package jp.rdlabo.capacitorworkers.poc;
+package jp.rdlabo.workerscapacitor.poc;
 
 import com.getcapacitor.BridgeActivity;
 

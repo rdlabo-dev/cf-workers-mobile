@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 import { FsImplementation, fsContract } from "../../src/compat/fs/index.spec";
 import {
   ModuleImplementation,

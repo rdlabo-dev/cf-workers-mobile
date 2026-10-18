@@ -1,7 +1,7 @@
 import { kvRequest } from "../../../validation/kv";
 import { runFeatures } from "../../../validation/run-features";
 import { Capacitor } from "@capacitor/core";
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import { runFrameworkContract } from "./frameworks";
 
 const isolation = () =>
@@ -26,7 +26,7 @@ export function startExperiment(
   framework?: Framework,
 ) {
   const errors: string[] = [];
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     worker:
       framework === "hono"
         ? hono
@@ -69,7 +69,7 @@ export function startPreferred(
   prefer?: "worker" | "direct",
   env: Record<string, unknown> = {},
 ) {
-  return capacitorWorkers({
+  return workersCapacitor({
     baseURL: "https://preferred.example/api",
     prefer,
     env,
@@ -83,7 +83,7 @@ declare global {
 window.startPreferred = startPreferred;
 
 export function startStartupProbe() {
-  return capacitorWorkers({
+  return workersCapacitor({
     baseURL: "https://preferred.example/api",
     prefer: "direct",
     worker: {
@@ -100,7 +100,7 @@ export function startDelayedDirect() {
   const gate = new Promise<void>((resolve) => {
     release = resolve;
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://preferred.example/api",
     prefer: "direct",
     worker: {

@@ -57,13 +57,13 @@ remainder-reference cleanup; that cleanup was separately manager-reviewed and
 passed the 15 isolated tests and the full 326-unit suite.
 
 Android built successfully, but its run timed out before PACKAGED_RESULT after
-another application (`jp.rdlabo.capacitorworkers.d1ui`) took the shared emulator's
+another application (`jp.rdlabo.workerscapacitor.d1ui`) took the shared emulator's
 foreground and the test application was frozen in the background. A dedicated
 read-only emulator was attempted; the emulator refused startup because the host
 had only approximately 116 MiB of free disk space. This run is **not** counted as
 a pass or evidence of an application regression. An uncontended Android rerun is
 still required. Native result JSON, console and build logs remain in the local
-packed consumer artifacts (`capacitor-workers-native-package-57wxPU`).
+packed consumer artifacts (`workers-capacitor-native-package-57wxPU`).
 
 Broader module acceptance, full OpenNext acceptance and required CI remain
 separate from the completed code-review cycle; PR #24 remains draft until its

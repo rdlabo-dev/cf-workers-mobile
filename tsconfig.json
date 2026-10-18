@@ -9,8 +9,8 @@
     "esModuleInterop": true,
     "types": ["node"],
     "paths": {
-      "@rdlabo/capacitor-workers/features": ["./src/features/index.ts"],
-      "@rdlabo/capacitor-workers/testing": ["./src/features/testing.ts"]
+      "@rdlabo/workers-capacitor/features": ["./src/features/index.ts"],
+      "@rdlabo/workers-capacitor/testing": ["./src/features/testing.ts"]
     }
   },
   "include": ["src", "tests", "*.ts"]

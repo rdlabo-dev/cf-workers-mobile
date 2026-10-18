@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 export default defineConfig(({ mode }) => {
   const framework = mode === "express" ? "express" : "hono";
   return {
@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: { include: [framework] },
     root: fileURLToPath(new URL(".", import.meta.url)),
     plugins: [
-      capacitorWorkersPlugin({
+      workersCapacitorPlugin({
         worker: `../../workers/${framework}/standard.ts`,
       }),
     ],

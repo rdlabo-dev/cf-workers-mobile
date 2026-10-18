@@ -3,8 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as viteBuild } from "vite";
 import { build as esbuild } from "esbuild";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/esbuild";
-import { capacitorWorkersPlugin as vitePlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "@rdlabo/workers-capacitor/vite";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 // Dedicated Worker contract via the configured-worker route: the node
 // contract worker is the configured entry of these builds.
@@ -52,7 +52,7 @@ await viteBuild({
     splitting: true,
     assetNames: "assets/[name]-[hash]",
     chunkNames: "chunks/[name]-[hash]",
-    plugins: [capacitorWorkersPlugin({ worker: nodeWorker })],
+    plugins: [workersCapacitorPlugin({ worker: nodeWorker })],
   });
   await writeFile(
     resolve(outdir, "index.html"),
@@ -77,7 +77,7 @@ for (const framework of ["hono", "express"]) {
     assetNames: "assets/[name]-[hash]",
     chunkNames: "chunks/[name]-[hash]",
     plugins: [
-      capacitorWorkersPlugin({
+      workersCapacitorPlugin({
         worker: `tests/fixtures/workers/${framework}/standard.ts`,
       }),
     ],
@@ -94,6 +94,6 @@ await cp(resolve(root, "tests/fixtures/apps/build-tools/raw"), raw, {
 });
 // Copy the ESM distribution verbatim: these files are never bundled.
 const dist = dirname(
-  fileURLToPath(import.meta.resolve("@rdlabo/capacitor-workers")),
+  fileURLToPath(import.meta.resolve("@rdlabo/workers-capacitor")),
 );
 await cp(dist, resolve(raw, "lib"), { recursive: true });

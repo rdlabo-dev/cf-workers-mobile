@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { capacitorWorkers } from "../../src/index";
-let runtime: ReturnType<typeof capacitorWorkers> | undefined;
+import { workersCapacitor } from "../../src/index";
+let runtime: ReturnType<typeof workersCapacitor> | undefined;
 let native: ReturnType<typeof vi.fn>;
 const worker = {
   fetch: async (request: Request) =>
@@ -28,10 +28,10 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 it("starts documents through the same public entry and keeps Worker routing", async () => {
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   await runtime.ready;
   expect(native).toHaveBeenCalledWith(
-    "CapacitorWorkers",
+    "WorkersCapacitor",
     "start",
     expect.objectContaining({
       entry: "/",
@@ -39,7 +39,7 @@ it("starts documents through the same public entry and keeps Worker routing", as
       assets: ["/index.html", "/main.js"],
     }),
   );
-  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const dispatch = (globalThis as any).__workersCapacitorDispatch;
   const result = await dispatch({
     url: "capacitor://localhost/api/echo",
     method: "POST",
@@ -49,8 +49,8 @@ it("starts documents through the same public entry and keeps Worker routing", as
   expect(atob(result.body)).toBe("payload");
   expect(result.url).toBe("https://worker.example/api/echo");
   await runtime.dispose();
-  expect(native).toHaveBeenLastCalledWith("CapacitorWorkers", "stop", {});
-  expect((globalThis as any).__capacitorWorkersDispatch).toBeUndefined();
+  expect(native).toHaveBeenLastCalledWith("WorkersCapacitor", "stop", {});
+  expect((globalThis as any).__workersCapacitorDispatch).toBeUndefined();
 });
 it.each([
   "//remote.example/",
@@ -60,7 +60,7 @@ it.each([
   "",
 ])("rejects invalid entry %s before changing fetch", (entry) => {
   const original = fetch;
-  expect(() => capacitorWorkers({ ...options, render: entry })).toThrow(
+  expect(() => workersCapacitor({ ...options, render: entry })).toThrow(
     "local absolute path",
   );
   expect(fetch).toBe(original);
@@ -70,16 +70,16 @@ it("fails explicitly when native integration is missing", () => {
     getPlatform: () => "ios",
     isPluginAvailable: () => false,
   });
-  expect(() => capacitorWorkers(options)).toThrow("not installed");
+  expect(() => workersCapacitor(options)).toThrow("not installed");
 });
 it("restores fetch and releases native resources after startup failure", async () => {
   const original = fetch;
   native.mockRejectedValueOnce(new Error("Native failed"));
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   await expect(runtime.ready).rejects.toThrow("Native failed");
   expect(fetch).toBe(original);
-  expect(native).toHaveBeenLastCalledWith("CapacitorWorkers", "stop", {});
-  runtime = capacitorWorkers({ ...options, render: undefined });
+  expect(native).toHaveBeenLastCalledWith("WorkersCapacitor", "stop", {});
+  runtime = workersCapacitor({ ...options, render: undefined });
   await runtime.ready;
 });
 it("disposes a pending start before allowing a new installation", async () => {
@@ -94,15 +94,15 @@ it("disposes a pending start before allowing a new installation", async () => {
       resolveStart = resolve;
     });
   });
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   const ready = runtime.ready.catch((error) => error);
   await waiting;
   const stopping = runtime.dispose();
-  expect(() => capacitorWorkers(options)).toThrow("already installed");
+  expect(() => workersCapacitor(options)).toThrow("already installed");
   resolveStart();
   await stopping;
   expect((await ready).message).toContain("disposed");
-  runtime = capacitorWorkers({ ...options, render: undefined });
+  runtime = workersCapacitor({ ...options, render: undefined });
   await runtime.ready;
 });
 it("fails before native start if generated assets are missing", async () => {
@@ -111,14 +111,14 @@ it("fails before native start if generated assets are missing", async () => {
     vi.fn(async () => new Response("", { status: 404 })),
   );
   const original = fetch;
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   await expect(runtime.ready).rejects.toThrow("assets are missing");
   expect(native).not.toHaveBeenCalled();
   expect(fetch).toBe(original);
 });
 it("keeps redirects inside the Worker origin and preserves POST for 307", async () => {
   const seen: string[] = [];
-  runtime = capacitorWorkers({
+  runtime = workersCapacitor({
     ...options,
     worker: {
       async fetch(request) {
@@ -139,7 +139,7 @@ it("keeps redirects inside the Worker origin and preserves POST for 307", async 
     },
   });
   await runtime.ready;
-  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const dispatch = (globalThis as any).__workersCapacitorDispatch;
   const result = await dispatch({
     url: "capacitor://localhost/begin",
     method: "POST",
@@ -161,7 +161,7 @@ it("keeps redirects inside the Worker origin and preserves POST for 307", async 
 function android() {
   const sw = {
     scriptURL:
-      "https://localhost/capacitor-workers-sw.js?baseURL=https%3A%2F%2Fworker.example",
+      "https://localhost/workers-capacitor-sw.js?baseURL=https%3A%2F%2Fworker.example",
     postMessage: vi.fn((_message, ports) => {
       ports[0].postMessage("done");
       ports[0].close();
@@ -199,19 +199,19 @@ function android() {
 }
 it("Android disposal disables its transport and unregisters it", async () => {
   const s = android();
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   await runtime.ready;
   await runtime.dispose();
   expect(s.sw.postMessage.mock.calls.map((c) => c[0])).toContain(
-    "capacitor-workers:disable-documents",
+    "workers-capacitor:disable-documents",
   );
   expect(s.registration.unregister).toHaveBeenCalled();
-  expect(native).toHaveBeenCalledWith("CapacitorWorkers", "stop", {});
+  expect(native).toHaveBeenCalledWith("WorkersCapacitor", "stop", {});
 });
 it("Android startup failure also releases an old document registration", async () => {
   const s = android();
   native.mockRejectedValueOnce(new Error("Native failed"));
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   await expect(runtime.ready).rejects.toThrow("Native failed");
   expect(s.registration.unregister).toHaveBeenCalledOnce();
 });
@@ -224,7 +224,7 @@ it("disposal waits for a pending SW registration and removes it after it resolve
         resolve = done;
       }),
   );
-  runtime = capacitorWorkers(options);
+  runtime = workersCapacitor(options);
   const ready = runtime.ready.catch((error) => error);
   await vi.waitFor(() => expect(s.container.register).toHaveBeenCalled());
   const stopped = runtime.dispose();
@@ -237,7 +237,7 @@ it("disposal waits for a pending SW registration and removes it after it resolve
 it.each([301, 302, 303, 307, 308])(
   "prepares native navigation in JS for status %i",
   async (status) => {
-    runtime = capacitorWorkers({
+    runtime = workersCapacitor({
       ...options,
       worker: {
         fetch: () =>
@@ -248,7 +248,7 @@ it.each([301, 302, 303, 307, 308])(
       },
     });
     await runtime.ready;
-    const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+    const dispatch = (globalThis as any).__workersCapacitorDispatch;
     const input = {
       url: "capacitor://localhost/begin",
       method: "POST",
@@ -286,7 +286,7 @@ it.each([301, 302, 303, 307, 308])(
 it("returns document headers before EOF and reads bounded chunks on demand", async () => {
   const cancel = vi.fn();
   let source!: ReadableStreamDefaultController<Uint8Array>;
-  runtime = capacitorWorkers({
+  runtime = workersCapacitor({
     ...options,
     worker: {
       fetch: () =>
@@ -304,7 +304,7 @@ it("returns document headers before EOF and reads bounded chunks on demand", asy
     },
   });
   await runtime.ready;
-  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const dispatch = (globalThis as any).__workersCapacitorDispatch;
   const result = await dispatch({
     url: "capacitor://localhost/live",
     method: "GET",
@@ -339,7 +339,7 @@ it("does not resurrect a document stream after cancellation while awaiting heade
     },
     options.baseURL,
   );
-  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const dispatch = (globalThis as any).__workersCapacitorDispatch;
   try {
     const pending = dispatch({
       id: "cancel-headers",
@@ -379,7 +379,7 @@ it("does not dispatch a document request after disposal during startup", async (
     },
     options.baseURL,
   );
-  const dispatch = (globalThis as any).__capacitorWorkersDispatch;
+  const dispatch = (globalThis as any).__workersCapacitorDispatch;
   const pending = dispatch({
     url: "capacitor://localhost/live",
     method: "GET",

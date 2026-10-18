@@ -1,6 +1,6 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
-const app = capacitorWorkers({
+const app = workersCapacitor({
   baseURL: "https://worker.invalid",
   render: "/",
 });

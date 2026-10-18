@@ -1,5 +1,5 @@
 {
-  "name": "capacitor-workers-demo",
+  "name": "workers-capacitor-demo",
   "private": true,
   "type": "module",
   "scripts": {
@@ -39,7 +39,7 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
-    "@rdlabo/capacitor-workers": "file:..",
+    "@rdlabo/workers-capacitor": "file:..",
     "express": "^5.3.0",
     "hono": "^4.13.13"
   },

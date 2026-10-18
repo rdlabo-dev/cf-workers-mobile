@@ -3,13 +3,13 @@
 `LocalStorageKV` implements the `kv.local.v1` profile through the common feature host. The API uses Workers KV method names and overloads. WebView `localStorage` persists each value together with its metadata and expiration. The application chooses a stable namespace; feature disposal never deletes application data.
 
 ```ts
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
-import { openFeature } from "@rdlabo/capacitor-workers/features";
-import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { openFeature } from "@rdlabo/workers-capacitor/features";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
 import worker from "./worker";
 
 const kv = await openFeature(new LocalStorageKV("my-app-settings"));
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   worker,
   baseURL: "https://example.com/api",
   env: { KV: kv.api },
@@ -49,7 +49,7 @@ The optional second constructor argument supplies an existing `Storage` backend 
 
 ## Compatibility and persistence boundaries
 
-The exported `kvContract` from `@rdlabo/capacitor-workers/testing/kv` exercises 18 shared behavior cases against the actual local workerd binding and the local adapter. `kvTextContract` remains available for its smaller `kv.text.v1` profile. Contract providers own an empty test namespace and its cleanup; never run them against application data. Expiration boundary and failure-path tests are separate; the workerd suite also waits for a real minimum TTL to elapse.
+The exported `kvContract` from `@rdlabo/workers-capacitor/testing/kv` exercises 18 shared behavior cases against the actual local workerd binding and the local adapter. `kvTextContract` remains available for its smaller `kv.text.v1` profile. Contract providers own an empty test namespace and its cleanup; never run them against application data. Expiration boundary and failure-path tests are separate; the workerd suite also waits for a real minimum TTL to elapse.
 
 This profile does not emulate global replication, eventual consistency, regional cache behavior, production rate limits or cloud synchronization. It does not claim identical error wording, distributed ordering or performance. Bulk response size checks are local serialized-result bounds, not a reproduction of Cloudflare's internal wire accounting. The KV API is implemented in TypeScript; it does not embed V8.
 

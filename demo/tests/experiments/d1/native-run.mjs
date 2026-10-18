@@ -40,8 +40,8 @@ const run = (command, args, cwd = consumer) =>
       : {}),
   });
 const app = ui
-  ? "jp.rdlabo.capacitorworkers.d1ui"
-  : "jp.rdlabo.capacitorworkers.d1test";
+  ? "jp.rdlabo.workerscapacitor.d1ui"
+  : "jp.rdlabo.workerscapacitor.d1test";
 const runId = `${platform}-${Date.now()}`;
 const config = { id: runId, mode: "flow", value: platform === "ios" ? 17 : 23 };
 if (ui)

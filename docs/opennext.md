@@ -37,7 +37,7 @@ bundle and registered into the VFS at startup.
 
 ```ts
 // vite.config.ts / esbuild
-capacitorWorkersPlugin({
+workersCapacitorPlugin({
   worker: ".open-next/worker.js",
   workerFiles: [
     /* every file under .open-next/server-functions/default */

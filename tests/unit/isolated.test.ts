@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { capacitorWorkers, type WorkerHandler } from "../../src/index";
+import { workersCapacitor, type WorkerHandler } from "../../src/index";
 import { createIsolatedWorker } from "../../src/isolated/bridge";
 
 import { workerFor } from "../helpers/isolated-worker";
@@ -104,7 +104,7 @@ it("cleans up a non-cloneable env without poisoning subsequent calls", async () 
 it("the public factory path disposes the worker and can be installed again", async () => {
   const client = workerFor({ fetch: (_req, env) => Response.json(env) });
   const original = globalThis.fetch;
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     worker: () => client as unknown as Worker,
     baseURL: "https://test/api",
     env: { value: "injected" },
@@ -117,7 +117,7 @@ it("the public factory path disposes the worker and can be installed again", asy
   runtime.dispose();
   expect(client.terminate).toHaveBeenCalledOnce();
   expect(globalThis.fetch).toBe(original);
-  const next = capacitorWorkers({
+  const next = workersCapacitor({
     worker: { fetch: () => new Response("next") },
     baseURL: "https://test/api",
   });

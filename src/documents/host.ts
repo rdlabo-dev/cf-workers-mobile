@@ -19,9 +19,9 @@ function encode(bytes: ArrayBuffer) {
 }
 export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
   const host = globalThis as typeof globalThis & {
-    __capacitorWorkersDispatch?: typeof nativeDispatch;
+    __workersCapacitorDispatch?: typeof nativeDispatch;
   };
-  if (host.__capacitorWorkersDispatch)
+  if (host.__workersCapacitorDispatch)
     throw new Error("Document host is already installed");
   const streams = new Map<
     string,
@@ -269,12 +269,12 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
       port.close();
     }
   };
-  host.__capacitorWorkersDispatch = nativeDispatch;
+  host.__workersCapacitorDispatch = nativeDispatch;
   globalThis.navigator?.serviceWorker?.addEventListener("message", message);
   return () => {
     for (const id of requests.keys()) void cancel(id);
-    if (host.__capacitorWorkersDispatch === nativeDispatch)
-      delete host.__capacitorWorkersDispatch;
+    if (host.__workersCapacitorDispatch === nativeDispatch)
+      delete host.__workersCapacitorDispatch;
     globalThis.navigator?.serviceWorker?.removeEventListener(
       "message",
       message,

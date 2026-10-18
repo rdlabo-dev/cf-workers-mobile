@@ -5,7 +5,7 @@ const registration = new URL(
   root,
 );
 const target = new URL(
-  "android/app/src/main/java/jp/rdlabo/capacitorworkers/poc/DocumentConnectionPlugin.java",
+  "android/app/src/main/java/jp/rdlabo/workerscapacitor/poc/DocumentConnectionPlugin.java",
   root,
 );
 const backup = new URL("artifacts/android-plugin-registration.json", root);
@@ -25,7 +25,7 @@ if (process.argv[2] === "apply") {
       ...JSON.parse(original),
       {
         pkg: "connection-probe",
-        classpath: "jp.rdlabo.capacitorworkers.poc.DocumentConnectionPlugin",
+        classpath: "jp.rdlabo.workerscapacitor.poc.DocumentConnectionPlugin",
       },
     ]),
   );

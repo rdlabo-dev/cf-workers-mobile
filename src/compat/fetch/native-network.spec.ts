@@ -74,7 +74,7 @@ describe("HTTP over native bytes", () => {
     expect(await connection.read()).toBeNull();
     await connection.close();
     expect(call.mock.calls[0]).toMatchObject([
-      "CapacitorWorkers",
+      "WorkersCapacitor",
       "socketOpen",
       { host: "example.invalid", port: 443, tls: true },
     ]);

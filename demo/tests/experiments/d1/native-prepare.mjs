@@ -48,7 +48,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "@rdlabo/capacitor-workers": `file:./${packed.filename}`,
+        "@rdlabo/workers-capacitor": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -101,15 +101,15 @@ await writeFile(
 );
 await writeFile(
   join(consumer, "vite.config.js"),
-  `import {capacitorWorkersPlugin} from "@rdlabo/capacitor-workers/vite";export default {plugins:[capacitorWorkersPlugin(${JSON.stringify({ worker: "worker.js", ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
+  `import {workersCapacitorPlugin} from "@rdlabo/workers-capacitor/vite";export default {plugins:[workersCapacitorPlugin(${JSON.stringify({ worker: "worker.js", ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
 );
 await writeFile(
   join(consumer, "capacitor.config.json"),
   JSON.stringify(
     {
       appId: ui
-        ? "jp.rdlabo.capacitorworkers.d1ui"
-        : "jp.rdlabo.capacitorworkers.d1test",
+        ? "jp.rdlabo.workerscapacitor.d1ui"
+        : "jp.rdlabo.workerscapacitor.d1test",
       appName: "D1 Migration",
       webDir: "dist",
       ios: { packageManager: "SPM" },

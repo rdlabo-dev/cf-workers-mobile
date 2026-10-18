@@ -26,7 +26,7 @@ export interface ServerBuildOptions {
   kvExecution?: Record<string, "local" | "remote">;
   serviceBindings?: string[];
   queueBindings?: string[];
-  /** Names explicitly supplied through capacitorWorkers({ env }); other env access stays on the server. */
+  /** Names explicitly supplied through workersCapacitor({ env }); other env access stays on the server. */
   localBindings?: string[];
 }
 export interface ServerCompilation {
@@ -179,8 +179,8 @@ export async function serverBindings(
       remoteKV.length ||
       services.length ||
       queues.length
-        ? "capacitor-workers-server.json"
-        : "capacitor-workers-d1.json",
+        ? "workers-capacitor-server.json"
+        : "workers-capacitor-d1.json",
   };
 }
 

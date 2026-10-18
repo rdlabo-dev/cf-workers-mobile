@@ -1,13 +1,13 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 import demo from "../vite.config";
 
 // Build the same demo with only its Worker selection changed.
 export default defineConfig({
   ...demo,
   plugins: [
-    capacitorWorkersPlugin({ worker: "./workers/express/standard.ts" }),
+    workersCapacitorPlugin({ worker: "./workers/express/standard.ts" }),
   ],
   build: {
     ...demo.build,

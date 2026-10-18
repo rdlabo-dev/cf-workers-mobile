@@ -12,7 +12,7 @@ const base = /Android/.test(navigator.userAgent)
 // Keep a native response pending across a real main-frame reload. A fresh JS
 // realm cannot dispose the old connection; the native lifecycle must own it.
 const reloadTransport = new FetchTransport(nativeNetwork);
-const reloadKey = "capacitor-workers-network-reload";
+const reloadKey = "workers-capacitor-network-reload";
 const previousID = sessionStorage.getItem(reloadKey);
 const reloadID = previousID ?? crypto.randomUUID();
 async function waitForReloadConnection(expected: boolean) {

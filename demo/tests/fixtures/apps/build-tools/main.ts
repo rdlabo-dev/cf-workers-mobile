@@ -1,7 +1,7 @@
 import {
-  capacitorWorkers,
+  workersCapacitor,
   type ExecutionPreference,
-} from "@rdlabo/capacitor-workers";
+} from "@rdlabo/workers-capacitor";
 import { runContract } from "../../../validation/contracts/http";
 import { runLocalNodeContracts } from "../../../validation/node-modules";
 // Bare, node:-prefixed, subpath, named and default import forms must all
@@ -37,7 +37,7 @@ function resolved() {
 
 async function run(prefer: ExecutionPreference) {
   // Both build integrations provide the configured entry; no special import.
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid/api",
     prefer,
   });

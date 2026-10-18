@@ -1,1 +1,1 @@
-export { fetchContractWorker as default } from "@rdlabo/capacitor-workers/testing/fetch";
+export { fetchContractWorker as default } from "@rdlabo/workers-capacitor/testing/fetch";

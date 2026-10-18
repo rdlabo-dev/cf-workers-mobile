@@ -1,12 +1,12 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { capacitorWorkers, FetchRuntime } from "../../src/index";
+import { workersCapacitor, FetchRuntime } from "../../src/index";
 let runtime:
-  | Pick<ReturnType<typeof capacitorWorkers>, "dispose" | "drain">
+  | Pick<ReturnType<typeof workersCapacitor>, "dispose" | "drain">
   | undefined;
 const original = globalThis.fetch;
 it("reports missing build configuration without changing fetch", () => {
   expect(() =>
-    capacitorWorkers({ baseURL: "https://api.example/api" }),
+    workersCapacitor({ baseURL: "https://api.example/api" }),
   ).toThrow("No Worker configured");
   expect(globalThis.fetch).toBe(original);
 });
@@ -21,8 +21,8 @@ it("prevents double installation and restores fetch", () => {
     baseURL: "https://api.example/api",
     worker: { fetch: () => new Response() },
   };
-  runtime = capacitorWorkers(options);
-  expect(() => capacitorWorkers(options)).toThrow("already installed");
+  runtime = workersCapacitor(options);
+  expect(() => workersCapacitor(options)).toThrow("already installed");
   runtime.dispose();
   runtime.dispose();
   expect(globalThis.fetch).toBe(original);
@@ -32,7 +32,7 @@ it("keeps env identity and separate contexts while draining nested background wo
   const contexts = new Set();
   const completed: string[] = [];
   const errors = vi.fn();
-  runtime = capacitorWorkers({
+  runtime = workersCapacitor({
     baseURL: "https://api.example/api",
     env,
     onBackgroundError: errors,
@@ -71,7 +71,7 @@ it("prefers a callable object's fetch method over treating it as a factory", asy
   const worker = Object.assign(callable, {
     fetch: vi.fn(() => new Response("ok")),
   });
-  runtime = capacitorWorkers({ worker, baseURL: "https://test/api" });
+  runtime = workersCapacitor({ worker, baseURL: "https://test/api" });
   expect(await (await fetch("https://test/api")).text()).toBe("ok");
   expect(callable).not.toHaveBeenCalled();
   expect(worker.fetch).toHaveBeenCalledOnce();
@@ -100,7 +100,7 @@ it("constructing a subclass leaves global fetch intact and closes its resources 
 it("validates configuration before creating an isolated Worker", () => {
   const factory = vi.fn();
   expect(() =>
-    capacitorWorkers({ worker: factory, baseURL: "ftp://invalid" }),
+    workersCapacitor({ worker: factory, baseURL: "ftp://invalid" }),
   ).toThrow("HTTP(S)");
   expect(factory).not.toHaveBeenCalled();
   expect(globalThis.fetch).toBe(original);

@@ -54,7 +54,7 @@ export async function lowerAsync(
 }
 export function asyncContextPlugin(): Plugin {
   return {
-    name: "capacitor-workers-async-context",
+    name: "workers-capacitor-async-context",
     setup(build) {
       build.onLoad(
         { filter: /\.[cm]?[jt]sx?$/, namespace: "file" },

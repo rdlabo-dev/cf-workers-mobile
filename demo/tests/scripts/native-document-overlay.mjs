@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir, rm, access } from "node:fs/promises";
 const root = new URL("../../", import.meta.url);
 const backup = new URL("artifacts/native-document-originals/", root);
 const files = [
-  "android/app/src/main/java/jp/rdlabo/capacitorworkers/poc/MainActivity.java",
+  "android/app/src/main/java/jp/rdlabo/workerscapacitor/poc/MainActivity.java",
   "ios/App/App/SceneDelegate.swift",
 ];
 const action = process.argv[2];

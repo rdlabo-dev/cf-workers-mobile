@@ -144,7 +144,7 @@ order:
 5. Shutdown and reinitialization (`stage:"reinit"`). iOS requests public
    `dispose()` from the document; the retained runtime host performs it and
    then calls the public startup API again. Android stops the native host via
-   `CapacitorWorkers.stop` from the visible page, reloads, and lets the
+   `WorkersCapacitor.stop` from the visible page, reloads, and lets the
    persistent Service Worker restart the bundled bootstrap. These are distinct
    mechanisms: public `dispose()` and the native stop method are not claimed
    equivalent. The Android reinit stage additionally reuses the Fetch-only
@@ -179,7 +179,7 @@ overlay investigation only.
 The raw byte transport and Workers Fetch policy run against the same loopback
 fixture in direct execution and a Dedicated Worker. Tests include redirects,
 compression, cookies, streaming, cancellation, main-frame reload and Worker
-termination. The public `capacitorWorkers()` entry is exercised in both realms.
+termination. The public `workersCapacitor()` entry is exercised in both realms.
 
 After building the library, prepare an independent packed consumer as above:
 

@@ -24,7 +24,7 @@ export function createTlsFixtures() {
     "-days",
     "2",
     "-subj",
-    "/CN=Capacitor Workers Local Test CA",
+    "/CN=Workers Capacitor Local Test CA",
     "-addext",
     "basicConstraints=critical,CA:TRUE",
     "-addext",

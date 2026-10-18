@@ -1,6 +1,6 @@
-import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
-import { openFeature } from "@rdlabo/capacitor-workers/features";
-import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
+import { openFeature } from "@rdlabo/workers-capacitor/features";
+import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
 import worker from "../fixtures/workers/compatibility/kv";
 export async function kvRequest(
   namespace: string,

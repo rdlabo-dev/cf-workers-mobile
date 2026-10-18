@@ -239,12 +239,12 @@ it("uses remote cookies, stores Set-Cookie on its origin, strips them from the d
   );
   expect(cookies.mock.calls).toEqual([
     [
-      "CapacitorWorkers",
+      "WorkersCapacitor",
       "cookiesGet",
       { url: "https://server.example/account" },
     ],
     [
-      "CapacitorWorkers",
+      "WorkersCapacitor",
       "cookiesSet",
       {
         url: "https://server.example/account",
