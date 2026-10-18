@@ -114,3 +114,15 @@ npx vitest run --config tests/vitest.config.ts tests/workers/rendering.test.ts
 The overlay stores original native entry files under `demo/artifacts/native-document-originals/` and refuses a second apply. It temporarily replaces Android's MainActivity and appends the iOS test controller to SceneDelegate; restoration does not use git reset. Do not edit those two native entry files while the overlay is active. All experimental sources are under `demo/tests/`.
 
 The Android probe unregisters its Service Worker after completing the report. If a run is interrupted before completion, unregister it through WebView DevTools (or clear this test app's storage) before restoring the ordinary demo; restoring files alone does not remove browser registrations.
+
+## Current library transport update
+
+The current `src/documents` / `native/ios/DocumentBridge.swift` transport returns
+headers before response EOF and pulls at most 64 KiB per native reply. Android's
+Service Worker uses the same host pull/cancel commands. Cancellation, disposal,
+and native navigation stop release response readers and abort request signals.
+The historical experiment observations above describe its earlier buffered code.
+Native document uploads remain bounded buffers (8 MiB maximum); Fetch-only Worker
+uploads use streaming. Legacy buffered native response callers are limited to
+8 MiB and should update with the library. Local unit and native build evidence
+must not be treated as physical-device peak-memory measurements.

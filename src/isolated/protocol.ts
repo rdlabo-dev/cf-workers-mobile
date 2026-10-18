@@ -3,11 +3,19 @@ export interface Invocation {
   url: string;
   method: string;
   headers: [string, string][];
-  body: ArrayBuffer | null;
+  hasBody: boolean;
   env: unknown;
 }
-export type Command = "pull" | "cancel" | "abort";
+export type Command =
+  | "pull"
+  | "cancel"
+  | "abort"
+  | { type: "upload-chunk"; value: Uint8Array }
+  | { type: "upload-end" }
+  | { type: "upload-error"; message: string };
 export type Reply =
+  | { type: "upload-pull" }
+  | { type: "upload-cancel" }
   | {
       type: "response";
       status: number;

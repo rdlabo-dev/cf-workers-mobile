@@ -85,26 +85,30 @@ async function dispatch(request) {
   const body =
     request.method === "GET" || request.method === "HEAD"
       ? undefined
-      : await request.clone().arrayBuffer();
+      : await readUpload(request);
   const message = {
     url: request.url,
     method: request.method,
     headers: Object.fromEntries(request.headers),
     body,
+    stream: true,
   };
-  const channel = new MessageChannel();
-  const result = await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      channel.port1.close();
-      reject(new Error("Worker response timeout"));
-    }, 30000);
-    channel.port1.onmessage = (event) => {
-      clearTimeout(timer);
-      channel.port1.close();
-      resolve(event.data);
-    };
-    host.postMessage(message, [channel.port2]);
-  });
+  const rpc = (message) =>
+    new Promise((resolve, reject) => {
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => {
+        channel.port1.close();
+        reject(new Error("Worker response timeout"));
+      }, 30000);
+      channel.port1.onmessage = (event) => {
+        clearTimeout(timer);
+        channel.port1.close();
+        resolve(event.data);
+      };
+      host.postMessage(message, [channel.port2]);
+    });
+  const result = await rpc(message);
+  const cancel = () => rpc({ action: "cancel", streamId: result.streamId });
   if (result.error) throw new Error(result.error);
   const headers = new Headers(result.headers);
   if (
@@ -112,15 +116,92 @@ async function dispatch(request) {
     headers.has("location")
   ) {
     const target = new URL(headers.get("location"), result.url);
-    if (target.origin !== baseURL)
+    if (target.origin !== baseURL) {
+      if (result.streamId) await cancel();
       throw new Error("External redirects are not supported");
+    }
     headers.set(
       "location",
       self.location.origin + target.pathname + target.search + target.hash,
     );
   }
+  let controller;
+  const abort = () => {
+    controller?.error(request.signal.reason);
+    void cancel().catch(() => {});
+  };
+  const responseBody = result.streamId
+    ? new ReadableStream(
+        {
+          start(value) {
+            controller = value;
+            request.signal.addEventListener("abort", abort, { once: true });
+          },
+          async pull(value) {
+            try {
+              const next = await rpc({
+                action: "pull",
+                streamId: result.streamId,
+              });
+              if (request.signal.aborted) return;
+              if (next.error) throw new Error(next.error);
+              if (next.done) {
+                request.signal.removeEventListener("abort", abort);
+                value.close();
+              } else
+                value.enqueue(
+                  Uint8Array.from(atob(next.body), (c) => c.charCodeAt(0)),
+                );
+            } catch (error) {
+              request.signal.removeEventListener("abort", abort);
+              value.error(error);
+              void cancel().catch(() => {});
+            }
+          },
+          async cancel() {
+            request.signal.removeEventListener("abort", abort);
+            await cancel();
+          },
+        },
+        { highWaterMark: 0 },
+      )
+    : result.body;
+  if (result.streamId && request.signal.aborted) {
+    await cancel();
+    request.signal.throwIfAborted();
+  }
   return new Response(
-    [101, 204, 205, 304].includes(result.status) ? null : result.body,
+    [101, 204, 205, 304].includes(result.status) ? null : responseBody,
     { status: result.status, headers },
   );
+}
+
+async function readUpload(request) {
+  const reader = request.body?.getReader();
+  if (!reader) return new ArrayBuffer(0);
+  const chunks = [];
+  let size = 0;
+  try {
+    for (;;) {
+      request.signal.throwIfAborted();
+      const next = await reader.read();
+      if (next.done) break;
+      size += next.value.length;
+      if (size > 8 * 1024 * 1024)
+        throw new RangeError("Document upload exceeds 8 MiB");
+      chunks.push(next.value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return bytes.buffer;
+  } catch (error) {
+    void reader.cancel(error).catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
 }

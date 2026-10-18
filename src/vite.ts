@@ -1,3 +1,4 @@
+import { lowerAsync, asyncContextPlugin } from "./build/async.js";
 import { documentAssets, listAssets } from "./build/documents.js";
 import { serverModules } from "./build/server-modules.js";
 import type { ServerBuildOptions } from "./build/server.js";
@@ -30,6 +31,16 @@ function compatibilityPlugins(
     ),
   );
   return [
+    {
+      name: "capacitor-workers-async-context",
+      enforce: "post",
+      transform(code, id) {
+        if (/\.[cm]?[jt]sx?(?:\?|$)/.test(id)) return lowerAsync(code, id);
+      },
+      renderChunk(code, chunk) {
+        return lowerAsync(code, chunk.fileName);
+      },
+    },
     ...(installGlobals
       ? [
           {
@@ -66,6 +77,7 @@ function compatibilityPlugins(
       config: () => ({
         // App globals and dependencies must share Buffer identity and the HTTP registry.
         optimizeDeps: {
+          esbuildOptions: { plugins: [asyncContextPlugin()] },
           include: [
             "cloudflare:node",
             "node:http",

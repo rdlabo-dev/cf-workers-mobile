@@ -131,7 +131,8 @@ replacement is required. The two-WebView lifecycle is internal to the adapter.
 
 This remains a PoC. Document rendering is native-only; ordinary browser/Electron/
 Tauri document startup is not implemented. Existing browser Fetch-only behavior
-is unchanged. Full response bodies are buffered. HTTP caching is disabled for
+is unchanged. Response bodies are pulled in bounded chunks; document uploads
+remain buffered with an 8 MiB limit. HTTP caching is disabled for
 Worker responses. External redirects are rejected. On iOS, the page-side Fetch
 bridge models redirect metadata with JavaScript properties rather than browser
 internal Response slots. The iOS multipart form supplement covers same-window

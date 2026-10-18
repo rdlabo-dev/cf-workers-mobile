@@ -70,7 +70,10 @@ final class DocumentNavigationDelegate: NSObject, WKNavigationDelegate {
     private let documents: DocumentSchemeHandler
     init(original: WKNavigationDelegate?, documents: DocumentSchemeHandler) { self.original = original; self.documents = documents }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        if action.targetFrame?.isMainFrame == true { documents.documentURL = action.request.url }
+        if action.targetFrame?.isMainFrame == true {
+            documents.cancelFetchStreams()
+            documents.documentURL = action.request.url
+        }
         if let original = original, original.responds(to: NSSelectorFromString("webView:decidePolicyForNavigationAction:decisionHandler:")) {
             original.webView?(webView, decidePolicyFor: action, decisionHandler: decisionHandler)
         } else { decisionHandler(.allow) }
@@ -91,8 +94,19 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     private var redirects = 0
     private var fetchReplies: [String: (Any?, String?) -> Void] = [:]
     private var fetchRequests: [String: [String: Any]] = [:]
+    private var fetchStreams = Set<String>()
+    func cancelFetchStreams() {
+        for id in fetchStreams { cancelStream(id) }
+        fetchStreams.removeAll()
+        for (id, reply) in fetchReplies {
+            cancelStream(id)
+            reply(nil, "Document navigated")
+        }
+        fetchReplies.removeAll(); fetchRequests.removeAll()
+    }
     private var ready = true
     private var tasks: [String: WKURLSchemeTask] = [:]
+    private var awaitingHeaders = Set<String>()
     init(assets: WKURLSchemeHandler, runtime: WKWebView, localURL: URL, assetsList: [String]) {
         self.assets = assets; self.runtime = runtime; self.localURL = localURL; self.assetsList = Set(assetsList)
         super.init()
@@ -104,10 +118,16 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         guard let url = task.request.url else { return false }
         return isLocal(url) && !assetsList.contains(url.path) && !url.path.hasPrefix("/_capacitor_")
     }
+    private func cancelStream(_ id: String) {
+        execute(["action": "cancel", "streamId": id]) { _ in }
+    }
     func close() {
+        cancelFetchStreams()
+        for id in tasks.keys { cancelStream(id) }
+        for id in fetchReplies.keys { cancelStream(id) }
         closed = true
         for task in tasks.values { task.didFailWithError(URLError(.cancelled)) }
-        tasks.removeAll(); documentTasks.removeAll()
+        tasks.removeAll(); documentTasks.removeAll(); awaitingHeaders.removeAll()
         for reply in fetchReplies.values { reply(nil, "Document runtime disposed") }
         fetchReplies.removeAll(); fetchRequests.removeAll()
     }
@@ -119,11 +139,13 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         guard handles(task) else { assets.webView(webView, start: task); return }
         let id = UUID().uuidString
         tasks[id] = task
+        awaitingHeaders.insert(id)
         if task.request.url == documentURL { documentTasks.insert(id); documentURL = nil }
         if ready { dispatch(id, task) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
-            if let expired = self?.tasks.removeValue(forKey: id) {
+            if self?.awaitingHeaders.remove(id) != nil, let expired = self?.tasks.removeValue(forKey: id) {
                 self?.documentTasks.remove(id)
+                self?.cancelStream(id)
                 expired.didFailWithError(URLError(.timedOut))
             }
         }
@@ -131,13 +153,14 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {
         guard handles(task) else { assets.webView(webView, stop: task); return }
         for (id, current) in tasks where current === task {
-            tasks.removeValue(forKey: id); documentTasks.remove(id)
+            tasks.removeValue(forKey: id); documentTasks.remove(id); awaitingHeaders.remove(id); cancelStream(id)
         }
     }
     private func dispatch(_ id: String, _ task: WKURLSchemeTask) {
         var request: [String: Any] = ["id": id, "url": task.request.url!.absoluteString,
-            "method": task.request.httpMethod ?? "GET", "headers": task.request.allHTTPHeaderFields ?? [:], "document": documentTasks.contains(id)]
+            "method": task.request.httpMethod ?? "GET", "headers": task.request.allHTTPHeaderFields ?? [:], "document": documentTasks.contains(id), "stream": true]
         if let body = task.request.httpBody {
+            guard body.count <= 8 * 1024 * 1024 else { fail(id, URLError(.dataLengthExceedsMaximum)); return }
             request["body"] = body.base64EncodedString()
         } else if let stream = task.request.httpBodyStream {
             stream.open()
@@ -152,6 +175,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
                     return
                 }
                 if count == 0 { break }
+                guard data.count + count <= 8 * 1024 * 1024 else { fail(id, URLError(.dataLengthExceedsMaximum)); return }
                 data.append(buffer, count: count)
             }
             request["body"] = data.base64EncodedString()
@@ -169,6 +193,8 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         }
     }
     private func fail(_ id: String, _ error: Error) {
+        cancelStream(id)
+        awaitingHeaders.remove(id)
         if documentTasks.remove(id) != nil { redirects = 0 }
         tasks.removeValue(forKey: id)?.didFailWithError(error)
     }
@@ -188,12 +214,17 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         }
         let id = UUID().uuidString
         request["id"] = id
+        let streamId = request["streamId"] as? String ?? id
         fetchReplies[id] = replyHandler
         fetchRequests[id] = request
         if ready { dispatchFetch(id) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
             self?.fetchRequests.removeValue(forKey: id)
-            self?.fetchReplies.removeValue(forKey: id)?(nil, "Fetch timeout")
+            if let reply = self?.fetchReplies.removeValue(forKey: id) {
+                self?.fetchStreams.remove(streamId)
+                self?.cancelStream(streamId)
+                reply(nil, "Fetch timeout")
+            }
         }
     }
     private func dispatchFetch(_ id: String) {
@@ -201,8 +232,15 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         execute(request) { [weak self] result in
             guard let self = self, !self.closed, let reply = self.fetchReplies.removeValue(forKey: id) else { return }
             switch result {
-            case .success(let value): reply(value, nil)
-            case .failure(let error): reply(nil, error.localizedDescription)
+            case .success(let value):
+                if let result = value as? [String: Any] {
+                    if let streamId = result["streamId"] as? String { self.fetchStreams.insert(streamId) }
+                    if result["done"] as? Bool == true, let streamId = request["streamId"] as? String { self.fetchStreams.remove(streamId) }
+                }
+                reply(value, nil)
+            case .failure(let error):
+                if let streamId = request["streamId"] as? String { self.fetchStreams.remove(streamId); self.cancelStream(streamId) }
+                reply(nil, error.localizedDescription)
             }
         }
     }
@@ -210,7 +248,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         guard let id = result["id"] as? String, let task = tasks[id],
               let status = result["status"] as? Int, let headers = result["headers"] as? [String: String],
               let encoded = result["body"] as? String, let body = Data(base64Encoded: encoded) else { return }
-        tasks.removeValue(forKey: id)
+        awaitingHeaders.remove(id)
         let isDocument = documentTasks.remove(id) != nil
         if isDocument, let navigation = result["navigation"] as? [String: Any] {
             guard let address = navigation["url"] as? String, let url = URL(string: address), isLocal(url),
@@ -220,6 +258,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
                 task.didFailWithError(URLError(.cannotParseResponse))
                 return
             }
+            tasks.removeValue(forKey: id)
             redirects += 1
             var next = URLRequest(url: url)
             next.httpMethod = method
@@ -237,7 +276,28 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         if isDocument { redirects = 0 }
         guard let response = HTTPURLResponse(url: task.request.url!, statusCode: status, httpVersion: nil, headerFields: headers) else { task.didFailWithError(URLError(.cannotParseResponse)); return }
         task.didReceive(response)
-        task.didReceive(body)
-        task.didFinish()
+        if let streamId = result["streamId"] as? String {
+            pull(id, streamId)
+        } else {
+            tasks.removeValue(forKey: id)
+            task.didReceive(body)
+            task.didFinish()
+        }
+    }
+    private func pull(_ id: String, _ streamId: String) {
+        guard tasks[id] != nil, !closed else { cancelStream(streamId); return }
+        execute(["action": "pull", "streamId": streamId]) { [weak self] result in
+            guard let self = self, let task = self.tasks[id], !self.closed else { return }
+            switch result {
+            case .failure(let error): self.fail(id, error)
+            case .success(let value):
+                guard let chunk = value as? [String: Any], let done = chunk["done"] as? Bool,
+                      let encoded = chunk["body"] as? String, let bytes = Data(base64Encoded: encoded) else {
+                    self.fail(id, URLError(.cannotDecodeRawData)); return
+                }
+                if done { self.tasks.removeValue(forKey: id); task.didFinish() }
+                else { task.didReceive(bytes); self.pull(id, streamId) }
+            }
+        }
     }
 }

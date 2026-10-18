@@ -24,10 +24,7 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
           .filter((result) => result.status === "unsupported")
           .map((result) => result.id),
       ),
-  ).toEqual([
-    ["settleRestore", "nestedAsyncRestore", "concurrentIsolation"],
-    ["settleRestore", "nestedAsyncRestore", "concurrentIsolation"],
-  ]);
+  ).toEqual([[], []]);
 });
 
 test("KV survives a WebView document reload and remains namespace-isolated", async ({

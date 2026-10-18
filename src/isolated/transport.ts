@@ -5,17 +5,53 @@ import type { WorkerHandler } from "../fetch/types.js";
 import type { Command, Invocation, Reply } from "./protocol.js";
 
 export function serve(worker: WorkerHandler<unknown>) {
-  // Buffered upload, pull-driven response chunks: no transferable streams required.
+  // Both directions are pull-driven; chunks are bounded without transferable streams.
   self.onmessage = async ({ data }: MessageEvent<Invocation>) => {
-    const { port, url, method, headers, body, env } = data;
+    const { port, url, method, headers, hasBody, env } = data;
     const controller = new AbortController();
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let bodyDone = false;
     let cancelling = false;
     let backgroundDone = false;
     const send = (reply: Reply) => port.postMessage(reply);
+    let uploadController:
+      | ReadableStreamDefaultController<Uint8Array>
+      | undefined;
+    let uploadPulled: (() => void) | undefined;
+    let uploadDone = !hasBody;
+    const stopUpload = (reason: unknown) => {
+      if (uploadDone) return;
+      uploadDone = true;
+      uploadController?.error(reason);
+      uploadPulled?.();
+      send({ type: "upload-cancel" });
+    };
+    const body = hasBody
+      ? new ReadableStream<Uint8Array>(
+          {
+            start(controller) {
+              uploadController = controller;
+            },
+            pull() {
+              return new Promise<void>((resolve) => {
+                uploadPulled = resolve;
+                send({ type: "upload-pull" });
+              });
+            },
+            cancel() {
+              uploadDone = true;
+              uploadPulled?.();
+              send({ type: "upload-cancel" });
+            },
+          },
+          { highWaterMark: 0 },
+        )
+      : null;
     const close = () => {
-      if (bodyDone && backgroundDone) port.close();
+      if (bodyDone && backgroundDone) {
+        stopUpload(new Error("Response completed"));
+        port.close();
+      }
     };
     const end = () => {
       if (!bodyDone) {
@@ -35,8 +71,21 @@ export function serve(worker: WorkerHandler<unknown>) {
     };
     port.onmessage = async ({ data }: MessageEvent<Command>) => {
       try {
-        if (data === "abort") {
+        if (typeof data === "object") {
+          if (!uploadDone) {
+            if (data.type === "upload-chunk")
+              uploadController!.enqueue(data.value);
+            else {
+              uploadDone = true;
+              if (data.type === "upload-end") uploadController!.close();
+              else uploadController!.error(new Error(data.message));
+            }
+            uploadPulled?.();
+            uploadPulled = undefined;
+          }
+        } else if (data === "abort") {
           controller.abort();
+          stopUpload(controller.signal.reason);
           if (reader) {
             cancelling = true;
             await reader.cancel();

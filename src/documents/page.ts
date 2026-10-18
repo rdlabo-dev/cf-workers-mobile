@@ -1,3 +1,4 @@
+import { readDocumentBody, encodeDocumentBytes } from "./body.js";
 import "./form-body.js";
 import { documentConfig, isDocumentURL } from "./page-config.js";
 import { FetchRuntime } from "../fetch/runtime.js";
@@ -14,6 +15,8 @@ const host = window as typeof window & {
           status: number;
           headers: Record<string, string>;
           body: string;
+          streamId?: string;
+          done?: boolean;
         }>;
       };
     };
@@ -25,17 +28,65 @@ class PageFetch extends FetchRuntime {
   protected async dispatch(request: Request) {
     const bytes = ["GET", "HEAD"].includes(request.method)
       ? undefined
-      : new Uint8Array(await request.arrayBuffer());
-    let binary = "";
-    if (bytes) for (const byte of bytes) binary += String.fromCharCode(byte);
+      : new Uint8Array(await readDocumentBody(request));
+    const encoded = bytes ? encodeDocumentBytes(bytes) : undefined;
     const result = await host.webkit.messageHandlers.documentFetch.postMessage({
       url: request.url,
+      stream: true,
       method: request.method,
       headers: Object.fromEntries(request.headers),
-      ...(bytes ? { body: btoa(binary) } : {}),
+      ...(encoded === undefined ? {} : { body: encoded }),
     });
     if (result.error) throw new TypeError(result.error);
-    const body = Uint8Array.from(atob(result.body), (c) => c.charCodeAt(0));
+    const streamId = result.streamId;
+    const post = (action: "pull" | "cancel") =>
+      host.webkit.messageHandlers.documentFetch.postMessage({
+        action,
+        streamId,
+      });
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const abort = () => {
+      controller?.error(request.signal.reason);
+      void post("cancel").catch(() => {});
+      request.signal.removeEventListener("abort", abort);
+    };
+    if (streamId && request.signal.aborted) {
+      await post("cancel");
+      request.signal.throwIfAborted();
+    }
+    const body = streamId
+      ? new ReadableStream<Uint8Array>(
+          {
+            start(value) {
+              controller = value;
+              request.signal.addEventListener("abort", abort, { once: true });
+            },
+            async pull(value) {
+              try {
+                const next = await post("pull");
+                if (request.signal.aborted) return;
+                if (next.error) throw new Error(next.error);
+                if (next.done) {
+                  request.signal.removeEventListener("abort", abort);
+                  value.close();
+                } else
+                  value.enqueue(
+                    Uint8Array.from(atob(next.body), (c) => c.charCodeAt(0)),
+                  );
+              } catch (error) {
+                request.signal.removeEventListener("abort", abort);
+                value.error(error);
+                void post("cancel").catch(() => {});
+              }
+            },
+            async cancel() {
+              request.signal.removeEventListener("abort", abort);
+              await post("cancel");
+            },
+          },
+          { highWaterMark: 0 },
+        )
+      : null;
     return new Response([204, 205, 304].includes(result.status) ? null : body, {
       status: result.status,
       headers: result.headers,
@@ -131,7 +182,7 @@ globalThis.fetch = async (input, init) => {
       body:
         becomesGET || ["GET", "HEAD"].includes(request.method)
           ? undefined
-          : await request.arrayBuffer(),
+          : await readDocumentBody(request),
       signal: request.signal,
       redirect: request.redirect,
     });
