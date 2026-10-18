@@ -1,4 +1,8 @@
 import {
+  UrlImplementation,
+  urlContract,
+} from "../../../src/compat/url/index.spec";
+import {
   AsyncHooksImplementation,
   asyncHooksContract,
   NodeAsyncHooks,
@@ -77,6 +81,7 @@ export async function runNodeContracts(
     await runContract(new NetImplementation(), netContract),
     await runContract(new BufferImplementation(), bufferContract),
     await runContract(new TimersImplementation(), timersContract),
+    await runContract(new UrlImplementation(), urlContract),
   ];
   reports.push(
     await runContract(

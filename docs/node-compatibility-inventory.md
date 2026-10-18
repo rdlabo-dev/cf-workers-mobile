@@ -25,7 +25,8 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 | `node:module` / `node:stream/web` / `node:util` | **Unverified**      | Scoped shims: `createRequire` (VFS `.json` only), platform stream constructors, util polyfill + `TextEncoder`/`TextDecoder`. Verified transitively by the OpenNext smoke. |
 | `node:async_hooks` / AsyncLocalStorage | **Unverified**                    | Scoped implementation at `src/compat/async-hooks/index.ts` with a 14-case contract compared against pinned workerd. Synchronous scopes, enterWith/disable, bind/snapshot, sticky single-context await propagation and AsyncResource boundaries pass locally; settle-restore and interleaved-context isolation are declared unsupported. A re-bundled OpenNext (Next 15.5) handler rendered static and dynamic routes locally with this approximation; full Workers parity is not established. |
 | `node:buffer` | **Complete** | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20). |
-| `node:timers` / `node:timers/promises` | **Unverified (CI pending)** | Whole-module implementation and shared 30-group contract are in `src/compat/timers/`. [Acceptance evidence](#timers-acceptance) records local verification; remote CI remains the merge gate. |
+| `node:timers` / `node:timers/promises` | **Complete** | Whole-module implementation and shared 30-group contract in `src/compat/timers/`. [Acceptance](#timers-acceptance) and [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) passed at `c5fb8a4`; merged as `400d022`. |
+| `node:url` | **Unverified (acceptance pending)** | Whole-module implementation, upstream vectors and 19 shared contract groups in `src/compat/url/`. See [URL acceptance](#url-acceptance). |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Scope and evidence
@@ -164,7 +165,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | **Complete**          | Path                 | `win32`                                                                            | A                          | Implemented with the pinned Workers module, including the subpath export; accepted at `b1a58d1`; remote CI passed.                                                                                   |
 | **Complete**          | Path                 | cwd-dependent `resolve`/`relative`                                                 | A                          | Matches the pinned Workers virtual root `/`; accepted at `b1a58d1`; remote CI passed.                                                                                                                |
 | **Complete**          | Path                 | `matchesGlob`                                                                      | A/S                        | Reproduces the pinned Workers throwing behavior with a passing contract; remote CI passed at `b1a58d1`.                                                                                              |
-| Unverified            | URL                  | `URL`, `URLSearchParams`, legacy parse/format/resolve, file URL conversion         | A                          | Standard APIs plus JS adaptation; Node-specific options need contract tests.                                                                                                                         |
+| Unverified            | URL                  | `URL`, `URLSearchParams`, legacy parse/format/resolve, file URL conversion         | A                          | Whole-module JS adapter, pinned Ada IDNA data and shared contract. See [URL acceptance](#url-acceptance).                                                                                                                         |
 | **Complete**          | Query strings        | parse/stringify/escape/unescape                                                    | A                          | All seven exports covered by the expanded module contract; remote CI passed at `b1a58d1`.                                                                                                            |
 | Unverified            | Punycode             | encode/decode, domain conversion helpers                                           | A                          | JS algorithm; preserve deprecated-module availability for the selected profile.                                                                                                                      |
 | **Complete**          | String decoder       | `StringDecoder` constructor and write/end/text                                     | A                          | Constructor, methods, encoding/state and reuse contracts verified locally; remote CI passed at `b1a58d1`.                                                                                            |
@@ -213,7 +214,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Not implemented       | Process           | cwd/chdir                                                         | A                                                    | Shared virtual cwd; validate against the virtual FS.                                                                                                                                                                                     |
 | Unverified            | Process           | hrtime, uptime and time-derived values                            | A/U                                                  | Implement documented compatibility behavior; native precision and matching timestamps are not the goal. Other process-v2 exports need baseline inspection.                                                                               |
 | Unverified            | Process           | exit, abort, fatal errors / runtime termination                   | U; D for uninstrumented direct execution             | Throwing an exception is catchable and is not proof of termination semantics. Inspect Workers behavior. Worker-host termination may cover isolated mode; an ordinary plugin cannot stop arbitrary main-realm JS while preserving the UI. |
-| Unverified            | Timers            | setTimeout/Interval/Immediate, clear variants, promises           | A+B                                                  | Whole-module Web implementation with compatible handles, cancellation, Promise helpers and scheduler. See [timers acceptance](#timers-acceptance). Background OS suspension remains an execution limit.                                                          |
+| Complete              | Timers            | setTimeout/Interval/Immediate, clear variants, promises           | A+B                                                  | Whole-module Web implementation with compatible handles, cancellation, Promise helpers and scheduler. See [timers acceptance](#timers-acceptance). Background OS suspension remains an execution limit.                                                          |
 | Unverified            | Console           | log/info/warn/error, format, Console streams, groups/timers       | A+B                                                  | Capture original sinks to prevent recursion; decide which methods require global installation.                                                                                                                                           |
 | Unverified            | Errors            | classes, codes, causes, validation                                | A                                                    | JS construction and validation; don't rely on host-specific message text accidentally.                                                                                                                                                   |
 | Unverified            | Errors            | captureStackTrace, structured stack formatting and exact stacks   | U                                                    | Browser engines differ. Exact V8 frames/internal hooks are D without engine support; determine whether required Workers exports actually expose them.                                                                                    |
@@ -545,7 +546,7 @@ Local acceptance on 2026-10-18 for implementation commit `4c73eb7`:
 | Document/form regression | 72 accepted results, including the 6 existing WebKit expected failures |
 | iOS 26.1 and Android 16 WebViews | Each: 430 passed + 4 existing ALS exclusions; timers 30 direct + 30 Dedicated Worker passed with no timer exclusions |
 | Manager and independent code reviews | Passed after correction and re-review |
-| Remote CI | Pending publication of this branch |
+| Remote CI | [Passed](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39093405066) at `c5fb8a4`; merged as `400d022` |
 
 Native runs used a separate test application ID to avoid overwriting another
 verification app. Their reports identify the platform, device and built-asset
@@ -561,3 +562,38 @@ passed: build and root/demo typechecks, 308 unit tests, 93 workerd tests,
 30 build-tool integration tests, and the packed consumer
 (320 feature passes + 6 declared async-hooks exclusions). The native results
 above remain evidence for `4c73eb7`; they do not claim a native rerun of the merge.
+
+
+## URL acceptance
+
+The acceptance unit is the complete `node:url` / `url` module, against workerd
+`1.20261012.1`, compatibility date `2026-10-17`, with no additional flags.
+The module and adjacent tests live in [`src/compat/url/`](../src/compat/url/index.spec.ts).
+The export audit covers all 13 named exports and the default namespace, including
+URL/URLSearchParams, legacy Url, parse/format/resolve/resolveObject, domain
+conversion, file URL helpers, toPathIfFileURL and urlToHttpOptions.
+
+The configured runtime owns/restores the global URL constructor so global and
+module identity agree. It retains native URL internal slots, normalizes host
+parsing and file resolution differences, and matches Workers' unsupported
+createObjectURL/revokeObjectURL behavior. URLSearchParams uses the platform
+constructor, including live URL linkage and the full prototype contract.
+Pre-installation URLs and URLs created by separately loaded bundles remain valid
+inputs to Node helpers. Installation tests cover ownership, rollback, disposal
+and an application replacing the global.
+
+IDNA mapping, Bidi and ContextJ behavior use tables extracted from the exact
+Ada 4.0.0 archive pinned by workerd. Punycode is pure JavaScript; NFC uses
+String.prototype.normalize. The maintainer generator pins the archive SHA-256;
+its C++20 extraction step is not part of library builds or consumer requirements.
+No native plugin or Wasm runtime is added. Notices travel with the package.
+The generated tables occupy about 239 kB of source before bundling/compression.
+
+The shared contract includes upstream modern/legacy URL vectors, 1,364 IDNA
+comparisons and 837 constructor/base/setter comparisons captured against the
+fixed workerd profile. Both successful values and rejected inputs are compared
+in direct and Dedicated Worker execution. The vectors include Unicode-mapped
+host delimiters, pinned Bidi assignments, file localhost, UNC-like paths,
+Windows drive roots and opaque custom schemes.
+
+Local verification is in progress; remote CI remains required before Complete.

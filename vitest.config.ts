@@ -22,6 +22,8 @@ export default defineConfig({
       "src/compat/abort/installation.spec.ts",
       "src/compat/buffer/installation.spec.ts",
       "src/compat/timers/installation.spec.ts",
+      "src/compat/url/installation.spec.ts",
+      "src/compat/url/interop.spec.ts",
       "src/compat/timers/host.spec.ts",
       "src/compat/async-hooks/callbacks.spec.ts",
       "src/compat/response/installation.spec.ts",

@@ -12,6 +12,7 @@ export {
   setImmediate,
   clearImmediate,
 } from "./inject.js";
+import { installUrlGlobals } from "../url/installation.js";
 import { installTimerGlobals } from "../timers/installation.js";
 
 const values = {
@@ -95,13 +96,17 @@ function installNodeNames(target: GlobalTarget) {
 
 export function installNodeGlobals(target: GlobalTarget = globalThis) {
   const restoreTimers = installTimerGlobals(target);
+  let restoreURL: (() => void) | undefined;
   try {
+    restoreURL = installUrlGlobals(target);
     const restoreNames = installNodeNames(target);
     return () => {
       restoreNames();
+      restoreURL?.();
       restoreTimers();
     };
   } catch (error) {
+    restoreURL?.();
     restoreTimers();
     throw error;
   }

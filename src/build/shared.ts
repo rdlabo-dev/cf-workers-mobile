@@ -33,6 +33,8 @@ export function compatibilityAliases() {
     "process/": stdlib.process,
     "cloudflare:node": compatPath("cloudflare-node"),
     "cloudflare:workers": compatPath("cloudflare-workers"),
+    "node:url": compatPath("url"),
+    url: compatPath("url"),
     "node:async_hooks": compatPath("async-hooks"),
     async_hooks: compatPath("async-hooks"),
     "node:timers/promises": fileURLToPath(

@@ -70,6 +70,8 @@ function compatibilityPlugins(
             "http",
             "node:buffer",
             "buffer",
+            "node:url",
+            "url",
             "node:timers",
             "timers",
             "node:timers/promises",

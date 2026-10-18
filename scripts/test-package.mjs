@@ -17,6 +17,7 @@ for (const module of [
   "string-decoder",
   "buffer",
   "timers",
+  "url",
 ]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
@@ -82,6 +83,7 @@ for (const module of [
   "abort",
   "async-hooks",
   "timers",
+  "url",
   "fs",
   "module",
   "stream-web",
@@ -93,6 +95,15 @@ for (const module of [
     join(directory, "index.spec.ts"),
     join(temp, directory, "index.spec.ts"),
   );
+}
+for (const name of [
+  "legacy.spec.ts",
+  "modern.spec.ts",
+  "assertions.spec.ts",
+  "idna.spec.ts",
+  "parsing.spec.ts",
+]) {
+  await cp(join("src/compat/url", name), join(temp, "src/compat/url", name));
 }
 await writeFile(
   join(temp, "vite.config.mjs"),
@@ -277,7 +288,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 326 ||
+    features.flatMap((report) => report.cases).length !== 364 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -314,7 +325,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 149 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 168 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||
