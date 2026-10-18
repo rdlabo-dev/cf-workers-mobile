@@ -1,5 +1,5 @@
 import { documentAssets, listAssets } from "./build/documents.js";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import type { Plugin } from "esbuild";
@@ -45,6 +45,11 @@ function compatibilityPlugin(): Plugin {
 export interface CapacitorWorkersPluginOptions {
   /** Workers entry relative to absWorkingDir (or cwd), or an absolute path. */
   worker: string;
+  /**
+   * Files embedded into the worker's read-only virtual filesystem
+   * (node:fs compat). Paths resolve relative to absWorkingDir.
+   */
+  workerFiles?: string[];
 }
 
 /** Browser ESM builds only. Worker assets participate in the parent build. */
@@ -86,6 +91,15 @@ export function capacitorWorkersPlugin(
         });
       }
       const entry = resolve(root, options.worker);
+      const virtualFiles = async () => {
+        if (!options.workerFiles?.length) return undefined;
+        const map: Record<string, { base64: string }> = {};
+        for (const file of options.workerFiles)
+          map[resolve(root, file)] = {
+            base64: (await readFile(resolve(root, file))).toString("base64"),
+          };
+        return JSON.stringify(map);
+      };
       await compatibilityPlugin().setup(build);
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;
@@ -112,7 +126,7 @@ export function capacitorWorkersPlugin(
           const result = await build.esbuild.build({
             absWorkingDir: root,
             stdin: {
-              contents: workerEntry(entry),
+              contents: workerEntry(entry, await virtualFiles()),
               resolveDir: root,
               sourcefile: "capacitor-worker-entry.js",
             },
