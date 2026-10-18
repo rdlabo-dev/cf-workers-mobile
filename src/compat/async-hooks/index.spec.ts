@@ -2,8 +2,8 @@ import * as nodeAsyncHooks from "node:async_hooks";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 // Resolve through the environment alias, including the real workerd oracle.
 const local = nodeAsyncHooks as unknown as typeof import("./index.js");
 function failure(fn: () => unknown, message: string) {

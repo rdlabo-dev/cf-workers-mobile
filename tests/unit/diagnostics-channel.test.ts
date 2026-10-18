@@ -4,7 +4,7 @@ import {
   diagnosticsContract,
   DiagnosticsImplementation,
 } from "../../src/compat/diagnostics-channel/index.spec.js";
-import { runContract } from "@rdlabo/workers-capacitor/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 it("matches the Workers diagnostics contract", async () => {
   const report = await runContract(
     new DiagnosticsImplementation(api),

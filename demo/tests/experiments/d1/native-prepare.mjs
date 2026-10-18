@@ -116,7 +116,7 @@ await writeFile(
 );
 await writeFile(
   join(consumer, "vite.config.js"),
-  `import {workersCapacitorPlugin} from "@rdlabo/workers-capacitor/vite";export default {plugins:[workersCapacitorPlugin(${JSON.stringify({ worker: "worker.js", ...(cloudflare ? { assetsExecution: "remote" } : {}), ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
+  `import {workersCapacitorPlugin} from "@rdlabo/workers-capacitor/tooling/vite";export default {plugins:[workersCapacitorPlugin(${JSON.stringify({ worker: "worker.js", ...(cloudflare ? { assetsExecution: "remote" } : {}), ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
 );
 await writeFile(
   join(consumer, "capacitor.config.json"),

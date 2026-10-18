@@ -2,8 +2,8 @@ import actual, * as namespace from "node:test";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import type local from "./index.js";
 type Api = typeof local;
 const groups = [

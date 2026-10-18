@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { transform } from "esbuild";
-import { lowerAsync } from "../../src/build/async.js";
+import { lowerAsync } from "../../src/tooling/async.js";
 
 it("preserves runtime arity and receivers when lowering TypeScript async functions", async () => {
   const lowered = await lowerAsync(

@@ -3,8 +3,8 @@ import { Socket } from "node:net";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 const groups = [
   "exports",
   "isatty",

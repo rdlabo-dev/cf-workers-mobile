@@ -24,7 +24,7 @@ named environments). The Vite/esbuild plugin reads binding names only; IDs and
 
 ```ts
 // Capacitor's vite.config.ts
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 export default {
   plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],
 };

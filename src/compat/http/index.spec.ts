@@ -19,12 +19,12 @@ const {
   handleAsNodeConnection,
   handleAsNodeRequest,
   httpServerHandler,
-} = cloudflareNode as unknown as typeof import("../../workers/cloudflare-node/index.js");
+} = cloudflareNode as unknown as typeof import("../../cloudflare/apis/cloudflare-node/index.js");
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 const api = {
   module: http,

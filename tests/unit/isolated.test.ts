@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { workersCapacitor, type WorkerHandler } from "../../src/index";
-import { createIsolatedWorker } from "../../src/isolated/bridge";
+import { createIsolatedWorker } from "../../src/browser/isolated/bridge";
 
 import { workerFor } from "../helpers/isolated-worker";
 const cleanups: (() => void)[] = [];

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [

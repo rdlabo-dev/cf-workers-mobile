@@ -73,10 +73,13 @@ is release-ready merely because one unit passes.
 
 ## Layout and tests
 
-Keep runtime implementations in `src/{compat,browser,workers}/<module>/index.ts`
+Keep runtime implementations in `src/compat/<module>/index.ts`, `src/browser/<module>/index.ts`, or
+`src/cloudflare/apis/<module>/index.ts`
 according to API ownership, with contracts/tests in the adjacent `index.spec.ts`.
-Cloud resource adapters and execution policy belong in `src/bindings`; cross-domain
-installation/codecs belong in `src/shared`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
+Cloud resource adapters and execution policy belong in `src/cloudflare/bindings`; cross-domain
+installation/codecs belong in `src/shared`. Application execution belongs in
+`src/cloudflare/workers` and browser host mechanisms in `src/browser`, build tooling in `src/tooling`, and the reusable feature/contract host
+in `src/shared/contracts`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
 that module directory. `demo/tests/` owns environment runners, not copies of
 module behavior. Production compilation excludes specs. Consumer tests may copy
 test contracts, but must resolve implementations from the packed package.

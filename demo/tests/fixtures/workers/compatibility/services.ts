@@ -1,7 +1,7 @@
 import kvWorker from "./kv";
-import { runContract } from "@rdlabo/workers-capacitor/testing";
-import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
-import type { KVNamespace } from "@rdlabo/workers-capacitor/features/kv";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
+import type { KVNamespace } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
 import { wasmContract } from "../../../validation/contracts/wasm";
 import {
   WorkersText,

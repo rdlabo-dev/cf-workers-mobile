@@ -1,4 +1,4 @@
-import { runContract } from "@rdlabo/workers-capacitor/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import {
   headersContract,
   HeadersImplementation,

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createFetchRuntime } from "../../src/fetch/worker-runtime.js";
+import { createFetchRuntime } from "../../src/cloudflare/workers/worker-runtime.js";
 import { workerFor } from "../helpers/isolated-worker.js";
-import type { RemoteWorkerOptions } from "../../src/fetch/types.js";
+import type { RemoteWorkerOptions } from "../../src/cloudflare/workers/types.js";
 
 const cleanups: (() => unknown)[] = [];
 afterEach(async () => {
@@ -181,7 +181,7 @@ it("cannot dispatch locally after disposal while an async selector is pending", 
 
 // Remote policy tests use the real dispatcher and cookie boundary with a fake
 // wire transport. Native acceptance exercises the same policy over actual TLS.
-import { createRemoteWorker } from "../../src/bindings/remote.js";
+import { createRemoteWorker } from "../../src/cloudflare/bindings/remote.js";
 import * as nativeNetwork from "../../src/browser/fetch/native-network.js";
 import * as nativeFetch from "../../src/browser/fetch/index.js";
 import { Response as WireResponse } from "../../src/browser/response/index.js";

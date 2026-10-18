@@ -16,44 +16,44 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./vite": {
-      "types": "./dist/vite.d.ts",
-      "import": "./dist/vite.js"
+    "./tooling/vite": {
+      "types": "./dist/tooling/vite.d.ts",
+      "import": "./dist/tooling/vite.js"
     },
-    "./features": {
-      "types": "./dist/features/index.d.ts",
-      "import": "./dist/features/index.js"
+    "./shared/contracts": {
+      "types": "./dist/shared/contracts/index.d.ts",
+      "import": "./dist/shared/contracts/index.js"
     },
-    "./testing": {
-      "types": "./dist/features/testing.d.ts",
-      "import": "./dist/features/testing.js"
+    "./shared/contracts/testing": {
+      "types": "./dist/shared/contracts/testing.d.ts",
+      "import": "./dist/shared/contracts/testing.js"
     },
-    "./features/fetch": {
-      "types": "./dist/features/fetch.d.ts",
-      "import": "./dist/features/fetch.js"
+    "./cloudflare/workers": {
+      "types": "./dist/cloudflare/workers/feature.d.ts",
+      "import": "./dist/cloudflare/workers/feature.js"
     },
-    "./features/kv": {
-      "types": "./dist/bindings/kv/index.d.ts",
-      "import": "./dist/bindings/kv/index.js"
+    "./cloudflare/bindings/kv": {
+      "types": "./dist/cloudflare/bindings/kv/index.d.ts",
+      "import": "./dist/cloudflare/bindings/kv/index.js"
     },
-    "./testing/fetch": {
-      "types": "./dist/testing/fetch.d.ts",
-      "import": "./dist/testing/fetch.js"
+    "./cloudflare/workers/testing": {
+      "types": "./dist/cloudflare/workers/contract.d.ts",
+      "import": "./dist/cloudflare/workers/contract.js"
     },
-    "./testing/kv": {
-      "types": "./dist/testing/kv.d.ts",
-      "import": "./dist/testing/kv.js"
+    "./cloudflare/bindings/kv/testing": {
+      "types": "./dist/cloudflare/bindings/kv/contract.d.ts",
+      "import": "./dist/cloudflare/bindings/kv/contract.js"
     },
-    "./esbuild": {
-      "types": "./dist/esbuild.d.ts",
-      "import": "./dist/esbuild.js"
+    "./tooling/esbuild": {
+      "types": "./dist/tooling/esbuild.d.ts",
+      "import": "./dist/tooling/esbuild.js"
     },
-    "./worker": {
-      "types": "./dist/worker.d.ts",
-      "import": "./dist/worker.js"
+    "./browser/isolated": {
+      "types": "./dist/browser/isolated/transport.d.ts",
+      "import": "./dist/browser/isolated/transport.js"
     },
-    "./cloudflare": {
-      "types": "./dist/cloudflare.d.ts"
+    "./cloudflare/apis/types": {
+      "types": "./dist/cloudflare/apis/types.d.ts"
     },
     "./environment": {
       "types": "./dist/environment.d.ts",

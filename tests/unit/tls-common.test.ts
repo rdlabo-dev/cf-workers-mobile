@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { runContract } from "@rdlabo/workers-capacitor/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import * as api from "../../src/compat/tls-common/index.js";
 import {
   TlsCommonImplementation,

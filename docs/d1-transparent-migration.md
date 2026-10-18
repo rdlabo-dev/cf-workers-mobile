@@ -9,7 +9,7 @@ or maintain a second router.
 
 ```ts
 // vite.config.ts — Capacitor build only
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 
 export default {
   plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],

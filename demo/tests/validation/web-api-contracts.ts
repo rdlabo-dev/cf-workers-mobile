@@ -7,7 +7,7 @@ import {
   AbortImplementation,
   abortContract,
 } from "../../../src/browser/abort/index.spec";
-import { runContract } from "@rdlabo/workers-capacitor/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import {
   HeadersImplementation,
   headersContract,

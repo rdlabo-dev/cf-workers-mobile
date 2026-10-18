@@ -1,4 +1,4 @@
-import type { WorkerSource } from "./fetch/types.js";
+import type { WorkerSource } from "./cloudflare/workers/types.js";
 
 // Build integrations replace this module, without changing the public import.
 // The unbundled ESM distribution requires an explicit worker option.

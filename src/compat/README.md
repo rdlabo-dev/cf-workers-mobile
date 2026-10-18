@@ -1,8 +1,8 @@
 # Node.js compatibility
 
 `compat` refers specifically to Workers Node.js compatibility. This folder owns
-`node:*` module implementations and Node-specific globals. Browser and Workers
-APIs are peer folders, not children of this directory.
+`node:*` module implementations and Node-specific globals. Browser APIs live in `src/browser`; Workers-specific APIs live in
+`src/cloudflare/apis`. They are not children of this directory.
 The target is the Node API behavior exposed by the pinned Workers baseline,
 not every API of a standalone Node process.
 
@@ -12,5 +12,5 @@ beside implementations. Moving a module here does not promote its status.
 
 `immediate` implements Node's setImmediate/clearImmediate; `stream-web` is the
 `node:stream/web` export adapter even though its underlying APIs are Web standard.
-`cloudflare:node` belongs in [workers](../workers/README.md) because it is a
+`cloudflare:node` belongs in [workers](../cloudflare/apis/README.md) because it is a
 Cloudflare-owned module bridging Node HTTP and Workers execution.

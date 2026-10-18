@@ -2,8 +2,8 @@ import * as querystring from "node:querystring";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 /** node:querystring module contract, matching the Workers baseline. */
 export interface NodeQuerystringApi {

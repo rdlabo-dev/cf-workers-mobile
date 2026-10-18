@@ -5,7 +5,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { chromium, webkit } from "@playwright/test";
-import { workersCapacitorPlugin } from "../../../../dist/esbuild.js";
+import { workersCapacitorPlugin } from "../../../../dist/tooling/esbuild.js";
 
 // An exhaustive discovery report, not a behavioral acceptance test. Failed
 // imports remain visible instead of silently disappearing from the inventory.
