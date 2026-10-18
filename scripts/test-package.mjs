@@ -1,6 +1,21 @@
-import { cp, mkdtemp, writeFile, mkdir } from "node:fs/promises";
+import assert from "node:assert/strict";
+import expectedCases from "../demo/tests/validation/expected-cases.json" with { type: "json" };
+const expectedNodeCases = Object.entries(expectedCases)
+  .filter(([feature]) => feature.startsWith("node."))
+  .sort();
+function checkNodeCases(reports) {
+  assert.deepEqual(
+    reports.map((r) => [r.feature, r.cases.map((c) => c.id)]).sort(),
+    expectedNodeCases,
+  );
+  assert.deepEqual(
+    reports.flatMap((r) => r.errors),
+    [],
+  );
+}
+import { cp, mkdtemp, writeFile, mkdir, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { chromium } from "@playwright/test";
@@ -122,104 +137,16 @@ await cp(
   join(temp, "node_modules/@rdlabo/workers-capacitor/dist/environment.js"),
   join(temp, "src/environment.js"),
 );
-await cp(
-  "src/compat/os/constants.spec.ts",
-  join(temp, "src/compat/os/constants.spec.ts"),
-);
-await cp(
-  "src/compat/punycode/upstream.spec.ts",
-  join(temp, "src/compat/punycode/upstream.spec.ts"),
-);
-await cp(
-  "src/compat/constants/values.spec.ts",
-  join(temp, "src/compat/constants/values.spec.ts"),
-);
-await cp(
-  "src/compat/http2/values.spec.ts",
-  join(temp, "src/compat/http2/values.spec.ts"),
-);
-await cp(
-  "src/compat/repl/values.spec.ts",
-  join(temp, "src/compat/repl/values.spec.ts"),
-);
-await cp(
-  "src/compat/sqlite/values.spec.ts",
-  join(temp, "src/compat/sqlite/values.spec.ts"),
-);
-// Copy module-owned contracts separately; these are not shipped.
-for (const module of [
-  "compat/path",
-  "compat/querystring",
-  "compat/string-decoder",
-  "compat/buffer",
-  "compat/http",
-  "compat/net",
-  "browser/headers",
-  "browser/request",
-  "browser/response",
-  "compat/immediate",
-  "browser/structured-clone",
-  "browser/encoding",
-  "browser/abort",
-  "compat/async-hooks",
-  "compat/timers",
-  "compat/url",
-  "compat/os",
-  "compat/tty",
-  "compat/wasi",
-  "compat/punycode",
-  "compat/constants",
-  "compat/v8",
-  "compat/http2",
-  "compat/vm",
-  "compat/child-process",
-  "compat/cluster",
-  "compat/dgram",
-  "compat/inspector",
-  "compat/domain",
-  "compat/readline",
-  "compat/repl",
-  "compat/sqlite",
-  "compat/test",
-  "compat/stream-consumers",
-  "compat/dns",
-  "compat/assert",
-  "compat/perf-hooks",
-  "compat/trace-events",
-  "compat/https",
-  "compat/worker-threads",
-  "compat/http-agent",
-  "compat/http-client",
-  "compat/http-incoming",
-  "compat/tls-common",
-  "compat/fs",
-  "compat/module",
-  "compat/stream-web",
-  "compat/util",
-  "compat/diagnostics-channel",
-  "compat/stream",
-  "compat/stream-readable",
-  "compat/stream-writable",
-  "compat/stream-duplex",
-  "compat/stream-transform",
-  "compat/stream-passthrough",
-  "compat/stream-promises",
-]) {
-  const directory = join("src", module);
-  await mkdir(join(temp, directory), { recursive: true });
-  await cp(
-    join(directory, "index.spec.ts"),
-    join(temp, directory, "index.spec.ts"),
-  );
-}
-for (const name of [
-  "legacy.spec.ts",
-  "modern.spec.ts",
-  "assertions.spec.ts",
-  "idna.spec.ts",
-  "parsing.spec.ts",
-]) {
-  await cp(join("src/compat/url", name), join(temp, "src/compat/url", name));
+// Discover module-owned specs by convention. Only test sources come from the
+// checkout; every implementation above still comes from the installed tarball.
+for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
+  const directory = join("src", domain);
+  for (const file of await readdir(directory, { recursive: true })) {
+    if (!file.endsWith(".spec.ts")) continue;
+    const target = join(temp, directory, file);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(directory, file), target);
+  }
 }
 await writeFile(
   join(temp, "vite.config.mjs"),
@@ -418,8 +345,20 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
       throw new Error(JSON.stringify(result));
   }
   const features = await page.evaluate(() => window.runFeatures());
+  const expectedFeatures = Object.entries(expectedCases).flatMap(
+    ([feature, cases]) =>
+      (feature.startsWith("node.") || feature === "fetch.basic"
+        ? ["direct", "isolated"]
+        : ["webview"]
+      ).map((environment) => [environment, feature, cases]),
+  );
+  assert.deepEqual(
+    features
+      .map((r) => [r.environment, r.feature, r.cases.map((c) => c.id)])
+      .sort(),
+    expectedFeatures.sort(),
+  );
   if (
-    features.flatMap((report) => report.cases).length !== 966 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -452,13 +391,12 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
         (prefer) => window.runBuildTool(prefer),
         prefer,
       );
+      if (build !== "raw") checkNodeCases(report.node.direct);
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 469 ||
-          report.node.direct.some(
-            (r) =>
-              r.errors.length || r.cases.some((c) => c.status !== "passed"),
-          ))
+        report.node.direct.some(
+          (r) => r.errors.length || r.cases.some((c) => c.status !== "passed"),
+        )
       )
         throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
       if (
@@ -482,10 +420,10 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
         (prefer) => window.runNodeBuild(prefer),
         prefer,
       );
+      checkNodeCases(report.contracts);
       const cases = report.contracts.flatMap((result) => result.cases);
       if (
         report.execution !== prefer ||
-        cases.length !== 469 ||
         cases.some((result) => result.status !== "passed") ||
         JSON.stringify(report.commonJsAssertions) !==
           JSON.stringify({ callable: true, sameDefault: true }) ||

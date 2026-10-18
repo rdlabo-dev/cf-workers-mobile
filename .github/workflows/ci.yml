@@ -28,6 +28,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: node scripts/url-idna/bundle-url.mjs --check
       - run: npm run build
       - run: npm test -- --allowOnly=false
 

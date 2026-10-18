@@ -1,3 +1,4 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
 import { builtinModules } from "node:module";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { build } from "esbuild";
@@ -51,67 +52,18 @@ it("runs the node module contracts against real workerd", async () => {
   const reports = (await (
     await harness.dispatchFetch("https://node-compat.invalid/")
   ).json()) as ContractResult[];
-  expect(reports.map((report) => report.feature)).toEqual([
-    "node.path",
-    "node.querystring",
-    "node.string_decoder",
-    "node.http",
-    "node.net",
-    "node.buffer",
-    "node.timers",
-    "node.url",
-    "node.os",
-    "node.tty",
-    "node.wasi",
-    "node.punycode",
-    "node.constants",
-    "node.v8",
-    "node.http2",
-    "node.vm",
-    "node.child_process",
-    "node.cluster",
-    "node.dgram",
-    "node.inspector",
-    "node.domain",
-    "node.readline",
-    "node.repl",
-    "node.sqlite",
-    "node.test",
-    "node.stream/consumers",
-    "node.assert",
-    "node.perf_hooks",
-    "node.trace_events",
-    "node.dns",
-    "node.https",
-    "node.worker_threads",
-    "node._http_agent",
-    "node._http_client",
-    "node._http_incoming",
-    "node._tls_common",
-
-    "node.async-hooks",
-    "node.stream-web",
-    "node.util",
-    "node.diagnostics_channel",
-    "node.stream",
-    "node._stream_readable",
-    "node._stream_writable",
-    "node._stream_duplex",
-    "node._stream_transform",
-    "node._stream_passthrough",
-    "node.stream/promises",
-  ]);
-  expect(reports.map((report) => report.cases.length)).toEqual([
-    14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5, 6, 8, 6, 8,
-    6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 8, 22, 7, 28, 15, 25, 2, 2, 2, 2,
-    2, 2,
-  ]);
+  const expected = Object.entries(expectedCases).filter(
+    ([feature]) =>
+      feature.startsWith("node.") &&
+      !["node.fs", "node.module"].includes(feature),
+  );
+  expect(
+    reports.map((r) => [r.feature, r.cases.map((c) => c.id)]).sort(),
+  ).toEqual(expected.sort());
   for (const report of reports) assertContract(report);
   expect(
     reports
       .flatMap((report) => report.cases)
-      .every(
-        (test) => test.status === "passed" || test.status === "unsupported",
-      ),
+      .every((test) => test.status === "passed"),
   ).toBe(true);
 });

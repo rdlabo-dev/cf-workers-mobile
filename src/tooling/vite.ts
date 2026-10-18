@@ -2,12 +2,13 @@ import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
 import { serverModules } from "./server-modules.js";
 import type { ServerBuildOptions } from "./server.js";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import {
   configuredPath,
   compatibilityAliases,
+  compatibilityDependencies,
   commonJSCompatibilityAliases,
   globalsInstallPath,
   nodeGlobalsInstallPath,
@@ -85,44 +86,30 @@ function compatibilityPlugins(
     {
       name: "workers-capacitor",
       enforce: "pre",
-      resolveId(source, _importer, options) {
+      async resolveId(source, importer, options) {
         if (options.custom?.["node-resolve"]?.isRequire)
           return commonJS[source] ?? commonJSPaths.get(normalizePath(source));
-      },
-      transform(code, id) {
-        const original = code;
-        const path = normalizePath(id.split("?")[0]);
-        const compatRoot = normalizePath(resolve(globalsPath, "../../.."));
-        if (path.startsWith(`${compatRoot}/`)) {
-          if (path === `${compatRoot}/browser/body/stream-body.js`)
-            code = code.replace(
-              'from "../../compat/buffer/blob.js"',
-              'from "node:buffer"',
-            );
-          code = code.replace(
-            /from "(?:\.\.\/stream-web|\.\.\/\.\.\/compat\/stream-web)\/index\.js"/g,
-            'from "node:stream/web"',
-          );
-          if (path === `${compatRoot}/compat/stream-web/interop.js`)
-            code = code.replace('from "./index.js"', 'from "node:stream/web"');
+        if (!importer || !source.startsWith(".")) return;
+        const root = normalizePath(resolve(globalsPath, "../../.."));
+        const owner = normalizePath(importer.split("?")[0]);
+        if (!owner.startsWith(`${root}/`)) return;
+        const target = normalizePath(resolve(dirname(owner), source));
+        // Runtime-relative imports and public builtins must resolve to the same
+        // optimized module. Keep internal buffer/performance imports untouched.
+        let specifier: string | undefined;
+        if (target === `${root}/compat/stream-web/index.js`)
+          specifier = "node:stream/web";
+        else if (
+          owner === `${root}/browser/body/stream-body.js` ||
+          owner === `${root}/shared/globals/web.js`
+        ) {
+          if (target === `${root}/compat/buffer/blob.js`)
+            specifier = "node:buffer";
+          if (target === `${root}/compat/perf-hooks/performance.js`)
+            specifier = "node:perf_hooks";
         }
-        if (
-          normalizePath(id.split("?")[0]) !==
-          normalizePath(resolve(globalsPath, "../web.js"))
-        )
-          return code === original ? undefined : code;
-        // Prebundled Node modules and runtime globals must share constructor identity.
-        // Keep the distributed runtime's relative import usable as raw browser ESM.
-        return code
-          .replace(
-            'from "../../compat/stream-web/index.js"',
-            'from "node:stream/web"',
-          )
-          .replace('from "../../compat/buffer/blob.js"', 'from "node:buffer"')
-          .replace(
-            'from "../../compat/perf-hooks/performance.js"',
-            'from "node:perf_hooks"',
-          );
+        if (specifier)
+          return this.resolve(specifier, importer, { skipSelf: true });
       },
       config: () => ({
         // App globals and dependencies must share Buffer identity and the HTTP registry.
@@ -135,115 +122,18 @@ function compatibilityPlugins(
                 setup(build) {
                   build.onResolve(
                     {
-                      filter:
-                        /^(?:node:)?(?:stream|_stream_(?:readable|writable|duplex|transform|passthrough))$/,
+                      filter: /^(?:node:)?[\w/]+$/,
                     },
                     ({ path, kind }) =>
-                      kind === "require-call"
-                        ? { path: commonJS[path]! }
+                      kind === "require-call" && commonJS[path]
+                        ? { path: commonJS[path] }
                         : undefined,
                   );
                 },
               },
             ],
           },
-          include: [
-            "cloudflare:node",
-            "node:_tls_common",
-            "_tls_common",
-            "node:_http_agent",
-            "_http_agent",
-            "node:_http_client",
-            "_http_client",
-            "node:_http_incoming",
-            "_http_incoming",
-            "node:diagnostics_channel",
-            "diagnostics_channel",
-            "node:async_hooks",
-            "async_hooks",
-            "node:stream",
-            "stream",
-            "node:stream/promises",
-            "stream/promises",
-            "node:_stream_readable",
-            "_stream_readable",
-            "node:_stream_writable",
-            "_stream_writable",
-            "node:_stream_duplex",
-            "_stream_duplex",
-            "node:_stream_transform",
-            "_stream_transform",
-            "node:_stream_passthrough",
-            "_stream_passthrough",
-            "node:stream/web",
-            "stream/web",
-            "node:stream/consumers",
-            "stream/consumers",
-            "node:dns",
-            "dns",
-            "node:dns/promises",
-            "dns/promises",
-            "node:assert/strict",
-            "assert/strict",
-            "node:assert",
-            "assert",
-            "node:perf_hooks",
-            "perf_hooks",
-            "node:trace_events",
-            "trace_events",
-            "node:https",
-            "https",
-            "node:http",
-            "http",
-            "node:buffer",
-            "buffer",
-            "node:punycode",
-            "punycode",
-            "node:constants",
-            "constants",
-            "node:v8",
-            "v8",
-            "node:http2",
-            "http2",
-            "node:child_process",
-            "child_process",
-            "node:cluster",
-            "cluster",
-            "node:dgram",
-            "dgram",
-            "node:inspector/promises",
-            "inspector/promises",
-            "node:inspector",
-            "inspector",
-            "node:readline/promises",
-            "readline/promises",
-            "node:readline",
-            "readline",
-            "node:domain",
-            "domain",
-            "node:worker_threads",
-            "worker_threads",
-            "node:test",
-            "node:sqlite",
-            "node:repl",
-            "repl",
-            "node:vm",
-            "vm",
-            "node:wasi",
-            "wasi",
-            "node:os",
-            "os",
-            "node:net",
-            "net",
-            "node:tty",
-            "tty",
-            "node:url",
-            "url",
-            "node:timers",
-            "timers",
-            "node:timers/promises",
-            "timers/promises",
-          ],
+          include: compatibilityDependencies(),
         },
         resolve: {
           alias: aliases,

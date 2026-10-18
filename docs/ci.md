@@ -47,11 +47,12 @@ The job uploads the source-pin metadata, JSON test reports, and failure screensh
   pinned workerd and the public browser adapters, including installed packages.
 - `test:node-inventory` checks the pinned namespace inventory and prevents new
   missing/extra exports or import failures, even within modules with known debt.
-  Its `*-boundaries.test.mjs` probes reproduce engine differences; passing these
+  The separately invoked `test:node-boundaries` probes reproduce engine differences; passing these
   probes is evidence about a limitation, not acceptance of our implementation.
 - Runtime and forced-stream-fallback acceptance require all declared cases to
   pass, including disposal. Changing a case to `unsupported` must fail these
-  gates. Counts protect against accidental omission but do not prove coverage.
+  gates. The independent feature/case-name baseline detects omissions; passing
+  it does not prove that every required behavior has been specified.
 - The library's Node 22 unit host supplies `Error.isError` using Node's intrinsic
   `util.types.isNativeError`. This test-only setup is not bundled or used in
   browser, workerd or packed-consumer tests. The target WebView must provide the
@@ -60,3 +61,16 @@ The job uploads the source-pin metadata, JSON test reports, and failure screensh
   evidence. They are not a reproducible CI gate. Native runs remain a separate
   acceptance obligation; a one-off successful run must not be presented as
   automatic protection for future changes.
+
+Builtin build aliases, CommonJS entry points and Vite prebundling derive from the
+same small table in `src/tooling/shared.ts`. Runtime constructor imports resolve
+through Vite's module resolver; source text is not rewritten to deduplicate them.
+The checked-in `demo/tests/validation/expected-cases.json` records feature/case
+names independently of the implementations. Removing a contract requires an
+explicit review of this baseline; it is not regenerated during tests.
+
+Run `cd demo && npm run test:node-boundaries` for exploratory engine/build probes.
+These use reduced examples and are deliberately outside the required CI gate;
+the production adapters are covered by the shared contracts and build tests.
+The library job also regenerates the URL parser in memory and rejects a mismatch
+with the checked-in output (`node scripts/url-idna/bundle-url.mjs --check`).

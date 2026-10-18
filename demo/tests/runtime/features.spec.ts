@@ -1,3 +1,4 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
 import { expect, test } from "@playwright/test";
 test("one feature standard covers direct/isolated fetch, state and engine capability", async ({
   page,
@@ -5,13 +6,17 @@ test("one feature standard covers direct/isolated fetch, state and engine capabi
   await page.goto("/");
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
-  expect(reports.map((report) => report.cases.length)).toEqual([
-    4, 4, 18, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3, 11, 5, 10, 5, 5,
-    6, 8, 6, 8, 6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2, 8, 22, 8, 2, 7,
-    28, 15, 25, 2, 2, 2, 2, 2, 2, 14, 11, 15, 18, 9, 24, 30, 19, 6, 5, 8, 5, 3,
-    11, 5, 10, 5, 5, 6, 8, 6, 8, 6, 4, 14, 10, 15, 14, 6, 14, 10, 12, 2, 2, 2,
-    8, 22, 8, 2, 7, 28, 15, 25, 2, 2, 2, 2, 2, 2,
-  ]);
+  const expected = Object.entries(expectedCases).flatMap(([feature, cases]) =>
+    (feature.startsWith("node.") || feature === "fetch.basic"
+      ? ["direct", "isolated"]
+      : ["webview"]
+    ).map((environment) => [environment, feature, cases]),
+  );
+  expect(
+    reports
+      .map((r) => [r.environment, r.feature, r.cases.map((c) => c.id)])
+      .sort(),
+  ).toEqual(expected.sort());
   const cases = reports.flatMap((report) => report.cases);
   expect(reports.flatMap((report) => report.errors)).toEqual([]);
   expect(cases.filter((result) => result.status !== "passed")).toEqual([]);

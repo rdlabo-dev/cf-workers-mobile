@@ -205,7 +205,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | Not implemented       | Module               | createRequire, resolution, dynamic module loading/hooks                            | U                          | Determine Workers' actual supported subset first. Statically bundled dependencies can use build-time resolution; arbitrary unbundled Node resolution must not be assumed.                            |
 
 The documentation's unsupported type-inspection list is not sufficient for this
-fixed profile. A reproducible [engine-boundary probe](../demo/tests/experiments/node-compat/engine-boundaries.test.mjs)
+fixed profile. A reproducible [engine-boundary probe](../demo/tests/experiments/node-compat/engine-boundaries.probe.mjs)
 shows that `util.types.isProxy()` returns true for both ordinary and revoked
 proxies without invoking traps, and false for the original target. The pinned
 [workerd util implementation](https://github.com/cloudflare/workerd/blob/5358e3d337336eaf696a48bc1563d808b10feba5/src/workerd/api/node/util.h)
@@ -716,7 +716,7 @@ installed-package regressions passed after this correction.
 
 The ES2016 lowering prototype restores concurrent/nested context in Chromium
 and WebKit only for the instrumented code. Two additional counterexamples are
-covered by `async-transform.test.mjs`:
+covered by `async-transform.probe.mjs`:
 
 - An untransformed native async callback still loses context even when its caller
   was transformed. Ordinary raw JavaScript, separately loaded dependencies and

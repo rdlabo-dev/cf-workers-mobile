@@ -1,3 +1,4 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
@@ -39,7 +40,17 @@ test("Vite development shares fallback constructors across direct and isolated m
   await page.waitForFunction(() => typeof window.runFeatures === "function");
   const reports = await page.evaluate(() => window.runFeatures());
   expect(reports.flatMap((report) => report.errors)).toEqual([]);
-  expect(reports.flatMap((report) => report.cases)).toHaveLength(966);
+  const expected = Object.entries(expectedCases).flatMap(([feature, cases]) =>
+    (feature.startsWith("node.") || feature === "fetch.basic"
+      ? ["direct", "isolated"]
+      : ["webview"]
+    ).map((environment) => [environment, feature, cases]),
+  );
+  expect(
+    reports
+      .map((r) => [r.environment, r.feature, r.cases.map((c) => c.id)])
+      .sort(),
+  ).toEqual(expected.sort());
   expect(
     reports
       .flatMap((report) => report.cases)

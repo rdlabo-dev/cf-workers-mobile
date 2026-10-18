@@ -138,13 +138,13 @@ implementation for `worker_threads`. Their export-name gaps are closed; this
 alone does not establish whole-module acceptance. The latter still has event
 branding, host-object serialization and global-identity differences to resolve.
 
-`stream-boundaries.test.mjs` records two differences in unmodified host streams:
+`stream-boundaries.probe.mjs` records two differences in unmodified host streams:
 Workers uses the last branch's reason for `tee()` cancellation and delays
 `pipeTo()` abort while an input read is pending. Chromium/WebKit use both branch
 reasons and abort immediately. These are implementation gaps, not evidence that
 stream compatibility is impossible.
 
-`message-port-boundaries.test.mjs` demonstrates that native browser ports deliver
+`message-port-boundaries.probe.mjs` demonstrates that native browser ports deliver
 on tasks, whereas Workers delivers on microtasks. Synthetic browser events
 cannot redefine their `isTrusted` flag. The local adapter implements microtask
 delivery, so it cannot currently provide the native trusted-event brand. This

@@ -39,7 +39,8 @@
     "test:runtime:fallback": "vite build --config tests/fixtures/apps/runtime/vite.stream-fallback.config.ts && playwright test --config tests/playwright.stream-fallback.config.ts",
     "test:runtime:fallback:dev": "playwright test --config tests/playwright.stream-fallback-dev.config.ts",
     "test:service-bindings": "node --test tests/experiments/services/integration.test.mjs",
-    "test:cloudflare-bindings": "node --test tests/experiments/cloudflare/integration.test.mjs"
+    "test:cloudflare-bindings": "node --test tests/experiments/cloudflare/integration.test.mjs",
+    "test:node-boundaries": "node --test tests/experiments/node-compat/*.probe.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

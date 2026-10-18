@@ -16,7 +16,8 @@
       "@rdlabo/workers-capacitor/cloudflare/apis/types"
     ],
     "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx"
+    "jsxImportSource": "hono/jsx",
+    "resolveJsonModule": true
   },
   "include": [
     "*.ts",
