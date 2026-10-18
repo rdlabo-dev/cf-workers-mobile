@@ -102,6 +102,8 @@ export function compatibilityAliases() {
     tty: compatPath("tty"),
     "node:url": compatPath("url"),
     url: compatPath("url"),
+    "node:diagnostics_channel": compatPath("diagnostics-channel"),
+    diagnostics_channel: compatPath("diagnostics-channel"),
     "node:async_hooks": compatPath("async-hooks"),
     async_hooks: compatPath("async-hooks"),
     "node:timers/promises": fileURLToPath(

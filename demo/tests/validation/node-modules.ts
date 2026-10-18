@@ -173,6 +173,11 @@ import {
   utilContract,
 } from "../../../src/compat/util/index.spec";
 
+import {
+  DiagnosticsImplementation,
+  diagnosticsContract,
+} from "../../../src/compat/diagnostics-channel/index.spec";
+
 export type NodeProfile = "bundled" | "workers";
 
 export async function runNodeContracts(
@@ -239,6 +244,7 @@ export async function runNodeContracts(
         ]),
     await runContract(new StreamWebImplementation(), streamWebContract),
     await runContract(new UtilImplementation(), utilContract),
+    await runContract(new DiagnosticsImplementation(), diagnosticsContract),
   );
   return reports;
 }
