@@ -1,4 +1,12 @@
 import {
+  PerfHooksImplementation,
+  perfHooksContract,
+} from "../../../src/compat/perf-hooks/index.spec";
+import {
+  TraceEventsImplementation,
+  traceEventsContract,
+} from "../../../src/compat/trace-events/index.spec";
+import {
   DnsImplementation,
   dnsContract,
 } from "../../../src/compat/dns/index.spec";
@@ -199,6 +207,8 @@ export async function runNodeContracts(
       new StreamConsumersImplementation(),
       streamConsumersContract,
     ),
+    await runContract(new PerfHooksImplementation(), perfHooksContract),
+    await runContract(new TraceEventsImplementation(), traceEventsContract),
     await runContract(new DnsImplementation(), dnsContract),
     await runContract(new HttpsImplementation(), httpsContract),
     await runContract(new WorkerThreadsImplementation(), workerThreadsContract),

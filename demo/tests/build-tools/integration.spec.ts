@@ -23,7 +23,7 @@ for (const build of [
         // node: and bare specifiers resolve to one profile per bundler.
         expect(report.resolved).toEqual(Array(11).fill(true));
         const cases = report.node.direct.flatMap((result) => result.cases);
-        expect(cases).toHaveLength(343);
+        expect(cases).toHaveLength(363);
         expect(
           cases.filter(
             (c) => c.status === "failed" || c.status === "unavailable",
@@ -74,7 +74,7 @@ for (const build of ["vite-node", "esbuild-node"]) {
           cases: { id: string; status: string }[];
         }[]
       ).flatMap((result) => result.cases);
-      expect(cases).toHaveLength(343);
+      expect(cases).toHaveLength(363);
       expect(
         cases.filter(
           (c) => c.status === "failed" || c.status === "unavailable",

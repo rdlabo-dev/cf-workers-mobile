@@ -40,6 +40,8 @@ for (const module of [
   "test",
   "stream-consumers",
   "dns",
+  "perf-hooks",
+  "trace-events",
   "https",
   "worker-threads",
   "http-agent",
@@ -155,6 +157,8 @@ for (const module of [
   "test",
   "stream-consumers",
   "dns",
+  "perf-hooks",
+  "trace-events",
   "https",
   "worker-threads",
   "http-agent",
@@ -374,7 +378,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 714 ||
+    features.flatMap((report) => report.cases).length !== 754 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -411,7 +415,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 343 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 363 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

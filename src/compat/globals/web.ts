@@ -7,7 +7,16 @@ import { structuredClone } from "../structured-clone/index.js";
 
 import { Blob, File } from "../buffer/blob.js";
 
-const values = { Request, Response, Headers, structuredClone, Blob, File };
+import * as performanceGlobals from "../perf-hooks/performance.js";
+const values = {
+  Request,
+  Response,
+  Headers,
+  structuredClone,
+  Blob,
+  File,
+  ...performanceGlobals,
+};
 type Name = keyof typeof values;
 type Target = Record<string, unknown>;
 type Patch = {
