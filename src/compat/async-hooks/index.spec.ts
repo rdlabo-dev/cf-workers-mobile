@@ -218,10 +218,17 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
           }),
         );
         await new Promise<void>((resolve) =>
-          setTimeout(() => {
-            equal(als.getStore(), "store");
-            resolve();
-          }),
+          setTimeout(
+            (a: number, b: string) => {
+              equal(als.getStore(), "store");
+              equal(a, 1);
+              equal(b, "x");
+              resolve();
+            },
+            0,
+            1,
+            "x",
+          ),
         );
       });
     },
