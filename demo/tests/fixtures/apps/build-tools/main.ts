@@ -3,7 +3,7 @@ import {
   type ExecutionPreference,
 } from "@rdlabo/capacitor-workers";
 import { runContract } from "../../../validation/contracts/http";
-import { runNodeContracts } from "../../../validation/node-modules";
+import { runLocalNodeContracts } from "../../../validation/node-modules";
 // Bare, node:-prefixed, subpath, named and default import forms must all
 // resolve to the same compat profiles under both bundlers.
 import nodePath from "node:path";
@@ -41,17 +41,18 @@ async function run(prefer: ExecutionPreference) {
     baseURL: "https://worker.invalid/api",
     prefer,
   });
+  let result;
   try {
     await runtime.ready;
-    return {
+    result = {
       execution: runtime.execution,
       cases: await runContract(fetch),
       resolved: resolved(),
-      node: { direct: await runNodeContracts("bundled") },
     };
   } finally {
-    runtime.dispose();
+    await runtime.dispose();
   }
+  return { ...result, node: { direct: await runLocalNodeContracts() } };
 }
 declare global {
   interface Window {

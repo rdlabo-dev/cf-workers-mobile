@@ -11,7 +11,7 @@ const pack = JSON.parse(
     encoding: "utf8",
   }),
 )[0];
-for (const module of ["path", "querystring", "string-decoder"]) {
+for (const module of ["path", "querystring", "string-decoder", "buffer"]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
     if (!pack.files.some((file) => file.path === notice))
@@ -64,6 +64,7 @@ for (const module of [
   "path",
   "querystring",
   "string-decoder",
+  "buffer",
   "http",
   "net",
   "headers",
@@ -203,6 +204,7 @@ try {
   }
   browser = await chromium.launch();
   const page = await browser.newPage();
+  page.on("pageerror", (error) => console.error("Consumer page error:", error));
   await page.goto("http://127.0.0.1:4189/");
   await page.waitForFunction(() => window.pocDone);
   const results = await page.evaluate(() => window.pocResults);
@@ -268,11 +270,13 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 162 ||
+    features.flatMap((report) => report.cases).length !== 266 ||
     features.some(
       (report) =>
         report.errors.length ||
-        report.cases.some((test) => test.status !== "passed"),
+        report.cases.some(
+          (test) => test.status === "failed" || test.status === "unavailable",
+        ),
     )
   )
     throw new Error(JSON.stringify(features));
@@ -301,6 +305,18 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
         (prefer) => window.runBuildTool(prefer),
         prefer,
       );
+      if (
+        build !== "raw" &&
+        (report.node.direct.flatMap((r) => r.cases).length !== 119 ||
+          report.node.direct.some(
+            (r) =>
+              r.errors.length ||
+              r.cases.some(
+                (c) => c.status === "failed" || c.status === "unavailable",
+              ),
+          ))
+      )
+        throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
       if (
         report.execution !== prefer ||
         report.cases.length !== (build === "raw" ? 4 : 9) ||
@@ -395,7 +411,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     ),
   );
   console.log(
-    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).length} passed, 0 exclusions, preferences 2/2 passed (${temp})`,
+    `Packed consumer: direct ${results.length}/26, isolated ${isolated.length}/22, common features ${features.flatMap((report) => report.cases).length} checked (${features.flatMap((report) => report.cases).filter((test) => test.status === "unsupported").length} declared unsupported), preferences 2/2 passed (${temp})`,
   );
 } finally {
   await browser?.close();

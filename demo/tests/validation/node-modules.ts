@@ -1,3 +1,4 @@
+import { capacitorWorkers } from "@rdlabo/capacitor-workers";
 // Environment runners share module-owned contracts. The node:* imports in
 // their implementations resolve to workerd builtins or the bundler aliases.
 import {
@@ -33,6 +34,10 @@ import {
   asyncHooksContract,
   NodeAsyncHooks,
 } from "../../../src/compat/async-hooks/index.spec";
+import {
+  BufferImplementation,
+  bufferContract,
+} from "../../../src/compat/buffer/index.spec";
 
 import {
   FsImplementation,
@@ -65,6 +70,7 @@ export async function runNodeContracts(
     await runContract(new NodeStringDecoder(), nodeStringDecoderContract),
     await runContract(new NodeHttp(), nodeHttpContract),
     await runContract(new NetImplementation(), netContract),
+    await runContract(new BufferImplementation(), bufferContract),
     await runContract(
       profile === "workers"
         ? new NodeAsyncHooks()
@@ -76,4 +82,17 @@ export async function runNodeContracts(
     await runContract(new StreamWebImplementation(), streamWebContract),
     await runContract(new UtilImplementation(), utilContract),
   ];
+}
+
+/** Standalone host validation owns a direct runtime, even when the app prefers a Worker. */
+export async function runLocalNodeContracts(): Promise<ContractResult[]> {
+  const runtime = capacitorWorkers({
+    baseURL: "https://node-contract.invalid",
+    worker: { fetch: () => new Response(null, { status: 204 }) },
+  });
+  try {
+    return await runNodeContracts("bundled");
+  } finally {
+    await runtime.dispose();
+  }
 }
