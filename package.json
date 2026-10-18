@@ -54,6 +54,10 @@
     },
     "./cloudflare": {
       "types": "./dist/cloudflare.d.ts"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.js"
     }
   },
   "scripts": {

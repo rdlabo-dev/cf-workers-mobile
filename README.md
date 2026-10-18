@@ -10,6 +10,7 @@ Small, experimental PoC: run a Cloudflare Workers fetch handler in a Capacitor W
 - [Runtime behavior](#runtime-behavior)
 - [Workers Express](#workers-express)
 - [Local KV](#local-kv)
+- [D1 and remote APIs](#d1-and-remote-apis)
 - [Development and testing](#development-and-testing)
 - [Compatibility and limitations](#compatibility-and-limitations)
 - [Extending the library](#extending-the-library)
@@ -223,6 +224,10 @@ Keep any other types your project already uses. This is a type-only entry; do no
 
 Use `LocalStorageKV` from `@rdlabo/capacitor-workers/features/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
 
+## D1 and remote APIs
+
+D1 stays in the deployed Cloudflare Worker. Capacitor does not receive a D1 binding or a Cloudflare API token; D1-backed operations must be exposed as authenticated, authorized **business REST endpoints** rather than arbitrary SQL or a D1 proxy. The optional `@rdlabo/capacitor-workers/auth` client scopes requests to one HTTPS API root and accepts an application-owned per-user token provider; it does not implement login, token storage, session verification or automatic retries. See the [D1 REST migration guide](docs/d1-rest-api.md) and [migration procedure](docs/d1-migration.md).
+
 ## Development and testing
 
 Requires Node 22.12+, npm, and the native SDKs for native tests. Package publication, PR creation and cloud deployment are not part of these commands.
@@ -368,7 +373,7 @@ Fetch implementations extend `FetchRuntime` and share one contract suite. See [t
 ## Roadmap
 
 1. Keep the runtime small and validate Hono/Workers Express against real WebViews.
-2. Add binding adapters: D1 → Capacitor SQLite, KV → local storage provider, R2 → Capacitor Filesystem; compare API behaviour against Workers. Local data is independent of cloud data; sync is separate.
+2. Keep privileged D1 access in deployed Workers behind business APIs; local KV remains an independent, opt-in adapter. Evaluate other bindings individually without copying server privileges into the client.
 3. Expand setup automation, compatibility and browser/Electron/Tauri execution. Keep Worker entry configuration and application initialization simple.
 
 The Hono + Express compatibility test app currently includes broad Node polyfills; bundle size is a PoC finding, not an optimized release. See [verification results](docs/verification.md) for measured results and limitations.

@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       "tests/unit/**/*.test.ts",
       "src/compat/cloudflare-node/index.spec.ts",
+      "src/auth/index.spec.ts",
       "src/compat/globals/index.spec.ts",
       "src/compat/globals/web.spec.ts",
       "src/compat/abort/installation.spec.ts",
