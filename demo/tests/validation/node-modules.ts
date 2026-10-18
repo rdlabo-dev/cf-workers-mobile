@@ -1,4 +1,8 @@
 import {
+  DnsImplementation,
+  dnsContract,
+} from "../../../src/compat/dns/index.spec";
+import {
   StreamConsumersImplementation,
   streamConsumersContract,
 } from "../../../src/compat/stream-consumers/index.spec";
@@ -195,6 +199,7 @@ export async function runNodeContracts(
       new StreamConsumersImplementation(),
       streamConsumersContract,
     ),
+    await runContract(new DnsImplementation(), dnsContract),
     await runContract(new HttpsImplementation(), httpsContract),
     await runContract(new WorkerThreadsImplementation(), workerThreadsContract),
     await runContract(new HttpAgentImplementation(), httpAgentContract),

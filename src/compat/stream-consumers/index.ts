@@ -24,10 +24,11 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import { iterable } from "./iterable.js";
 import { Buffer } from "node:buffer";
 
 export async function blob(stream) {
-  return new Blob(await Array.fromAsync(stream));
+  return new Blob(await Array.fromAsync(iterable(stream)));
 }
 
 export async function arrayBuffer(stream) {
@@ -42,7 +43,7 @@ export async function buffer(stream) {
 export async function text(stream) {
   const dec = new TextDecoder();
   let str = "";
-  for await (const chunk of stream) {
+  for await (const chunk of iterable(stream)) {
     if (typeof chunk === "string") str += chunk;
     else str += dec.decode(chunk, { stream: true });
   }

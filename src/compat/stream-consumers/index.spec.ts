@@ -165,6 +165,24 @@ export const streamConsumersContract: ContractSuite<
       }
       same(error instanceof TypeError, true);
       same(closed, true);
+      let canceled = false;
+      const invalidStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(123);
+        },
+        cancel() {
+          canceled = true;
+        },
+      });
+      let streamError;
+      try {
+        await api.text(invalidStream);
+      } catch (error) {
+        streamError = error;
+      }
+      same(streamError instanceof TypeError, true);
+      same(canceled, true);
+      same(invalidStream.locked, false);
     },
   },
 };
