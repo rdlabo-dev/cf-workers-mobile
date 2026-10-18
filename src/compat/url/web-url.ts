@@ -1,7 +1,7 @@
 import { NativeURL, hostKey, instanceKey } from "./brand.js";
 export { isURLInstance } from "./brand.js";
 import { URL as StandardURL } from "./standard-url.js";
-import { platform } from "../globals/platform.js";
+import { platform } from "../../shared/globals/platform.js";
 const coerceString = String.prototype.concat;
 const nativeBlobSize = Object.getOwnPropertyDescriptor(
   platform.Blob.prototype,

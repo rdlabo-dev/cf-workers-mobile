@@ -16,7 +16,7 @@ custom-controller setup below is the earlier experiment, not the proposed public
 Visible Capacitor WebView: normal document / link / resource request
   → iOS WKURLSchemeHandler or Android Service Worker FetchEvent
   → offscreen WebView that stays alive across document navigation
-  → existing capacitor-workers transport and dedicated Worker
+  → existing workers-capacitor transport and dedicated Worker
   → Hono or Express Fetch Handler
   → Response bytes / status / headers
   → visible WebView's normal document loader
@@ -74,7 +74,7 @@ The separate browser Service Worker comparison has 16 successful Chromium tests.
 
 The ordinary demo browser suite passed all eight regression tests. Demo typechecking and both runtime-host build modes also passed. Native outcomes are manual simulator/emulator runs, not GitHub Actions results. CI runs the browser comparison, builds the Express host variant, and runs the workerd suite, but does not run this native driver.
 
-Reports appear in the visible page and at `localStorage['native-document-result']`; the state machine lives in sessionStorage so it survives document navigation. Start a fresh app process for each run. A previous report alone is not evidence: check the framework and current on-screen result. Evidence files live under ignored `demo/artifacts/native-documents-*` and `demo/artifacts/split-fetch-*-ios.json`. Each iOS runtime launch removes the previous native report to avoid mistaking an interrupted run for success. The iOS probe also writes `Documents/native-document-result.json` in the simulator app container; obtain the current container with `xcrun simctl get_app_container <device> jp.rdlabo.capacitorworkers.poc data` after each installation.
+Reports appear in the visible page and at `localStorage['native-document-result']`; the state machine lives in sessionStorage so it survives document navigation. Start a fresh app process for each run. A previous report alone is not evidence: check the framework and current on-screen result. Evidence files live under ignored `demo/artifacts/native-documents-*` and `demo/artifacts/split-fetch-*-ios.json`. Each iOS runtime launch removes the previous native report to avoid mistaking an interrupted run for success. The iOS probe also writes `Documents/native-document-result.json` in the simulator app container; obtain the current container with `xcrun simctl get_app_container <device> jp.rdlabo.workerscapacitor.poc data` after each installation.
 
 The workerd suite separately executes both Worker fixtures, including their generated script routes. It does not test native interception. The earlier Turbo implementation and dependencies were removed; only its investigation record remains.
 
@@ -114,3 +114,15 @@ npx vitest run --config tests/vitest.config.ts tests/workers/rendering.test.ts
 The overlay stores original native entry files under `demo/artifacts/native-document-originals/` and refuses a second apply. It temporarily replaces Android's MainActivity and appends the iOS test controller to SceneDelegate; restoration does not use git reset. Do not edit those two native entry files while the overlay is active. All experimental sources are under `demo/tests/`.
 
 The Android probe unregisters its Service Worker after completing the report. If a run is interrupted before completion, unregister it through WebView DevTools (or clear this test app's storage) before restoring the ordinary demo; restoring files alone does not remove browser registrations.
+
+## Current library transport update
+
+The current `src/documents` / `native/ios/DocumentBridge.swift` transport returns
+headers before response EOF and pulls at most 64 KiB per native reply. Android's
+Service Worker uses the same host pull/cancel commands. Cancellation, disposal,
+and native navigation stop release response readers and abort request signals.
+The historical experiment observations above describe its earlier buffered code.
+Native document uploads remain bounded buffers (8 MiB maximum); Fetch-only Worker
+uploads use streaming. Legacy buffered native response callers are limited to
+8 MiB and should update with the library. Local unit and native build evidence
+must not be treated as physical-device peak-memory measurements.

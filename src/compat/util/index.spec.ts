@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 import * as namespace from "node:util";
 // The oracle must use workerd's builtin, never the implementation source.
 const util = namespace as unknown as typeof import("./index.js");

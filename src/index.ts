@@ -1,12 +1,17 @@
+import { assertLocalRuntime } from "./environment.js";
+export {
+  getExecutionEnvironment,
+  type ExecutionEnvironment,
+} from "./environment.js";
 import {
   clearPreviousRendering,
   startRendering,
   validateRendering,
 } from "./documents/runtime.js";
 import { createFetchRuntime } from "./fetch/worker-runtime.js";
-import type { CapacitorWorkersOptions } from "./fetch/types.js";
+import type { WorkersCapacitorOptions } from "./fetch/types.js";
 export type {
-  CapacitorWorkersOptions,
+  WorkersCapacitorOptions,
   WorkerContext,
   WorkerFactory,
   WorkerSource,
@@ -20,11 +25,12 @@ export { FetchRuntime, type FetchRuntimeOptions } from "./fetch/runtime.js";
 let installed = false;
 
 /** Installs synchronously; await ready before local requests. Does not start a server. */
-export function capacitorWorkers<Env = Record<string, unknown>>(
-  options: CapacitorWorkersOptions<Env>,
+export function workersCapacitor<Env = Record<string, unknown>>(
+  options: WorkersCapacitorOptions<Env>,
 ) {
+  assertLocalRuntime();
   if (installed)
-    throw new Error("capacitorWorkers is already installed; dispose it first.");
+    throw new Error("workersCapacitor is already installed; dispose it first.");
   if (options.render !== undefined)
     validateRendering(options.render, options.baseURL);
   const original = globalThis.fetch;

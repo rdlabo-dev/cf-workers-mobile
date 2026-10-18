@@ -9,10 +9,10 @@ or maintain a second router.
 
 ```ts
 // vite.config.ts — Capacitor build only
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 
 export default {
-  plugins: [capacitorWorkersPlugin({ worker: "worker/src/index.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],
 };
 ```
 
@@ -25,9 +25,9 @@ The esbuild plugin accepts the same options.
 
 ```ts
 // App startup — the business Worker remains unchanged
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://local.invalid/",
   remote: {
     origin: "https://existing-worker.example.com",
@@ -59,7 +59,7 @@ This also covers fallthrough and overlapping routes. Pure routes remain local.
 D1 bindings, server `env` values, unknown dependency behavior, dynamic property
 access, and mutable state shared with server operations widen the server boundary.
 An `env` binding may be explicitly kept local with the build option
-`localBindings: ["LABEL"]` when it is supplied through `capacitorWorkers({ env })`.
+`localBindings: ["LABEL"]` when it is supplied through `workersCapacitor({ env })`.
 A D1 binding cannot be declared local. Unknown top-level initialization, internal router dispatch, ambient global state
 and cookie/header state also keep the entire Worker on the server.
 The analysis is deliberately conservative;
@@ -73,7 +73,7 @@ This mode requires connectivity for every intercepted request; it does not make
 the existing application available offline. It is never selected by catching a
 D1 error after partly running an operation.
 
-Both build integrations emit `capacitor-workers-d1.json` describing the selected
+For D1-only builds, both integrations emit `workers-capacitor-d1.json` describing the selected
 mode and route/middleware registrations. This report is diagnostic metadata,
 not a second router maintained by application authors.
 
@@ -130,6 +130,28 @@ fallback. Abort and runtime disposal cancel pending credential lookup/transport;
 a late token cannot send after disposal. SQL removal reduces disclosure of the
 server implementation; it does not replace server-side authorization or identify
 arbitrary hardcoded secrets in otherwise local application code.
+
+## Shared transport security and upload limits
+
+App-local `Origin` and `Referer` headers are remapped to the remote origin for
+existing Worker navigation. Do not treat the rewritten Origin alone as proof of
+trusted user intent. Retain application CSRF token checks where used and restrict
+WebView content/navigation and native bridge access. HttpOnly hides cookies from
+scripts but does not prevent compromised scripts from making authenticated
+requests. Native Cookie transport does not promise browser-equivalent SameSite
+or CSRF protection.
+
+Browser uploads and native Fetch redirect-follow uploads are buffered up to
+8 MiB by default. Configure `remote.maxBufferedBodyBytes` with a nonnegative safe
+integer (bytes). Exceeding the limit cancels the body producer and rejects before
+network dispatch; zero permits only empty bodies. Native manual/error redirect
+modes retain streaming. This bounds transport buffering, not total application
+heap usage or bodies already allocated by callers. Apply application limits
+before allocating large uploads; use R2 multipart uploads for larger objects.
+
+Hyperdrive uses the same transport; see the
+[Hyperdrive guide](hyperdrive-transparent-migration.md) for binding setup and
+additional database boundaries.
 
 ## Verification
 

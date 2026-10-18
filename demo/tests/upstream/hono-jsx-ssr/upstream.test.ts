@@ -4,7 +4,7 @@ import { cases } from "./cases";
 import { metadata, workerEntry } from "./sample";
 
 // The original Worker is the baseline; browser.spec.ts applies the same
-// expectations through capacitorWorkers in direct and isolated execution.
+// expectations through workersCapacitor in direct and isolated execution.
 describe("upstream honojs/examples jsx-ssr", () => {
   const harness = createTestHarness({
     workers: [

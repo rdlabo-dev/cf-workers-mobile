@@ -2,8 +2,8 @@ import constants, * as namespace from "node:constants";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 import { expectedValues } from "./values.spec";
 export const constantsFeature = defineFeature<typeof constants>()(
   "node.constants",

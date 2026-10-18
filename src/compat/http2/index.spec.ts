@@ -3,8 +3,8 @@ import { Buffer } from "node:buffer";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 import { expectedValues } from "./values.spec";
 export const http2Feature = defineFeature<typeof http2>()("node.http2", [
   "exports",

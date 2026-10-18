@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [
@@ -13,7 +13,7 @@ export default defineConfig({
         return `export default Uint8Array.from(atob(${JSON.stringify(data)}), c => c.charCodeAt(0));`;
       },
     },
-    capacitorWorkersPlugin({ worker: "../../workers/runtime/node-globals.ts" }),
+    workersCapacitorPlugin({ worker: "../../workers/runtime/node-globals.ts" }),
   ],
   // These frameworks are loaded by separate Worker fixtures during a run.
   // Prebundle both before testing so dependency discovery cannot reload a page.

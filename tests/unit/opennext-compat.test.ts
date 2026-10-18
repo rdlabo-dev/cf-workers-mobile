@@ -1,8 +1,8 @@
-import { installWebGlobals } from "../../src/compat/globals/web.js";
+import { installWebGlobals } from "../../src/shared/globals/web.js";
 import * as localUtil from "../../src/compat/util/index";
 import * as localStreams from "../../src/compat/stream-web/index";
 import { expect, it } from "vitest";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 import { FsImplementation, fsContract } from "../../src/compat/fs/index.spec";
 import {
   ModuleImplementation,

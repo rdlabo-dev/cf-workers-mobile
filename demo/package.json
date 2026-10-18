@@ -1,5 +1,5 @@
 {
-  "name": "capacitor-workers-demo",
+  "name": "workers-capacitor-demo",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "android": "cap run android",
     "test:browser": "npm run build && vite build --config tests/vite.express.config.ts && npm run build:validation && playwright test --config tests/playwright.config.ts",
     "test:workers": "vitest run --config tests/vitest.config.ts",
+    "test:hyperdrive-migration": "node --test tests/experiments/hyperdrive/integration.test.mjs",
     "test:d1-migration": "node --test tests/experiments/d1/integration.test.mjs",
     "build:runtime": "vite build --config tests/fixtures/apps/runtime/vite.config.ts",
     "test:runtime": "npm run build:runtime && playwright test --config tests/playwright.runtime.config.ts",
@@ -36,11 +37,13 @@
     "test:workers:tls": "vitest run --config tests/vitest.tls.config.ts",
     "test:node-inventory": "node --test tests/experiments/node-compat/*.test.mjs",
     "test:runtime:fallback": "vite build --config tests/fixtures/apps/runtime/vite.stream-fallback.config.ts && playwright test --config tests/playwright.stream-fallback.config.ts",
-    "test:runtime:fallback:dev": "playwright test --config tests/playwright.stream-fallback-dev.config.ts"
+    "test:runtime:fallback:dev": "playwright test --config tests/playwright.stream-fallback-dev.config.ts",
+    "test:service-bindings": "node --test tests/experiments/services/integration.test.mjs",
+    "test:cloudflare-bindings": "node --test tests/experiments/cloudflare/integration.test.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
-    "@rdlabo/capacitor-workers": "file:..",
+    "@rdlabo/workers-capacitor": "file:..",
     "express": "^5.3.0",
     "hono": "^4.13.13"
   },
@@ -54,6 +57,7 @@
     "cf": "^1.0.0-beta.17",
     "esbuild": "^0.28.2",
     "miniflare": "5.20261012.0-beta",
+    "mysql2": "^3.24.6",
     "typescript": "^7.0.2",
     "vite": "^7.3.7",
     "vitest": "^5.0.5",

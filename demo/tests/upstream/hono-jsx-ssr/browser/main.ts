@@ -1,10 +1,10 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
 const prefer =
   new URL(location.href).searchParams.get("prefer") === "direct"
     ? "direct"
     : "worker";
-const runtime = capacitorWorkers({ baseURL: "https://worker.invalid", prefer });
+const runtime = workersCapacitor({ baseURL: "https://worker.invalid", prefer });
 declare global {
   interface Window {
     upstreamReady: Promise<typeof runtime.execution>;

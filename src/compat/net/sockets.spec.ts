@@ -1,6 +1,9 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { connect } from "./sockets.js";
-import { setNativeCall, type NativeCall } from "../fetch/native-network.js";
+import {
+  setNativeCall,
+  type NativeCall,
+} from "../../browser/fetch/native-network.js";
 let restore: (() => void) | undefined;
 afterEach(() => {
   restore?.();

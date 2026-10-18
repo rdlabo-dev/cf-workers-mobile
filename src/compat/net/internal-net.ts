@@ -98,7 +98,7 @@ type JSStreamSocket = Socket;
 
 import { inspect } from "node:util";
 type FixedLengthArray<T, N extends number> = T[] & { length: N };
-import { asyncDispose, dispose } from "../globals/symbols.js";
+import { asyncDispose, dispose } from "../../shared/globals/symbols.js";
 
 const kInspect = inspect.custom;
 

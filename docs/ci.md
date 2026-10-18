@@ -30,7 +30,7 @@ Linux Chromium/WebKit and local workerd are automatic gates. They do not establi
 
 No simulator/emulator job is claimed here: the existing manual native procedure has not yet been reproduced on GitHub-hosted runners. The packed consumer intentionally installs into a fresh temporary project; it tests package usability separately from the lockfile-controlled library/demo installs.
 
-`.github/workflows/codeql.yml` is a separate analysis workflow. Its Swift job prepares the iOS demo and compiles the app with `xcodebuild` on a macOS runner to give CodeQL a real build, but it performs no simulator launch and no native acceptance — those remain local `test:native:package` runs on a developer machine.
+`.github/workflows/codeql.yml` separately analyzes GitHub Actions, JavaScript/TypeScript and Java/Kotlin. Swift CodeQL is excluded because its macOS build cost and latency are impractical for this project. iOS native build and acceptance verification remain local `test:native:package` runs on a developer machine; removing Swift CodeQL does not replace those checks.
 
 ## Official upstream sample gate
 

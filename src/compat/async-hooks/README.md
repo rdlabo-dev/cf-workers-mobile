@@ -11,11 +11,13 @@ callback receivers, AsyncResource binding metadata and destroy results have
 shared contracts against workerd. The oracle no longer excludes these APIs
 because an older local implementation implemented desktop Node behavior.
 
-Whole-module acceptance remains open. Native async continuations cannot be
-intercepted by replacing Promise.prototype.then. The current context adapter
-retains its documented sticky approximation and explicitly excludes restoration
-and concurrent-isolation contracts. It also does not implement workerd's
-request-origin guard on captured contexts. Neither limitation is hidden by the
-matching export namespace. The engine and async-transform experiments under
-demo/tests/experiments/node-compat document the tested boundary; ordinary async
-lowering is not an exact replacement for native await semantics.
+Whole-module acceptance remains open. Capacitor builds lower async functions and
+generators, then capture Promise continuations. The shared contract now covers
+settle restoration, nested asynchronous scopes and concurrent isolation, in
+addition to the pinned Workers stubs. Native async callbacks that bypass the
+build plugin are rejected rather than silently leaking another scope's store.
+
+The adapter does not implement workerd's request-origin guard on captured
+contexts. Matching exports and the ordinary continuation contracts do not prove
+full engine equivalence. The experiments under demo/tests/experiments/node-compat
+document the remaining native-promise and scheduling boundaries.

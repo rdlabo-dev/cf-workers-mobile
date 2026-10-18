@@ -40,7 +40,7 @@ try {
     device,
     "artifacts/connection-ios/Build/Products/Debug-iphonesimulator/App.app",
   ]);
-  const app = "jp.rdlabo.capacitorworkers.poc";
+  const app = "jp.rdlabo.workerscapacitor.poc";
   const container = run("xcrun", [
     "simctl",
     "get_app_container",

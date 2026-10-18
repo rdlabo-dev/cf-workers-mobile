@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { context, type BuildResult } from "esbuild";
 import { expect, it } from "vitest";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/esbuild";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/esbuild";
 
 it("watches Worker dependencies and emits a new asset without writing output", async () => {
-  const dir = await mkdtemp(resolve(tmpdir(), "capacitor-workers-watch-"));
+  const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-watch-"));
   const results: BuildResult[] = [];
   await writeFile(resolve(dir, "value.js"), 'export default "before-change";');
   await writeFile(
@@ -16,7 +16,7 @@ it("watches Worker dependencies and emits a new asset without writing output", a
   );
   await writeFile(
     resolve(dir, "main.js"),
-    `import {capacitorWorkers} from ${JSON.stringify(fileURLToPath(import.meta.resolve("@rdlabo/capacitor-workers")))}; globalThis.runtime = capacitorWorkers({baseURL:"https://worker.invalid/api"});`,
+    `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("@rdlabo/workers-capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:"https://worker.invalid/api"});`,
   );
   const build = await context({
     absWorkingDir: dir,
@@ -26,7 +26,7 @@ it("watches Worker dependencies and emits a new asset without writing output", a
     format: "esm",
     write: false,
     plugins: [
-      capacitorWorkersPlugin({ worker: "worker.js" }),
+      workersCapacitorPlugin({ worker: "worker.js" }),
       {
         name: "capture",
         setup(build) {
@@ -56,3 +56,94 @@ it("watches Worker dependencies and emits a new asset without writing output", a
     await rm(dir, { recursive: true, force: true });
   }
 }, 15000);
+
+it.each([true, false])(
+  "preserves an explicit JSX loader (async=%s)",
+  async (asyncFunction) => {
+    const { build } = await import("esbuild");
+    const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-jsx-"));
+    try {
+      await writeFile(
+        resolve(dir, "main.js"),
+        `export ${asyncFunction ? "async" : ""} function App() { ${asyncFunction ? "await Promise.resolve();" : ""} return <div/>; }`,
+      );
+      const result = await build({
+        absWorkingDir: dir,
+        entryPoints: ["main.js"],
+        outdir: "out",
+        bundle: true,
+        format: "esm",
+        platform: "browser",
+        write: false,
+        loader: { ".js": "jsx" },
+        plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.outputFiles[0].text).toContain("createElement");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+it("does not transform source files explicitly loaded as text", async () => {
+  const { build } = await import("esbuild");
+  const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-text-"));
+  try {
+    await writeFile(
+      resolve(dir, "main.js"),
+      'import content from "./payload.ts"; export default content;',
+    );
+    await writeFile(
+      resolve(dir, "payload.ts"),
+      "async <this is not JavaScript>",
+    );
+    const result = await build({
+      absWorkingDir: dir,
+      entryPoints: ["main.js"],
+      outdir: "out",
+      bundle: true,
+      format: "esm",
+      platform: "browser",
+      write: false,
+      loader: { ".ts": "text" },
+      plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
+    });
+    expect(result.outputFiles[0].text).toContain(
+      "async <this is not JavaScript>",
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+it.each([true, false])(
+  "preserves TypeScript decorators (legacy=%s)",
+  async (legacy) => {
+    const { build } = await import("esbuild");
+    const dir = await mkdtemp(
+      resolve(tmpdir(), "workers-capacitor-decorator-"),
+    );
+    try {
+      await writeFile(
+        resolve(dir, "main.ts"),
+        `function Service(...args: any[]) {}\n${legacy ? "@Service export" : "export @Service"} class App { ${legacy ? "constructor(@Service value: unknown) {}" : "@Service accessor value = 1;"} async run() { await Promise.resolve(); return 1; } }`,
+      );
+      const result = await build({
+        absWorkingDir: dir,
+        entryPoints: ["main.ts"],
+        outdir: "out",
+        bundle: true,
+        format: "esm",
+        platform: "browser",
+        write: false,
+        tsconfigRaw: { compilerOptions: { experimentalDecorators: legacy } },
+        plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.outputFiles[0].text).toContain("Service");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+);

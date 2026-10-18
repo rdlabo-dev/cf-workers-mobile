@@ -1,6 +1,6 @@
 // @ts-nocheck
 export { EventEmitter } from "node:events";
-import { dispose } from "../globals/symbols.js";
+import { dispose } from "../../shared/globals/symbols.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
 import { validateAbortSignal, validateFunction } from "../net/validators.js";
 export function addAbortListener(

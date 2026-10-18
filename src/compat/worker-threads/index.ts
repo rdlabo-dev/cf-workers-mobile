@@ -24,7 +24,7 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import { asyncDispose } from "../globals/symbols.js";
+import { asyncDispose } from "../../shared/globals/symbols.js";
 import { ERR_METHOD_NOT_IMPLEMENTED } from "./errors.js";
 import { EventEmitter } from "node:events";
 import type {

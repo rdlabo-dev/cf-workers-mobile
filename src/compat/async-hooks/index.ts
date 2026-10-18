@@ -1,17 +1,11 @@
 import * as hooks from "./hooks.js";
 export * from "./hooks.js";
 import { contextAware, addCallbackBinding } from "./callbacks.js";
-// Scoped AsyncLocalStorage implementation. Exact within synchronous scopes.
-// For callbacks returning promises, run/exit install a "sticky" context
-// that survives settle until another scope overwrites it: awaits inside a
-// serialized request see the store, including lazily scheduled render work
-// (React microtasks, MessageChannel tasks and stream pulls are wrapped to
-// capture the context at schedule/construction time). Engine async hooks
-// (workerd) or a whole-program async transform are required for real
-// continuation isolation — concurrent interleaved request contexts are NOT
-// isolated; serialize dispatch when isolation is needed. Only patch worker
-// realms: the document's fetch adapter uses MessageChannel itself, so
-// replacing its ports can prevent responses from arriving.
+import { getExecutionEnvironment } from "../../environment.js";
+// Context propagation uses synchronous scopes and captured Promise callbacks.
+// Native await bypasses Promise.then: browser builds must lower async functions
+// with the supplied build plugins. Reject untransformed async scope callbacks
+// before they can silently read another request's store.
 
 const storageInstances = new WeakSet<object>();
 const resourceInstances = new WeakSet<object>();
@@ -43,32 +37,11 @@ function scope<T, A extends unknown[]>(
   callback: (...args: A) => T,
   args: A,
 ): T {
-  const previous = current;
-  current = context;
-  let result: T;
-  try {
-    result = Reflect.apply(callback, globalThis, args);
-  } catch (error) {
-    current = previous;
-    throw error;
-  }
-  if (
-    result !== null &&
-    (typeof result === "object" || typeof result === "function") &&
-    typeof (result as unknown as PromiseLike<T>).then === "function"
-  ) {
-    // Sticky context: the context stays installed after the returned
-    // promise settles. Workers engines restore via async hooks and
-    // propagate store to continuations registered inside the scope; this
-    // approximation instead keeps the last context visible until another
-    // scope overwrites it, which covers serialized single-request flows
-    // (verified against an OpenNext handler). Divergence: getStore after
-    // an awaited run returns the stale store rather than undefined.
-    void previous;
-  } else {
-    current = previous;
-  }
-  return result;
+  if (Object.prototype.toString.call(callback) === "[object AsyncFunction]")
+    throw new Error(
+      "AsyncLocalStorage requires async/await lowering by the workers-capacitor build plugin; native async callbacks are unsupported.",
+    );
+  return withContext(context, callback, args);
 }
 
 const capture = () => (current === undefined ? undefined : new Map(current));
@@ -98,7 +71,7 @@ export class AsyncLocalStorage<Store = unknown> {
     storageInstances.add(this);
     // An unused import must not mutate timer/global ownership. Install only
     // when a Worker actually starts using context propagation.
-    if (typeof document === "undefined") installAsyncContextPropagation();
+    installAsyncContextPropagation();
   }
 
   get name() {
@@ -166,7 +139,7 @@ export class AsyncLocalStorage<Store = unknown> {
 let propagated = false;
 /** Patch Promise/timers/microtasks once per realm. Safe to call repeatedly. */
 function installAsyncContextPropagation(): void {
-  if (propagated) return;
+  if (propagated || getExecutionEnvironment() === "cloudflare-workers") return;
   propagated = true;
   const then = Promise.prototype.then;
   Promise.prototype.then = function <T, R1 = T, R2 = never>(
@@ -232,48 +205,88 @@ function installAsyncContextPropagation(): void {
             ...args: unknown[]
           ) => {
             queue.push(capture());
-            return Reflect.apply(post, send, args);
+            try {
+              return Reflect.apply(post, send, args);
+            } catch (error) {
+              queue.pop();
+              throw error;
+            }
           };
         };
         const wrapReceive = (port: MessagePort) => {
-          const queue = queues.get(port);
-          const pop = () => queue?.shift();
-          const addEventListener = port.addEventListener.bind(port);
+          const queue = queues.get(port)!;
+          const add = port.addEventListener.bind(port);
+          // One context per message, shared by every listener for that event.
+          const contexts = new WeakMap<Event, Context | undefined>();
+          add("message", (event) => contexts.set(event, queue.shift()));
+          add("messageerror", (event) => contexts.set(event, queue.shift()));
+          const listeners = new WeakMap<object, EventListener>();
+          const wrap = (listener: EventListenerOrEventListenerObject) => {
+            let wrapped = listeners.get(listener);
+            if (!wrapped) {
+              wrapped = (event) =>
+                withContext(
+                  contexts.get(event),
+                  () => {
+                    if (typeof listener === "function")
+                      listener.call(port, event);
+                    else listener.handleEvent(event);
+                  },
+                  [],
+                );
+              listeners.set(listener, wrapped);
+            }
+            return wrapped;
+          };
+          const remove = port.removeEventListener.bind(port);
           port.addEventListener = ((
             type: string,
             listener: EventListenerOrEventListenerObject | null,
-            options?: unknown,
-          ) => {
-            if (
-              (type === "message" || type === "messageerror") &&
-              typeof listener === "function"
-            )
-              listener = (event: Event) =>
-                withContext(pop(), listener as (e: Event) => void, [event]);
-            return addEventListener(
+            options?: boolean | AddEventListenerOptions,
+          ) =>
+            listener &&
+            add(
               type,
-              listener as EventListenerOrEventListenerObject,
-              options as boolean | AddEventListenerOptions | undefined,
-            );
-          }) as typeof port.addEventListener;
-          let handler: ((event: MessageEvent) => void) | null = null;
-          addEventListener("message", (event) => {
-            if (handler)
-              return withContext(pop(), handler as (e: Event) => void, [event]);
-          });
+              ["message", "messageerror"].includes(type)
+                ? wrap(listener)
+                : listener,
+              options,
+            )) as typeof port.addEventListener;
+          port.removeEventListener = ((
+            type: string,
+            listener: EventListenerOrEventListenerObject | null,
+            options?: boolean | AddEventListenerOptions,
+          ) =>
+            listener &&
+            remove(
+              type,
+              ["message", "messageerror"].includes(type)
+                ? (listeners.get(listener) ?? listener)
+                : listener,
+              options,
+            )) as typeof port.removeEventListener;
           for (const name of ["onmessage", "onmessageerror"] as const) {
-            let stored: unknown = null;
+            let stored: ((event: MessageEvent) => void) | null = null;
+            const type = name.slice(2);
             Object.defineProperty(port, name, {
               configurable: true,
               enumerable: true,
               get: () => stored,
               set: (value) => {
-                stored = value;
-                if (name === "onmessage" && typeof value === "function")
-                  handler = value as (event: MessageEvent) => void;
+                if (stored) remove(type, wrap(stored as EventListener));
+                stored = typeof value === "function" ? value : null;
+                if (stored) {
+                  add(type, wrap(stored as EventListener));
+                  if (name === "onmessage") port.start();
+                }
               },
             });
           }
+          const close = port.close.bind(port);
+          port.close = () => {
+            queue.length = 0;
+            close();
+          };
         };
         wrapSend(channel.port2, channel.port1);
         wrapSend(channel.port1, channel.port2);

@@ -1,6 +1,7 @@
+import { asyncContextPlugin, lowerAsync } from "./build/async.js";
 import { documentAssets, listAssets } from "./build/documents.js";
-import { d1Modules } from "./build/d1-modules.js";
-import type { D1BuildOptions } from "./build/d1.js";
+import { serverModules } from "./build/server-modules.js";
+import type { ServerBuildOptions } from "./build/server.js";
 import { readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -17,7 +18,7 @@ import {
 const require = createRequire(import.meta.url);
 function compatibilityPlugin(): Plugin {
   return {
-    name: "capacitor-workers-compatibility",
+    name: "workers-capacitor-compatibility",
     setup(build) {
       const aliases: Record<string, string> = {
         ...require("node-stdlib-browser"),
@@ -32,7 +33,7 @@ function compatibilityPlugin(): Plugin {
       const empty = require("node-stdlib-browser").fs;
       build.onResolve({ filter }, ({ path, kind }) =>
         aliases[path] === empty
-          ? { path, namespace: "capacitor-workers-unavailable" }
+          ? { path, namespace: "workers-capacitor-unavailable" }
           : {
               path: require.resolve(
                 kind === "require-call"
@@ -43,7 +44,7 @@ function compatibilityPlugin(): Plugin {
       );
       // Like Vite's browser external: importable, but no unsupported API is provided.
       build.onLoad(
-        { filter: /.*/, namespace: "capacitor-workers-unavailable" },
+        { filter: /.*/, namespace: "workers-capacitor-unavailable" },
         () => ({ contents: "module.exports = {};", loader: "js" }),
       );
       build.initialOptions.inject = [
@@ -52,7 +53,7 @@ function compatibilityPlugin(): Plugin {
     },
   };
 }
-export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
+export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
   /** Workers entry relative to absWorkingDir (or cwd), or an absolute path. */
   worker: string;
   /**
@@ -63,11 +64,11 @@ export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
 }
 
 /** Browser ESM builds only. Worker assets participate in the parent build. */
-export function capacitorWorkersPlugin(
-  options: CapacitorWorkersPluginOptions,
+export function workersCapacitorPlugin(
+  options: WorkersCapacitorPluginOptions,
 ): Plugin {
   return {
-    name: "capacitor-workers",
+    name: "workers-capacitor",
     async setup(build) {
       const config = build.initialOptions;
       if (
@@ -78,7 +79,7 @@ export function capacitorWorkersPlugin(
         (!config.outdir && !config.outfile)
       )
         throw new Error(
-          "capacitorWorkersPlugin requires worker, bundle: true, format: 'esm', browser platform and outdir or outfile.",
+          "workersCapacitorPlugin requires worker, bundle: true, format: 'esm', browser platform and outdir or outfile.",
         );
       const root = config.absWorkingDir ?? process.cwd();
       // Written builds include document assets automatically. In-memory builds
@@ -87,11 +88,11 @@ export function capacitorWorkersPlugin(
         const outdir = resolve(root, config.outdir ?? dirname(config.outfile!));
         build.onEnd(async (result) => {
           if (result.errors.length) return;
-          const compilation = await d1.get();
+          const compilation = await server.get();
           if (compilation) {
             const { mode, reason, routes } = compilation;
             await writeFile(
-              resolve(outdir, "capacitor-workers-d1.json"),
+              resolve(outdir, compilation.reportFile),
               JSON.stringify({ mode, reason, routes }, null, 2),
             );
           }
@@ -99,8 +100,8 @@ export function capacitorWorkersPlugin(
             (await listAssets(outdir)).filter(
               (file) =>
                 ![
-                  "capacitor-workers-assets.json",
-                  "capacitor-workers-sw.js",
+                  "workers-capacitor-assets.json",
+                  "workers-capacitor-sw.js",
                 ].includes(file),
             ),
           );
@@ -109,47 +110,47 @@ export function capacitorWorkersPlugin(
         });
       }
       const originalEntry = resolve(root, options.worker);
-      const d1 = d1Modules(originalEntry, root, options);
+      const server = serverModules(originalEntry, root, options);
       let entry = originalEntry;
       let selector: string | undefined;
-      const d1Plugin: Plugin = {
-        name: "capacitor-workers-d1",
+      const serverPlugin: Plugin = {
+        name: "workers-capacitor-server",
         setup(build) {
           build.onResolve(
-            { filter: /\.capacitor-d1-(local|selector)\.js$/ },
-            ({ path }) => (d1.owns(path) ? { path } : undefined),
+            { filter: /\.capacitor-server-(local|selector)\.js$/ },
+            ({ path }) => (server.owns(path) ? { path } : undefined),
           );
           build.onLoad({ filter: /\.[cm]?[jt]sx?$/ }, async ({ path }) => {
-            const generated = await d1.load(path);
+            const generated = await server.load(path);
             if (generated)
               return {
-                contents: generated.code,
+                contents: (await lowerAsync(generated.code, path, "js")).code,
                 loader: "js",
                 resolveDir: dirname(originalEntry),
                 watchFiles: generated.inputs,
               };
-            await d1.guard(path);
+            await server.guard(path);
           });
         },
       };
       build.onStart(async () => {
-        d1.reset();
-        const compilation = await d1.get();
-        entry = compilation ? d1.localEntry : originalEntry;
-        selector = compilation ? d1.selectorEntry : undefined;
+        server.reset();
+        const compilation = await server.get();
+        entry = compilation ? server.localEntry : originalEntry;
+        selector = compilation ? server.selectorEntry : undefined;
         if (compilation)
           return {
             warnings: [
               {
                 text:
                   compilation.mode === "worker"
-                    ? `D1: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
-                    : `D1: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+                    ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+                    : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
               },
             ],
           };
       });
-      await d1Plugin.setup(build);
+      await serverPlugin.setup(build);
       const virtualFiles = async () => {
         if (!options.workerFiles?.length) return undefined;
         const map: Record<string, { base64: string }> = {};
@@ -163,37 +164,37 @@ export function capacitorWorkersPlugin(
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;
         return {
-          contents: workerSource(entry, "capacitor-workers:factory", selector),
+          contents: workerSource(entry, "workers-capacitor:factory", selector),
           loader: "js",
           resolveDir: root,
         };
       });
       build.onResolve(
-        { filter: /^capacitor-workers:(factory|asset\.js)$/ },
-        ({ path }) => ({ path, namespace: "capacitor-workers" }),
+        { filter: /^workers-capacitor:(factory|asset\.js)$/ },
+        ({ path }) => ({ path, namespace: "workers-capacitor" }),
       );
       build.onLoad(
-        { filter: /:factory$/, namespace: "capacitor-workers" },
+        { filter: /:factory$/, namespace: "workers-capacitor" },
         () => ({
-          contents: `import url from "capacitor-workers:asset.js";\nexport default () => new Worker(new URL(url, import.meta.url), { type: "module" });`,
+          contents: `import url from "workers-capacitor:asset.js";\nexport default () => new Worker(new URL(url, import.meta.url), { type: "module" });`,
           loader: "js",
         }),
       );
       build.onLoad(
-        { filter: /:asset\.js$/, namespace: "capacitor-workers" },
+        { filter: /:asset\.js$/, namespace: "workers-capacitor" },
         async () => {
           const result = await build.esbuild.build({
             absWorkingDir: root,
             stdin: {
               contents: workerEntry(entry, await virtualFiles()),
               resolveDir: root,
-              sourcefile: "capacitor-worker-entry.js",
+              sourcefile: "workers-capacitor-entry.js",
             },
             bundle: true,
             format: "esm",
             platform: "browser",
             write: false,
-            outfile: "capacitor-worker.js",
+            outfile: "workers-capacitor-worker.js",
             metafile: true,
             target: config.target ?? "es2022",
             minify: config.minify,
@@ -206,11 +207,11 @@ export function capacitorWorkersPlugin(
             conditions: config.conditions,
             mainFields: config.mainFields,
             loader: config.loader,
-            plugins: [d1Plugin, compatibilityPlugin()],
+            plugins: [serverPlugin, compatibilityPlugin(), asyncContextPlugin()],
             logLevel: "silent",
           });
           const inputs = Object.keys(result.metafile.inputs)
-            .filter((path) => path !== "capacitor-worker-entry.js")
+            .filter((path) => path !== "workers-capacitor-entry.js")
             .map((path) => resolve(root, path));
           if (result.outputFiles.length !== 1)
             throw new Error(
@@ -228,6 +229,7 @@ export function capacitorWorkersPlugin(
           };
         },
       );
+      await asyncContextPlugin().setup(build);
     },
   };
 }

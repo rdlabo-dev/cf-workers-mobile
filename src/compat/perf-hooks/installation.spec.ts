@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { installWebGlobals } from "../globals/web.js";
+import { installWebGlobals } from "../../shared/globals/web.js";
 import * as values from "./performance.js";
 
 describe.each(Object.entries(values))("%s global ownership", (name, value) => {

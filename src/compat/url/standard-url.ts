@@ -103,9 +103,13 @@ var require_utils = __commonJS({
     var ctorRegistrySymbol = /* @__PURE__ */ Symbol.for(
       "[webidl2js] constructor registry",
     );
-    var AsyncIteratorPrototype = Object.getPrototypeOf(
-      Object.getPrototypeOf(async function* () {}).prototype,
-    );
+    // URL exposes no asynchronous iterators. Keep the unused WebIDL fallback
+    // independent of async-generator intrinsics, which browser builds lower.
+    var AsyncIteratorPrototype = {
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
     function initCtorRegistry(globalObject) {
       if (Object.hasOwn(globalObject, ctorRegistrySymbol)) {
         return globalObject[ctorRegistrySymbol];

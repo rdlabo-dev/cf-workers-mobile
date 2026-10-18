@@ -1,4 +1,4 @@
-import { nativeStreams } from "../globals/platform.js";
+import { nativeStreams } from "../../shared/globals/platform.js";
 import { usesPonyfill } from "./runtime.js";
 import { ReadableStream, WritableStream } from "./index.js";
 /** Convert host byte streams without buffering the entire body or pre-reading it. */

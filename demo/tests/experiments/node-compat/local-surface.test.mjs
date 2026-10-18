@@ -4,7 +4,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { chromium, webkit } from "@playwright/test";
-import { capacitorWorkersPlugin } from "../../../../dist/esbuild.js";
+import { workersCapacitorPlugin } from "../../../../dist/esbuild.js";
 
 // An exhaustive discovery report, not a behavioral acceptance test. Failed
 // imports remain visible instead of silently disappearing from the inventory.
@@ -38,7 +38,7 @@ for (const name of Object.keys(baseline.modules)) {
       outfile: "demo/artifacts/node-inventory/probe.js",
       logLevel: "silent",
       plugins: [
-        capacitorWorkersPlugin({ worker: "demo/src/workers/hono/standard.ts" }),
+        workersCapacitorPlugin({ worker: "demo/src/workers/hono/standard.ts" }),
       ],
     });
     sources.set(name, { source: result.outputFiles[0].text });

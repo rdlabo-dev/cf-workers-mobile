@@ -48,7 +48,7 @@ function packagedRequestStop() {
   if (window.Capacitor?.getPlatform() === "ios")
     localStorage.setItem("packaged-stop", "requested");
   else
-    return window.Capacitor.nativePromise("CapacitorWorkers", "stop", {}).then(
+    return window.Capacitor.nativePromise("WorkersCapacitor", "stop", {}).then(
       () => console.log("PACKAGED_STOP", "android native stop completed"),
     );
 }
@@ -84,14 +84,14 @@ async function packagedMigration() {
     document.head.appendChild(script);
   });
   const isDocumentWorker = (worker) =>
-    worker && new URL(worker.scriptURL).pathname === "/capacitor-workers-sw.js";
+    worker && new URL(worker.scriptURL).pathname === "/workers-capacitor-sw.js";
   const before = await navigator.serviceWorker.getRegistrations();
   const hadDocumentRegistration = before.some((registration) =>
     [registration.active, registration.waiting, registration.installing].some(
       isDocumentWorker,
     ),
   );
-  const app = DocumentLifecycleTest.capacitorWorkers({
+  const app = DocumentLifecycleTest.workersCapacitor({
     baseURL: "https://worker.invalid/api",
     worker: { fetch: () => new Response("fetch-only") },
   });
@@ -116,7 +116,7 @@ async function packagedMigration() {
     };
   } finally {
     await app.dispose();
-    await window.Capacitor.nativePromise("CapacitorWorkers", "stop", {});
+    await window.Capacitor.nativePromise("WorkersCapacitor", "stop", {});
   }
   if (
     !result.hadDocumentRegistration ||

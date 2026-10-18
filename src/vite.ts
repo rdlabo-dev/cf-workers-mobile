@@ -1,6 +1,7 @@
+import { lowerAsync, asyncContextPlugin } from "./build/async.js";
 import { documentAssets, listAssets } from "./build/documents.js";
-import { d1Modules } from "./build/d1-modules.js";
-import type { D1BuildOptions } from "./build/d1.js";
+import { serverModules } from "./build/server-modules.js";
+import type { ServerBuildOptions } from "./build/server.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -41,10 +42,20 @@ function compatibilityPlugins(
     Object.entries(aliases).filter(([specifier]) => !specifier.includes(":")),
   );
   return [
+    {
+      name: "workers-capacitor-async-context",
+      enforce: "post",
+      transform(code, id) {
+        if (/\.[cm]?[jt]sx?(?:\?|$)/.test(id)) return lowerAsync(code, id);
+      },
+      renderChunk(code, chunk) {
+        return lowerAsync(code, chunk.fileName);
+      },
+    },
     ...(installGlobals
       ? [
           {
-            name: "capacitor-workers-global-install",
+            name: "workers-capacitor-global-install",
             enforce: "pre" as const,
             transform(code: string, id: string) {
               // CommonJS proxy modules are already generated ESM. Injecting a
@@ -72,7 +83,7 @@ function compatibilityPlugins(
         ]
       : []),
     {
-      name: "capacitor-workers",
+      name: "workers-capacitor",
       enforce: "pre",
       resolveId(source, _importer, options) {
         if (options.custom?.["node-resolve"]?.isRequire)
@@ -81,18 +92,18 @@ function compatibilityPlugins(
       transform(code, id) {
         const original = code;
         const path = normalizePath(id.split("?")[0]);
-        const compatRoot = normalizePath(resolve(globalsPath, "../.."));
+        const compatRoot = normalizePath(resolve(globalsPath, "../../.."));
         if (path.startsWith(`${compatRoot}/`)) {
-          if (path === `${compatRoot}/body/stream-body.js`)
+          if (path === `${compatRoot}/browser/body/stream-body.js`)
             code = code.replace(
-              'from "../buffer/blob.js"',
+              'from "../../compat/buffer/blob.js"',
               'from "node:buffer"',
             );
           code = code.replace(
-            'from "../stream-web/index.js"',
+            /from "(?:\.\.\/stream-web|\.\.\/\.\.\/compat\/stream-web)\/index\.js"/g,
             'from "node:stream/web"',
           );
-          if (path === `${compatRoot}/stream-web/interop.js`)
+          if (path === `${compatRoot}/compat/stream-web/interop.js`)
             code = code.replace('from "./index.js"', 'from "node:stream/web"');
         }
         if (
@@ -103,10 +114,13 @@ function compatibilityPlugins(
         // Prebundled Node modules and runtime globals must share constructor identity.
         // Keep the distributed runtime's relative import usable as raw browser ESM.
         return code
-          .replace('from "../stream-web/index.js"', 'from "node:stream/web"')
-          .replace('from "../buffer/blob.js"', 'from "node:buffer"')
           .replace(
-            'from "../perf-hooks/performance.js"',
+            'from "../../compat/stream-web/index.js"',
+            'from "node:stream/web"',
+          )
+          .replace('from "../../compat/buffer/blob.js"', 'from "node:buffer"')
+          .replace(
+            'from "../../compat/perf-hooks/performance.js"',
             'from "node:perf_hooks"',
           );
       },
@@ -115,8 +129,9 @@ function compatibilityPlugins(
         optimizeDeps: {
           esbuildOptions: {
             plugins: [
+              asyncContextPlugin(),
               {
-                name: "capacitor-workers-commonjs-builtins",
+                name: "workers-capacitor-commonjs-builtins",
                 setup(build) {
                   build.onResolve(
                     {
@@ -260,7 +275,7 @@ function compatibilityPlugins(
 
 // A real-looking absolute ID survives Vite's worker query stripping without
 // writing generated entry files into the consumer's project.
-const entrySuffix = ".capacitor-worker.js";
+const entrySuffix = ".workers-capacitor-worker.js";
 function virtualId(
   source: string,
   root: string,
@@ -285,7 +300,7 @@ function workerEntryPlugin(
   virtualFiles?: () => Promise<string>,
 ): Plugin {
   return {
-    name: "capacitor-workers-entry",
+    name: "workers-capacitor-entry",
     enforce: "pre",
     resolveId(source) {
       return virtualId(source, root(), (path) => entries.has(path));
@@ -302,7 +317,7 @@ function workerEntryPlugin(
 }
 
 /** Add only to the Capacitor/browser build, never the Cloudflare build. */
-export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
+export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
   /**
@@ -313,8 +328,8 @@ export interface CapacitorWorkersPluginOptions extends D1BuildOptions {
    */
   workerFiles?: string[];
 }
-export function capacitorWorkersPlugin(
-  options: CapacitorWorkersPluginOptions = {},
+export function workersCapacitorPlugin(
+  options: WorkersCapacitorPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
   const virtualFiles = options.workerFiles?.length
@@ -331,27 +346,27 @@ export function capacitorWorkersPlugin(
     : undefined;
   let root: string;
   let publicDir: string;
-  let d1: ReturnType<typeof d1Modules> | undefined;
-  const d1Plugin = (): Plugin => ({
-    name: "capacitor-workers-d1",
+  let server: ReturnType<typeof serverModules> | undefined;
+  const serverPlugin = (): Plugin => ({
+    name: "workers-capacitor-server",
     enforce: "pre",
     resolveId(id) {
-      return virtualId(id, root, (path) => d1?.owns(path) ?? false);
+      return virtualId(id, root, (path) => server?.owns(path) ?? false);
     },
     async load(id) {
-      if (!d1) return;
+      if (!server) return;
       const path = id.split("?")[0];
-      const generated = await d1.load(path);
+      const generated = await server.load(path);
       if (generated) {
         for (const input of generated.inputs) this.addWatchFile(input);
         return { code: generated.code, map: null };
       }
-      await d1.guard(path);
+      await server.guard(path);
     },
     async handleHotUpdate(ctx) {
-      const previous = await d1?.get();
+      const previous = await server?.get();
       if (previous?.inputs.includes(ctx.file)) {
-        d1?.reset();
+        server?.reset();
         ctx.server.moduleGraph.invalidateAll();
         ctx.server.ws.send({ type: "full-reload" });
         return [];
@@ -359,19 +374,19 @@ export function capacitorWorkersPlugin(
     },
   });
   return [
-    d1Plugin(),
+    serverPlugin(),
     {
-      name: "capacitor-workers-source",
+      name: "workers-capacitor-source",
       enforce: "pre",
       config: () => ({
-        optimizeDeps: { exclude: ["@rdlabo/capacitor-workers"] },
+        optimizeDeps: { exclude: ["@rdlabo/workers-capacitor"] },
         worker: { format: "es" },
       }),
       configResolved(config) {
         root = config.root;
         publicDir = config.publicDir;
         if (options.worker)
-          d1 = d1Modules(resolve(root, options.worker), root, options);
+          server = serverModules(resolve(root, options.worker), root, options);
       },
       generateBundle: {
         order: "post",
@@ -380,11 +395,11 @@ export function capacitorWorkersPlugin(
             ...Object.keys(bundle),
             ...(publicDir ? await listAssets(publicDir) : []),
           ];
-          const compilation = await d1?.get();
+          const compilation = await server?.get();
           if (compilation) {
-            const fileName = "capacitor-workers-d1.json";
+            const fileName = compilation.reportFile;
             if (files.includes(fileName))
-              this.error("D1 report asset collision: " + fileName);
+              this.error("Server report asset collision: " + fileName);
             const { mode, reason, routes } = compilation;
             this.emitFile({
               type: "asset",
@@ -413,14 +428,14 @@ export function capacitorWorkersPlugin(
         });
         if (!resolved || resolved.external)
           this.error("Cannot resolve Worker entry: " + path);
-        const compilation = await d1?.get();
+        const compilation = await server?.get();
         if (compilation)
           this.warn(
             compilation.mode === "worker"
-              ? `D1: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
-              : `D1: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+              ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+              : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
           );
-        const entry = compilation ? d1!.localEntry : resolved.id;
+        const entry = compilation ? server!.localEntry : resolved.id;
         const generated = entry + entrySuffix;
         if (existsSync(generated))
           this.error(
@@ -429,7 +444,7 @@ export function capacitorWorkersPlugin(
           );
         entries.set(generated, entry);
         return `import Constructor from ${JSON.stringify(generated + "?worker")};
-${compilation ? `import { needsRemote } from ${JSON.stringify(d1!.selectorEntry)};` : ""}
+${compilation ? `import { needsRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
 import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
 export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote," : ""} async loadDirect() {
   const dispose = installNodeGlobals();
@@ -444,14 +459,14 @@ export default { createWorker: () => new Constructor(), ${compilation ? "needsRe
     },
     workerEntryPlugin(entries, () => root, virtualFiles),
     {
-      name: "capacitor-workers-worker-build",
+      name: "workers-capacitor-worker-build",
       config(config) {
         const previous = config.worker?.plugins;
         return {
           worker: {
             plugins: () => [
               ...(previous?.() ?? []),
-              d1Plugin(),
+              serverPlugin(),
               workerEntryPlugin(entries, () => root, virtualFiles),
               ...compatibilityPlugins("worker"),
             ],

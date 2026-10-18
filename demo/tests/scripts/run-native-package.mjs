@@ -22,7 +22,7 @@ const { consumer } = JSON.parse(
 );
 const output = join(consumer, "artifacts");
 await mkdir(output, { recursive: true });
-const appId = "jp.rdlabo.capacitorworkers.packaged";
+const appId = "jp.rdlabo.workerscapacitor.packaged";
 const run = (command, args, options = {}) =>
   execFileSync(command, args, {
     cwd: consumer,

@@ -1,3 +1,5 @@
+import { config as cloudflareConfig } from "../cloudflare/backend.mjs";
+import { config as serviceConfig } from "../services/backend.mjs";
 import { execFileSync } from "node:child_process";
 import {
   mkdtemp,
@@ -12,9 +14,19 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const ui = process.argv.includes("--ui");
+const services = process.argv.includes("--services");
+const cloudflare = process.argv.includes("--cloudflare");
+if ([ui, services, cloudflare].filter(Boolean).length > 1)
+  throw new Error("Choose one of --ui, --services or --cloudflare");
 const artifacts = join(
   repo,
-  ui ? "demo/artifacts/d1-native-ui" : "demo/artifacts/d1-native",
+  cloudflare
+    ? "demo/artifacts/cloudflare-native"
+    : services
+      ? "demo/artifacts/services-native"
+      : ui
+        ? "demo/artifacts/d1-native-ui"
+        : "demo/artifacts/d1-native",
 );
 const refreshing = process.argv.includes("--refresh");
 const consumer = refreshing
@@ -41,7 +53,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "@rdlabo/capacitor-workers": `file:./${packed.filename}`,
+        "@rdlabo/workers-capacitor": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -54,21 +66,49 @@ await writeFile(
   ),
 );
 await cp(
-  new URL(ui ? "ui-worker.js" : "worker.js", import.meta.url),
+  new URL(
+    cloudflare
+      ? "../cloudflare/worker.js"
+      : services
+        ? "../services/worker.js"
+        : ui
+          ? "ui-worker.js"
+          : "worker.js",
+    import.meta.url,
+  ),
   join(consumer, "worker.js"),
 );
 await cp(
-  new URL(ui ? "ui-main.js" : "native-main.js", import.meta.url),
+  new URL(
+    cloudflare
+      ? "../cloudflare/native-main.js"
+      : services
+        ? "../services/native-main.js"
+        : ui
+          ? "ui-main.js"
+          : "native-main.js",
+    import.meta.url,
+  ),
   join(consumer, "main.js"),
 );
 await cp(join(artifacts, "server.json"), join(consumer, "server.json"));
 await writeFile(
   join(consumer, "wrangler.jsonc"),
-  JSON.stringify({
-    d1_databases: [
-      { binding: "DB", database_name: "existing", database_id: "server-only" },
-    ],
-  }),
+  JSON.stringify(
+    cloudflare
+      ? cloudflareConfig
+      : services
+        ? serviceConfig
+        : {
+            d1_databases: [
+              {
+                binding: "DB",
+                database_name: "existing",
+                database_id: "server-only",
+              },
+            ],
+          },
+  ),
 );
 await writeFile(
   join(consumer, "index.html"),
@@ -76,15 +116,17 @@ await writeFile(
 );
 await writeFile(
   join(consumer, "vite.config.js"),
-  'import {capacitorWorkersPlugin} from "@rdlabo/capacitor-workers/vite";export default {plugins:[capacitorWorkersPlugin({worker:"worker.js"})],build:{target:"es2022",sourcemap:true}};',
+  `import {workersCapacitorPlugin} from "@rdlabo/workers-capacitor/vite";export default {plugins:[workersCapacitorPlugin(${JSON.stringify({ worker: "worker.js", ...(cloudflare ? { assetsExecution: "remote" } : {}), ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
 );
 await writeFile(
   join(consumer, "capacitor.config.json"),
   JSON.stringify(
     {
-      appId: ui
-        ? "jp.rdlabo.capacitorworkers.d1ui"
-        : "jp.rdlabo.capacitorworkers.d1test",
+      appId: cloudflare
+        ? "jp.rdlabo.workerscapacitor.cloudflaretest"
+        : ui
+          ? "jp.rdlabo.workerscapacitor.d1ui"
+          : "jp.rdlabo.workerscapacitor.d1test",
       appName: "D1 Migration",
       webDir: "dist",
       ios: { packageManager: "SPM" },

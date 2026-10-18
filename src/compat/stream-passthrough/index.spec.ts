@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 // @ts-expect-error Node's public declarations omit this Workers internal entry.
 import * as namespace from "node:_stream_passthrough";
 import * as s from "node:stream";

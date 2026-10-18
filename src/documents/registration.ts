@@ -1,5 +1,5 @@
-const scriptPath = "/capacitor-workers-sw.js";
-const disableMessage = "capacitor-workers:disable-documents";
+const scriptPath = "/workers-capacitor-sw.js";
+const disableMessage = "workers-capacitor:disable-documents";
 
 export function isDocumentWorker(worker: ServiceWorker | null): boolean {
   if (!worker) return false;
@@ -32,7 +32,7 @@ export async function enableDocumentWorker() {
   const controller = navigator.serviceWorker.controller;
   if (
     !isDocumentWorker(controller) ||
-    !(await notify(controller!, "capacitor-workers:enable-documents"))
+    !(await notify(controller!, "workers-capacitor:enable-documents"))
   )
     throw new Error("Document Service Worker did not acknowledge startup");
 }

@@ -1,4 +1,4 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import { Capacitor } from "@capacitor/core";
 import settings from "./server.json";
 const platform = Capacitor.getPlatform();
@@ -12,7 +12,7 @@ function check(name, condition) {
 try {
   for (const prefer of ["direct", "worker"]) {
     let token = "test-alice";
-    const runtime = capacitorWorkers({
+    const runtime = workersCapacitor({
       baseURL: "https://local.invalid/",
       prefer,
       remote: { origin, getToken: () => token },

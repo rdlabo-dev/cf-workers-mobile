@@ -1,4 +1,4 @@
-import { asyncDispose } from "../globals/symbols.js";
+import { asyncDispose } from "../../shared/globals/symbols.js";
 // Copyright (c) 2017-2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -1231,7 +1231,8 @@ export class ClientRequest extends OutgoingMessage {
   timeout?: number;
   _ended = false;
   private abortController = new AbortController();
-  private chunks: Uint8Array[] = [];
+  private upload?: TransformStream<Uint8Array, Uint8Array>;
+  private uploadWriter?: WritableStreamDefaultWriter<Uint8Array>;
   private response?: IncomingMessage;
   private timer?: ReturnType<typeof setTimeout>;
   private sent = false;
@@ -1384,14 +1385,8 @@ export class ClientRequest extends OutgoingMessage {
     }
     if (values.timeout !== undefined) this.setTimeout(values.timeout);
     if (callback) this.once("response", callback);
-    this.once("finish", () => {
-      try {
-        this.#send();
-      } catch (error) {
-        this.destroy(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
   }
+
   override _implicitHeader() {
     if (this.hasHeader("content-length"))
       this._contentLength = Number(this.getHeader("content-length"));
@@ -1409,12 +1404,55 @@ export class ClientRequest extends OutgoingMessage {
     encoding: BufferEncoding,
     callback: (error?: Error | null) => void,
   ) {
-    if (this.method !== "GET" && this.method !== "HEAD")
-      this.chunks.push(Buffer.from(chunk as never, encoding));
-    callback();
+    if (this.method === "GET" || this.method === "HEAD") {
+      callback();
+      return;
+    }
+    try {
+      if (!this.upload) {
+        this.upload = new TransformStream<Uint8Array, Uint8Array>();
+        this.uploadWriter = this.upload.writable.getWriter();
+      }
+      this.#send();
+      void this.uploadWriter!.write(Buffer.from(chunk as never, encoding)).then(
+        () => callback(),
+        (error) => {
+          this.destroy(error);
+          callback(error);
+        },
+      );
+    } catch (error) {
+      this.destroy(error as Error);
+      callback(error as Error);
+    }
   }
+  override _final = (callback: (error?: Error | null) => void) => {
+    try {
+      this.#send();
+      if (this.uploadWriter)
+        void this.uploadWriter.close().then(
+          () => callback(),
+          (error) => {
+            this.destroy(error);
+            callback(error);
+          },
+        );
+      else callback();
+    } catch (error) {
+      this.destroy(error as Error);
+      callback(error as Error);
+    }
+  };
+  override flushHeaders = () => {
+    super.flushHeaders();
+    if (this.method !== "GET" && this.method !== "HEAD" && !this.upload) {
+      this.upload = new TransformStream<Uint8Array, Uint8Array>();
+      this.uploadWriter = this.upload.writable.getWriter();
+    }
+    this.#send();
+  };
   #send() {
-    if (this.destroyed) return;
+    if (this.destroyed || this.sent) return;
     this.sent = true;
     this.#armTimer();
     const missingHost =
@@ -1444,10 +1482,7 @@ export class ClientRequest extends OutgoingMessage {
           : value
         : [value])
         headers.push([name, String(item)]);
-    const body =
-      this.method === "GET" || this.method === "HEAD" || !this.chunks.length
-        ? null
-        : new Blob(this.chunks as BlobPart[]);
+    const body = this.upload?.readable ?? null;
     const response = missingHost
       ? Promise.resolve(
           new Response(null, {
@@ -1463,7 +1498,8 @@ export class ClientRequest extends OutgoingMessage {
           signal: this.abortController.signal,
           redirect: "manual",
           encodeResponseBody: "manual",
-        } as RequestInit & { encodeResponseBody: "manual" });
+          duplex: "half",
+        } as RequestInit & { encodeResponseBody: "manual"; duplex: "half" });
     void response.then(
       (response) => {
         if (this.destroyed) {
@@ -1528,10 +1564,16 @@ export class ClientRequest extends OutgoingMessage {
       this.destroy(coded(new Error("The operation was aborted"), "ABORT_ERR"));
     }, this.timeout);
   }
+  #releaseUpload(error = new Error("Request closed")) {
+    void this.uploadWriter?.abort(error).catch(() => {});
+    this.uploadWriter = undefined;
+    this.upload = undefined;
+  }
   #emitClose() {
     if (!this._closed) {
       this._closed = true;
       this.destroyed = true;
+      this.#releaseUpload();
       if (this.timer) clearTimeout(this.timer);
       this.emit("close");
     }
@@ -1546,6 +1588,7 @@ export class ClientRequest extends OutgoingMessage {
   override destroy(error?: Error): this {
     if (this.destroyed) return this;
     this.destroyed = true;
+    this.#releaseUpload(error);
     if (this.timer) clearTimeout(this.timer);
     if (!this.response && error == null && !this.aborted)
       error = coded(new Error("socket hang up"), "ECONNRESET");

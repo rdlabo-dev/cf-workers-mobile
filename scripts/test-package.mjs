@@ -75,7 +75,7 @@ for (const name of ["NOTICE.md", "LICENSE-MIT"]) {
     throw new Error(`Missing stream ponyfill notice in tarball: ${notice}`);
 }
 for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
-  const notice = `dist/compat/brotli/${name}`;
+  const notice = `dist/shared/brotli/${name}`;
   if (!pack.files.some((file) => file.path === notice))
     throw new Error(
       `Missing bundled codec license notice in tarball: ${notice}`,
@@ -110,10 +110,16 @@ for (const entry of [
 }
 // Candidate Web API contracts use internal modules from the installed tarball.
 // Never copy library implementation sources from the checkout.
+for (const domain of ["compat", "browser", "workers", "shared"]) {
+  await cp(
+    join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
+    join(temp, "src", domain),
+    { recursive: true },
+  );
+}
 await cp(
-  join(temp, "node_modules/@rdlabo/capacitor-workers/dist/compat"),
-  join(temp, "src/compat"),
-  { recursive: true },
+  join(temp, "node_modules/@rdlabo/workers-capacitor/dist/environment.js"),
+  join(temp, "src/environment.js"),
 );
 await cp(
   "src/compat/os/constants.spec.ts",
@@ -141,63 +147,63 @@ await cp(
 );
 // Copy module-owned contracts separately; these are not shipped.
 for (const module of [
-  "path",
-  "querystring",
-  "string-decoder",
-  "buffer",
-  "http",
-  "net",
-  "headers",
-  "request",
-  "response",
-  "immediate",
-  "structured-clone",
-  "encoding",
-  "abort",
-  "async-hooks",
-  "timers",
-  "url",
-  "os",
-  "tty",
-  "wasi",
-  "punycode",
-  "constants",
-  "v8",
-  "http2",
-  "vm",
-  "child-process",
-  "cluster",
-  "dgram",
-  "inspector",
-  "domain",
-  "readline",
-  "repl",
-  "sqlite",
-  "test",
-  "stream-consumers",
-  "dns",
-  "assert",
-  "perf-hooks",
-  "trace-events",
-  "https",
-  "worker-threads",
-  "http-agent",
-  "http-client",
-  "http-incoming",
-  "fs",
-  "module",
-  "stream-web",
-  "util",
-  "diagnostics-channel",
-  "stream",
-  "stream-readable",
-  "stream-writable",
-  "stream-duplex",
-  "stream-transform",
-  "stream-passthrough",
-  "stream-promises",
+  "compat/path",
+  "compat/querystring",
+  "compat/string-decoder",
+  "compat/buffer",
+  "compat/http",
+  "compat/net",
+  "browser/headers",
+  "browser/request",
+  "browser/response",
+  "compat/immediate",
+  "browser/structured-clone",
+  "browser/encoding",
+  "browser/abort",
+  "compat/async-hooks",
+  "compat/timers",
+  "compat/url",
+  "compat/os",
+  "compat/tty",
+  "compat/wasi",
+  "compat/punycode",
+  "compat/constants",
+  "compat/v8",
+  "compat/http2",
+  "compat/vm",
+  "compat/child-process",
+  "compat/cluster",
+  "compat/dgram",
+  "compat/inspector",
+  "compat/domain",
+  "compat/readline",
+  "compat/repl",
+  "compat/sqlite",
+  "compat/test",
+  "compat/stream-consumers",
+  "compat/dns",
+  "compat/assert",
+  "compat/perf-hooks",
+  "compat/trace-events",
+  "compat/https",
+  "compat/worker-threads",
+  "compat/http-agent",
+  "compat/http-client",
+  "compat/http-incoming",
+  "compat/fs",
+  "compat/module",
+  "compat/stream-web",
+  "compat/util",
+  "compat/diagnostics-channel",
+  "compat/stream",
+  "compat/stream-readable",
+  "compat/stream-writable",
+  "compat/stream-duplex",
+  "compat/stream-transform",
+  "compat/stream-passthrough",
+  "compat/stream-promises",
 ]) {
-  const directory = join("src", "compat", module);
+  const directory = join("src", module);
   await mkdir(join(temp, directory), { recursive: true });
   await cp(
     join(directory, "index.spec.ts"),
@@ -215,8 +221,9 @@ for (const name of [
 }
 await writeFile(
   join(temp, "vite.config.mjs"),
-  `import { capacitorWorkersPlugin } from '@rdlabo/capacitor-workers/vite';
-export default {root:'demo/tests/validation',plugins:[capacitorWorkersPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
+  `import { readFile } from 'node:fs/promises';
+import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/vite';
+export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},workersCapacitorPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
 );
 execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
   cwd: temp,
@@ -224,26 +231,30 @@ execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
 });
 await writeFile(
   join(temp, "consumer.ts"),
-  `/// <reference types="@rdlabo/capacitor-workers/cloudflare" />
+  `/// <reference types="@rdlabo/workers-capacitor/cloudflare" />
 import worker from "./demo/src/workers/hono/standard";
 import { httpServerHandler } from "cloudflare:node";
 const handler = httpServerHandler({ port: 3000 });
 const response: Promise<Response> = handler.fetch(new Request("https://worker.invalid/api"));
 // @ts-expect-error Logical ports must be numeric.
 httpServerHandler({ port: "3000" });
-import { capacitorWorkers, FetchRuntime, type WorkerContext } from "@rdlabo/capacitor-workers";
+import { workersCapacitor, FetchRuntime, type WorkerContext } from "@rdlabo/workers-capacitor";
 class ExampleRuntime extends FetchRuntime<{ label: string }> {
   protected dispatch(request: Request, env: { label: string }, ctx: WorkerContext) {
     ctx.waitUntil(Promise.resolve());
     return new Response(env.label + request.method);
   }
 }
-import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/capacitor-workers/features";
-import { runContract, type ContractSuite } from "@rdlabo/capacitor-workers/testing";
-import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
-import { fetchContract, fetchContractWorker } from "@rdlabo/capacitor-workers/testing/fetch";
-import { LocalStorageKV } from "@rdlabo/capacitor-workers/features/kv";
-import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
+import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/features";
+import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/testing";
+import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
+import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/testing/fetch";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
+import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/vite";
+buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
+// @ts-expect-error Local ASSETS is not a completed compatibility unit.
+buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
+import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();
 const bytes: Promise<ArrayBuffer | null> = kv.get("key", "arrayBuffer");
@@ -280,7 +291,7 @@ void openFeature(new Implementation()).then(session => {
 const example = new ExampleRuntime({ baseURL: "https://worker.invalid/api", env: { label: "local" } });
 const fetcher: typeof fetch = example.fetch;
 example.dispose();
-const runtime = capacitorWorkers({worker, baseURL:"https://worker.invalid/api"});
+const runtime = workersCapacitor({worker, baseURL:"https://worker.invalid/api"});
 const ready: Promise<void> = runtime.ready;
 // @ts-expect-error Worker handlers must not degrade to any.
 const invalid: number = worker;
@@ -349,8 +360,8 @@ try {
   // Rebuild the same installed tarball consumer using the public isolated import.
   await writeFile(
     join(temp, "vite.config.mjs"),
-    `import { capacitorWorkersPlugin } from '@rdlabo/capacitor-workers/vite';
-export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorkersPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
+    `import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/vite';
+export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
   );
   execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
     cwd: temp,
@@ -410,9 +421,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
     features.some(
       (report) =>
         report.errors.length ||
-        report.cases.some(
-          (test) => test.status === "failed" || test.status === "unavailable",
-        ),
+        report.cases.some((test) => test.status !== "passed"),
     )
   )
     throw new Error(JSON.stringify(features));

@@ -194,8 +194,8 @@ it("falls back on a platform constructor denial, but not a script startup error"
   expect(broken.terminate).toHaveBeenCalled();
 });
 it("rejects a local top-level await fetch instead of deadlocking direct startup", async () => {
-  const { capacitorWorkers } = await import("../../src/index");
-  const runtime = capacitorWorkers({
+  const { workersCapacitor } = await import("../../src/index");
+  const runtime = workersCapacitor({
     baseURL: "https://test/api",
     prefer: "direct",
     worker: {

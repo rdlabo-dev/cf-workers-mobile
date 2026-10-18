@@ -9,7 +9,7 @@ const deliveryErrors = new WeakMap<
   Event,
   { error?: unknown; threw: boolean }
 >();
-import { structuredClone as clone } from "../structured-clone/index.js";
+import { structuredClone as clone } from "../../browser/structured-clone/index.js";
 type Listener = EventListenerOrEventListenerObject;
 type Registration = {
   listener: Listener;

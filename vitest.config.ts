@@ -1,7 +1,15 @@
+import { lowerAsync } from "./src/build/async.js";
 import { readFile } from "node:fs/promises";
 import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
+    {
+      name: "test-async-context",
+      enforce: "post",
+      transform(code, id) {
+        if (/\.[cm]?[jt]sx?$/.test(id)) return lowerAsync(code, id);
+      },
+    },
     {
       name: "test-brotli-binary",
       async load(id) {
@@ -16,27 +24,27 @@ export default defineConfig({
     // Node module contract specs run via demo tests in workerd and WebViews.
     include: [
       "tests/unit/**/*.test.ts",
-      "src/compat/cloudflare-node/index.spec.ts",
-      "src/compat/globals/index.spec.ts",
-      "src/compat/globals/web.spec.ts",
-      "src/compat/abort/installation.spec.ts",
+      "src/workers/cloudflare-node/index.spec.ts",
+      "src/shared/globals/index.spec.ts",
+      "src/shared/globals/web.spec.ts",
+      "src/browser/abort/installation.spec.ts",
       "src/compat/buffer/installation.spec.ts",
       "src/compat/timers/installation.spec.ts",
       "src/compat/url/installation.spec.ts",
       "src/compat/url/interop.spec.ts",
       "src/compat/timers/host.spec.ts",
       "src/compat/async-hooks/callbacks.spec.ts",
-      "src/compat/response/installation.spec.ts",
+      "src/browser/response/installation.spec.ts",
       "src/compat/perf-hooks/installation.spec.ts",
       "src/compat/stream-web/installation.spec.ts",
       "src/compat/stream-web/context.spec.ts",
-      "src/compat/brotli/index.spec.ts",
-      "src/compat/fetch/index.spec.ts",
-      "src/compat/fetch/interop.spec.ts",
-      "src/compat/fetch/native-network.spec.ts",
-      "src/compat/fetch/scope.spec.ts",
+      "src/shared/brotli/index.spec.ts",
+      "src/browser/fetch/index.spec.ts",
+      "src/browser/fetch/interop.spec.ts",
+      "src/browser/fetch/native-network.spec.ts",
+      "src/browser/fetch/scope.spec.ts",
       "src/compat/net/sockets.spec.ts",
-      "src/compat/http-wire/index.spec.ts",
+      "src/shared/http-wire/index.spec.ts",
     ],
   },
 });

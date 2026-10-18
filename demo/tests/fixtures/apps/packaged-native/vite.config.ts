@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 import { resolve } from "node:path";
 export default defineConfig(({ mode }) => ({
   resolve: {
@@ -9,6 +9,6 @@ export default defineConfig(({ mode }) => ({
       ),
     },
   },
-  plugins: [capacitorWorkersPlugin({ worker: "./worker.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "./worker.ts" })],
   build: { target: "es2022" },
 }));

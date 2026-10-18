@@ -1,4 +1,4 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import {
   enableDocumentWorker,
   registerDocumentWorker,
@@ -6,7 +6,7 @@ import {
 } from "../../../../../src/documents/registration";
 Object.assign(window, {
   documentLifecycle: {
-    capacitorWorkers,
+    workersCapacitor,
     enableDocumentWorker,
     registerDocumentWorker,
     stopDocumentWorker,

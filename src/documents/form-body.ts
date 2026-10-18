@@ -1,3 +1,4 @@
+import { readDocumentBody, encodeDocumentBytes } from "./body.js";
 import { isDocumentURL } from "./page-config.js";
 // Only multipart POSTs need this iOS workaround. Serialize before starting a
 // native URLRequest navigation, so the submitting Window cannot disappear while
@@ -33,9 +34,7 @@ async function navigate(
     method: "POST",
     body: new FormData(form, button),
   });
-  const bytes = new Uint8Array(await request.arrayBuffer());
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const bytes = new Uint8Array(await readDocumentBody(request));
   await (
     window as typeof window & {
       webkit: {
@@ -48,7 +47,7 @@ async function navigate(
     formNavigate: {
       url: url.href,
       headers: Object.fromEntries(request.headers),
-      body: btoa(binary),
+      body: encodeDocumentBytes(bytes),
     },
   });
 }

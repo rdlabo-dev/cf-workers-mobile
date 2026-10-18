@@ -3,11 +3,11 @@ import {
   registerDocumentWorker,
   stopDocumentWorker,
 } from "../../src/documents/registration";
-import { capacitorWorkers } from "../../src/index";
+import { workersCapacitor } from "../../src/index";
 function setup() {
   const own = {
     scriptURL:
-      "https://localhost/capacitor-workers-sw.js?baseURL=https%3A%2F%2Fworker.example",
+      "https://localhost/workers-capacitor-sw.js?baseURL=https%3A%2F%2Fworker.example",
     postMessage: vi.fn((_message, ports) => {
       ports[0].postMessage("disabled");
       ports[0].close();
@@ -83,7 +83,7 @@ it("does not overwrite a registration owned by the application", async () => {
 it("clears previous document registration when starting Android Fetch-only mode", async () => {
   const s = setup();
   vi.stubGlobal("Capacitor", { getPlatform: () => "android" });
-  const app = capacitorWorkers({
+  const app = workersCapacitor({
     baseURL: "https://worker.example",
     worker: { fetch: () => new Response("ok") },
   });
@@ -109,14 +109,14 @@ it("keeps the installation lock until a pending migration finishes", async () =>
     baseURL: "https://worker.example",
     worker: { fetch: () => new Response("ok") },
   };
-  const app = capacitorWorkers(options);
+  const app = workersCapacitor(options);
   const stopped = app.dispose();
-  expect(() => capacitorWorkers(options)).toThrow("already installed");
+  expect(() => workersCapacitor(options)).toThrow("already installed");
   finish([]);
   await stopped;
   await app.ready;
   vi.stubGlobal("Capacitor", { getPlatform: () => "web" });
-  const next = capacitorWorkers(options);
+  const next = workersCapacitor(options);
   await next.ready;
   await next.dispose();
 });
@@ -129,7 +129,7 @@ it.each(["web", "android"])(
     const nativeFetch = vi.fn(async () => new Response("network"));
     vi.stubGlobal("fetch", nativeFetch);
     const failure = new Error("Worker startup failed");
-    const app = capacitorWorkers({
+    const app = workersCapacitor({
       baseURL: "https://worker.example/api",
       prefer: "direct",
       worker: {

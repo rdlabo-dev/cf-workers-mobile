@@ -9,19 +9,19 @@ import {
   nodeHttpNetworkContract,
   nodeHttpNetworkFeature,
 } from "../../../src/compat/http/index.spec";
-import { capacitorWorkers } from "../../../dist/index";
-import { createFetch } from "../../../dist/compat/fetch";
-import { Request } from "../../../dist/compat/request";
+import { workersCapacitor } from "../../../dist/index";
+import { createFetch } from "../../../dist/browser/fetch";
+import { Request } from "../../../dist/browser/request";
 import {
   fetchPolicyContract,
   fetchPolicyFeature,
-} from "../../../src/compat/fetch/policy.spec";
-import { FetchTransport } from "../../../dist/compat/fetch/transport";
+} from "../../../src/browser/fetch/policy.spec";
+import { FetchTransport } from "../../../dist/browser/fetch/transport";
 import {
   createNativeNetwork,
   type NativeCall,
-} from "../../../dist/compat/fetch/native-network";
-import { createNetworkScope } from "../../../dist/compat/fetch/scope";
+} from "../../../dist/browser/fetch/native-network";
+import { createNetworkScope } from "../../../dist/browser/fetch/scope";
 
 declare const __NETWORK_TLS__: boolean;
 type Result = { name: string; ok: boolean; error?: string };
@@ -272,7 +272,7 @@ export async function runNativeNetwork(
     method: "POST",
     body: "pre-install request",
   });
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://worker.invalid",
     worker: {
       async fetch(request) {

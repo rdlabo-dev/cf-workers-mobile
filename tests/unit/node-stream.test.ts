@@ -4,7 +4,7 @@ import {
   streamContract,
   StreamImplementation,
 } from "../../src/compat/stream/index.spec.js";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 it("runs the pinned Workers stream contract", async () => {
   const report = await runContract(
     new StreamImplementation(

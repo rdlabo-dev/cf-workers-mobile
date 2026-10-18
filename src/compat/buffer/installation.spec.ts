@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Blob, File } from "./blob.js";
-import { installWebGlobals } from "../globals/web.js";
+import { installWebGlobals } from "../../shared/globals/web.js";
 for (const [name, installed] of Object.entries({ Blob, File }))
   describe(`${name} ownership`, () => {
     it("restores original descriptors after the final owner", () => {

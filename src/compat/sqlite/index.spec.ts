@@ -2,8 +2,8 @@ import sqlite, * as namespace from "node:sqlite";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 import { expectedValues } from "./values.spec";
 const groups = ["exports", "constants", "constructors", "backup"] as const;
 export const sqliteFeature = defineFeature<typeof sqlite>()(

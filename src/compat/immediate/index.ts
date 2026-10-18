@@ -1,4 +1,4 @@
-import { dispose } from "../globals/symbols.js";
+import { dispose } from "../../shared/globals/symbols.js";
 import { bindCallback, markContextAware } from "../async-hooks/callbacks.js";
 // Workers' global Immediate has inert ref/unref methods: requests own lifetime.
 const token = {};

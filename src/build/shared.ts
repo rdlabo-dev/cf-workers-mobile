@@ -8,19 +8,21 @@ export const transportPath = fileURLToPath(
   new URL("../isolated/transport.js", import.meta.url),
 );
 export const globalsPath = fileURLToPath(
-  new URL("../compat/globals/index.js", import.meta.url),
+  new URL("../shared/globals/index.js", import.meta.url),
 );
 export const networkRelayPath = fileURLToPath(
-  new URL("../compat/fetch/relay.js", import.meta.url),
+  new URL("../browser/fetch/relay.js", import.meta.url),
 );
 export const globalsInstallPath = fileURLToPath(
-  new URL("../compat/globals/install.js", import.meta.url),
+  new URL("../shared/globals/install.js", import.meta.url),
 );
 export const nodeGlobalsInstallPath = fileURLToPath(
-  new URL("../compat/globals/node-install.js", import.meta.url),
+  new URL("../shared/globals/node-install.js", import.meta.url),
 );
-export const compatPath = (name: string) =>
+export const nodeCompatPath = (name: string) =>
   fileURLToPath(new URL(`../compat/${name}/index.js`, import.meta.url));
+const workersModulePath = (name: string) =>
+  fileURLToPath(new URL(`../workers/${name}/index.js`, import.meta.url));
 // A compat module reusing a CommonJS polyfill imports the concrete package
 // file; the bare name is the alias target, so only the deep specifier can
 // reach the real implementation without recursing.
@@ -31,150 +33,156 @@ export function compatibilityAliases() {
     // readable-stream uses this trailing-slash package import. Resolve it
     // before Vite converts the process prefix into a directory path.
     "process/": stdlib.process,
-    "cloudflare:node": compatPath("cloudflare-node"),
-    "cloudflare:workers": compatPath("cloudflare-workers"),
+    "cloudflare:node": workersModulePath("cloudflare-node"),
+    "cloudflare:workers": workersModulePath("cloudflare-workers"),
     "punycode/": polyfill("punycode/punycode.js"),
-    "node:punycode": compatPath("punycode"),
-    punycode: compatPath("punycode"),
-    "node:child_process": compatPath("child-process"),
-    child_process: compatPath("child-process"),
-    "node:cluster": compatPath("cluster"),
-    cluster: compatPath("cluster"),
-    "node:dgram": compatPath("dgram"),
-    dgram: compatPath("dgram"),
-    "node:inspector/promises": compatPath("inspector").replace(
+    "node:punycode": nodeCompatPath("punycode"),
+    punycode: nodeCompatPath("punycode"),
+    "node:child_process": nodeCompatPath("child-process"),
+    child_process: nodeCompatPath("child-process"),
+    "node:cluster": nodeCompatPath("cluster"),
+    cluster: nodeCompatPath("cluster"),
+    "node:dgram": nodeCompatPath("dgram"),
+    dgram: nodeCompatPath("dgram"),
+    "node:inspector/promises": nodeCompatPath("inspector").replace(
       /index\.js$/,
       "promises.js",
     ),
-    "inspector/promises": compatPath("inspector").replace(
+    "inspector/promises": nodeCompatPath("inspector").replace(
       /index\.js$/,
       "promises.js",
     ),
-    "node:inspector": compatPath("inspector"),
-    inspector: compatPath("inspector"),
-    "node:readline/promises": compatPath("readline").replace(
+    "node:inspector": nodeCompatPath("inspector"),
+    inspector: nodeCompatPath("inspector"),
+    "node:readline/promises": nodeCompatPath("readline").replace(
       /index\.js$/,
       "promises.js",
     ),
-    "readline/promises": compatPath("readline").replace(
+    "readline/promises": nodeCompatPath("readline").replace(
       /index\.js$/,
       "promises.js",
     ),
-    "node:readline": compatPath("readline"),
-    readline: compatPath("readline"),
-    "node:domain": compatPath("domain"),
-    domain: compatPath("domain"),
-    "node:stream/promises": compatPath("stream-promises"),
-    "stream/promises": compatPath("stream-promises"),
-    "node:stream/consumers": compatPath("stream-consumers"),
-    "stream/consumers": compatPath("stream-consumers"),
-    "node:dns/promises": compatPath("dns").replace("index.js", "promises.js"),
-    "dns/promises": compatPath("dns").replace("index.js", "promises.js"),
-    "node:dns": compatPath("dns"),
-    dns: compatPath("dns"),
-    "node:assert/strict": compatPath("assert").replace("index.js", "index.cjs"),
-    "assert/strict": compatPath("assert").replace("index.js", "index.cjs"),
-    "node:assert": compatPath("assert").replace("index.js", "index.cjs"),
-    assert: compatPath("assert").replace("index.js", "index.cjs"),
-    "node:perf_hooks": compatPath("perf-hooks"),
-    perf_hooks: compatPath("perf-hooks"),
-    "node:trace_events": compatPath("trace-events"),
-    trace_events: compatPath("trace-events"),
-    "node:https": compatPath("https"),
-    https: compatPath("https"),
-    "node:worker_threads": compatPath("worker-threads"),
-    worker_threads: compatPath("worker-threads"),
-    "node:test": compatPath("test"),
-    "node:sqlite": compatPath("sqlite"),
-    "node:repl": compatPath("repl"),
-    repl: compatPath("repl"),
-    "node:vm": compatPath("vm"),
-    vm: compatPath("vm"),
-    "node:http2": compatPath("http2"),
-    http2: compatPath("http2"),
-    "node:constants": compatPath("constants"),
-    constants: compatPath("constants"),
-    "node:v8": compatPath("v8"),
-    v8: compatPath("v8"),
-    "node:wasi": compatPath("wasi"),
-    wasi: compatPath("wasi"),
-    "node:os": compatPath("os"),
-    os: compatPath("os"),
-    "node:tty": compatPath("tty"),
-    tty: compatPath("tty"),
-    "node:url": compatPath("url"),
-    url: compatPath("url"),
-    "node:diagnostics_channel": compatPath("diagnostics-channel"),
-    diagnostics_channel: compatPath("diagnostics-channel"),
-    "node:async_hooks": compatPath("async-hooks"),
-    async_hooks: compatPath("async-hooks"),
+    "node:readline": nodeCompatPath("readline"),
+    readline: nodeCompatPath("readline"),
+    "node:domain": nodeCompatPath("domain"),
+    domain: nodeCompatPath("domain"),
+    "node:stream/promises": nodeCompatPath("stream-promises"),
+    "stream/promises": nodeCompatPath("stream-promises"),
+    "node:stream/consumers": nodeCompatPath("stream-consumers"),
+    "stream/consumers": nodeCompatPath("stream-consumers"),
+    "node:dns/promises": nodeCompatPath("dns").replace(
+      "index.js",
+      "promises.js",
+    ),
+    "dns/promises": nodeCompatPath("dns").replace("index.js", "promises.js"),
+    "node:dns": nodeCompatPath("dns"),
+    dns: nodeCompatPath("dns"),
+    "node:assert/strict": nodeCompatPath("assert").replace(
+      "index.js",
+      "index.cjs",
+    ),
+    "assert/strict": nodeCompatPath("assert").replace("index.js", "index.cjs"),
+    "node:assert": nodeCompatPath("assert").replace("index.js", "index.cjs"),
+    assert: nodeCompatPath("assert").replace("index.js", "index.cjs"),
+    "node:perf_hooks": nodeCompatPath("perf-hooks"),
+    perf_hooks: nodeCompatPath("perf-hooks"),
+    "node:trace_events": nodeCompatPath("trace-events"),
+    trace_events: nodeCompatPath("trace-events"),
+    "node:https": nodeCompatPath("https"),
+    https: nodeCompatPath("https"),
+    "node:worker_threads": nodeCompatPath("worker-threads"),
+    worker_threads: nodeCompatPath("worker-threads"),
+    "node:test": nodeCompatPath("test"),
+    "node:sqlite": nodeCompatPath("sqlite"),
+    "node:repl": nodeCompatPath("repl"),
+    repl: nodeCompatPath("repl"),
+    "node:vm": nodeCompatPath("vm"),
+    vm: nodeCompatPath("vm"),
+    "node:http2": nodeCompatPath("http2"),
+    http2: nodeCompatPath("http2"),
+    "node:constants": nodeCompatPath("constants"),
+    constants: nodeCompatPath("constants"),
+    "node:v8": nodeCompatPath("v8"),
+    v8: nodeCompatPath("v8"),
+    "node:wasi": nodeCompatPath("wasi"),
+    wasi: nodeCompatPath("wasi"),
+    "node:os": nodeCompatPath("os"),
+    os: nodeCompatPath("os"),
+    "node:tty": nodeCompatPath("tty"),
+    tty: nodeCompatPath("tty"),
+    "node:url": nodeCompatPath("url"),
+    url: nodeCompatPath("url"),
+    "node:diagnostics_channel": nodeCompatPath("diagnostics-channel"),
+    diagnostics_channel: nodeCompatPath("diagnostics-channel"),
+    "node:async_hooks": nodeCompatPath("async-hooks"),
+    async_hooks: nodeCompatPath("async-hooks"),
     "node:timers/promises": fileURLToPath(
       new URL("../compat/timers/promises.js", import.meta.url),
     ),
     "timers/promises": fileURLToPath(
       new URL("../compat/timers/promises.js", import.meta.url),
     ),
-    "node:timers": compatPath("timers"),
-    timers: compatPath("timers"),
-    "node:fs/promises": compatPath("fs/promises"),
-    "fs/promises": compatPath("fs/promises"),
-    "node:fs": compatPath("fs"),
-    fs: compatPath("fs"),
-    "node:module": compatPath("module"),
-    module: compatPath("module"),
-    "node:_stream_readable": compatPath("stream-readable"),
-    _stream_readable: compatPath("stream-readable"),
-    "node:_stream_writable": compatPath("stream-writable"),
-    _stream_writable: compatPath("stream-writable"),
-    "node:_stream_duplex": compatPath("stream-duplex"),
-    _stream_duplex: compatPath("stream-duplex"),
-    "node:_stream_transform": compatPath("stream-transform"),
-    _stream_transform: compatPath("stream-transform"),
-    "node:_stream_passthrough": compatPath("stream-passthrough"),
-    _stream_passthrough: compatPath("stream-passthrough"),
-    "node:stream/web": compatPath("stream-web"),
-    "stream/web": compatPath("stream-web"),
+    "node:timers": nodeCompatPath("timers"),
+    timers: nodeCompatPath("timers"),
+    "node:fs/promises": nodeCompatPath("fs/promises"),
+    "fs/promises": nodeCompatPath("fs/promises"),
+    "node:fs": nodeCompatPath("fs"),
+    fs: nodeCompatPath("fs"),
+    "node:module": nodeCompatPath("module"),
+    module: nodeCompatPath("module"),
+    "node:_stream_readable": nodeCompatPath("stream-readable"),
+    _stream_readable: nodeCompatPath("stream-readable"),
+    "node:_stream_writable": nodeCompatPath("stream-writable"),
+    _stream_writable: nodeCompatPath("stream-writable"),
+    "node:_stream_duplex": nodeCompatPath("stream-duplex"),
+    _stream_duplex: nodeCompatPath("stream-duplex"),
+    "node:_stream_transform": nodeCompatPath("stream-transform"),
+    _stream_transform: nodeCompatPath("stream-transform"),
+    "node:_stream_passthrough": nodeCompatPath("stream-passthrough"),
+    _stream_passthrough: nodeCompatPath("stream-passthrough"),
+    "node:stream/web": nodeCompatPath("stream-web"),
+    "stream/web": nodeCompatPath("stream-web"),
     // The util compat reuses the npm package through its deep specifier,
     // which must precede the bare "util" alias.
     "util/util.js": polyfill("util/util.js"),
-    "node:util": compatPath("util"),
-    util: compatPath("util"),
-    "node:buffer": compatPath("buffer"),
-    buffer: compatPath("buffer"),
-    "node:_http_agent": compatPath("http-agent"),
-    _http_agent: compatPath("http-agent"),
-    "node:_http_client": compatPath("http-client"),
-    _http_client: compatPath("http-client"),
-    "node:_http_incoming": compatPath("http-incoming"),
-    _http_incoming: compatPath("http-incoming"),
-    "node:http": compatPath("http"),
-    http: compatPath("http"),
-    "node:net": compatPath("net"),
-    net: compatPath("net"),
-    "node:stream": compatPath("stream"),
-    stream: compatPath("stream"),
+    "node:util": nodeCompatPath("util"),
+    util: nodeCompatPath("util"),
+    "node:buffer": nodeCompatPath("buffer"),
+    buffer: nodeCompatPath("buffer"),
+    "node:_http_agent": nodeCompatPath("http-agent"),
+    _http_agent: nodeCompatPath("http-agent"),
+    "node:_http_client": nodeCompatPath("http-client"),
+    _http_client: nodeCompatPath("http-client"),
+    "node:_http_incoming": nodeCompatPath("http-incoming"),
+    _http_incoming: nodeCompatPath("http-incoming"),
+    "node:http": nodeCompatPath("http"),
+    http: nodeCompatPath("http"),
+    "node:net": nodeCompatPath("net"),
+    net: nodeCompatPath("net"),
+    "node:stream": nodeCompatPath("stream"),
+    stream: nodeCompatPath("stream"),
     // Subpath aliases must precede their parents: object-form alias entries
     // also match an "<alias>/" prefix.
-    "node:path/win32": compatPath("path/win32"),
-    "path/win32": compatPath("path/win32"),
-    "node:path/posix": compatPath("path/posix"),
-    "path/posix": compatPath("path/posix"),
-    "node:path": compatPath("path"),
-    path: compatPath("path"),
-    "node:querystring": compatPath("querystring"),
-    querystring: compatPath("querystring"),
+    "node:path/win32": nodeCompatPath("path/win32"),
+    "path/win32": nodeCompatPath("path/win32"),
+    "node:path/posix": nodeCompatPath("path/posix"),
+    "path/posix": nodeCompatPath("path/posix"),
+    "node:path": nodeCompatPath("path"),
+    path: nodeCompatPath("path"),
+    "node:querystring": nodeCompatPath("querystring"),
+    querystring: nodeCompatPath("querystring"),
     "string_decoder/lib/string_decoder.js": polyfill(
       "string_decoder/lib/string_decoder.js",
     ),
-    "node:string_decoder": compatPath("string-decoder"),
-    string_decoder: compatPath("string-decoder"),
+    "node:string_decoder": nodeCompatPath("string-decoder"),
+    string_decoder: nodeCompatPath("string-decoder"),
   };
 }
 export function workerEntry(entry: string, virtualFiles?: string) {
   // WebKit can evaluate a Worker entry twice when a dynamic child imports its
   // exports. Keep the bootstrap free of exports and all shared code in children.
   const files = virtualFiles
-    ? `const { registerVirtualFiles } = await import(${JSON.stringify(compatPath("fs"))});\nregisterVirtualFiles(${virtualFiles});\n`
+    ? `const { registerVirtualFiles } = await import(${JSON.stringify(nodeCompatPath("fs"))});\nregisterVirtualFiles(${virtualFiles});\n`
     : "";
   return `const { initializeWorkerNetwork } = await import(${JSON.stringify(networkRelayPath)});\nawait initializeWorkerNetwork();\nawait import(${JSON.stringify(globalsInstallPath)});\n${files}const { default: worker } = await import(${JSON.stringify(entry)});\nconst { serve } = await import(${JSON.stringify(transportPath)});\nserve(worker);`;
 }
@@ -187,7 +195,7 @@ export function workerSource(
 }
 
 export const globalsInjectPath = fileURLToPath(
-  new URL("../compat/globals/inject.js", import.meta.url),
+  new URL("../shared/globals/inject.js", import.meta.url),
 );
 
 /** CommonJS builtins return their default value; ESM keeps named helpers intact. */
@@ -201,7 +209,7 @@ export function commonJSCompatibilityAliases(): Record<string, string> {
     ["_stream_transform", "stream-transform"],
     ["_stream_passthrough", "stream-passthrough"],
   ]) {
-    const path = compatPath(directory!).replace("index.js", "index.cjs");
+    const path = nodeCompatPath(directory!).replace("index.js", "index.cjs");
     entries[name!] = path;
     entries[`node:${name}`] = path;
   }

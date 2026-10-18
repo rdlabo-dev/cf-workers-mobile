@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { LocalStorageKV } from "../../src/features/kv/index";
+import { LocalStorageKV } from "../../src/bindings/kv/index";
 import { openFeature } from "../../src/features/index";
 function storage() {
   const data = new Map<string, string>();
@@ -327,5 +327,51 @@ it("rejects nested and cyclic read modes in single and bulk reads", async () => 
     await expect(
       api.getWithMetadata(["key"], options as never),
     ).rejects.toBeInstanceOf(TypeError);
+  }
+});
+
+it("decodes streams lazily in bounded chunks and preserves split base64 groups on writes", async () => {
+  const api = new LocalStorageKV("streaming", storage()).create();
+  const expected = Uint8Array.from({ length: 150003 }, (_, i) => i % 251);
+  let offset = 0;
+  await api.put(
+    "data",
+    new ReadableStream({
+      pull(controller) {
+        if (offset === expected.length) {
+          controller.close();
+          return;
+        }
+        const end = Math.min(
+          expected.length,
+          offset + (offset < 4 ? 1 : 12347),
+        );
+        controller.enqueue(expected.slice(offset, end));
+        offset = end;
+      },
+    }),
+  );
+  const decode = vi.spyOn(globalThis, "atob");
+  try {
+    const stream = (await api.get("data", "stream"))!;
+    expect(decode).not.toHaveBeenCalled();
+    const reader = stream.getReader();
+    const parts: Uint8Array[] = [];
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      parts.push(next.value);
+    }
+    expect(Math.max(...parts.map((part) => part.length))).toBeLessThanOrEqual(
+      49152,
+    );
+    expect(
+      new Uint8Array(await new Blob(parts as BlobPart[]).arrayBuffer()),
+    ).toEqual(expected);
+    expect(decode.mock.calls.every(([value]) => value.length <= 65536)).toBe(
+      true,
+    );
+  } finally {
+    decode.mockRestore();
   }
 });

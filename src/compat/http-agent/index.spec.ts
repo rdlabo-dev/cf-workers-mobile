@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/capacitor-workers/features";
-import type { ContractSuite } from "@rdlabo/capacitor-workers/testing";
+} from "@rdlabo/workers-capacitor/features";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
 // @ts-expect-error The pinned Workers builtin is not declared by @types/node.
 import * as actual from "node:_http_agent";
 import * as http from "node:http";

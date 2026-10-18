@@ -1,5 +1,5 @@
 import { observeConsumption } from "./reader.js";
-import { getNativeCall } from "../fetch/native-network.js";
+import { getNativeCall } from "../../browser/fetch/native-network.js";
 
 export interface SocketInfo {
   localAddress?: string | null;
@@ -77,7 +77,7 @@ export function connect(
   const close = () => {
     if (!closing) {
       stopped = true;
-      closing = call("CapacitorWorkers", "socketClose", { id }).then(
+      closing = call("WorkersCapacitor", "socketClose", { id }).then(
         () => {
           if (!readEnded) {
             readEnded = true;
@@ -111,7 +111,7 @@ export function connect(
   const opened = Promise.resolve()
     .then(() => {
       if (stopped) throw new Error("Socket closed before connection");
-      return call("CapacitorWorkers", "socketOpen", {
+      return call("WorkersCapacitor", "socketOpen", {
         id,
         host: url.hostname.replace(/^\[|\]$/g, ""),
         port,
@@ -120,7 +120,7 @@ export function connect(
     })
     .then(async (value) => {
       if (stopped) {
-        await call("CapacitorWorkers", "socketClose", { id });
+        await call("WorkersCapacitor", "socketClose", { id });
         throw new Error("Socket closed before connection");
       }
       return value as SocketInfo;
@@ -128,7 +128,7 @@ export function connect(
   void opened
     .then(async () => {
       if (stopped) return;
-      await call("CapacitorWorkers", "socketWatch", { id });
+      await call("WorkersCapacitor", "socketWatch", { id });
       terminal = true;
       notifyTerminal();
     })
@@ -145,7 +145,7 @@ export function connect(
         try {
           await opened;
           readPending = true;
-          const result = (await call("CapacitorWorkers", "socketRead", {
+          const result = (await call("WorkersCapacitor", "socketRead", {
             id,
             maxBytes: 65536,
           })) as { chunk?: string; eof?: boolean };
@@ -183,7 +183,7 @@ export function connect(
       try {
         await opened;
         for (let offset = 0; offset < chunk.byteLength; offset += 65536)
-          await call("CapacitorWorkers", "socketWrite", {
+          await call("WorkersCapacitor", "socketWrite", {
             id,
             chunk: encoded(chunk.subarray(offset, offset + 65536)),
           });
@@ -195,7 +195,7 @@ export function connect(
     async close() {
       try {
         await opened;
-        await call("CapacitorWorkers", "socketEnd", { id });
+        await call("WorkersCapacitor", "socketEnd", { id });
         writeEnded = true;
         await finish();
       } catch (error) {

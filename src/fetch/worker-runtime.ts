@@ -1,14 +1,14 @@
-import { installWebGlobals } from "../compat/globals/web.js";
-import { createOutboundFetch } from "../compat/fetch/outbound.js";
-import { browserFetch, isRequest } from "../compat/fetch/interop.js";
-import type { RequestInit as WorkerRequestInit } from "../compat/request/index.js";
-import { installDirectNetworkScope } from "../compat/fetch/scope.js";
+import { installWebGlobals } from "../shared/globals/web.js";
+import { createOutboundFetch } from "../browser/fetch/outbound.js";
+import { browserFetch, isRequest } from "../browser/fetch/interop.js";
+import type { RequestInit as WorkerRequestInit } from "../browser/request/index.js";
+import { installDirectNetworkScope } from "../browser/fetch/scope.js";
 import configuredWorker from "../configured.js";
 import { createIsolatedWorker } from "../isolated/bridge.js";
-import { createRemoteWorker } from "./remote.js";
+import { createRemoteWorker } from "../bindings/remote.js";
 import { FetchRuntime, type FetchRuntimeOptions } from "./runtime.js";
 import type {
-  CapacitorWorkersOptions,
+  WorkersCapacitorOptions,
   LoadedWorker,
   WorkerContext,
   WorkerFactory,
@@ -158,7 +158,7 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
   }
   override readonly ready: Promise<void>;
   constructor(
-    options: CapacitorWorkersOptions<Env>,
+    options: WorkersCapacitorOptions<Env>,
     private readonly source: WorkerSource<Env>,
   ) {
     super(options);
@@ -168,7 +168,7 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
       );
     if (options.remote && !source.needsRemote)
       throw new TypeError(
-        "remote requires build-generated server routes; configure the Worker's D1 bindings in the build plugin.",
+        "remote requires build-generated server routes; configure the Worker's server bindings in the build plugin.",
       );
     if (options.remote)
       this.remote = createRemoteWorker(
@@ -179,7 +179,7 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
     void this.ready.catch(() => {});
   }
   private async initialize(
-    options: CapacitorWorkersOptions<Env>,
+    options: WorkersCapacitorOptions<Env>,
     source: WorkerSource<Env>,
   ) {
     if (
@@ -290,7 +290,7 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
 }
 
 /** The installer and feature host select execution in exactly the same way. */
-export function createFetchRuntime<Env>(options: CapacitorWorkersOptions<Env>) {
+export function createFetchRuntime<Env>(options: WorkersCapacitorOptions<Env>) {
   if (
     options.prefer !== undefined &&
     !["worker", "direct"].includes(options.prefer)
@@ -299,7 +299,7 @@ export function createFetchRuntime<Env>(options: CapacitorWorkersOptions<Env>) {
   const worker = options.worker ?? configuredWorker;
   if (!worker)
     throw new TypeError(
-      "No Worker configured. Set worker in the Vite/esbuild capacitorWorkersPlugin, or pass an explicit worker option for browser ESM.",
+      "No Worker configured. Set worker in the Vite/esbuild workersCapacitorPlugin, or pass an explicit worker option for browser ESM.",
     );
   const source = worker as WorkerSource<Env>;
   if (

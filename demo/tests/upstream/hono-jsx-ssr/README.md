@@ -32,7 +32,7 @@ Upstream behavior relied on by the assertions:
   `compatibility_date` 2024-04-01): HTTP status and body for every route
   above. Requires the artifacts clone.
 - `fixture/` + `worker.ts`: the Capacitor consumer. `main.ts` calls
-  `capacitorWorkers({ baseURL: "https://worker.invalid", render: "/" })`;
+  `workersCapacitor({ baseURL: "https://worker.invalid", render: "/" })`;
   the Vite plugin bundles `worker.ts`, which injects `public/probe.js` into
   upstream HTML responses only (404 `text/plain` bodies are untouched). The
   `upstream-worker` alias resolves to the copied upstream entry; the
@@ -97,7 +97,7 @@ npm run test:upstream:workerd
 npm run test:upstream:browser
 ```
 
-`cases.ts` contains six shared HTTP expectations. Workerd evaluates the original entry; `browser/` builds it through the public Vite plugin and calls the public `capacitorWorkers` API. `browser.spec.ts` checks the same responses in Chromium/WebKit and explicitly asserts `direct` and `worker` execution. Returned HTML is inspected as a response, not displayed or used as a substitute for native document navigation. Native checks above continue to verify actual documents.
+`cases.ts` contains six shared HTTP expectations. Workerd evaluates the original entry; `browser/` builds it through the public Vite plugin and calls the public `workersCapacitor` API. `browser.spec.ts` checks the same responses in Chromium/WebKit and explicitly asserts `direct` and `worker` execution. Returned HTML is inspected as a response, not displayed or used as a substitute for native document navigation. Native checks above continue to verify actual documents.
 
 CI uses the root and demo lockfiles, and checks the installed Hono version against `upstream.json`. `sample.ts` rejects a missing, dirty, or wrong-commit clone before tests/builds run. The clone is obtained by the explicit prepare command; ordinary unit tests do not fetch the network. The source pin is updated through a reviewed change to `upstream.json`, not by following the upstream default branch.
 

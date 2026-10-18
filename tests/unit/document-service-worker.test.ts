@@ -17,7 +17,7 @@ function setup(cache = new Map<string, Response>()) {
   }));
   const nativeFetch = vi.fn(async (request: string | Request) =>
     String(typeof request === "string" ? request : request.url).includes(
-      "capacitor-workers-assets.json",
+      "workers-capacitor-assets.json",
     )
       ? Response.json(assets)
       : new Response("asset"),
@@ -28,6 +28,8 @@ function setup(cache = new Map<string, Response>()) {
     Response,
     Headers,
     MessageChannel,
+    ReadableStream,
+    atob,
     setTimeout,
     clearTimeout,
     fetch: nativeFetch,
@@ -42,7 +44,7 @@ function setup(cache = new Map<string, Response>()) {
     },
     self: {
       location: new URL(
-        "https://localhost/capacitor-workers-sw.js?baseURL=https%3A%2F%2Fworker.example",
+        "https://localhost/workers-capacitor-sw.js?baseURL=https%3A%2F%2Fworker.example",
       ),
       addEventListener: (name: string, handler: any) =>
         listeners.set(name, handler),
@@ -51,7 +53,7 @@ function setup(cache = new Map<string, Response>()) {
           hostAvailable
             ? [
                 {
-                  url: "https://localhost/index.html?__capacitor_workers_host=1",
+                  url: "https://localhost/index.html?__workers_capacitor_host=1",
                   postMessage: async (request: any, ports: MessagePort[]) => {
                     ports[0].postMessage(await dispatch(request));
                     ports[0].close();
@@ -71,8 +73,8 @@ function setup(cache = new Map<string, Response>()) {
       const port = { postMessage: vi.fn() };
       listeners.get("message")!({
         data: disabled
-          ? "capacitor-workers:disable-documents"
-          : "capacitor-workers:enable-documents",
+          ? "workers-capacitor:disable-documents"
+          : "workers-capacitor:enable-documents",
         ports: [port],
         waitUntil: (value: Promise<void>) => {
           pending = value;
@@ -190,4 +192,29 @@ it("keeps shutdown across a SW restart and explicitly enables a new rendering se
   expect(restarted.dispatch).not.toHaveBeenCalled();
   await restarted.disable(false);
   expect(await (await restarted.fetch(request))!.text()).toBe("worker");
+});
+
+it("pulls streamed document bytes only when consumed and cancels the host stream", async () => {
+  const sw = setup();
+  sw.dispatch.mockImplementation(async (request: any) => {
+    if (request.action === "pull")
+      return { body: btoa("chunk"), done: false } as any;
+    if (request.action === "cancel") return { done: true, body: "" } as any;
+    return {
+      url: "https://worker.example/live",
+      status: 200,
+      headers: {},
+      body: "",
+      streamId: "live",
+    } as any;
+  });
+  const response = (await sw.fetch(new Request("https://localhost/live")))!;
+  expect(sw.dispatch).toHaveBeenCalledTimes(1);
+  const reader = response.body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe("chunk");
+  await reader.cancel();
+  expect(sw.dispatch).toHaveBeenLastCalledWith({
+    action: "cancel",
+    streamId: "live",
+  });
 });

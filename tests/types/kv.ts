@@ -1,4 +1,4 @@
-import type { KVNamespace, KVValue } from "../../src/features/kv/index.js";
+import type { KVNamespace, KVValue } from "../../src/bindings/kv/index.js";
 
 // Alternative backends are checked against the independent public contract.
 function checkBackend(api: KVNamespace) {

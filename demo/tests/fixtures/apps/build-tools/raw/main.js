@@ -1,4 +1,4 @@
-import { capacitorWorkers } from "./lib/index.js";
+import { workersCapacitor } from "./lib/index.js";
 import { fetchContract } from "./lib/testing/fetch.js";
 const worker = {
   createWorker: () =>
@@ -8,7 +8,7 @@ const worker = {
   loadDirect: async () => (await import("./worker.js")).default,
 };
 window.runBuildTool = async (prefer) => {
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     worker,
     baseURL: "https://worker.invalid/api",
     prefer,

@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { capacitorWorkersPlugin } from "@rdlabo/capacitor-workers/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -13,6 +13,6 @@ export default defineConfig({
       "upstream-worker": resolve(`./upstream/${meta.entry}`),
     },
   },
-  plugins: [capacitorWorkersPlugin({ worker: "./worker.ts" })],
+  plugins: [workersCapacitorPlugin({ worker: "./worker.ts" })],
   build: { target: "es2022" },
 });

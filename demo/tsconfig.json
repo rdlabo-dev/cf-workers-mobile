@@ -13,7 +13,7 @@
     "esModuleInterop": true,
     "types": [
       "node",
-      "@rdlabo/capacitor-workers/cloudflare"
+      "@rdlabo/workers-capacitor/cloudflare"
     ],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"

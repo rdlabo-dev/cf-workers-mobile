@@ -1,11 +1,11 @@
 /// <reference types="vite/client" />
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
 // This Window is an offscreen runtime host, not the rendered application.
 // Keeping it alive lets the visible WebView use real document navigation.
 const framework =
   new URLSearchParams(location.search).get("framework") ?? import.meta.env.MODE;
-const runtime = capacitorWorkers({
+const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
   worker:
     framework === "express"

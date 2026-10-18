@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { capacitorWorkers, type WorkerHandler } from "../../src/index";
+import { workersCapacitor, type WorkerHandler } from "../../src/index";
 import { createIsolatedWorker } from "../../src/isolated/bridge";
 
 import { workerFor } from "../helpers/isolated-worker";
@@ -104,7 +104,7 @@ it("cleans up a non-cloneable env without poisoning subsequent calls", async () 
 it("the public factory path disposes the worker and can be installed again", async () => {
   const client = workerFor({ fetch: (_req, env) => Response.json(env) });
   const original = globalThis.fetch;
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     worker: () => client as unknown as Worker,
     baseURL: "https://test/api",
     env: { value: "injected" },
@@ -117,7 +117,7 @@ it("the public factory path disposes the worker and can be installed again", asy
   runtime.dispose();
   expect(client.terminate).toHaveBeenCalledOnce();
   expect(globalThis.fetch).toBe(original);
-  const next = capacitorWorkers({
+  const next = workersCapacitor({
     worker: { fetch: () => new Response("next") },
     baseURL: "https://test/api",
   });
@@ -186,7 +186,9 @@ it("reports response reconstruction failure and releases the call", async () => 
 it.each(["dispose", "crash", "abort"] as const)(
   "settles a paused upload and cancels its source on %s",
   async (action) => {
-    const fetchHandler = vi.fn(() => new Response("unexpected"));
+    const fetchHandler = vi.fn(
+      async (request: Request) => new Response(await request.text()),
+    );
     const { client, isolated, ctx, pending } = setup({ fetch: fetchHandler });
     const cancel = vi.fn(() => new Promise<void>(() => {}));
     const controller = new AbortController();
@@ -216,7 +218,7 @@ it.each(["dispose", "crash", "abort"] as const)(
     await Promise.all(pending);
     expect(cancel).toHaveBeenCalledOnce();
     expect(isolated.activeCalls).toBe(0);
-    expect(fetchHandler).not.toHaveBeenCalled();
+    expect(fetchHandler).toHaveBeenCalledOnce();
   },
 );
 
@@ -242,4 +244,79 @@ it("tracks a call waiting for startup and releases it on disposal", async () => 
   await Promise.all(pending);
   expect(isolated.activeCalls).toBe(0);
   expect(worker.postMessage).not.toHaveBeenCalled();
+});
+
+it("streams uploads before EOF and transfers bounded chunks", async () => {
+  let source!: ReadableStreamDefaultController<Uint8Array>;
+  let received!: () => void;
+  const first = new Promise<void>((resolve) => {
+    received = resolve;
+  });
+  const sizes: number[] = [];
+  const { isolated, ctx } = setup({
+    async fetch(request) {
+      const reader = request.body!.getReader();
+      for (;;) {
+        const next = await reader.read();
+        if (next.done) break;
+        sizes.push(next.value.length);
+        received();
+      }
+      return new Response("ok");
+    },
+  });
+  const result = isolated.handler.fetch(
+    new Request("https://test/upload", {
+      method: "POST",
+      duplex: "half",
+      body: new ReadableStream({
+        start(controller) {
+          source = controller;
+          controller.enqueue(new Uint8Array(200000));
+        },
+      }),
+    } as RequestInit),
+    {},
+    ctx,
+  );
+  await first;
+  source.close();
+  expect(await (await result).text()).toBe("ok");
+  expect(sizes.reduce((a, b) => a + b, 0)).toBe(200000);
+  expect(Math.max(...sizes)).toBeLessThanOrEqual(65536);
+});
+
+it("cancels an unread upload when a handler responds without reading it", async () => {
+  const cancel = vi.fn();
+  const { isolated, ctx, pending } = setup({
+    fetch: () => new Response("early"),
+  });
+  const body = new ReadableStream<Uint8Array>({ cancel }, { highWaterMark: 0 });
+  const request = new Request("https://test/api", {
+    method: "POST",
+    body,
+    duplex: "half",
+  } as RequestInit);
+  expect(await (await isolated.handler.fetch(request, {}, ctx)).text()).toBe(
+    "early",
+  );
+  await Promise.all(pending);
+  await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  expect(body.locked).toBe(false);
+});
+
+it("releases the upload reader after successful EOF", async () => {
+  const { isolated, ctx, pending } = setup({
+    fetch: async (request) => new Response(await request.text()),
+  });
+  const request = new Request("https://test/api", {
+    method: "POST",
+    body: "data",
+  });
+  expect(await (await isolated.handler.fetch(request, {}, ctx)).text()).toBe(
+    "data",
+  );
+  await Promise.all(pending);
+  await vi.waitFor(() => expect(isolated.activeCalls).toBe(0));
+  expect(request.body!.locked).toBe(false);
 });

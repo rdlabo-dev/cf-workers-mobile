@@ -1,28 +1,28 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import {
   EncodingImplementation,
   encodingContract,
-} from "../../../src/compat/encoding/index.spec";
+} from "../../../src/browser/encoding/index.spec";
 import {
   AbortImplementation,
   abortContract,
-} from "../../../src/compat/abort/index.spec";
-import { runContract } from "@rdlabo/capacitor-workers/testing";
+} from "../../../src/browser/abort/index.spec";
+import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   HeadersImplementation,
   headersContract,
-} from "../../../src/compat/headers/index.spec";
-import { Headers } from "../../../src/compat/headers";
+} from "../../../src/browser/headers/index.spec";
+import { Headers } from "../../../src/browser/headers";
 import {
   RequestImplementation,
   requestContract,
-} from "../../../src/compat/request/index.spec";
-import { Request } from "../../../src/compat/request";
+} from "../../../src/browser/request/index.spec";
+import { Request } from "../../../src/browser/request";
 import {
   ResponseImplementation,
   responseContract,
-} from "../../../src/compat/response/index.spec";
-import { Response } from "../../../src/compat/response";
+} from "../../../src/browser/response/index.spec";
+import { Response } from "../../../src/browser/response";
 
 import {
   ImmediateImplementation,
@@ -32,7 +32,7 @@ import {
   StructuredCloneImplementation,
   structuredCloneContract,
   localStructuredCloneApi,
-} from "../../../src/compat/structured-clone/index.spec";
+} from "../../../src/browser/structured-clone/index.spec";
 
 const contracts = {
   encoding: () => runContract(new EncodingImplementation(), encodingContract),
@@ -56,7 +56,7 @@ export type WebApiName = keyof typeof contracts;
 export async function runWebApiContracts(name?: WebApiName) {
   // Standalone API contracts own the same Web globals as an application runtime,
   // including resource-management symbols on older WebViews.
-  const runtime = capacitorWorkers({
+  const runtime = workersCapacitor({
     baseURL: "https://web-contract.invalid",
     worker: { fetch: () => new globalThis.Response(null, { status: 204 }) },
   });
