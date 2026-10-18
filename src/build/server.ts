@@ -19,6 +19,13 @@ export interface ServerBuildOptions {
   d1Bindings?: string[];
   /** Hyperdrive binding names when configuration is supplied by another tool. */
   hyperdriveBindings?: string[];
+  r2Bindings?: string[];
+  /** KV names when configuration is supplied by another tool. */
+  kvBindings?: string[];
+  /** Required execution policy for every configured KV binding. */
+  kvExecution?: Record<string, "local" | "remote">;
+  serviceBindings?: string[];
+  queueBindings?: string[];
   /** Names explicitly supplied through capacitorWorkers({ env }); other env access stays on the server. */
   localBindings?: string[];
 }
@@ -35,7 +42,15 @@ export async function serverBindings(
   root: string,
   options: ServerBuildOptions,
 ) {
-  for (const key of ["d1Bindings", "hyperdriveBindings"] as const) {
+  for (const key of [
+    "d1Bindings",
+    "hyperdriveBindings",
+    "r2Bindings",
+    "kvBindings",
+    "serviceBindings",
+    "queueBindings",
+    "localBindings",
+  ] as const) {
     const values = options[key];
     if (
       values !== undefined &&
@@ -74,10 +89,16 @@ export async function serverBindings(
     )
   )
     throw new Error(`Invalid Worker environments in ${file}`);
-  function configured(key: "d1_databases" | "hyperdrive") {
-    const groups = environments.map((environment) =>
-      environment[key] === undefined ? [] : environment[key],
-    );
+  function configured(key: string, child?: string) {
+    const groups = environments.map((environment) => {
+      let value = environment[key];
+      if (child && value !== undefined) {
+        if (!value || typeof value !== "object" || Array.isArray(value))
+          throw new Error(`Invalid ${key} in ${file}`);
+        value = value[child];
+      }
+      return value === undefined ? [] : value;
+    });
     if (
       groups.some(
         (bindings) =>
@@ -88,19 +109,78 @@ export async function serverBindings(
           ),
       )
     )
-      throw new Error(`Invalid ${key} in ${file}`);
+      throw new Error(`Invalid ${key}${child ? "." + child : ""} in ${file}`);
     return groups.flat().map((item: { binding: string }) => item.binding);
   }
-  // Overrides apply per binding kind: an explicit D1 list must not suppress
-  // Hyperdrive discovery (and vice versa). Only names leave this function.
+  // Each explicit list overrides only its own kind, without suppressing others.
   const d1 = options.d1Bindings ?? configured("d1_databases");
   const hyperdrive = options.hyperdriveBindings ?? configured("hyperdrive");
+  const r2 = options.r2Bindings ?? configured("r2_buckets");
+  const kv = options.kvBindings ?? configured("kv_namespaces");
+  const policies = options.kvExecution === undefined ? {} : options.kvExecution;
+  if (!policies || typeof policies !== "object" || Array.isArray(policies))
+    throw new TypeError(
+      "kvExecution must map binding names to local or remote",
+    );
+  for (const [name, policy] of Object.entries(policies)) {
+    if (!kv.includes(name))
+      throw new Error(`Unknown KV binding in kvExecution: ${name}`);
+    if (policy !== "local" && policy !== "remote")
+      throw new TypeError(`kvExecution.${name} must be local or remote`);
+  }
+  for (const name of kv)
+    if (!Object.hasOwn(policies, name))
+      throw new Error(`Set kvExecution.${name} to local or remote`);
+  const services = options.serviceBindings ?? configured("services");
+  const queues = options.queueBindings ?? configured("queues", "producers");
+  const consumers = environments.flatMap((environment) => {
+    const queues = environment.queues;
+    if (queues === undefined) return [];
+    if (!queues || typeof queues !== "object" || Array.isArray(queues))
+      throw new Error(`Invalid queues in ${file}`);
+    const consumers = queues.consumers === undefined ? [] : queues.consumers;
+    if (
+      !Array.isArray(consumers) ||
+      consumers.some(
+        (item) => typeof item?.queue !== "string" || !item.queue.trim(),
+      )
+    )
+      throw new Error(`Invalid queues.consumers in ${file}`);
+    return consumers;
+  });
+  const remoteKV = kv.filter((name) => policies[name] === "remote");
+  const serverOnly = [
+    ...d1,
+    ...hyperdrive,
+    ...r2,
+    ...services,
+    ...queues,
+    ...remoteKV,
+  ];
+  if (options.localBindings?.some((name) => serverOnly.includes(name)))
+    throw new Error("A server binding cannot also be a local binding");
+  // Local KV does not require a network boundary. If another binding selects the
+  // request for remote execution, the original Worker uses its cloud KV there.
+  const localKV = kv.filter(
+    (name) => policies[name] === "local" && !serverOnly.includes(name),
+  );
   return {
-    names: [...new Set<string>([...d1, ...hyperdrive])],
+    names: [...new Set<string>(serverOnly)],
+    localBindings: [...new Set([...(options.localBindings ?? []), ...localKV])],
+    kvBindings: localKV,
     config: file,
-    reportFile: hyperdrive.length
-      ? "capacitor-workers-server.json"
-      : "capacitor-workers-d1.json",
+    forceRemoteReason: consumers.length
+      ? "Queue consumers execute only on the deployed Worker"
+      : undefined,
+    reportFile:
+      consumers.length ||
+      hyperdrive.length ||
+      r2.length ||
+      remoteKV.length ||
+      services.length ||
+      queues.length
+        ? "capacitor-workers-server.json"
+        : "capacitor-workers-d1.json",
   };
 }
 
@@ -155,9 +235,18 @@ export async function compileServerWorker(
   options: Pick<
     BuildOptions,
     "alias" | "tsconfig" | "define" | "conditions"
-  > & { localBindings?: string[] } = {},
+  > & {
+    localBindings?: string[];
+    kvBindings?: string[];
+    forceRemoteReason?: string;
+  } = {},
 ): Promise<ServerCompilation> {
-  const { localBindings = [], ...buildOptions } = options;
+  const {
+    localBindings = [],
+    kvBindings = [],
+    forceRemoteReason,
+    ...buildOptions
+  } = options;
   if (localBindings.some((name) => bindings.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
   const bundled = await build({
@@ -180,7 +269,8 @@ export async function compileServerWorker(
     resolve(dirname(entry), file),
   );
   try {
-    return partition(source, bindings, inputs, localBindings);
+    if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);
+    return partition(source, bindings, inputs, localBindings, kvBindings);
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
     return {
@@ -199,6 +289,7 @@ function partition(
   bindings: string[],
   inputs: string[],
   localBindings: string[],
+  kvBindings: string[],
 ): ServerCompilation {
   const program = parseAst(source);
   const text = (node: Node) => {
@@ -332,6 +423,21 @@ function partition(
       );
     return false;
   }
+  // Direct operations on a configured server/KV binding cannot be local Headers
+  // operations. Aliases and other unknown receivers retain the conservative check.
+  function serverBindingReceiver(node: Node): boolean {
+    if (
+      node.type !== "MemberExpression" ||
+      ![...bindings, ...kvBindings].includes(property(node) ?? "")
+    )
+      return false;
+    return (
+      (node.object.type === "MemberExpression" &&
+        property(node.object) === "env") ||
+      (node.object.type === "Identifier" &&
+        environmentImports.has(node.object.name))
+    );
+  }
   walk(program, (child, parent) => {
     if (
       child.type === "ImportDeclaration" &&
@@ -400,6 +506,7 @@ function partition(
       // here. Unknown collection keys therefore widen the boundary conservatively.
       if (
         (method === "header" || headerMethods.has(method ?? "")) &&
+        !serverBindingReceiver(child.callee.object) &&
         (child.arguments[0]?.type !== "Literal" ||
           typeof child.arguments[0].value !== "string")
       )
