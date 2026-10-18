@@ -11,7 +11,7 @@ const pack = JSON.parse(
     encoding: "utf8",
   }),
 )[0];
-for (const module of ["path", "querystring", "string-decoder"]) {
+for (const module of ["path", "querystring", "string-decoder", "buffer"]) {
   for (const name of ["LICENSE-3RD-PARTY.md", "LICENSE-APACHE"]) {
     const notice = `dist/compat/${module}/${name}`;
     if (!pack.files.some((file) => file.path === notice))
@@ -298,6 +298,15 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
         (prefer) => window.runBuildTool(prefer),
         prefer,
       );
+      if (
+        build !== "raw" &&
+        (report.node.direct.flatMap((r) => r.cases).length !== 91 ||
+          report.node.direct.some(
+            (r) =>
+              r.errors.length || r.cases.some((c) => c.status !== "passed"),
+          ))
+      )
+        throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
       if (
         report.execution !== prefer ||
         report.cases.length !== (build === "raw" ? 4 : 9) ||

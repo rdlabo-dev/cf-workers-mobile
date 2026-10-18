@@ -1,4 +1,3 @@
-import { capacitorWorkers } from "@rdlabo/capacitor-workers";
 import { verifyKVPersistence } from "./kv";
 import { FetchImplementation } from "@rdlabo/capacitor-workers/features/fetch";
 import { assertContract, runContract } from "@rdlabo/capacitor-workers/testing";
@@ -10,7 +9,7 @@ const isolated = () =>
 import { fetchContract } from "@rdlabo/capacitor-workers/testing/fetch";
 import { kvContract } from "@rdlabo/capacitor-workers/testing/kv";
 import { wasmContract } from "./contracts/wasm";
-import { runNodeContracts } from "./node-modules";
+import { runLocalNodeContracts } from "./node-modules";
 import { runNodeContractsInWorker } from "./node-worker";
 import { PersistentText, WasmValidation } from "./implementations";
 export async function runFeatures() {
@@ -37,16 +36,8 @@ export async function runFeatures() {
     environment: "webview",
     ...(await runContract(new WasmValidation(), wasmContract)),
   });
-  const runtime = capacitorWorkers({
-    baseURL: "https://node-contract.invalid",
-    worker: { fetch: () => new Response(null, { status: 204 }) },
-  });
-  try {
-    for (const report of await runNodeContracts("bundled"))
-      reports.push({ environment: "direct", ...report });
-  } finally {
-    await runtime.dispose();
-  }
+  for (const report of await runLocalNodeContracts())
+    reports.push({ environment: "direct", ...report });
   for (const report of await runNodeContractsInWorker())
     reports.push({ environment: "isolated", ...report });
   for (const report of reports) assertContract(report);
