@@ -15,17 +15,17 @@ The status column describes this repository. **Class A/B/C/D/U/S describes feasi
 
 | Module / feature                       | Current status                    | Implemented scope and remaining work                                                                                                                                                                          |
 | -------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node:path`                            | **Complete**                      | [Module contract](../src/compat/node/path/index.spec.ts): POSIX, win32, relative resolution and the actual Workers `matchesGlob` rejection. Accepted at `b1a58d1`; remote CI passed.                               |
-| `node:querystring`                     | **Complete**                      | [Module contract](../src/compat/node/querystring/index.spec.ts), including all seven exports. Accepted at `b1a58d1`; remote CI passed.                                                                             |
-| `node:string_decoder`                  | **Complete**                      | [Module contract](../src/compat/node/string-decoder/index.spec.ts), including constructor, prototype, encodings and public state. Accepted at `b1a58d1`; remote CI passed.                                         |
+| `node:path`                            | **Complete**                      | [Module contract](../src/compat/path/index.spec.ts): POSIX, win32, relative resolution and the actual Workers `matchesGlob` rejection. Accepted at `b1a58d1`; remote CI passed.                               |
+| `node:querystring`                     | **Complete**                      | [Module contract](../src/compat/querystring/index.spec.ts), including all seven exports. Accepted at `b1a58d1`; remote CI passed.                                                                             |
+| `node:string_decoder`                  | **Complete**                      | [Module contract](../src/compat/string-decoder/index.spec.ts), including constructor, prototype, encodings and public state. Accepted at `b1a58d1`; remote CI passed.                                         |
 | `node:http` / Cloudflare Node bridge | **Complete** | Export/prototype audits, HTTP client/server contracts and TCP dispatch through public `net.Server` and both Cloudflare helpers. Accepted at `35316ae`. |
-| `node:net` | **Complete** | [Module contract](../src/compat/node/net/index.spec.ts): all 17 named exports, logical ports, Socket/Server behavior and native TCP in direct/Worker execution. Accepted at `35316ae`. |
+| `node:net` | **Complete** | [Module contract](../src/compat/net/index.spec.ts): all 17 named exports, logical ports, Socket/Server behavior and native TCP in direct/Worker execution. Accepted at `35316ae`. |
 | Node global injection                  | **Complete**                      | Pre-evaluation Node globals, owned Web globals and native Fetch passed shared/native contracts, packed-consumer gates, reviews and CI at 13261ce. Module-scope extensions require configured/lazy loading.    |
 | `node:fs` / `node:fs/promises`         | **Unverified**                    | Read-only VFS with `workerFiles` bundler embedding; verified against a re-bundled OpenNext handler locally. Write APIs, FileHandle, watch and realpath edge cases are unimplemented. |
 | `node:module` / `node:stream/web` / `node:util` | **Unverified**      | Scoped shims: `createRequire` (VFS `.json` only), platform stream constructors, util polyfill + `TextEncoder`/`TextDecoder`. Verified transitively by the OpenNext smoke. |
 | `node:async_hooks` / AsyncLocalStorage | **Unverified** | Scoped implementation with a 15-case contract. Capacitor builds lower async functions/generators and capture Promise continuations; settle restoration, nested scopes and concurrent isolation are covered. Cloudflare retains native async hooks. Full module/native acceptance remains outstanding. |
 | `node:buffer` | **Complete** | Whole-module implementation and [Buffer acceptance](#buffer-acceptance) passed [remote CI](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39084878630) at `e90bc50` (PR #20). |
-| `node:timers` / `node:timers/promises` | **Unverified (CI pending)** | Whole-module implementation and shared 30-group contract are in `src/compat/node/timers/`. [Acceptance evidence](#timers-acceptance) records local verification; remote CI remains the merge gate. |
+| `node:timers` / `node:timers/promises` | **Unverified (CI pending)** | Whole-module implementation and shared 30-group contract are in `src/compat/timers/`. [Acceptance evidence](#timers-acceptance) records local verification; remote CI remains the merge gate. |
 | Other module families                  | **Unverified or Not implemented** | See each row below. Other module families are not certified Complete.                                                                                                                                         |
 
 ## Scope and evidence
@@ -110,15 +110,15 @@ and report API-specific test names. `globals` verifies the installation lifecycl
 
 | Responsibility | Owning tests |
 | --- | --- |
-| Fetch transport and Workers HTTP policy | [fetch/index.spec.ts](../src/compat/web/fetch/index.spec.ts), [fetch/policy.spec.ts](../src/compat/web/fetch/policy.spec.ts) |
-| Headers | [headers/index.spec.ts](../src/compat/web/headers/index.spec.ts) |
-| Request | [request/index.spec.ts](../src/compat/web/request/index.spec.ts) |
-| Response and installed body decoding | [response/index.spec.ts](../src/compat/web/response/index.spec.ts), [response/installation.spec.ts](../src/compat/web/response/installation.spec.ts) |
-| AbortController / AbortSignal and timeout installation | [abort/index.spec.ts](../src/compat/web/abort/index.spec.ts), [abort/installation.spec.ts](../src/compat/web/abort/installation.spec.ts) |
-| TextEncoder / TextDecoder | [encoding/index.spec.ts](../src/compat/web/encoding/index.spec.ts) |
-| structuredClone | [structured-clone/index.spec.ts](../src/compat/web/structured-clone/index.spec.ts) |
-| setImmediate / clearImmediate | [immediate/index.spec.ts](../src/compat/node/immediate/index.spec.ts) |
-| Global installation, ownership and restoration | [globals/index.spec.ts](../src/compat/shared/globals/index.spec.ts), [globals/web.spec.ts](../src/compat/shared/globals/web.spec.ts) |
+| Fetch transport and Workers HTTP policy | [fetch/index.spec.ts](../src/browser/fetch/index.spec.ts), [fetch/policy.spec.ts](../src/browser/fetch/policy.spec.ts) |
+| Headers | [headers/index.spec.ts](../src/browser/headers/index.spec.ts) |
+| Request | [request/index.spec.ts](../src/browser/request/index.spec.ts) |
+| Response and installed body decoding | [response/index.spec.ts](../src/browser/response/index.spec.ts), [response/installation.spec.ts](../src/browser/response/installation.spec.ts) |
+| AbortController / AbortSignal and timeout installation | [abort/index.spec.ts](../src/browser/abort/index.spec.ts), [abort/installation.spec.ts](../src/browser/abort/installation.spec.ts) |
+| TextEncoder / TextDecoder | [encoding/index.spec.ts](../src/browser/encoding/index.spec.ts) |
+| structuredClone | [structured-clone/index.spec.ts](../src/browser/structured-clone/index.spec.ts) |
+| setImmediate / clearImmediate | [immediate/index.spec.ts](../src/compat/immediate/index.spec.ts) |
+| Global installation, ownership and restoration | [globals/index.spec.ts](../src/shared/globals/index.spec.ts), [globals/web.spec.ts](../src/shared/globals/web.spec.ts) |
 
 ### Test organization follow-up (2026-10-17)
 
@@ -160,7 +160,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 | **Complete**          | Buffer globals       | unqualified `Buffer`                                                               | B                          | Inject before application/dependency evaluation; imports and global must use the same implementation.                                                                                                |
 | Unverified            | Events               | `EventEmitter`, `once`, `on`, listener bookkeeping                                 | A                          | Preserve ordering, error events, cancellation and iterator cleanup.                                                                                                                                  |
 | Not implemented       | Events + context     | `EventEmitterAsyncResource` where exposed                                          | U                          | Depends on the async context decision; do not claim parity from EventEmitter alone.                                                                                                                  |
-| **Complete**          | Path                 | POSIX and win32 operations, relative resolution and baseline matchesGlob rejection | A                          | Full module candidate verified locally; remote CI passed at `b1a58d1`. See the [contract](../src/compat/node/path/index.spec.ts).                                                                         |
+| **Complete**          | Path                 | POSIX and win32 operations, relative resolution and baseline matchesGlob rejection | A                          | Full module candidate verified locally; remote CI passed at `b1a58d1`. See the [contract](../src/compat/path/index.spec.ts).                                                                         |
 | **Complete**          | Path                 | `win32`                                                                            | A                          | Implemented with the pinned Workers module, including the subpath export; accepted at `b1a58d1`; remote CI passed.                                                                                   |
 | **Complete**          | Path                 | cwd-dependent `resolve`/`relative`                                                 | A                          | Matches the pinned Workers virtual root `/`; accepted at `b1a58d1`; remote CI passed.                                                                                                                |
 | **Complete**          | Path                 | `matchesGlob`                                                                      | A/S                        | Reproduces the pinned Workers throwing behavior with a passing contract; remote CI passed at `b1a58d1`.                                                                                              |
@@ -226,7 +226,7 @@ The [official overview](https://developers.cloudflare.com/workers/runtime-apis/n
 
 ## Inventory: async context and diagnostics
 
-[AsyncLocalStorage documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/) requires context to survive asynchronous work. A scoped implementation now exists at `src/compat/node/async-hooks/index.ts` with [its module contract](../src/compat/node/async-hooks/index.spec.ts) compared against pinned workerd in `demo/tests/workers/node-compat.test.ts`. The pinned workerd baseline itself does not implement `enterWith()`, `disable()`, or `AsyncResource` constructor-type/async-id surfaces; those rows are declared unsupported for the workers profile.
+[AsyncLocalStorage documentation](https://developers.cloudflare.com/workers/runtime-apis/nodejs/asynclocalstorage/) requires context to survive asynchronous work. A scoped implementation now exists at `src/compat/async-hooks/index.ts` with [its module contract](../src/compat/async-hooks/index.spec.ts) compared against pinned workerd in `demo/tests/workers/node-compat.test.ts`. The pinned workerd baseline itself does not implement `enterWith()`, `disable()`, or `AsyncResource` constructor-type/async-id surfaces; those rows are declared unsupported for the workers profile.
 
 | Implementation status | API / behavior                                                                       | Class                                                   | Decision                                                                                                                                                                                  |
 | --------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -247,7 +247,7 @@ See [Diagnostics Channel](https://developers.cloudflare.com/workers/runtime-apis
 | Implementation status | Category               | API family                                                                              | Class                                                | Boundary / remaining check                                                                                                                                                                                           |
 | --------------------- | ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Not implemented       | FS                     | read/write/open/close, metadata, directories, links, sync/callback/promises, FileHandle | A candidate                                          | In-memory virtual FS; inspect Workers-supported operations and error codes, file descriptor lifetime and request isolation. No device Filesystem plugin inherently required.                                         |
-| Implemented (scoped)  | FS                     | `/bundle` files                                                                         | A + build                                            | Read-only in-memory VFS at `src/compat/node/fs` (`readFileSync`/`readdirSync`/`existsSync`/`statSync`/`lstatSync`/`realpathSync` + `fs/promises` subset), populated by the `workerFiles` bundler option. Verified against an OpenNext handler. Writes, FileHandle, descriptors and watch remain unimplemented. |
+| Implemented (scoped)  | FS                     | `/bundle` files                                                                         | A + build                                            | Read-only in-memory VFS at `src/compat/fs` (`readFileSync`/`readdirSync`/`existsSync`/`statSync`/`lstatSync`/`realpathSync` + `fs/promises` subset), populated by the `workerFiles` bundler option. Verified against an OpenNext handler. Writes, FileHandle, descriptors and watch remain unimplemented. |
 | Not implemented       | FS                     | `/tmp`, `/dev/null`, `/dev/zero`, `/dev/full`, `/dev/random`                            | A                                                    | Virtual devices and secure random source. Match Workers' lifetime and permission rules; do not introduce persistence.                                                                                                |
 | Not implemented       | FS                     | watch, permissions/ownership and other host-like operations                             | U/S                                                  | Establish which operations Workers implements, ignores or rejects. Never infer mobile filesystem behavior from API names.                                                                                            |
 | **Complete**       | HTTP receiving         | Server, IncomingMessage, ServerResponse, createServer, listen/close                     | A                                                    | Fetch-handler adaptation with an in-memory server registry. No network listener.                                                                                                                                     |
@@ -295,15 +295,15 @@ Dates/flags govern whether these are importable. Do not broaden a stub into a fu
 
 ## Existing implementation vs planned feasibility
 
-Each compatibility module owns a directory under `src/compat/node/<module>/`, with `index.ts` as its entry point. Subpaths and dependency declarations stay inside that directory (for example, `path/posix/index.ts` and `path/win32/index.ts`). Each module keeps its tests, including contract definitions and coverage, in the adjacent `index.spec.ts`; environment runners in `demo/tests/` execute those same contracts. Test code is excluded from the production compilation. TypeScript preserves the implementation structure in `dist/compat/node/`; the shared build aliases resolve to the compiled entry points.
+Each compatibility module owns a directory under `src/compat/<module>/`, with `index.ts` as its entry point. Subpaths and dependency declarations stay inside that directory (for example, `path/posix/index.ts` and `path/win32/index.ts`). Each module keeps its tests, including contract definitions and coverage, in the adjacent `index.spec.ts`; environment runners in `demo/tests/` execute those same contracts. Test code is excluded from the production compilation. TypeScript preserves the implementation structure in `dist/compat/`; the shared build aliases resolve to the compiled entry points.
 
 | Current code                                                      | Actual evidence / gap                                                                                                                                                                      |
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/vite.ts`, `src/esbuild.ts`                                   | Broad browser polyfills and shared overrides. General Node compatibility is not certified. esbuild maps unavailable modules to an empty object, which is not proof of Workers stub parity. |
 | `src/build/shared.ts`                                             | Shared aliases for http, net, async_hooks, path, querystring, string_decoder and Cloudflare helpers. Extend this existing boundary; avoid separate Vite/esbuild truth sources.                  |
-| `src/compat/node/http/index.ts`, `src/compat/workers/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.        |
-| `src/compat/node/async-hooks/index.ts`                                 | AsyncResource is undefined; ALS is not implemented.                                                                                                                                        |
-| `src/compat/shared/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
+| `src/compat/http/index.ts`, `src/workers/cloudflare-node/index.ts` | HTTP client/server export and prototype audits, streaming, headers, validation and cancellation contracts are implemented. Public Cloudflare TCP dispatch also passes through the complete net dependency at 35316ae.        |
+| `src/compat/async-hooks/index.ts`                                 | AsyncResource is undefined; ALS is not implemented.                                                                                                                                        |
+| `src/shared/globals/index.ts`                                     | Node injection, owned Web API installation, pre-evaluation, collision and cleanup contracts passed manager/independent review. Packed-consumer and CI gates passed at 13261ce.             |
 | `src/features/index.ts`, `testing.ts`                             | Existing typed definitions, implementation coverage and lifecycle test harness are reusable. A new abstract framework is unnecessary.                                                      |
 | Native document plugin                                            | Document rendering plus native TCP/TLS only. HTTP/1.1 framing/parsing runs in JS/WASM using llhttp. iOS uses Network.framework without AsyncHTTPClient/NIO; Android uses Netty without its HTTP codec. See the native boundary document. |
 
@@ -426,7 +426,7 @@ Workers' own unsupported `resolveObjectURL` and Blob/File `endings` behavior is
 verified as an expected rejection, not excluded from coverage.
 
 Implementation and the shared 24-group contract live together in
-[`src/compat/node/buffer/`](../src/compat/node/buffer/index.spec.ts). Numeric tests include
+[`src/compat/buffer/`](../src/compat/buffer/index.spec.ts). Numeric tests include
 independent byte expectations, and transcode covers 96 fixed workerd vectors.
 Blob/File tests include conversion order, mutable inputs, subclass branding,
 structured cloning, host interoperability, installation/restoration and late
@@ -502,7 +502,7 @@ subset while other runtime checks fail.
 The acceptance unit is `node:timers` together with `node:timers/promises`, using
 workerd `1.20261012.1`, compatibility date `2026-10-17`, and no additional flags.
 Both bare and `node:` imports resolve to the same implementation. Sources and the
-shared 30-group contract live in [`src/compat/node/timers/`](../src/compat/node/timers/index.spec.ts).
+shared 30-group contract live in [`src/compat/timers/`](../src/compat/timers/index.spec.ts).
 
 The export audit covers `Timeout`, callback timers and all clear functions,
 `active`, `enroll`, `unenroll`, the `promises` namespace and both default exports.

@@ -64,7 +64,7 @@ public class WorkersCapacitorPlugin extends Plugin {
     }
     @PluginMethod public void stop(PluginCall call) { main.post(() -> { close(); call.resolve(); }); }
 
-    // ---- Outbound network transport (see src/compat/web/fetch/transport.ts) ----
+    // ---- Outbound network transport (see src/browser/fetch/transport.ts) ----
 
     private WorkerSockets.Result result(PluginCall call) {
         WorkerSockets owner = network;

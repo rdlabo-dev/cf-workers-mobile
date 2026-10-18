@@ -8,21 +8,21 @@ export const transportPath = fileURLToPath(
   new URL("../isolated/transport.js", import.meta.url),
 );
 export const globalsPath = fileURLToPath(
-  new URL("../compat/shared/globals/index.js", import.meta.url),
+  new URL("../shared/globals/index.js", import.meta.url),
 );
 export const networkRelayPath = fileURLToPath(
-  new URL("../compat/web/fetch/relay.js", import.meta.url),
+  new URL("../browser/fetch/relay.js", import.meta.url),
 );
 export const globalsInstallPath = fileURLToPath(
-  new URL("../compat/shared/globals/install.js", import.meta.url),
+  new URL("../shared/globals/install.js", import.meta.url),
 );
 export const nodeGlobalsInstallPath = fileURLToPath(
-  new URL("../compat/shared/globals/node-install.js", import.meta.url),
+  new URL("../shared/globals/node-install.js", import.meta.url),
 );
 export const nodeCompatPath = (name: string) =>
-  fileURLToPath(new URL(`../compat/node/${name}/index.js`, import.meta.url));
-const workersCompatPath = (name: string) =>
-  fileURLToPath(new URL(`../compat/workers/${name}/index.js`, import.meta.url));
+  fileURLToPath(new URL(`../compat/${name}/index.js`, import.meta.url));
+const workersModulePath = (name: string) =>
+  fileURLToPath(new URL(`../workers/${name}/index.js`, import.meta.url));
 // A compat module reusing a CommonJS polyfill imports the concrete package
 // file; the bare name is the alias target, so only the deep specifier can
 // reach the real implementation without recursing.
@@ -33,15 +33,15 @@ export function compatibilityAliases() {
     // readable-stream uses this trailing-slash package import. Resolve it
     // before Vite converts the process prefix into a directory path.
     "process/": stdlib.process,
-    "cloudflare:node": workersCompatPath("cloudflare-node"),
-    "cloudflare:workers": workersCompatPath("cloudflare-workers"),
+    "cloudflare:node": workersModulePath("cloudflare-node"),
+    "cloudflare:workers": workersModulePath("cloudflare-workers"),
     "node:async_hooks": nodeCompatPath("async-hooks"),
     async_hooks: nodeCompatPath("async-hooks"),
     "node:timers/promises": fileURLToPath(
-      new URL("../compat/node/timers/promises.js", import.meta.url),
+      new URL("../compat/timers/promises.js", import.meta.url),
     ),
     "timers/promises": fileURLToPath(
-      new URL("../compat/node/timers/promises.js", import.meta.url),
+      new URL("../compat/timers/promises.js", import.meta.url),
     ),
     "node:timers": nodeCompatPath("timers"),
     timers: nodeCompatPath("timers"),
@@ -100,5 +100,5 @@ export function workerSource(
 }
 
 export const globalsInjectPath = fileURLToPath(
-  new URL("../compat/shared/globals/inject.js", import.meta.url),
+  new URL("../shared/globals/inject.js", import.meta.url),
 );

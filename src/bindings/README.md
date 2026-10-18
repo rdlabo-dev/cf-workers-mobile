@@ -1,7 +1,7 @@
 # Cloudflare bindings and execution policy
 
 This folder owns cloud binding discovery and execution policy. It is separate
-from local runtime API compatibility under `src/compat`.
+from the runtime APIs in `src/compat`, `src/browser` and `src/workers`.
 
 | Source      | Responsibility                                                        |
 | ----------- | --------------------------------------------------------------------- |

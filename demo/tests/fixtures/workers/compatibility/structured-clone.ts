@@ -3,10 +3,10 @@ import {
   localStructuredCloneApi,
   StructuredCloneImplementation,
   structuredCloneContract,
-} from "../../../../../src/compat/web/structured-clone/index.spec";
-import type { Headers as LocalHeaders } from "../../../../../src/compat/web/headers";
-import type { Request as LocalRequest } from "../../../../../src/compat/web/request";
-import type { Response as LocalResponse } from "../../../../../src/compat/web/response";
+} from "../../../../../src/browser/structured-clone/index.spec";
+import type { Headers as LocalHeaders } from "../../../../../src/browser/headers";
+import type { Request as LocalRequest } from "../../../../../src/browser/request";
+import type { Response as LocalResponse } from "../../../../../src/browser/response";
 
 const workersStructuredClone = (...args: unknown[]) =>
   Reflect.apply(globalThis.structuredClone, globalThis, args);

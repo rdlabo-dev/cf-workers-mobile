@@ -1,18 +1,18 @@
 import {
   Response as WorkerResponse,
   networkResponse,
-} from "../compat/web/response/index.js";
-import { Request as WorkerRequest } from "../compat/web/request/index.js";
-import { Headers as WorkerHeaders } from "../compat/web/headers/index.js";
-import { browserFetch } from "../compat/web/fetch/interop.js";
-import { platform } from "../compat/shared/globals/platform.js";
-import { createFetch } from "../compat/web/fetch/index.js";
+} from "../browser/response/index.js";
+import { Request as WorkerRequest } from "../browser/request/index.js";
+import { Headers as WorkerHeaders } from "../browser/headers/index.js";
+import { browserFetch } from "../browser/fetch/interop.js";
+import { platform } from "../shared/globals/platform.js";
+import { createFetch } from "../browser/fetch/index.js";
 import {
   createNativeNetwork,
   getNativeCall,
-} from "../compat/web/fetch/native-network.js";
-import { createNetworkScope } from "../compat/web/fetch/scope.js";
-import { FetchTransport } from "../compat/web/fetch/transport.js";
+} from "../browser/fetch/native-network.js";
+import { createNetworkScope } from "../browser/fetch/scope.js";
+import { FetchTransport } from "../browser/fetch/transport.js";
 import type { RemoteWorkerOptions } from "../fetch/types.js";
 
 /** Host-owned: credentials never cross the Dedicated Worker message boundary. */

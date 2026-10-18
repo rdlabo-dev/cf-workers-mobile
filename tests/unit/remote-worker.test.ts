@@ -182,10 +182,10 @@ it("cannot dispatch locally after disposal while an async selector is pending", 
 // Remote policy tests use the real dispatcher and cookie boundary with a fake
 // wire transport. Native acceptance exercises the same policy over actual TLS.
 import { createRemoteWorker } from "../../src/bindings/remote.js";
-import * as nativeNetwork from "../../src/compat/web/fetch/native-network.js";
-import * as nativeFetch from "../../src/compat/web/fetch/index.js";
-import { Response as WireResponse } from "../../src/compat/web/response/index.js";
-import { Request as WireRequest } from "../../src/compat/web/request/index.js";
+import * as nativeNetwork from "../../src/browser/fetch/native-network.js";
+import * as nativeFetch from "../../src/browser/fetch/index.js";
+import { Response as WireResponse } from "../../src/browser/response/index.js";
+import { Request as WireRequest } from "../../src/browser/request/index.js";
 function nativeRemote(
   send: (request: WireRequest) => Promise<WireResponse>,
   cookies = vi.fn(

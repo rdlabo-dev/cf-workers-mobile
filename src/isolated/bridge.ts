@@ -1,4 +1,4 @@
-import { createNetworkRelay } from "../compat/web/fetch/relay.js";
+import { createNetworkRelay } from "../browser/fetch/relay.js";
 import type { WorkerHandler } from "../fetch/types.js";
 import type { Command, Reply } from "./protocol.js";
 

@@ -1,16 +1,16 @@
-# Runtime compatibility domains
+# Node.js compatibility
 
-This directory contains local runtime compatibility, grouped by API origin.
-Placement does not certify completeness. See each domain's status and evidence.
+`compat` refers specifically to Workers Node.js compatibility. This folder owns
+`node:*` module implementations and Node-specific globals. Browser and Workers
+APIs are peer folders, not children of this directory.
+The target is the Node API behavior exposed by the pinned Workers baseline,
+not every API of a standalone Node process.
 
-| Folder                       | Responsibility                                       | Status entry point                                           |
-| ---------------------------- | ---------------------------------------------------- | ------------------------------------------------------------ |
-| [node](node/README.md)       | Workers-compatible `node:*` modules and Node globals | [Node inventory](../../docs/node-compatibility-inventory.md) |
-| [web](web/README.md)         | Web-standard APIs adapted to Workers behavior        | [Web status](web/README.md)                                  |
-| [workers](workers/README.md) | Cloudflare-specific runtime modules and APIs         | [Workers status](workers/README.md)                          |
-| [shared](shared/README.md)   | Cross-domain installation, codecs and wire helpers   | Internal implementation only                                 |
+The [Node compatibility inventory](../../docs/node-compatibility-inventory.md)
+is the authoritative per-module status and acceptance record. Contracts remain
+beside implementations. Moving a module here does not promote its status.
 
-Cloud resource configuration, KV and whole-request remote dispatch live in
-[bindings](../bindings/README.md). Feature contract/lifecycle infrastructure stays
-in `src/features`; fetch interception and isolated execution stay in their runtime
-folders. API identity, implementation location and execution policy are separate.
+`immediate` implements Node's setImmediate/clearImmediate; `stream-web` is the
+`node:stream/web` export adapter even though its underlying APIs are Web standard.
+`cloudflare:node` belongs in [workers](../workers/README.md) because it is a
+Cloudflare-owned module bridging Node HTTP and Workers execution.

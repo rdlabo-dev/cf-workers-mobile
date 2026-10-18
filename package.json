@@ -61,7 +61,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/build-document-assets.mjs && node scripts/build-compat-codecs.mjs && node scripts/build-compat-notices.mjs",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-document-assets.mjs && node scripts/build-codecs.mjs && node scripts/build-notices.mjs",
     "test": "vitest run",
     "test:package": "node scripts/test-package.mjs",
     "typecheck": "tsc --noEmit"

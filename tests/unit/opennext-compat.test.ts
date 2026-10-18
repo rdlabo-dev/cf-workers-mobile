@@ -1,15 +1,15 @@
 import { expect, it } from "vitest";
 import { runContract } from "@rdlabo/workers-capacitor/testing";
-import { FsImplementation, fsContract } from "../../src/compat/node/fs/index.spec";
+import { FsImplementation, fsContract } from "../../src/compat/fs/index.spec";
 import {
   ModuleImplementation,
   moduleContract,
-} from "../../src/compat/node/module/index.spec";
+} from "../../src/compat/module/index.spec";
 import {
   StreamWebImplementation,
   streamWebContract,
-} from "../../src/compat/node/stream-web/index.spec";
-import { UtilImplementation, utilContract } from "../../src/compat/node/util/index.spec";
+} from "../../src/compat/stream-web/index.spec";
+import { UtilImplementation, utilContract } from "../../src/compat/util/index.spec";
 
 it("fs contract", async () => {
   const report = await runContract(new FsImplementation(), fsContract);

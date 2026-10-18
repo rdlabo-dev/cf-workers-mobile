@@ -73,10 +73,10 @@ is release-ready merely because one unit passes.
 
 ## Layout and tests
 
-Keep runtime implementations in `src/compat/{node,web,workers}/<module>/index.ts`
+Keep runtime implementations in `src/{compat,browser,workers}/<module>/index.ts`
 according to API ownership, with contracts/tests in the adjacent `index.spec.ts`.
 Cloud resource adapters and execution policy belong in `src/bindings`; cross-domain
-installation/codecs belong in `src/compat/shared`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
+installation/codecs belong in `src/shared`. See the [support map](docs/api-support.md). Subpaths and dependency declarations belong to
 that module directory. `demo/tests/` owns environment runners, not copies of
 module behavior. Production compilation excludes specs. Consumer tests may copy
 test contracts, but must resolve implementations from the packed package.

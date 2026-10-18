@@ -1,8 +1,8 @@
-import { installWebGlobals } from "../compat/shared/globals/web.js";
-import { createOutboundFetch } from "../compat/web/fetch/outbound.js";
-import { browserFetch, isRequest } from "../compat/web/fetch/interop.js";
-import type { RequestInit as WorkerRequestInit } from "../compat/web/request/index.js";
-import { installDirectNetworkScope } from "../compat/web/fetch/scope.js";
+import { installWebGlobals } from "../shared/globals/web.js";
+import { createOutboundFetch } from "../browser/fetch/outbound.js";
+import { browserFetch, isRequest } from "../browser/fetch/interop.js";
+import type { RequestInit as WorkerRequestInit } from "../browser/request/index.js";
+import { installDirectNetworkScope } from "../browser/fetch/scope.js";
 import configuredWorker from "../configured.js";
 import { createIsolatedWorker } from "../isolated/bridge.js";
 import { createRemoteWorker } from "../bindings/remote.js";

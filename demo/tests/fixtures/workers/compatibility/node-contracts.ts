@@ -1,7 +1,7 @@
 // Type-only views: execution must use the installed public globals.
 const { Headers, Request } = globalThis as unknown as {
-  Headers: typeof import("../../../../../src/compat/web/headers").Headers;
-  Request: typeof import("../../../../../src/compat/web/request").Request;
+  Headers: typeof import("../../../../../src/browser/headers").Headers;
+  Request: typeof import("../../../../../src/browser/request").Request;
 };
 import { runNodeContracts } from "../../../validation/node-modules";
 import { nodeGlobals } from "./node-globals";

@@ -4,7 +4,7 @@ vi.mock(
   // @ts-expect-error The browser-only readable-stream entry has no declarations.
   async () => import("readable-stream/lib/ours/browser.js"),
 );
-import { request } from "../../src/compat/node/http/index";
+import { request } from "../../src/compat/http/index";
 it("finishes an upload using the browser Writable implementation", async () => {
   vi.stubGlobal("fetch", async (_url: unknown, init: RequestInit) => {
     const data = await new Response(init.body).text();

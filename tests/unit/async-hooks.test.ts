@@ -1,13 +1,13 @@
 import {
   AsyncLocalStorage,
   AsyncResource,
-} from "../../src/compat/node/async-hooks/index";
+} from "../../src/compat/async-hooks/index";
 import { expect, it } from "vitest";
 import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   AsyncHooksImplementation,
   asyncHooksContract,
-} from "../../src/compat/node/async-hooks/index.spec";
+} from "../../src/compat/async-hooks/index.spec";
 
 it("async-hooks contract", async () => {
   const report = await runContract(
@@ -40,7 +40,7 @@ it("keeps stream source and sink receivers intact", async () => {
 
 it("delivers one message context to all listeners and supports removal and null handlers", async () => {
   const { AsyncLocalStorage } =
-    await import("../../src/compat/node/async-hooks/index");
+    await import("../../src/compat/async-hooks/index");
   const als = new AsyncLocalStorage<string>();
   const { port1, port2 } = new MessageChannel();
   const seen: unknown[] = [];
@@ -74,7 +74,7 @@ it("delivers one message context to all listeners and supports removal and null 
 
 it("rejects native async callbacks before running them", async () => {
   const { AsyncLocalStorage } =
-    await import("../../src/compat/node/async-hooks/index");
+    await import("../../src/compat/async-hooks/index");
   const als = new AsyncLocalStorage<string>();
   const callback = new Function(
     "return async function () { throw new Error('must not run'); }",

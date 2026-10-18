@@ -3,25 +3,25 @@ import { handleAsNodeConnection, connectHandler } from "cloudflare:node";
 import {
   runNetIncomingContract,
   runNetNetworkContract,
-} from "../../../src/compat/node/net/index.spec";
+} from "../../../src/compat/net/index.spec";
 import { request, get } from "node:http";
 import {
   nodeHttpNetworkContract,
   nodeHttpNetworkFeature,
-} from "../../../src/compat/node/http/index.spec";
+} from "../../../src/compat/http/index.spec";
 import { workersCapacitor } from "../../../dist/index";
-import { createFetch } from "../../../dist/compat/web/fetch";
-import { Request } from "../../../dist/compat/web/request";
+import { createFetch } from "../../../dist/browser/fetch";
+import { Request } from "../../../dist/browser/request";
 import {
   fetchPolicyContract,
   fetchPolicyFeature,
-} from "../../../src/compat/web/fetch/policy.spec";
-import { FetchTransport } from "../../../dist/compat/web/fetch/transport";
+} from "../../../src/browser/fetch/policy.spec";
+import { FetchTransport } from "../../../dist/browser/fetch/transport";
 import {
   createNativeNetwork,
   type NativeCall,
-} from "../../../dist/compat/web/fetch/native-network";
-import { createNetworkScope } from "../../../dist/compat/web/fetch/scope";
+} from "../../../dist/browser/fetch/native-network";
+import { createNetworkScope } from "../../../dist/browser/fetch/scope";
 
 declare const __NETWORK_TLS__: boolean;
 type Result = { name: string; ok: boolean; error?: string };

@@ -4,7 +4,7 @@ import {
   netContract,
   runNetIncomingContract,
   runNetNetworkContract,
-} from "../../../../../src/compat/node/net/index.spec";
+} from "../../../../../src/compat/net/index.spec";
 import net from "node:net";
 import { handleAsNodeConnection, connectHandler } from "cloudflare:node";
 export default {

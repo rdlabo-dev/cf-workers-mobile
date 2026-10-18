@@ -2,37 +2,37 @@ import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import {
   EncodingImplementation,
   encodingContract,
-} from "../../../src/compat/web/encoding/index.spec";
+} from "../../../src/browser/encoding/index.spec";
 import {
   AbortImplementation,
   abortContract,
-} from "../../../src/compat/web/abort/index.spec";
+} from "../../../src/browser/abort/index.spec";
 import { runContract } from "@rdlabo/workers-capacitor/testing";
 import {
   HeadersImplementation,
   headersContract,
-} from "../../../src/compat/web/headers/index.spec";
-import { Headers } from "../../../src/compat/web/headers";
+} from "../../../src/browser/headers/index.spec";
+import { Headers } from "../../../src/browser/headers";
 import {
   RequestImplementation,
   requestContract,
-} from "../../../src/compat/web/request/index.spec";
-import { Request } from "../../../src/compat/web/request";
+} from "../../../src/browser/request/index.spec";
+import { Request } from "../../../src/browser/request";
 import {
   ResponseImplementation,
   responseContract,
-} from "../../../src/compat/web/response/index.spec";
-import { Response } from "../../../src/compat/web/response";
+} from "../../../src/browser/response/index.spec";
+import { Response } from "../../../src/browser/response";
 
 import {
   ImmediateImplementation,
   immediateContract,
-} from "../../../src/compat/node/immediate/index.spec";
+} from "../../../src/compat/immediate/index.spec";
 import {
   StructuredCloneImplementation,
   structuredCloneContract,
   localStructuredCloneApi,
-} from "../../../src/compat/web/structured-clone/index.spec";
+} from "../../../src/browser/structured-clone/index.spec";
 
 const contracts = {
   encoding: () => runContract(new EncodingImplementation(), encodingContract),

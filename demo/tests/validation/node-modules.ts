@@ -2,12 +2,12 @@ import {
   AsyncHooksImplementation,
   asyncHooksContract,
   NodeAsyncHooks,
-} from "../../../src/compat/node/async-hooks/index.spec";
-import { installNodeGlobals } from "../../../src/compat/shared/globals/index";
+} from "../../../src/compat/async-hooks/index.spec";
+import { installNodeGlobals } from "../../../src/shared/globals/index";
 import {
   TimersImplementation,
   timersContract,
-} from "../../../src/compat/node/timers/index.spec";
+} from "../../../src/compat/timers/index.spec";
 import { workersCapacitor } from "@rdlabo/workers-capacitor";
 // Environment runners share module-owned contracts. The node:* imports in
 // their implementations resolve to workerd builtins or the bundler aliases.
@@ -19,47 +19,47 @@ import {
   nodePathContract,
   BundledPath,
   WorkersPath,
-} from "../../../src/compat/node/path/index.spec";
+} from "../../../src/compat/path/index.spec";
 import {
   nodeQuerystringContract,
   NodeQuerystring,
-} from "../../../src/compat/node/querystring/index.spec";
+} from "../../../src/compat/querystring/index.spec";
 import {
   nodeStringDecoderContract,
   NodeStringDecoder,
-} from "../../../src/compat/node/string-decoder/index.spec";
+} from "../../../src/compat/string-decoder/index.spec";
 
 import {
   nodeHttpContract,
   NodeHttp,
-} from "../../../src/compat/node/http/index.spec";
+} from "../../../src/compat/http/index.spec";
 
 import {
   NetImplementation,
   netContract,
-} from "../../../src/compat/node/net/index.spec";
+} from "../../../src/compat/net/index.spec";
 
 import {
   BufferImplementation,
   bufferContract,
-} from "../../../src/compat/node/buffer/index.spec";
+} from "../../../src/compat/buffer/index.spec";
 
 import {
   FsImplementation,
   fsContract,
-} from "../../../src/compat/node/fs/index.spec";
+} from "../../../src/compat/fs/index.spec";
 import {
   ModuleImplementation,
   moduleContract,
-} from "../../../src/compat/node/module/index.spec";
+} from "../../../src/compat/module/index.spec";
 import {
   StreamWebImplementation,
   streamWebContract,
-} from "../../../src/compat/node/stream-web/index.spec";
+} from "../../../src/compat/stream-web/index.spec";
 import {
   UtilImplementation,
   utilContract,
-} from "../../../src/compat/node/util/index.spec";
+} from "../../../src/compat/util/index.spec";
 
 export type NodeProfile = "bundled" | "workers";
 
