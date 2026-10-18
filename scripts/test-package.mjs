@@ -56,6 +56,11 @@ for (const module of [
       throw new Error(`Missing upstream license notice in tarball: ${notice}`);
   }
 }
+for (const name of ["NOTICE.md", "LICENSE-APACHE"]) {
+  const notice = `dist/compat/async-hooks/${name}`;
+  if (!pack.files.some((file) => file.path === notice))
+    throw new Error(`Missing async hook license notice in tarball: ${notice}`);
+}
 for (const name of ["NOTICE", "LICENSE-APACHE", "LICENSE-MIT"]) {
   const notice = `dist/compat/brotli/${name}`;
   if (!pack.files.some((file) => file.path === notice))
@@ -380,7 +385,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 820 ||
+    features.flatMap((report) => report.cases).length !== 834 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -417,7 +422,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 396 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 403 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||
