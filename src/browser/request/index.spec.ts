@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import type { Request as LocalRequest } from "./index.js";
 const equal = (a: unknown, b: unknown) => {
   if (JSON.stringify(a) !== JSON.stringify(b))

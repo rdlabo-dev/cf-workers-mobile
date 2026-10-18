@@ -1,4 +1,4 @@
-# Browser APIs
+# Browser APIs and host mechanisms
 
 This folder owns browser API implementations and adapters used by the WebView
 runtime, including the adaptations needed for Workers behavior. The name describes
@@ -27,4 +27,9 @@ Blob/File are shared with the Node Buffer implementation in `../compat/buffer/bl
 Web installation uses that same implementation rather than creating a second copy.
 
 Cloudflare extensions to standard Request/Response APIs stay with their owning
-Web API. Cloudflare-only APIs belong in [workers](../workers/README.md).
+Web API. Cloudflare-only APIs belong in [workers](../cloudflare/apis/README.md).
+
+Browser-specific application mechanisms also live here: [documents](documents/README.md)
+uses DOM/navigation/Service Worker facilities, and [isolated](isolated/README.md) uses
+Dedicated Worker/MessageChannel facilities. Cross-mode request coordination lives
+in [execution](../cloudflare/workers/README.md).

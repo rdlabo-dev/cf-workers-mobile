@@ -1,4 +1,4 @@
-import { lowerAsync } from "./src/build/async.js";
+import { lowerAsync } from "./src/tooling/async.js";
 import { readFile } from "node:fs/promises";
 import { defineConfig } from "vitest/config";
 export default defineConfig({
@@ -24,7 +24,7 @@ export default defineConfig({
     // Node module contract specs run via demo tests in workerd and WebViews.
     include: [
       "tests/unit/**/*.test.ts",
-      "src/workers/cloudflare-node/index.spec.ts",
+      "src/cloudflare/apis/cloudflare-node/index.spec.ts",
       "src/shared/globals/index.spec.ts",
       "src/shared/globals/web.spec.ts",
       "src/browser/abort/installation.spec.ts",

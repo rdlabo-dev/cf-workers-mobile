@@ -14,7 +14,7 @@ import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import {
   runContract,
   type ContractResult,
-} from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import {
   nodePathContract,
   BundledPath,

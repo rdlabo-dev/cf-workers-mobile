@@ -9,8 +9,8 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { join, relative } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { workersCapacitorPlugin as vitePlugin } from "../../../../dist/vite.js";
-import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/esbuild.js";
+import { workersCapacitorPlugin as vitePlugin } from "../../../../dist/tooling/vite.js";
+import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/tooling/esbuild.js";
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 const fixture = fileURLToPath(new URL("worker.js", import.meta.url));
 const artifacts = join(repo, "demo/artifacts/service-bindings");
@@ -55,7 +55,7 @@ for (const tool of ["vite", "esbuild"])
       const main = join(root, "main.js");
       await writeFile(
         main,
-        `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};import {LocalStorageKV} from ${JSON.stringify(join(repo, "dist/bindings/kv/index.js"))};let runtime,token='test-owner';window.start=async (prefer,localKV=false)=>{runtime=workersCapacitor({baseURL:'https://local.invalid',prefer,...(localKV?{env:{CLOUD_KV:new LocalStorageKV('service-test').create()}}:{}),remote:{origin:'https://deployed.invalid',getToken:()=>token,maxBufferedBodyBytes:1024}});await runtime.ready;return runtime.execution;};window.deviceValue=key=>new LocalStorageKV('service-test').create().get(key);window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const res=await fetch(path,init);return {status:res.status,text:await res.text(),etag:res.headers.get('etag'),effects:res.headers.get('x-effects')}};`,
+        `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};import {LocalStorageKV} from ${JSON.stringify(join(repo, "dist/cloudflare/bindings/kv/index.js"))};let runtime,token='test-owner';window.start=async (prefer,localKV=false)=>{runtime=workersCapacitor({baseURL:'https://local.invalid',prefer,...(localKV?{env:{CLOUD_KV:new LocalStorageKV('service-test').create()}}:{}),remote:{origin:'https://deployed.invalid',getToken:()=>token,maxBufferedBodyBytes:1024}});await runtime.ready;return runtime.execution;};window.deviceValue=key=>new LocalStorageKV('service-test').create().get(key);window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const res=await fetch(path,init);return {status:res.status,text:await res.text(),etag:res.headers.get('etag'),effects:res.headers.get('x-effects')}};`,
       );
       const out = join(root, "dist");
       if (tool === "vite")

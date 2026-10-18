@@ -11,8 +11,8 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import mysql from "mysql2/promise";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { workersCapacitorPlugin as vitePlugin } from "../../../../dist/vite.js";
-import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/esbuild.js";
+import { workersCapacitorPlugin as vitePlugin } from "../../../../dist/tooling/vite.js";
+import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/tooling/esbuild.js";
 
 export function databaseIntegration(kind) {
   const hyperdrive = kind === "hyperdrive";

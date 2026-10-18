@@ -60,7 +60,12 @@ for (const entry of [
 }
 // Candidate Web API contracts use internal modules from the installed tarball.
 // Never copy library implementation sources from the checkout.
-for (const domain of ["compat", "browser", "workers", "shared"]) {
+for (const domain of [
+  "compat",
+  "browser",
+  "cloudflare",
+  "shared",
+]) {
   await cp(
     join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
     join(temp, "src", domain),
@@ -103,7 +108,7 @@ for (const module of [
 await writeFile(
   join(temp, "vite.config.mjs"),
   `import { readFile } from 'node:fs/promises';
-import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/vite';
+import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/tooling/vite';
 export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},workersCapacitorPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
 );
 execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
@@ -112,7 +117,7 @@ execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
 });
 await writeFile(
   join(temp, "consumer.ts"),
-  `/// <reference types="@rdlabo/workers-capacitor/cloudflare" />
+  `/// <reference types="@rdlabo/workers-capacitor/cloudflare/apis/types" />
 import worker from "./demo/src/workers/hono/standard";
 import { httpServerHandler } from "cloudflare:node";
 const handler = httpServerHandler({ port: 3000 });
@@ -126,16 +131,16 @@ class ExampleRuntime extends FetchRuntime<{ label: string }> {
     return new Response(env.label + request.method);
   }
 }
-import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/features";
-import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/testing";
-import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
-import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/testing/fetch";
-import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
-import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/vite";
+import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
+import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
+import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/cloudflare/workers/testing";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
+import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
 // @ts-expect-error Local ASSETS is not a completed compatibility unit.
 buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
-import { FetchImplementation } from "@rdlabo/workers-capacitor/features/fetch";
+import { FetchImplementation } from "@rdlabo/workers-capacitor/cloudflare/workers";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();
 const bytes: Promise<ArrayBuffer | null> = kv.get("key", "arrayBuffer");
@@ -231,7 +236,7 @@ try {
   // Rebuild the same installed tarball consumer using the public isolated import.
   await writeFile(
     join(temp, "vite.config.mjs"),
-    `import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/vite';
+    `import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/tooling/vite';
 export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
   );
   execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {

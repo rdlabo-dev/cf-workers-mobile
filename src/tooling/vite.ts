@@ -1,0 +1,326 @@
+import { lowerAsync, asyncContextPlugin } from "./async.js";
+import { documentAssets, listAssets } from "./documents.js";
+import { serverModules } from "./server-modules.js";
+import type { ServerBuildOptions } from "./server.js";
+import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import {
+  configuredPath,
+  compatibilityAliases,
+  globalsInstallPath,
+  nodeGlobalsInstallPath,
+  globalsPath,
+  globalsInjectPath,
+  workerEntry,
+} from "./shared.js";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
+import inject from "@rollup/plugin-inject";
+import type { Plugin, PluginOption } from "vite";
+import { normalizePath } from "vite";
+
+/** Add only to the Capacitor/browser build, never the Cloudflare build. */
+function compatibilityPlugins(
+  installGlobals: false | "worker" | "node" = false,
+): PluginOption[] {
+  // Overrides take bare module names only; both bare and "node:" imports of
+  // the same module resolve to the shared compat profile.
+  const overrides = Object.fromEntries(
+    Object.entries(compatibilityAliases()).filter(
+      ([specifier]) => !specifier.includes(":"),
+    ),
+  );
+  return [
+    {
+      name: "workers-capacitor-async-context",
+      enforce: "post",
+      transform(code, id) {
+        if (/\.[cm]?[jt]sx?(?:\?|$)/.test(id)) return lowerAsync(code, id);
+      },
+      renderChunk(code, chunk) {
+        return lowerAsync(code, chunk.fileName);
+      },
+    },
+    ...(installGlobals
+      ? [
+          {
+            name: "workers-capacitor-global-install",
+            enforce: "pre" as const,
+            transform(code: string, id: string) {
+              const path = normalizePath(id.split("?")[0]);
+              if (
+                !/\.[cm]?[jt]sx?$/.test(path) ||
+                path.includes("/node_modules/") ||
+                path.startsWith(
+                  normalizePath(resolve(globalsPath, "../../../")),
+                )
+              )
+                return;
+              return `import ${JSON.stringify(installGlobals === "worker" ? globalsInstallPath : nodeGlobalsInstallPath)};\n${code}`;
+            },
+          },
+        ]
+      : []),
+    {
+      name: "workers-capacitor",
+      enforce: "pre",
+      transform(code, id) {
+        if (
+          normalizePath(id.split("?")[0]) !==
+          normalizePath(resolve(globalsPath, "../web.js"))
+        )
+          return;
+        // Vite's prebundled node:buffer and runtime globals must share Blob/File.
+        // Keep the distributed runtime's relative import usable as raw browser ESM.
+        return code.replace(
+          'from "../../compat/buffer/blob.js"',
+          'from "node:buffer"',
+        );
+      },
+      config: () => ({
+        // App globals and dependencies must share Buffer identity and the HTTP registry.
+        optimizeDeps: {
+          esbuildOptions: { plugins: [asyncContextPlugin()] },
+          include: [
+            "cloudflare:node",
+            "node:http",
+            "http",
+            "node:buffer",
+            "buffer",
+            "node:timers",
+            "timers",
+            "node:timers/promises",
+            "timers/promises",
+          ],
+        },
+        resolve: {
+          alias: compatibilityAliases(),
+        },
+      }),
+    },
+    ...nodePolyfills({
+      overrides,
+      globals: { Buffer: false, global: false, process: false },
+    }),
+    {
+      ...inject({
+        Buffer: [globalsInjectPath, "Buffer"],
+        process: [globalsInjectPath, "process"],
+        global: [globalsInjectPath, "global"],
+        setImmediate: [globalsInjectPath, "setImmediate"],
+        clearImmediate: [globalsInjectPath, "clearImmediate"],
+        exclude: [
+          normalizePath(globalsPath),
+          normalizePath(globalsInjectPath),
+          normalizePath(globalsInstallPath),
+        ],
+      }),
+      enforce: "post",
+    },
+  ];
+}
+
+// A real-looking absolute ID survives Vite's worker query stripping without
+// writing generated entry files into the consumer's project.
+const entrySuffix = ".workers-capacitor-worker.js";
+function virtualId(
+  source: string,
+  root: string,
+  owns: (path: string) => boolean,
+) {
+  const [path, ...query] = source.split("?");
+  const candidates = [path];
+  if (path.startsWith("/@fs/"))
+    candidates.push(
+      /^[a-z]:/i.test(path.slice(5)) ? path.slice(5) : "/" + path.slice(5),
+    );
+  if (root && path.startsWith("/"))
+    candidates.push(normalizePath(resolve(root, "." + path)));
+  const match = candidates.find(owns);
+  return match
+    ? match + (query.length ? "?" + query.join("?") : "")
+    : undefined;
+}
+function workerEntryPlugin(
+  entries: Map<string, string>,
+  root: () => string,
+  virtualFiles?: () => Promise<string>,
+): Plugin {
+  return {
+    name: "workers-capacitor-entry",
+    enforce: "pre",
+    resolveId(source) {
+      return virtualId(source, root(), (path) => entries.has(path));
+    },
+    load(id) {
+      const [path, query = ""] = id.split("?");
+      if (entries.has(path) && !new URLSearchParams(query).has("worker")) {
+        const original = entries.get(path)!;
+        if (!virtualFiles) return workerEntry(original);
+        return virtualFiles().then((files) => workerEntry(original, files));
+      }
+    },
+  };
+}
+
+/** Add only to the Capacitor/browser build, never the Cloudflare build. */
+export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
+  /** Workers application entry, relative to Vite root or an absolute path. */
+  worker?: string;
+  /**
+   * Files embedded into the worker's read-only virtual filesystem
+   * (node:fs compat). Paths resolve relative to the Vite root; the
+   * normalized absolute path is the lookup key, with suffix matching so
+   * bundled runtimes find entries regardless of their cwd assumptions.
+   */
+  workerFiles?: string[];
+}
+export function workersCapacitorPlugin(
+  options: WorkersCapacitorPluginOptions = {},
+): PluginOption[] {
+  const entries = new Map<string, string>();
+  const virtualFiles = options.workerFiles?.length
+    ? async () => {
+        const map: Record<string, { base64: string }> = {};
+        for (const file of options.workerFiles!) {
+          const path = resolve(root, file);
+          map[normalizePath(path)] = {
+            base64: (await readFile(path)).toString("base64"),
+          };
+        }
+        return JSON.stringify(map);
+      }
+    : undefined;
+  let root: string;
+  let publicDir: string;
+  let server: ReturnType<typeof serverModules> | undefined;
+  const serverPlugin = (): Plugin => ({
+    name: "workers-capacitor-server",
+    enforce: "pre",
+    resolveId(id) {
+      return virtualId(id, root, (path) => server?.owns(path) ?? false);
+    },
+    async load(id) {
+      if (!server) return;
+      const path = id.split("?")[0];
+      const generated = await server.load(path);
+      if (generated) {
+        for (const input of generated.inputs) this.addWatchFile(input);
+        return { code: generated.code, map: null };
+      }
+      await server.guard(path);
+    },
+    async handleHotUpdate(ctx) {
+      const previous = await server?.get();
+      if (previous?.inputs.includes(ctx.file)) {
+        server?.reset();
+        ctx.server.moduleGraph.invalidateAll();
+        ctx.server.ws.send({ type: "full-reload" });
+        return [];
+      }
+    },
+  });
+  return [
+    serverPlugin(),
+    {
+      name: "workers-capacitor-source",
+      enforce: "pre",
+      config: () => ({
+        optimizeDeps: { exclude: ["@rdlabo/workers-capacitor"] },
+        worker: { format: "es" },
+      }),
+      configResolved(config) {
+        root = config.root;
+        publicDir = config.publicDir;
+        if (options.worker)
+          server = serverModules(resolve(root, options.worker), root, options);
+      },
+      generateBundle: {
+        order: "post",
+        async handler(_options, bundle) {
+          const files = [
+            ...Object.keys(bundle),
+            ...(publicDir ? await listAssets(publicDir) : []),
+          ];
+          const compilation = await server?.get();
+          if (compilation) {
+            const fileName = compilation.reportFile;
+            if (files.includes(fileName))
+              this.error("Server report asset collision: " + fileName);
+            const { mode, reason, routes } = compilation;
+            this.emitFile({
+              type: "asset",
+              fileName,
+              source: JSON.stringify({ mode, reason, routes }, null, 2),
+            });
+            files.push(fileName);
+          }
+          const assets = await documentAssets(files);
+          for (const [fileName, source] of Object.entries(assets)) {
+            if (files.includes(fileName))
+              this.error("Document asset collision: " + fileName);
+            this.emitFile({ type: "asset", fileName, source });
+          }
+        },
+      },
+      async load(id) {
+        if (
+          id.split("?")[0] !== normalizePath(configuredPath) ||
+          !options.worker
+        )
+          return;
+        const path = resolve(root, options.worker);
+        const resolved = await this.resolve(path, undefined, {
+          skipSelf: true,
+        });
+        if (!resolved || resolved.external)
+          this.error("Cannot resolve Worker entry: " + path);
+        const compilation = await server?.get();
+        if (compilation)
+          this.warn(
+            compilation.mode === "worker"
+              ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+              : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+          );
+        const entry = compilation ? server!.localEntry : resolved.id;
+        const generated = entry + entrySuffix;
+        if (existsSync(generated))
+          this.error(
+            "Generated Worker entry conflicts with an existing file: " +
+              generated,
+          );
+        entries.set(generated, entry);
+        return `import Constructor from ${JSON.stringify(generated + "?worker")};
+${compilation ? `import { needsRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
+import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
+export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote," : ""} async loadDirect() {
+  const dispose = installNodeGlobals();
+  try {
+    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+} };`;
+      },
+    },
+    workerEntryPlugin(entries, () => root, virtualFiles),
+    {
+      name: "workers-capacitor-worker-build",
+      config(config) {
+        const previous = config.worker?.plugins;
+        return {
+          worker: {
+            plugins: () => [
+              ...(previous?.() ?? []),
+              serverPlugin(),
+              workerEntryPlugin(entries, () => root, virtualFiles),
+              ...compatibilityPlugins("worker"),
+            ],
+          },
+        };
+      },
+    },
+    ...compatibilityPlugins(options.worker ? false : "node"),
+  ];
+}

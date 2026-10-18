@@ -4,8 +4,8 @@
 
 ```ts
 import { workersCapacitor } from "@rdlabo/workers-capacitor";
-import { openFeature } from "@rdlabo/workers-capacitor/features";
-import { LocalStorageKV } from "@rdlabo/workers-capacitor/features/kv";
+import { openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
+import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
 import worker from "./worker";
 
 const kv = await openFeature(new LocalStorageKV("my-app-settings"));
@@ -49,7 +49,7 @@ The optional second constructor argument supplies an existing `Storage` backend 
 
 ## Compatibility and persistence boundaries
 
-The exported `kvContract` from `@rdlabo/workers-capacitor/testing/kv` exercises 18 shared behavior cases against the actual local workerd binding and the local adapter. `kvTextContract` remains available for its smaller `kv.text.v1` profile. Contract providers own an empty test namespace and its cleanup; never run them against application data. Expiration boundary and failure-path tests are separate; the workerd suite also waits for a real minimum TTL to elapse.
+The exported `kvContract` from `@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing` exercises 18 shared behavior cases against the actual local workerd binding and the local adapter. `kvTextContract` remains available for its smaller `kv.text.v1` profile. Contract providers own an empty test namespace and its cleanup; never run them against application data. Expiration boundary and failure-path tests are separate; the workerd suite also waits for a real minimum TTL to elapse.
 
 This profile does not emulate global replication, eventual consistency, regional cache behavior, production rate limits or cloud synchronization. It does not claim identical error wording, distributed ordering or performance. Bulk response size checks are local serialized-result bounds, not a reproduction of Cloudflare's internal wire accounting. The KV API is implemented in TypeScript; it does not embed V8.
 

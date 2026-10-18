@@ -3,7 +3,7 @@ import {
   enableDocumentWorker,
   registerDocumentWorker,
   stopDocumentWorker,
-} from "../../../../../src/documents/registration";
+} from "../../../../../src/browser/documents/registration";
 Object.assign(window, {
   documentLifecycle: {
     workersCapacitor,

@@ -1,4 +1,4 @@
-import type { ContractResult } from "@rdlabo/workers-capacitor/testing";
+import type { ContractResult } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 // This runtime fixture is built by Vite. Build-tool tests separately exercise
 // the configured Worker entry through both Vite and esbuild.

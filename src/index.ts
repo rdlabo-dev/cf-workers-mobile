@@ -7,9 +7,9 @@ import {
   clearPreviousRendering,
   startRendering,
   validateRendering,
-} from "./documents/runtime.js";
-import { createFetchRuntime } from "./fetch/worker-runtime.js";
-import type { WorkersCapacitorOptions } from "./fetch/types.js";
+} from "./browser/documents/runtime.js";
+import { createFetchRuntime } from "./cloudflare/workers/worker-runtime.js";
+import type { WorkersCapacitorOptions } from "./cloudflare/workers/types.js";
 export type {
   WorkersCapacitorOptions,
   WorkerContext,
@@ -19,8 +19,11 @@ export type {
   ExecutionPreference,
   WorkerHandler,
   RemoteWorkerOptions,
-} from "./fetch/types.js";
-export { FetchRuntime, type FetchRuntimeOptions } from "./fetch/runtime.js";
+} from "./cloudflare/workers/types.js";
+export {
+  FetchRuntime,
+  type FetchRuntimeOptions,
+} from "./cloudflare/workers/runtime.js";
 
 let installed = false;
 

@@ -2,7 +2,7 @@ import { expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 const script = readFileSync(
-  new URL("../../src/documents/service-worker.js", import.meta.url),
+  new URL("../../src/browser/documents/service-worker.js", import.meta.url),
   "utf8",
 );
 function setup(cache = new Map<string, Response>()) {

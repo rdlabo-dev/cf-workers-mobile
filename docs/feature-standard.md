@@ -20,12 +20,12 @@ import {
   FeatureImplementation,
   openFeature,
   type FeatureScope,
-} from "@rdlabo/workers-capacitor/features";
+} from "@rdlabo/workers-capacitor/shared/contracts";
 import {
   runContract,
   assertContract,
   type ContractSuite,
-} from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 interface TextAPI {
   read(key: string): Promise<string | null>;
@@ -95,9 +95,9 @@ Requirements are executable checks in `create`, not strings in an unverified cap
 | `kv.local.v1`            | `LocalStorageKV` persistent binding                                 | Same eighteen text/binary/stream/metadata/bulk/list/expiration/Unicode cases run against an actual local Workers KV binding |
 | `engine.wasm-validation` | Current engine's `WebAssembly.validate`                             | Same two valid/invalid-module cases run in workerd and WebViews                                                             |
 
-Fetch connects through `@rdlabo/workers-capacitor/features/fetch`; both the feature adapter and existing `workersCapacitor` installer use `createFetchRuntime`. The installer remains synchronous and application setup is unchanged. The existing fifteen fetch adapter cases and framework/transport tests remain as more detailed regression suites; the four portable HTTP cases do not replace them or claim that all URL/interception behavior exists in workerd.
+Fetch connects through `@rdlabo/workers-capacitor/cloudflare/workers`; both the feature adapter and existing `workersCapacitor` installer use `createFetchRuntime`. The installer remains synchronous and application setup is unchanged. The existing fifteen fetch adapter cases and framework/transport tests remain as more detailed regression suites; the four portable HTTP cases do not replace them or claim that all URL/interception behavior exists in workerd.
 
-Reusable HTTP and KV assertions are exported from `@rdlabo/workers-capacitor/testing/fetch` and `@rdlabo/workers-capacitor/testing/kv`. The HTTP subpath also exports `fetchContractWorker`, the neutral Worker fixture; mount it at `https://worker.invalid/api` when running `fetchContract`. The engine demonstration remains in `demo/tests/validation/contracts/wasm.ts`. Environment-specific implementations live in `demo/tests/validation/implementations.ts`. The common runner itself never imports fetch, KV or WebAssembly. The workerd HTTP adapter converts the harness's Response type to a standard Response for this buffered HTTP profile; it makes no claim about streaming equivalence.
+Reusable HTTP and KV assertions are exported from `@rdlabo/workers-capacitor/cloudflare/workers/testing` and `@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing`. The HTTP subpath also exports `fetchContractWorker`, the neutral Worker fixture; mount it at `https://worker.invalid/api` when running `fetchContract`. The engine demonstration remains in `demo/tests/validation/contracts/wasm.ts`. Environment-specific implementations live in `demo/tests/validation/implementations.ts`. The common runner itself never imports fetch, KV or WebAssembly. The workerd HTTP adapter converts the harness's Response type to a standard Response for this buffered HTTP profile; it makes no claim about streaming equivalence.
 
 Workers KV uses the official [local binding facility](https://developers.cloudflare.com/kv/concepts/kv-bindings/), with an exclusively owned ephemeral namespace cleared before and after each case. The shipped local adapter uses Web Storage; its test wrapper deletes only test-owned keys. See [KV scope and usage](kv.md). Expiration, metadata and listing are included; cloud consistency and synchronization are not emulated. The earlier delegated-binding branch is not merged by this change. Its transport can later supply an API through this same standard without adding a new test architecture.
 
@@ -110,8 +110,8 @@ Runtime checks belong to implementations. Validate inputs, reject unsupported op
 Published contract suites check the portable behavior promised by a profile. Implementations and their real Workers references run the same suite. Implementation rejection tests (for example unknown option fields) remain separate from shared compatibility assertions. Do not impose an implementation-specific rejection on a Workers reference that accepts the operation. Backend persistence, quota and namespace isolation are also verified separately.
 
 ```ts
-import { runContract, assertContract } from "@rdlabo/workers-capacitor/testing";
-import { kvContract } from "@rdlabo/workers-capacitor/testing/kv";
+import { runContract, assertContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
 
 // implementation is your FeatureImplementation<typeof kvFeature>.
 // Its create(scope) must prepare isolated test state and register its cleanup.

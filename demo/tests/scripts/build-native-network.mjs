@@ -1,4 +1,4 @@
-import { workersCapacitorPlugin } from "../../../dist/esbuild.js";
+import { workersCapacitorPlugin } from "../../../dist/tooling/esbuild.js";
 import { build } from "esbuild";
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

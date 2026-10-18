@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Plugin } from "vite";
-import { workersCapacitorPlugin } from "../../src/vite";
+import { workersCapacitorPlugin } from "../../src/tooling/vite";
 
 it("does not transform ordinary files sharing the generated-entry suffix", () => {
   const plugin = workersCapacitorPlugin().find(

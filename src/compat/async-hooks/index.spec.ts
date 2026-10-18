@@ -2,8 +2,8 @@ import * as nodeAsyncHooks from "node:async_hooks";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/features";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import type { AsyncLocalStorage, AsyncResource } from "./index.js";
 // Resolve implementations through the environment alias: importing the local
 // implementation here would patch globals even in the workerd oracle realm.
