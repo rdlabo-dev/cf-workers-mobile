@@ -35,6 +35,14 @@ export function compatibilityAliases() {
     "cloudflare:workers": compatPath("cloudflare-workers"),
     "node:async_hooks": compatPath("async-hooks"),
     async_hooks: compatPath("async-hooks"),
+    "node:timers/promises": fileURLToPath(
+      new URL("../compat/timers/promises.js", import.meta.url),
+    ),
+    "timers/promises": fileURLToPath(
+      new URL("../compat/timers/promises.js", import.meta.url),
+    ),
+    "node:timers": compatPath("timers"),
+    timers: compatPath("timers"),
     "node:fs/promises": compatPath("fs/promises"),
     "fs/promises": compatPath("fs/promises"),
     "node:fs": compatPath("fs"),
@@ -88,3 +96,7 @@ export function workerSource(
 ) {
   return `import createWorker from ${JSON.stringify(factoryImport)};\n${selector ? `import { needsRemote } from ${JSON.stringify(selector)};` : ""}\nimport { installNodeGlobals } from ${JSON.stringify(globalsPath)};\nexport default { createWorker, ${selector ? "needsRemote," : ""} async loadDirect() {\n  const dispose = installNodeGlobals();\n  try {\n    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };\n  } catch (error) {\n    dispose();\n    throw error;\n  }\n} };`;
 }
+
+export const globalsInjectPath = fileURLToPath(
+  new URL("../compat/globals/inject.js", import.meta.url),
+);

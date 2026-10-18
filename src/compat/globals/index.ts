@@ -1,18 +1,26 @@
-// esbuild injects these imports only where a Node global is referenced.
-// Initialize process before Buffer: its util dependency reads process during evaluation.
-import process from "node:process";
-import { Buffer } from "node:buffer";
-
 import {
-  setImmediate as localSetImmediate,
-  clearImmediate as localClearImmediate,
-} from "../immediate/index.js";
-export const setImmediate = globalThis.setImmediate ?? localSetImmediate;
-export const clearImmediate = globalThis.clearImmediate ?? localClearImmediate;
-export { Buffer, process };
-export const global = globalThis;
+  Buffer,
+  process,
+  global,
+  setImmediate as nodeSetImmediate,
+  clearImmediate as nodeClearImmediate,
+} from "./inject.js";
+export {
+  Buffer,
+  process,
+  global,
+  setImmediate,
+  clearImmediate,
+} from "./inject.js";
+import { installTimerGlobals } from "../timers/installation.js";
 
-const values = { Buffer, process, global, setImmediate, clearImmediate };
+const values = {
+  Buffer,
+  process,
+  global,
+  setImmediate: nodeSetImmediate,
+  clearImmediate: nodeClearImmediate,
+};
 type NodeGlobal = keyof typeof values;
 type GlobalTarget = typeof globalThis & Record<string, unknown>;
 type Installation = {
@@ -41,7 +49,7 @@ function removeInstalled(target: GlobalTarget, installation: Installation) {
     if (owns(target, name, descriptor)) delete target[name];
 }
 
-export function installNodeGlobals(target: GlobalTarget = globalThis) {
+function installNodeNames(target: GlobalTarget) {
   let installation = installations.get(target);
   if (installation) {
     for (const name of Object.keys(values) as NodeGlobal[])
@@ -83,4 +91,18 @@ export function installNodeGlobals(target: GlobalTarget = globalThis) {
     installations.delete(target);
     removeInstalled(target, installation);
   };
+}
+
+export function installNodeGlobals(target: GlobalTarget = globalThis) {
+  const restoreTimers = installTimerGlobals(target);
+  try {
+    const restoreNames = installNodeNames(target);
+    return () => {
+      restoreNames();
+      restoreTimers();
+    };
+  } catch (error) {
+    restoreTimers();
+    throw error;
+  }
 }

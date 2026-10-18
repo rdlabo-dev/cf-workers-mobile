@@ -1,3 +1,4 @@
+import { capacitorWorkers } from "@rdlabo/capacitor-workers";
 import {
   EncodingImplementation,
   encodingContract,
@@ -52,8 +53,18 @@ const contracts = {
 };
 export type WebApiName = keyof typeof contracts;
 
-export function runWebApiContracts(name?: WebApiName) {
-  return Promise.all(
-    name ? [contracts[name]()] : Object.values(contracts).map((run) => run()),
-  );
+export async function runWebApiContracts(name?: WebApiName) {
+  // Standalone API contracts own the same Web globals as an application runtime,
+  // including resource-management symbols on older WebViews.
+  const runtime = capacitorWorkers({
+    baseURL: "https://web-contract.invalid",
+    worker: { fetch: () => new globalThis.Response(null, { status: 204 }) },
+  });
+  try {
+    return await Promise.all(
+      name ? [contracts[name]()] : Object.values(contracts).map((run) => run()),
+    );
+  } finally {
+    await runtime.dispose();
+  }
 }

@@ -8,7 +8,7 @@ import type { Plugin } from "esbuild";
 import {
   configuredPath,
   compatibilityAliases,
-  globalsPath,
+  globalsInjectPath,
   workerEntry,
   workerSource,
 } from "./build/shared.js";
@@ -39,7 +39,7 @@ function compatibilityPlugin(): Plugin {
         () => ({ contents: "module.exports = {};", loader: "js" }),
       );
       build.initialOptions.inject = [
-        ...new Set([...(build.initialOptions.inject ?? []), globalsPath]),
+        ...new Set([...(build.initialOptions.inject ?? []), globalsInjectPath]),
       ];
     },
   };
