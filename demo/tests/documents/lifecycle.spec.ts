@@ -49,17 +49,18 @@ test("document transport can start again after shutdown", async ({ page }) => {
   await page.goto("/lifecycle.html");
   await page.waitForFunction(() => !!(window as any).documentLifecycle);
   for (let i = 0; i < 2; i++) {
-    await page.evaluate(() =>
-      (window as any).documentLifecycle
-        .registerDocumentWorker("https://worker.example")
-        .then(() => undefined),
-    );
+    await page.evaluate(async () => {
+      (window as any).documentRegistration = await (
+        window as any
+      ).documentLifecycle.registerDocumentWorker("https://worker.example");
+    });
     // Unregistering leaves the previous controller attached to this page.
     // Wait for the new registration to control it, as the runtime does.
-    await page.waitForFunction(async () => {
-      const registration = await navigator.serviceWorker.getRegistration("/");
+    await page.waitForFunction(() => {
+      const registration = (window as any)
+        .documentRegistration as ServiceWorkerRegistration;
       return (
-        registration?.active &&
+        registration?.active?.state === "activated" &&
         !registration.installing &&
         !registration.waiting &&
         navigator.serviceWorker.controller === registration.active
