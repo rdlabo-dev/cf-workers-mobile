@@ -20,3 +20,33 @@ export const platform = {
   fetch: globalThis.fetch.bind(globalThis),
   structuredClone: globalThis.structuredClone.bind(globalThis),
 };
+
+export const nativeStreamsSymbol = Symbol.for(
+  "@rdlabo/capacitor-workers/native-streams",
+);
+const streamConstructors = {
+  ReadableStream: globalThis.ReadableStream,
+  WritableStream: globalThis.WritableStream,
+  TransformStream: globalThis.TransformStream,
+  ByteLengthQueuingStrategy: globalThis.ByteLengthQueuingStrategy,
+  CountQueuingStrategy: globalThis.CountQueuingStrategy,
+  ReadableByteStreamController: globalThis.ReadableByteStreamController,
+  ReadableStreamBYOBReader: globalThis.ReadableStreamBYOBReader,
+  ReadableStreamBYOBRequest: globalThis.ReadableStreamBYOBRequest,
+  ReadableStreamDefaultController: globalThis.ReadableStreamDefaultController,
+  ReadableStreamDefaultReader: globalThis.ReadableStreamDefaultReader,
+  TransformStreamDefaultController: globalThis.TransformStreamDefaultController,
+  WritableStreamDefaultController: globalThis.WritableStreamDefaultController,
+  WritableStreamDefaultWriter: globalThis.WritableStreamDefaultWriter,
+  CompressionStream: globalThis.CompressionStream,
+  DecompressionStream: globalThis.DecompressionStream,
+  TextEncoderStream: globalThis.TextEncoderStream,
+  TextDecoderStream: globalThis.TextDecoderStream,
+};
+export const nativeStreams =
+  (
+    globalThis.ReadableStream as unknown as Record<
+      symbol,
+      typeof streamConstructors
+    >
+  )[nativeStreamsSymbol] ?? streamConstructors;

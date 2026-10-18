@@ -385,7 +385,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 834 ||
+    features.flatMap((report) => report.cases).length !== 844 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -422,7 +422,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 403 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 408 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

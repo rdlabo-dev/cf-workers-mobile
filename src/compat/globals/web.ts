@@ -1,3 +1,4 @@
+import streams from "../stream-web/index.js";
 import { installAbortTimeout } from "../abort/index.js";
 import { installResourceSymbols } from "./symbols.js";
 import { Request } from "../request/index.js";
@@ -18,6 +19,7 @@ import {
   performance,
 } from "../perf-hooks/performance.js";
 const values = {
+  ...streams,
   Request,
   Response,
   Headers,

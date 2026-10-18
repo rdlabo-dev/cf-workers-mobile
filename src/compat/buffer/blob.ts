@@ -1,3 +1,4 @@
+import { readable } from "../stream-web/interop.js";
 /** Buffer's Blob/File exports use the pinned Workers constructor semantics. */
 import {
   platform,
@@ -169,6 +170,9 @@ export class Blob extends NativeBlob {
   }
   override get type() {
     return types.get(this) ?? nativeType.call(this);
+  }
+  override stream() {
+    return readable(NativeBlob.prototype.stream.call(this));
   }
   override async text() {
     return decoder.decode(await NativeBlob.prototype.arrayBuffer.call(this));

@@ -75,6 +75,7 @@ function compatibilityPlugins(
         // Prebundled Node modules and runtime globals must share constructor identity.
         // Keep the distributed runtime's relative import usable as raw browser ESM.
         return code
+          .replace('from "../stream-web/index.js"', 'from "node:stream/web"')
           .replace('from "../buffer/blob.js"', 'from "node:buffer"')
           .replace(
             'from "../perf-hooks/performance.js"',

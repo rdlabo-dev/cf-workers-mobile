@@ -74,6 +74,31 @@ jobs:
       - run: npm run test:d1-migration
         working-directory: demo
 
+  streams-fallback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            demo/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: demo
+      - run: npm run typecheck
+        working-directory: demo
+      - run: npx playwright install --with-deps chromium webkit
+        working-directory: demo
+      - run: npm run test:runtime:fallback
+        working-directory: demo
+
   package:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -135,7 +160,7 @@ jobs:
   required:
     name: CI
     if: ${{ always() }}
-    needs: [library, compatibility, package, upstream]
+    needs: [library, compatibility, streams-fallback, package, upstream]
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     steps:
@@ -143,10 +168,12 @@ jobs:
         env:
           LIBRARY: ${{ needs.library.result }}
           COMPATIBILITY: ${{ needs.compatibility.result }}
+          STREAMS: ${{ needs['streams-fallback'].result }}
           PACKAGE: ${{ needs.package.result }}
           UPSTREAM: ${{ needs.upstream.result }}
         run: |
           test "$LIBRARY" = success
           test "$COMPATIBILITY" = success
+          test "$STREAMS" = success
           test "$PACKAGE" = success
           test "$UPSTREAM" = success

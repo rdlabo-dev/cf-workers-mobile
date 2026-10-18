@@ -28,6 +28,8 @@ export default defineConfig({
       "src/compat/async-hooks/callbacks.spec.ts",
       "src/compat/response/installation.spec.ts",
       "src/compat/perf-hooks/installation.spec.ts",
+      "src/compat/stream-web/installation.spec.ts",
+      "src/compat/stream-web/context.spec.ts",
       "src/compat/brotli/index.spec.ts",
       "src/compat/fetch/index.spec.ts",
       "src/compat/fetch/interop.spec.ts",

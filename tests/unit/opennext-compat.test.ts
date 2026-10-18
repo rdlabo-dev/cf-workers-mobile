@@ -1,3 +1,4 @@
+import { installWebGlobals } from "../../src/compat/globals/web.js";
 import * as localUtil from "../../src/compat/util/index";
 import * as localStreams from "../../src/compat/stream-web/index";
 import { expect, it } from "vitest";
@@ -25,11 +26,16 @@ it("module contract", async () => {
   expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
 });
 it("stream-web contract", async () => {
-  const report = await runContract(
-    new StreamWebImplementation(localStreams),
-    streamWebContract,
-  );
-  expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+  const release = installWebGlobals();
+  try {
+    const report = await runContract(
+      new StreamWebImplementation(localStreams),
+      streamWebContract,
+    );
+    expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+  } finally {
+    release();
+  }
 });
 it("util contract", async () => {
   const report = await runContract(

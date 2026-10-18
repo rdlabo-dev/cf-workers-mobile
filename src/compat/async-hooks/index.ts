@@ -210,48 +210,8 @@ function installAsyncContextPropagation(): void {
       (globalThis as unknown as Record<string, unknown>)[name] =
         wrapCallback(schedule);
   }
-  // Stream pulls/writes run continuations after their creating scope
-  // settled; wrap source/sink callbacks with the context at construction.
-  const wrapMethods =
-    (names: string[]) =>
-    <T>(source: T): T => {
-      if (source === null || typeof source !== "object") return source;
-      const context = capture();
-      const wrapped = Object.create(Object.getPrototypeOf(source));
-      for (const name of [...Object.getOwnPropertyNames(source), ...names]) {
-        const fn = (source as Record<string, unknown>)[name];
-        wrapped[name] =
-          names.includes(name) && typeof fn === "function"
-            ? (...args: unknown[]) =>
-                withContext(context, fn as (...a: unknown[]) => unknown, args)
-            : fn;
-      }
-      return wrapped;
-    };
-  const NativeReadableStream = globalThis.ReadableStream;
-  if (typeof NativeReadableStream === "function") {
-    const wrapSource = wrapMethods(["pull", "cancel", "start"]);
-    globalThis.ReadableStream = class extends (NativeReadableStream as new (
-      source?: unknown,
-      strategy?: QueuingStrategy,
-    ) => ReadableStream) {
-      constructor(source?: unknown, strategy?: QueuingStrategy) {
-        super(wrapSource(source) as UnderlyingSource | undefined, strategy);
-      }
-    } as typeof ReadableStream;
-  }
-  const NativeWritableStream = globalThis.WritableStream;
-  if (typeof NativeWritableStream === "function") {
-    const wrapSink = wrapMethods(["write", "close", "abort", "start"]);
-    globalThis.WritableStream = class extends (NativeWritableStream as new (
-      sink?: unknown,
-      strategy?: QueuingStrategy,
-    ) => WritableStream) {
-      constructor(sink?: unknown, strategy?: QueuingStrategy) {
-        super(wrapSink(sink) as UnderlyingSink | undefined, strategy);
-      }
-    } as typeof WritableStream;
-  }
+  // Stream constructors capture callbacks through the shared callback binding.
+  // Their public identity must remain stable after AsyncLocalStorage is used.
   // Schedulers such as React's use MessageChannel; deliver each posted
   // message to its listeners under the context captured at postMessage.
   const NativeMessageChannel = globalThis.MessageChannel;
