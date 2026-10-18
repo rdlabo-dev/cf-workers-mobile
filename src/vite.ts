@@ -1,6 +1,7 @@
 import { documentAssets, listAssets } from "./build/documents.js";
 import { resolve } from "node:path";
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import {
   configuredPath,
   compatibilityAliases,
@@ -99,7 +100,10 @@ function compatibilityPlugins(
 // A real-looking absolute ID survives Vite's worker query stripping without
 // writing generated entry files into the consumer's project.
 const entrySuffix = ".capacitor-worker.js";
-function workerEntryPlugin(entries: Map<string, string>): Plugin {
+function workerEntryPlugin(
+  entries: Map<string, string>,
+  virtualFiles?: () => Promise<string>,
+): Plugin {
   return {
     name: "capacitor-workers-entry",
     enforce: "pre",
@@ -110,7 +114,8 @@ function workerEntryPlugin(entries: Map<string, string>): Plugin {
       const [path, query = ""] = id.split("?");
       if (entries.has(path) && !new URLSearchParams(query).has("worker")) {
         const original = entries.get(path)!;
-        return workerEntry(original);
+        if (!virtualFiles) return workerEntry(original);
+        return virtualFiles().then((files) => workerEntry(original, files));
       }
     },
   };
@@ -120,11 +125,30 @@ function workerEntryPlugin(entries: Map<string, string>): Plugin {
 export interface CapacitorWorkersPluginOptions {
   /** Workers application entry, relative to Vite root or an absolute path. */
   worker?: string;
+  /**
+   * Files embedded into the worker's read-only virtual filesystem
+   * (node:fs compat). Paths resolve relative to the Vite root; the
+   * normalized absolute path is the lookup key, with suffix matching so
+   * bundled runtimes find entries regardless of their cwd assumptions.
+   */
+  workerFiles?: string[];
 }
 export function capacitorWorkersPlugin(
   options: CapacitorWorkersPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
+  const virtualFiles = options.workerFiles?.length
+    ? async () => {
+        const map: Record<string, { base64: string }> = {};
+        for (const file of options.workerFiles!) {
+          const path = resolve(root, file);
+          map[normalizePath(path)] = {
+            base64: (await readFile(path)).toString("base64"),
+          };
+        }
+        return JSON.stringify(map);
+      }
+    : undefined;
   let root: string;
   let publicDir: string;
   return [
@@ -187,7 +211,7 @@ export default { createWorker: () => new Constructor(), async loadDirect() {
 } };`;
       },
     },
-    workerEntryPlugin(entries),
+    workerEntryPlugin(entries, virtualFiles),
     {
       name: "capacitor-workers-worker-build",
       config(config) {
@@ -196,7 +220,7 @@ export default { createWorker: () => new Constructor(), async loadDirect() {
           worker: {
             plugins: () => [
               ...(previous?.() ?? []),
-              workerEntryPlugin(entries),
+              workerEntryPlugin(entries, virtualFiles),
               ...compatibilityPlugins("worker"),
             ],
           },

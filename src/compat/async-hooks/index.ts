@@ -142,7 +142,8 @@ export function installAsyncContextPropagation(): void {
       const context = capture();
       return Reflect.apply(schedule, undefined, [
         typeof callback === "function"
-          ? () => withContext(context, callback, [])
+          ? (...cbArgs: unknown[]) =>
+              withContext(context, callback, cbArgs)
           : callback,
         ...args,
       ]);
