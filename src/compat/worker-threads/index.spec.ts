@@ -125,7 +125,19 @@ export const workerThreadsContract: ContractSuite<typeof workerThreadsFeature> =
         for (const name of ["postMessage", "ref", "unref"] as const)
           same(Reflect.apply(p[name], {}, []), undefined);
         same(await Reflect.apply(p.postMessageToThread, {}, []), undefined);
-        same(await Reflect.apply(p[Symbol.asyncDispose], {}, []), undefined);
+        same(
+          await Reflect.apply(
+            p[
+              Symbol.asyncDispose ??
+                (Symbol.for(
+                  "Symbol.asyncDispose",
+                ) as typeof Symbol.asyncDispose)
+            ],
+            {},
+            [],
+          ),
+          undefined,
+        );
       },
       async workerRejections(api) {
         for (const name of [

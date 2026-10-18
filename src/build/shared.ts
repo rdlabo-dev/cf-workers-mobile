@@ -64,6 +64,8 @@ export function compatibilityAliases() {
     readline: compatPath("readline"),
     "node:domain": compatPath("domain"),
     domain: compatPath("domain"),
+    "node:stream/consumers": compatPath("stream-consumers"),
+    "stream/consumers": compatPath("stream-consumers"),
     "node:https": compatPath("https"),
     https: compatPath("https"),
     "node:worker_threads": compatPath("worker-threads"),

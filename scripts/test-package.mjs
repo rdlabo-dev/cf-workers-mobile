@@ -38,6 +38,7 @@ for (const module of [
   "repl",
   "sqlite",
   "test",
+  "stream-consumers",
   "https",
   "worker-threads",
   "http-agent",
@@ -151,6 +152,7 @@ for (const module of [
   "repl",
   "sqlite",
   "test",
+  "stream-consumers",
   "https",
   "worker-threads",
   "http-agent",
@@ -370,7 +372,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
   }
   const features = await page.evaluate(() => window.runFeatures());
   if (
-    features.flatMap((report) => report.cases).length !== 666 ||
+    features.flatMap((report) => report.cases).length !== 686 ||
     features.some(
       (report) =>
         report.errors.length ||
@@ -407,7 +409,7 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[capacitorWorker
       );
       if (
         build !== "raw" &&
-        (report.node.direct.flatMap((r) => r.cases).length !== 319 ||
+        (report.node.direct.flatMap((r) => r.cases).length !== 329 ||
           report.node.direct.some(
             (r) =>
               r.errors.length ||

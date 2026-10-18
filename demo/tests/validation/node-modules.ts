@@ -1,4 +1,8 @@
 import {
+  StreamConsumersImplementation,
+  streamConsumersContract,
+} from "../../../src/compat/stream-consumers/index.spec";
+import {
   HttpsImplementation,
   httpsContract,
 } from "../../../src/compat/https/index.spec";
@@ -187,6 +191,10 @@ export async function runNodeContracts(
     await runContract(new ReplImplementation(), replContract),
     await runContract(new SqliteImplementation(), sqliteContract),
     await runContract(new TestImplementation(), testContract),
+    await runContract(
+      new StreamConsumersImplementation(),
+      streamConsumersContract,
+    ),
     await runContract(new HttpsImplementation(), httpsContract),
     await runContract(new WorkerThreadsImplementation(), workerThreadsContract),
     await runContract(new HttpAgentImplementation(), httpAgentContract),

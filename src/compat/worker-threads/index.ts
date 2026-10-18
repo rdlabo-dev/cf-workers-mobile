@@ -24,6 +24,7 @@
 // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
 // USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import { asyncDispose } from "../globals/symbols.js";
 import { ERR_METHOD_NOT_IMPLEMENTED } from "./errors.js";
 import { EventEmitter } from "node:events";
 import type {
@@ -109,7 +110,7 @@ export class Worker extends EventEmitter implements _Worker {
     throw new ERR_METHOD_NOT_IMPLEMENTED("Worker.startHeapProfile");
   }
 
-  async [Symbol.asyncDispose](): Promise<void> {
+  async [asyncDispose](): Promise<void> {
     // Do nothing
   }
 }

@@ -77,6 +77,8 @@ function compatibilityPlugins(
             "_http_client",
             "node:_http_incoming",
             "_http_incoming",
+            "node:stream/consumers",
+            "stream/consumers",
             "node:https",
             "https",
             "node:http",
