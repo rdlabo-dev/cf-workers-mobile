@@ -136,13 +136,19 @@ async function createRemote(root, backend) {
     { cwd: root, stdio: "pipe" },
   );
   const received = [];
+  let allowedOrigin;
   const server = createSecureServer(
     {
       key: await readFile(join(root, "key.pem")),
       cert: await readFile(join(root, "cert.pem")),
     },
     async (req, res) => {
-      res.setHeader("access-control-allow-origin", req.headers.origin ?? "*");
+      if (!allowedOrigin || req.headers.origin !== allowedOrigin) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      res.setHeader("access-control-allow-origin", allowedOrigin);
       res.setHeader("access-control-allow-credentials", "true");
       res.setHeader(
         "access-control-allow-headers",
@@ -173,9 +179,10 @@ async function createRemote(root, backend) {
         // explicit 304 rather than a cached representation reconstructed by Fetch.
         res.setHeader("cache-control", "no-store");
         res.end(Buffer.from(await response.arrayBuffer()));
-      } catch (error) {
+      } catch {
         res.statusCode = 500;
-        res.end(String(error));
+        res.setHeader("content-type", "text/plain");
+        res.end("Test backend request failed");
       }
     },
   );
@@ -183,6 +190,9 @@ async function createRemote(root, backend) {
   return {
     origin: `https://127.0.0.1:${server.address().port}`,
     received,
+    allowUI(url) {
+      allowedOrigin = new URL(url).origin;
+    },
     close: () =>
       new Promise((resolve, reject) =>
         server.close((error) => (error ? reject(error) : resolve())),
@@ -232,6 +242,7 @@ for (const [tool, mode] of [
         workerConfig: "wrangler.json",
         assetsExecution: "remote",
       });
+      remote.allowUI(server.url);
       for (const [engine, launcher] of [
         ["chromium", chromium],
         ["webkit", webkit],

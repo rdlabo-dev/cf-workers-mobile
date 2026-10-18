@@ -34,6 +34,11 @@ Final reviews approved candidate `9d1b869` with no outstanding required changes:
 This approval record is a documentation-only follow-up to that reviewed candidate.
 CI remains a separate prerequisite for merging; the PR stays draft pending CI.
 
+The CI follow-up restricts the browser HTTPS test server to the exact generated
+UI origin and returns a generic plain-text 500 without exception details. Both
+reviewers approved this narrow test-only change; all five integration groups
+(20 combinations) passed again. Production and native harnesses are unchanged.
+
 ## Verification
 
 - Typecheck and production build: pass.
