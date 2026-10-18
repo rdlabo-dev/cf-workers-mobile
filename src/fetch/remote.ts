@@ -32,33 +32,40 @@ export function createRemoteWorker(
     throw new TypeError(
       "remote.origin must be an HTTPS origin without a path, credentials, query or fragment.",
     );
+  const maxBufferedBodyBytes = options.maxBufferedBodyBytes ?? 8 * 1024 * 1024;
+  if (!Number.isSafeInteger(maxBufferedBodyBytes) || maxBufferedBodyBytes < 0)
+    throw new TypeError(
+      "remote.maxBufferedBodyBytes must be a nonnegative safe integer",
+    );
   const lifetime = new AbortController();
   const native = getNativeCall();
   const scope = native ? createNetworkScope(native) : undefined;
-  const send = scope
+  const nativeSend = scope
     ? createFetch(
         new FetchTransport(createNativeNetwork({ nativeCall: scope.call })),
       )
-    : async (request: WorkerRequest) => {
-        const response = await browserFetch(
-          new platform.Request(request.url, {
-            method: request.method,
-            headers: [...request.headers],
-            body: await browserBody(request),
-            signal: request.signal,
-            credentials: "include",
-            redirect: "manual",
-            duplex: "half",
-          } as RequestInit),
-          undefined,
-          original,
-        );
-        if (response.status === 0)
-          throw new TypeError(
-            "Browser Fetch hides remote redirect locations. Remote redirects require the native transport.",
-          );
-        return response;
-      };
+    : undefined;
+  async function send(request: WorkerRequest, body: BodyInit | null) {
+    if (nativeSend) return nativeSend(request);
+    const response = await browserFetch(
+      new platform.Request(request.url, {
+        method: request.method,
+        headers: [...request.headers],
+        body,
+        signal: request.signal,
+        credentials: "include",
+        redirect: "manual",
+        duplex: "half",
+      } as RequestInit),
+      undefined,
+      original,
+    );
+    if (response.status === 0)
+      throw new TypeError(
+        "Browser Fetch hides remote redirect locations. Remote redirects require the native transport.",
+      );
+    return response;
+  }
   return {
     async fetch(request: Request): Promise<Response> {
       const signal = AbortSignal.any([request.signal, lifetime.signal]);
@@ -111,9 +118,12 @@ export function createRemoteWorker(
         // Follow mode needs a replayable body for 307/308. Manual document
         // requests keep streaming; the document host owns any subsequent hop.
         let body: BodyInit | null = request.body;
-        if (body && request.redirect === "follow")
+        if (body && (!native || request.redirect === "follow"))
           body = await wait(
-            browserBody(new WorkerRequest(target, { method, body, signal })),
+            bufferedBody(
+              new WorkerRequest(target, { method, body, signal }),
+              maxBufferedBodyBytes,
+            ),
           );
         for (let hop = 0; ; hop++) {
           signal.throwIfAborted();
@@ -132,7 +142,7 @@ export function createRemoteWorker(
             signal,
             redirect: "manual",
           });
-          const response = await wait(send(outgoing));
+          const response = await wait(send(outgoing, body));
           try {
             signal.throwIfAborted();
             const responseHeaders = new WorkerHeaders(response.headers);
@@ -251,10 +261,12 @@ function scopedCookie(value: string, target: URL): string[] {
 
 // WebKit and HTTP/1 browser fetch do not support arbitrary streaming uploads.
 // Native execution keeps the existing streaming byte transport.
-async function browserBody(request: WorkerRequest) {
+async function bufferedBody(request: WorkerRequest, limit: number) {
   if (!request.body) return null;
   const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
+  // A growable byte buffer bounds both payload and per-chunk overhead. Keeping
+  // arbitrary source views could otherwise retain huge backing buffers.
+  let bytes: Uint8Array<ArrayBuffer> = new Uint8Array(0);
   let length = 0;
   const abort = () => {
     void reader.cancel(request.signal.reason).catch(() => {});
@@ -266,16 +278,25 @@ async function browserBody(request: WorkerRequest) {
       const part = await reader.read();
       request.signal.throwIfAborted();
       if (part.done) break;
-      chunks.push(part.value);
-      length += part.value.length;
+      if (part.value.byteLength > limit - length)
+        throw new RangeError(
+          `Remote upload exceeds maxBufferedBodyBytes (${limit})`,
+        );
+      const needed = length + part.value.byteLength;
+      if (needed > bytes.length) {
+        const expanded = new Uint8Array(
+          Math.min(limit, Math.max(needed, bytes.length * 2, 65536)),
+        );
+        expanded.set(bytes.subarray(0, length));
+        bytes = expanded;
+      }
+      bytes.set(part.value, length);
+      length = needed;
     }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return bytes;
+    return bytes.subarray(0, length);
+  } catch (error) {
+    void reader.cancel(error).catch(() => {});
+    throw error;
   } finally {
     request.signal.removeEventListener("abort", abort);
     reader.releaseLock();

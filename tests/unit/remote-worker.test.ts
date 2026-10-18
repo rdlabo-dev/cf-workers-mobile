@@ -414,3 +414,151 @@ it("preserves an external Origin for the existing server CSRF check", async () =
     "https://untrusted.example/form",
   );
 });
+
+for (const redirect of ["follow", "manual", "error"] as const) {
+  it(`bounds browser ${redirect} uploads before sending, cancelling the producer`, async () => {
+    const send = vi.fn(async (_request: Request) => new Response("ok"));
+    const cancelled = vi.fn();
+    const remote = createRemoteWorker(
+      { origin: "https://server.example", maxBufferedBodyBytes: 4 },
+      send as typeof fetch,
+    );
+    cleanups.push(() => remote.dispose());
+    const body = new ReadableStream({
+      pull(c) {
+        c.enqueue(new Uint8Array(3));
+      },
+      cancel: cancelled,
+    });
+    await expect(
+      remote.fetch(
+        new Request("https://local.example/file", {
+          method: "POST",
+          body,
+          redirect,
+          duplex: "half",
+        } as RequestInit),
+      ),
+    ).rejects.toThrow("maxBufferedBodyBytes");
+    expect(send).not.toHaveBeenCalled();
+    expect(cancelled).toHaveBeenCalledTimes(1);
+    expect(body.locked).toBe(false);
+  });
+}
+it("accepts the exact byte limit without keeping reused chunk buffers", async () => {
+  const send = vi.fn(
+    async (request: Request) => new Response(await request.arrayBuffer()),
+  );
+  const remote = createRemoteWorker(
+    { origin: "https://server.example", maxBufferedBodyBytes: 4 },
+    send as typeof fetch,
+  );
+  cleanups.push(() => remote.dispose());
+  let i = 0;
+  const buffer = new Uint8Array(1024 * 1024);
+  const body = new ReadableStream(
+    {
+      pull(c) {
+        if (i === 4) return c.close();
+        buffer[0] = ++i;
+        c.enqueue(buffer.subarray(0, 1));
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  const result = await remote.fetch(
+    new Request("https://local.example/file", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit),
+  );
+  expect([...new Uint8Array(await result.arrayBuffer())]).toEqual([1, 2, 3, 4]);
+});
+it("cancels a pending buffered producer on disposal without sending", async () => {
+  const send = vi.fn(async () => new Response("no"));
+  const cancel = vi.fn();
+  const remote = createRemoteWorker(
+    { origin: "https://server.example" },
+    send as typeof fetch,
+  );
+  const body = new ReadableStream({ cancel });
+  const pending = remote.fetch(
+    new Request("https://local.example/file", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit),
+  );
+  const rejected = expect(pending).rejects.toThrow("disposed");
+  await Promise.resolve();
+  await remote.dispose();
+  await rejected;
+  expect(cancel).toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+});
+it("rejects invalid buffered-upload limits at initialization", () => {
+  for (const maxBufferedBodyBytes of [
+    -1,
+    0.1,
+    NaN,
+    Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+  ])
+    expect(() =>
+      createRemoteWorker(
+        { origin: "https://server.example", maxBufferedBodyBytes },
+        fetch,
+      ),
+    ).toThrow("safe integer");
+});
+it("caps native redirect-follow bodies before cookie lookup or network", async () => {
+  const { remote, cookies } = nativeRemote(
+    vi.fn(async () => new WireResponse("no")),
+  );
+  const cancel = vi.fn();
+  const body = new ReadableStream({
+    start(c) {
+      c.enqueue(new Uint8Array(8 * 1024 * 1024 + 1));
+    },
+    cancel,
+  });
+  await expect(
+    remote.fetch(
+      new Request("https://logical.example/file", {
+        method: "POST",
+        body,
+        duplex: "half",
+      } as RequestInit),
+    ),
+  ).rejects.toThrow("maxBufferedBodyBytes");
+  expect(cookies).not.toHaveBeenCalled();
+  expect(cancel).toHaveBeenCalledOnce();
+});
+for (const redirect of ["manual", "error"] as const)
+  it(`native ${redirect} sends before the streaming producer completes`, async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+        c.enqueue(new Uint8Array([7]));
+      },
+    });
+    const { remote } = nativeRemote(async (request) => {
+      const reader = request.body!.getReader();
+      expect((await reader.read()).value).toEqual(new Uint8Array([7]));
+      controller.close();
+      expect((await reader.read()).done).toBe(true);
+      reader.releaseLock();
+      return new WireResponse("streamed");
+    });
+    const response = await remote.fetch(
+      new Request("https://logical.example/file", {
+        method: "POST",
+        body,
+        redirect,
+        duplex: "half",
+      } as RequestInit),
+    );
+    expect(await response.text()).toBe("streamed");
+  });

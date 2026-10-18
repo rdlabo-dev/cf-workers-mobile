@@ -19,7 +19,9 @@ export async function browserFetch(
   fetcher = platform.fetch,
 ): Promise<Response> {
   let response: globalThis.Response;
+  let method: string;
   if (input instanceof platform.Request) {
+    method = init?.method ?? input.method;
     response = await fetcher(input, init as globalThis.RequestInit);
   } else {
     const resolved =
@@ -30,6 +32,7 @@ export async function browserFetch(
           )
         : input;
     const request = new Request(resolved, init);
+    method = request.method;
     response = await fetcher(request.url, {
       method: request.method,
       headers: [...request.headers],
@@ -43,8 +46,14 @@ export async function browserFetch(
   }
   if (response.type === "error" || response.status === 0)
     return Response.error();
+  // WebKit can expose an empty ReadableStream for a network 204/205/304 or
+  // HEAD response. Workers Response correctly forbids bodies for these cases.
+  const nullBody =
+    method.toUpperCase() === "HEAD" ||
+    [204, 205, 304].includes(response.status);
+  if (nullBody) void response.body?.cancel().catch(() => {});
   return networkResponse(
-    response.body,
+    nullBody ? null : response.body,
     {
       status: response.status,
       statusText: response.statusText,

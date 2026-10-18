@@ -83,3 +83,37 @@ it("invalid initializers do not consume existing platform Request bodies", async
     expect(await source.text()).toBe("original");
   }
 });
+
+it("normalizes browser empty streams for null-body statuses and HEAD", async () => {
+  for (const [method, status] of [
+    ["GET", 204],
+    ["GET", 205],
+    ["GET", 304],
+    ["HEAD", 200],
+  ] as const) {
+    let cancelled = false;
+    const stream = new ReadableStream({
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const response = await browserFetch(
+      new platform.Request("https://example.invalid/", { method }),
+      undefined,
+      async () =>
+        ({
+          status,
+          statusText: "",
+          headers: new platform.Headers(),
+          body: stream,
+          type: "basic",
+          url: "https://example.invalid/",
+          redirected: false,
+        }) as globalThis.Response,
+    );
+    expect(response.status).toBe(status);
+    expect(response.body).toBeNull();
+    expect(await response.text()).toBe("");
+    expect(cancelled).toBe(true);
+  }
+});

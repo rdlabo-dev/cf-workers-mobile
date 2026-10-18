@@ -141,10 +141,13 @@ scripts but does not prevent compromised scripts from making authenticated
 requests. Native Cookie transport does not promise browser-equivalent SameSite
 or CSRF protection.
 
-Browser uploads and native Fetch redirect-follow uploads are buffered without an
-explicit body-size cap in the shared remote transport. Large bodies can exhaust
-client memory; apply suitable client upload limits before constructing/sending
-buffered bodies. Manual native document requests retain streaming.
+Browser uploads and native Fetch redirect-follow uploads are buffered up to
+8 MiB by default. Configure `remote.maxBufferedBodyBytes` with a nonnegative safe
+integer (bytes). Exceeding the limit cancels the body producer and rejects before
+network dispatch; zero permits only empty bodies. Native manual/error redirect
+modes retain streaming. This bounds transport buffering, not total application
+heap usage or bodies already allocated by callers. Apply application limits
+before allocating large uploads; use R2 multipart uploads for larger objects.
 
 Hyperdrive uses the same transport; see the
 [Hyperdrive guide](hyperdrive-transparent-migration.md) for binding setup and

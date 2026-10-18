@@ -109,9 +109,10 @@ Whole-Worker delegation needs connectivity for every intercepted request.
 - Ordinary browsers still require credentialed CORS and obey browser Cookie
   policies. Browser manual remote redirects are unsupported.
 - Browser uploads and native Fetch redirect-follow uploads are buffered. The
-  shared remote transport currently has no explicit body-size cap, so large
-  bodies can exhaust client memory. Manual native document requests stream;
-  enforce suitable upload limits before constructing/sending buffered bodies.
+  shared transport defaults to an 8 MiB cap, configurable through
+  `remote.maxBufferedBodyBytes`. Over-limit bodies reject before dispatch.
+  Native manual/error redirect modes stream. The cap does not bound total app
+  memory; enforce application limits before allocating large bodies.
 
 The shared transport and Cookie behavior are detailed in the
 [D1 guide](d1-transparent-migration.md). Hyperdrive adds build-time binding
