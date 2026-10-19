@@ -110,12 +110,13 @@ export async function compileServerWorker(
         (route) =>
           !route ||
           !/^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
-          typeof route.path !== "string" ||
-          !route.path.startsWith("/"),
+          !(typeof route.path === "string"
+            ? route.path.startsWith("/")
+            : route.path instanceof RegExp),
       ))
   )
     throw new TypeError(
-      "manual execution requires localRoutes with an uppercase HTTP method and an absolute registration path",
+      "manual execution requires localRoutes with an uppercase HTTP method and an absolute registration path or RegExp",
     );
   if (execution === "local" && (bindings.length || forceRemoteReason))
     throw new Error(
@@ -1279,12 +1280,23 @@ async function partition(
     // Do not guess effective paths through mounts or aliases. They remain remote.
     const entries = [...registrations.values()].flat();
     for (const route of localRoutes) {
+      // Copy stateful expressions so each registration and rebuild is independent.
+      const pattern =
+        route.path instanceof RegExp
+          ? new RegExp(route.path.source, route.path.flags)
+          : undefined;
+      const matchesPath = (path: string | undefined) => {
+        if (path === undefined) return false;
+        if (!pattern) return path === route.path;
+        pattern.lastIndex = 0;
+        return pattern.test(path);
+      };
       const matches = entries.filter(
         ({ router, call }) =>
           router === root &&
           !routerInitializers.get(root)?.includes(".basePath(") &&
           property(call.callee) === route.method.toLowerCase() &&
-          literal(call.arguments[0]) === route.path,
+          matchesPath(literal(call.arguments[0])),
       );
       if (!matches.length)
         throw new Error(

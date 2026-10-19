@@ -134,6 +134,54 @@ it("manual does not bypass authentication middleware", async () => {
     `import {Hono} from 'hono'; const app=new Hono(); app.use('/private',async(c,next)=>{if(c.req.header('authorization')!==c.env.SECRET)return c.text('denied',401);await next();});app.get('/private',c=>c.text('PROTECTED_CONTENT'));export default app;`,
   );
 });
+it.each(["", "g", "y"])(
+  "manual matches registration paths with RegExp flags=%s without publishing other routes",
+  async (flags) => {
+    const path = new RegExp("^/pages/", flags);
+    path.lastIndex = 4;
+    await fixture(
+      { execution: "manual", localRoutes: [{ method: "GET", path }] },
+      async (graph) => {
+        const result = (await graph.get())!;
+        expect(path.lastIndex).toBe(4);
+        expect(result.local + result.selector).not.toContain("PRIVATE_POST");
+        expect(result.local + result.selector).not.toContain("PRIVATE_OTHER");
+        const { needsRemote } = await load(result.selector);
+        for (const url of ["/pages/about", "/pages/news/123?lang=en"]) {
+          expect(
+            await needsRemote(new Request(`https://local.invalid${url}`)),
+          ).toBe(false);
+        }
+        for (const [url, method] of [
+          ["/pages/about", "POST"],
+          ["/pages/cloud", "GET"],
+          ["/pages/missing", "GET"],
+          ["/other", "GET"],
+        ]) {
+          expect(
+            await needsRemote(
+              new Request(`https://local.invalid${url}`, { method }),
+            ),
+          ).toBe(true);
+        }
+        expect(
+          await (
+            await (
+              await load(result.local)
+            ).default.fetch(new Request("https://local.invalid/pages/news/123"))
+          ).text(),
+        ).toBe("123");
+      },
+      `import {Hono} from 'hono'; const app=new Hono();
+      app.get('/pages/about',c=>c.text('about'));
+      app.get('/pages/news/:id',c=>c.text(c.req.param('id')));
+      app.post('/pages/about',c=>c.text('PRIVATE_POST'));
+      app.get('/pages/cloud',c=>c.text(c.env.SECRET));
+      app.get('/other',c=>c.text('PRIVATE_OTHER'));
+      export default app;`,
+    );
+  },
+);
 it.each(["auto", "manual"] as const)(
   "%s keeps a separate REST API and unselected private pages on the server",
   async (execution) => {
@@ -207,6 +255,8 @@ it("local explicitly distributes the whole Worker and supports standalone POST",
 it.each([
   { execution: "local", remoteBindings: ["SECRET"] },
   { execution: "manual", localRoutes: [{ method: "GET", path: "/typo" }] },
+  { execution: "manual", localRoutes: [{ method: "GET", path: /^\/typo\// }] },
+  { execution: "manual", localRoutes: [{ method: "GET", path: 123 }] },
   { execution: "auto", localRoutes: [{ method: "GET", path: "/" }] },
   { execution: "manual" },
 ] as ServerBuildOptions[])(
