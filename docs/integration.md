@@ -84,7 +84,7 @@ For the Vite example below, install `vite@7` as a dev dependency if it is not al
 Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Until a package release is available, build and pack this repository with `npm install`, `npm run build`, `npm pack`, then install the resulting `.tgz` in the application. Do not assume an npm release exists. In the application, install the actual file:
 
 ```sh
-npm install /absolute/path/to/workers-capacitor-0.0.0-poc.1.tgz
+npm install /absolute/path/to/workers-capacitor-0.1.0.tgz
 ```
 
 Keep Capacitor/native projects in the application package, not in the library's source tree. Reuse existing dependencies and scripts rather than scaffolding a second application unnecessarily.
