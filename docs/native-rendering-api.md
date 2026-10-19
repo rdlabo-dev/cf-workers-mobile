@@ -2,7 +2,7 @@
 
 The package includes the native connection for Capacitor 8 (verified with 8.5.3).
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
-this PoC. No npm release is made by the packaging tests.
+this Preview. No npm release is made by the packaging tests.
 
 ## Installation
 
@@ -19,7 +19,7 @@ in the Vite/esbuild plugin, and call `workersCapacitor({ baseURL, render: "/" })
 Build the web assets before synchronizing:
 
 ```sh
-npm install /path/to/workers-capacitor-0.0.0-poc.1.tgz
+npm install /path/to/workers-capacitor-0.1.0.tgz
 npm run build
 npx cap sync
 npx cap run ios # or android
@@ -128,7 +128,7 @@ replacement is required. The two-WebView lifecycle is internal to the adapter.
 
 ## Scope and limits
 
-This remains a PoC. Document rendering is native-only; ordinary browser/Electron/
+This is a Preview release. Document rendering is native-only; ordinary browser/Electron/
 Tauri document startup is not implemented. Existing browser Fetch-only behavior
 is unchanged. Response bodies are pulled in bounded chunks; document uploads
 remain buffered with an 8 MiB limit. HTTP caching is disabled for
