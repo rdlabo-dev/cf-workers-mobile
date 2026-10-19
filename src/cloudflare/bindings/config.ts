@@ -11,7 +11,15 @@ export interface ServerBuildOptions {
   /** Distribution permission for Hono registration paths (exact strings or RegExp).
    * Only used with execution: "manual". Includes retained dependency data. */
   localRoutes?: {
-    method: "GET" | "HEAD" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+    method:
+      | "*"
+      | "GET"
+      | "HEAD"
+      | "POST"
+      | "PUT"
+      | "PATCH"
+      | "DELETE"
+      | "OPTIONS";
     path: string | RegExp;
   }[];
   /** Existing Wrangler JSON, JSONC or TOML configuration. Auto-detected in the build root. */

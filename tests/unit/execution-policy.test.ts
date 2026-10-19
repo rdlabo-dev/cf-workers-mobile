@@ -134,6 +134,67 @@ it("manual does not bypass authentication middleware", async () => {
     `import {Hono} from 'hono'; const app=new Hono(); app.use('/private',async(c,next)=>{if(c.req.header('authorization')!==c.env.SECRET)return c.text('denied',401);await next();});app.get('/private',c=>c.text('PROTECTED_CONTENT'));export default app;`,
   );
 });
+it.each(["/notes", /^\/notes$/])(
+  "manual accepts all methods for path %s without overriding server boundaries",
+  async (path) => {
+    await fixture(
+      {
+        execution: "manual",
+        localRoutes: [
+          { method: "*", path },
+          { method: "*", path: "/any" },
+        ],
+      },
+      async (graph) => {
+        const result = (await graph.get())!;
+        const { needsRemote } = await load(result.selector);
+        for (const method of [
+          "GET",
+          "HEAD",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE",
+          "OPTIONS",
+        ]) {
+          expect(
+            await needsRemote(
+              new Request("https://local.invalid/notes", { method }),
+            ),
+          ).toBe(method === "DELETE");
+          expect(
+            await needsRemote(
+              new Request("https://local.invalid/any", { method }),
+            ),
+          ).toBe(false);
+        }
+        expect(
+          await needsRemote(new Request("https://local.invalid/other")),
+        ).toBe(true);
+        expect(result.local + result.selector).not.toContain("PRIVATE_OTHER");
+        const response = await (
+          await load(result.local)
+        ).default.fetch(
+          new Request("https://local.invalid/notes", {
+            method: "POST",
+            body: "note",
+          }),
+        );
+        expect(await response.text()).toBe("note");
+      },
+      `import {Hono} from 'hono'; const app=new Hono();
+      app.get('/notes',c=>c.text('notes'));
+      app.post('/notes',async c=>c.text(await c.req.text()));
+      app.put('/notes',c=>c.text('put'));
+      app.patch('/notes',c=>c.text('patch'));
+      app.options('/notes',c=>c.text('options'));
+      app.delete('/notes',c=>c.text(c.env.SECRET));
+      app.all('/any',c=>c.text('any'));
+      app.get('/other',c=>c.text('PRIVATE_OTHER'));
+      export default app;`,
+    );
+  },
+);
 it.each(["", "g", "y"])(
   "manual matches registration paths with RegExp flags=%s without publishing other routes",
   async (flags) => {

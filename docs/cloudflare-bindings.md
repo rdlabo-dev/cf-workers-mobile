@@ -101,13 +101,15 @@ workersCapacitorPlugin({
 });
 ```
 
-`localRoutes` is available only with `manual`. Use uppercase HTTP methods and
+`localRoutes` is available only with `manual`. Use uppercase HTTP methods (or
+`"*"` for all methods) and
 either exact Hono registration paths or JavaScript regular expressions:
 
 ```ts
 localRoutes: [
   { method: "GET", path: "/" },
   { method: "GET", path: /^\/pages\// },
+  { method: "*", path: /^\/notes\// },
 ],
 ```
 
@@ -123,6 +125,10 @@ registrations on the exported Hono router; mounted routes, `basePath`, and `on()
 registrations are not resolved for manual permission. For an analyzable Hono
 graph, an unresolved selection fails the build rather than broadening permission.
 An unsupported Worker graph stays entirely remote. An empty list permits no routes.
+`method: "*"` selects every supported direct HTTP-method registration and
+`app.all()` at the matching paths. It does not grant middleware permission or
+override server dependencies. It also permits matching methods added later;
+use a specific method when that broader distribution permission is not intended.
 The example assumes direct `app.get("/", ...)` and `app.get("/about", ...)`
 registrations. Copy your application's actual registration paths; this setting
 does not create new routes or require rewriting the existing Worker.

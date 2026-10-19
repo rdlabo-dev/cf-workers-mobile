@@ -109,14 +109,14 @@ export async function compileServerWorker(
       localRoutes.some(
         (route) =>
           !route ||
-          !/^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
+          !/^(\*|GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
           !(typeof route.path === "string"
             ? route.path.startsWith("/")
             : route.path instanceof RegExp),
       ))
   )
     throw new TypeError(
-      "manual execution requires localRoutes with an uppercase HTTP method and an absolute registration path or RegExp",
+      'manual execution requires localRoutes with an uppercase HTTP method or "*" and an absolute registration path or RegExp',
     );
   if (execution === "local" && (bindings.length || forceRemoteReason))
     throw new Error(
@@ -1295,7 +1295,11 @@ async function partition(
         ({ router, call }) =>
           router === root &&
           !routerInitializers.get(root)?.includes(".basePath(") &&
-          property(call.callee) === route.method.toLowerCase() &&
+          (route.method === "*"
+            ? /^(get|head|post|put|patch|delete|options|all)$/.test(
+                property(call.callee) ?? "",
+              )
+            : property(call.callee) === route.method.toLowerCase()) &&
           matchesPath(literal(call.arguments[0])),
       );
       if (!matches.length)
