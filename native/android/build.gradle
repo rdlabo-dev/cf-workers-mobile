@@ -15,5 +15,6 @@ android {
 
 dependencies {
     implementation project(':capacitor-android')
+    implementation "androidx.webkit:webkit:${rootProject.ext.has('androidxWebkitVersion') ? rootProject.ext.androidxWebkitVersion : '1.14.0'}"
     implementation 'io.netty:netty-handler:4.1.139.Final'
 }

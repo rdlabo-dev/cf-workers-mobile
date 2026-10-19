@@ -1,0 +1,48 @@
+{
+  "main": "../../../artifacts/upstream/flare-stack-blog/clone/.cloudflare/output/v0/workers/default/bundle/index.js",
+  "compatibility_date": "2026-02-17",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "acceptance",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "acceptance",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "acceptance",
+    },
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "QUEUE",
+        "queue": "acceptance-queue",
+      },
+    ],
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RateLimiter",
+        "class_name": "RateLimiter",
+      },
+      {
+        "name": "PostPublisher",
+        "class_name": "PostPublisher",
+      },
+    ],
+  },
+  "assets": {
+    "directory": "../../../artifacts/upstream/flare-stack-blog/clone/.cloudflare/output/v0/workers/default/assets",
+    "binding": "ASSETS",
+  },
+}

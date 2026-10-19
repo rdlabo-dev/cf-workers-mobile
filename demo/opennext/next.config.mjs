@@ -1,1 +1,1 @@
-export default { output: "standalone", images: { unoptimized: true } };
+export default { output: "standalone" };

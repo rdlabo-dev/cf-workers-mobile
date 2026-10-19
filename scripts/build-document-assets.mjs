@@ -18,3 +18,15 @@ await writeFile(
     await import("node:fs/promises")
   ).readFile("src/browser/documents/service-worker.js"),
 );
+
+const links = await build({
+  entryPoints: ["src/browser/documents/links.ts"],
+  bundle: true,
+  format: "iife",
+  target: "es2022",
+  write: false,
+});
+await writeFile(
+  "dist/browser/documents/links-source.js",
+  `export const linksScript = ${JSON.stringify(links.outputFiles[0].text)};\n`,
+);

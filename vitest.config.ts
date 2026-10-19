@@ -39,6 +39,7 @@ export default defineConfig({
       "src/compat/perf-hooks/installation.spec.ts",
       "src/compat/stream-web/installation.spec.ts",
       "src/compat/stream-web/context.spec.ts",
+      "src/compat/stream-web/interop.spec.ts",
       "src/shared/brotli/index.spec.ts",
       "src/browser/fetch/index.spec.ts",
       "src/browser/fetch/interop.spec.ts",

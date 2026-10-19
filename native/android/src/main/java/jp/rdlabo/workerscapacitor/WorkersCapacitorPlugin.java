@@ -15,6 +15,7 @@ public class WorkersCapacitorPlugin extends Plugin {
     private final Handler main = new Handler(Looper.getMainLooper());
     private volatile WorkerSockets network = new WorkerSockets();
     private WebView runtime;
+    private androidx.webkit.ScriptHandler documentLinks;
     private HostBridge hostBridge;
     private PluginCall starting;
     private Runnable timeout;
@@ -43,6 +44,11 @@ public class WorkersCapacitorPlugin extends Plugin {
                 URI local = new URI(bridge.getLocalUrl());
                 if (!url.getScheme().equals(local.getScheme()) || !url.getAuthority().equals(local.getAuthority()) || !url.getPath().equals("/index.html")) throw new IllegalArgumentException();
             } catch (Exception error) { call.reject("Invalid document bootstrap URL"); return; }
+            if (!androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                call.reject("Document navigation requires a WebView with document-start script support"); return;
+            }
+            String script = "globalThis.__workersCapacitorDocuments = {baseURL:" + JSONObject.quote(call.getString("baseURL")) + "};\n" + call.getString("linksScript");
+            documentLinks = androidx.webkit.WebViewCompat.addDocumentStartJavaScript(bridge.getWebView(), script, java.util.Collections.singleton(bridge.getLocalUrl().replaceAll("/$", "")));
             starting = call;
             runtime = new WebView(getContext());
             runtime.getSettings().setJavaScriptEnabled(true);
@@ -123,6 +129,7 @@ public class WorkersCapacitorPlugin extends Plugin {
     }
 
     private void close() {
+        if (documentLinks != null) { documentLinks.remove(); documentLinks = null; }
         if (hostBridge != null) { hostBridge.network.shutdown(); hostBridge = null; }
         if (timeout != null) main.removeCallbacks(timeout);
         if (starting != null) { starting.reject("Document runtime disposed"); starting = null; }

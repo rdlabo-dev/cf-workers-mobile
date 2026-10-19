@@ -25,6 +25,7 @@ final class WorkerSockets {
     }
     private final Map<String, Connection> connections = new ConcurrentHashMap<>();
     private EventLoopGroup group;
+    private SSLContext tlsContext;
     private boolean stopped;
     private final class Connection extends SimpleChannelInboundHandler<ByteBuf> {
         final String id;
@@ -88,7 +89,13 @@ final class WorkerSockets {
         try {
             final SSLEngine engine;
             if(tls) {
-                engine=SSLContext.getDefault().createSSLEngine(host,port); engine.setUseClientMode(true);
+                // Android cannot resume HttpURLConnection's SSLSocket sessions in
+                // an SSLEngine. Keep our session cache separate, using default trust.
+                if(tlsContext==null) {
+                    SSLContext context=SSLContext.getInstance("TLS");
+                    context.init(null,null,null); tlsContext=context;
+                }
+                engine=tlsContext.createSSLEngine(host,port); engine.setUseClientMode(true);
                 SSLParameters parameters=engine.getSSLParameters(); parameters.setEndpointIdentificationAlgorithm("HTTPS"); engine.setSSLParameters(parameters);
             } else engine=null;
             if(group==null) group=new NioEventLoopGroup(1);

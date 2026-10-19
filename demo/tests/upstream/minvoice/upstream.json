@@ -1,0 +1,7 @@
+{
+  "name": "Minvoice",
+  "repository": "https://github.com/ddyy/minvoice",
+  "commit": "99563a5a4d8e90481e76d2440c719c909a67f243",
+  "entry": "src/index.tsx",
+  "license": "MIT"
+}

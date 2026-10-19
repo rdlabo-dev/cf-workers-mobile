@@ -33,6 +33,33 @@ function assets() {
     },
   );
 }
+// Bound simultaneous header RPCs to avoid flooding the Android bridge.
+// Body reads and cancellation must remain independent of these slots.
+let opening = 0;
+const waiting = [];
+function acquire(signal) {
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      const index = waiting.indexOf(start);
+      if (index !== -1) waiting.splice(index, 1);
+      reject(signal.reason);
+    };
+    const start = () => {
+      signal.removeEventListener("abort", abort);
+      opening++;
+      resolve(() => {
+        opening--;
+        waiting.shift()?.();
+      });
+    };
+    if (signal.aborted) return reject(signal.reason);
+    if (opening < 6) start();
+    else {
+      waiting.push(start);
+      signal.addEventListener("abort", abort, { once: true });
+    }
+  });
+}
 // Android's native interceptor cannot expose request bodies or return redirects.
 // Keep those semantics in the browser's standard FetchEvent pipeline.
 self.addEventListener("install", (event) =>
@@ -86,28 +113,50 @@ async function dispatch(request) {
     request.method === "GET" || request.method === "HEAD"
       ? undefined
       : await readUpload(request);
+  request.signal.throwIfAborted();
   const message = {
+    id: crypto.randomUUID(),
     url: request.url,
     method: request.method,
     headers: Object.fromEntries(request.headers),
     body,
     stream: true,
   };
-  const rpc = (message) =>
+  const rpc = (message, signal) =>
     new Promise((resolve, reject) => {
       const channel = new MessageChannel();
-      const timer = setTimeout(() => {
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
         channel.port1.close();
+      };
+      const abort = () => {
+        cleanup();
+        reject(signal.reason);
+      };
+      const timer = setTimeout(() => {
+        cleanup();
         reject(new Error("Worker response timeout"));
       }, 30000);
       channel.port1.onmessage = (event) => {
-        clearTimeout(timer);
-        channel.port1.close();
+        cleanup();
         resolve(event.data);
       };
       host.postMessage(message, [channel.port2]);
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) abort();
     });
-  const result = await rpc(message);
+  let result;
+  const release = await acquire(request.signal);
+  try {
+    result = await rpc(message, request.signal);
+  } catch (error) {
+    // The host may still be opening a connection or have produced a late stream.
+    void rpc({ action: "cancel", streamId: message.id }).catch(() => {});
+    throw error;
+  } finally {
+    release();
+  }
   const cancel = () => rpc({ action: "cancel", streamId: result.streamId });
   if (result.error) throw new Error(result.error);
   const headers = new Headers(result.headers);

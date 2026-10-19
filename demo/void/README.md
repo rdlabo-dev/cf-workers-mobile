@@ -14,4 +14,4 @@ npm run test:void --prefix demo
 
 Tests live in `../tests/void/` and create an ephemeral local D1 database. They do not deploy or access a Cloudflare account. Chromium and WebKit must be installed through Playwright. CI runs this sample in its own parallel compatibility job.
 
-See [Void integration and limits](../../docs/void.md) for connecting the generated Worker to Capacitor. Native acceptance is not yet covered. This sample has no authentication; do not deploy it as a production data endpoint.
+See [Void integration and limits](../../docs/void.md) for connecting the generated Worker to Capacitor. Android native tests cover SSR, hydration, form actions and client-only rendering. The iOS test reproduces the upstream router’s rejection of `capacitor:` URLs; it is a known-boundary test, not an iOS support claim. This sample has no authentication; do not deploy it as a production data endpoint.

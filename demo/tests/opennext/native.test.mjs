@@ -182,16 +182,19 @@ test(
         ]);
         await run("adb", ["-s", device, "shell", "pm", "clear", appId]);
       }
+      let iosPid;
       const launch = async () => {
-        if (platform === "ios")
-          await run("xcrun", [
+        if (platform === "ios") {
+          const output = await run("xcrun", [
             "simctl",
             "launch",
             "--terminate-running-process",
             device,
             appId,
           ]);
-        else {
+          iosPid = output.trim().split(": ").at(-1);
+          assert.match(iosPid, /^\d+$/);
+        } else {
           await run("adb", ["-s", device, "shell", "am", "force-stop", appId]);
           await run("adb", [
             "-s",
@@ -217,6 +220,45 @@ test(
       )
         .filter((info) => info.isFile())
         .reduce((sum, info) => sum + info.size, 0);
+      // Process RSS excludes separate WebView renderer/GPU processes. This is
+      // a simulator/emulator debug baseline, not a physical-device memory budget.
+      const memory =
+        platform === "ios"
+          ? await run("ps", ["-o", "rss=", "-p", iosPid])
+          : await run("adb", [
+              "-s",
+              device,
+              "shell",
+              "dumpsys",
+              "meminfo",
+              appId,
+            ]);
+      const hostProcessRssKiB =
+        platform === "ios"
+          ? Number(memory.trim())
+          : Number(memory.match(/TOTAL RSS:\s*(\d+)/)?.[1]);
+      assert.ok(Number.isFinite(hostProcessRssKiB) && hostProcessRssKiB > 0);
+      await writeFile(join(artifacts, `${platform}-memory.txt`), memory);
+      await writeFile(
+        join(artifacts, `${platform}-performance.json`),
+        JSON.stringify(
+          {
+            platform,
+            device,
+            configuration: "Debug",
+            environment: "simulator/emulator",
+            execution: local ? "local" : "remote",
+            launchToHydrationMs: hydrated.launchToHydrationMs,
+            bundleBytes: hydrated.bundleBytes,
+            hostProcessRssKiB,
+            samples: 1,
+            memoryScope:
+              "host process RSS only; excludes renderer/GPU processes",
+          },
+          null,
+          2,
+        ),
+      );
       if (local) {
         await waitReport("local-complete");
         assert.deepEqual(

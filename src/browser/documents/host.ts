@@ -57,15 +57,15 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
     headers.delete("if-none-match");
     headers.delete("if-modified-since");
     const target = new URL(url.pathname + url.search, baseURL).href;
-    const response = await runtime.fetch(
-      new Request(target, {
-        method: request.method,
-        headers,
-        body: request.body,
-        redirect: "manual",
-        signal,
-      }),
-    );
+    // Do not pass through the browser's Request guard: it silently removes
+    // observed Origin/Sec-Fetch-* headers before the Workers runtime sees them.
+    const response = await runtime.fetch(target, {
+      method: request.method,
+      headers,
+      body: request.body,
+      redirect: "manual",
+      signal,
+    });
     if (signal.aborted) {
       void response.body?.cancel(signal.reason).catch(() => {});
       signal.throwIfAborted();

@@ -11,7 +11,7 @@ These files verify the library. For the setup to copy into your application, sta
 | `build-tools/`                               | Playwright assertions for Vite, esbuild, and browser ES Modules.                                                             |
 | `build/`                                     | Vitest assertions for the esbuild watch integration.                                                                         |
 | `workers/`                                   | Vitest checks running Hono, Express, and compatibility handlers in local workerd.                                            |
-| `upstream/`                                  | Verbatim upstream app checks (hono-jsx-ssr). Sources stay in the git-ignored artifacts clone; see each sample's README.      |
+| `upstream/`                                  | Verbatim upstream app checks. Sources stay in the git-ignored artifacts clone; see each sample's README.                     |
 | `validation/`                                | The compatibility page, shared check runners/contracts, and Worker entry wrappers.                                           |
 | `fixtures/apps/runtime/`                     | A browser/native test app that exposes runtime operations to the tests. Formerly the dedicated Worker experiment.            |
 | `fixtures/apps/build-tools/`                 | Test apps built with Vite/esbuild or loaded as plain JavaScript. These are build inputs, not build scripts.                  |
@@ -207,4 +207,30 @@ Initial HTML is not automatically request-time SSR. Fresh query values must appe
 
 The OpenNext native test installs `fixtures/plugins/bridge-probe` through Capacitor's normal package discovery. The test-only driver uses `@capacitor/core` to call the plugin, receive its delayed native event and observe a rejected call from the remote-rendered page. The same checks run after client navigation, full document navigation and app relaunch. The driver removes its listener after each check and registers again in each new document; old JavaScript listeners are not expected to survive document replacement. Run the existing OpenNext native commands sequentially because they share generated assets and a temporary Capacitor configuration override, restored in `finally`.
 
-This verifies an automatically registered package plugin. It does not verify manual host-controller registration, arbitrary third-party plugins or background lifecycle delivery. No production plugin or CI emulator job is added.
+This verifies an automatically registered package plugin. It does not verify manual host-controller registration, arbitrary third-party plugins or background lifecycle delivery. This fixture adds no production plugin.
+
+## Application acceptance
+
+Each application's `browser.test.mjs` establishes the unchanged upstream Worker's baseline; it does not exercise the adapter. The CI matrix then runs `native.test.mjs` through the public API on an Android emulator, independently per application. pknotes has browser coverage only because native passkey registration remains unsupported by this fixture. Counterscale defaults to authentication-only coverage in CI; live analytics requires explicit test-account configuration.
+
+- [Inkstone](upstream/inkstone/README.md): owner registration, note creation and persistence across reloads.
+- [Counterscale](upstream/counterscale/README.md): password/session acceptance in CI; an explicit live mode verifies Analytics Engine counts and dashboard rendering using a test account.
+- [pknotes](upstream/pknotes/README.md): browser PRF registration and encrypted note round trip; native registration fails in the current shell; this is a diagnostic, not acceptance.
+- [TSRSS](upstream/tsrss/README.md): HTML form login, article read/star state and logout with D1/KV assertions.
+- [0bin](upstream/0bin/README.md): original encryption/decryption UI and D1 ciphertext assertions.
+- [Sink](upstream/sink/README.md): original Nuxt login and link creation UI with D1 assertions.
+- [FlareDrive](upstream/flaredrive/README.md): original file listing and authenticated WebDAV/R2 round trip; HTTP Basic login prompts are outside this scenario.
+- [Minvoice](upstream/minvoice/README.md): pinned third-party source, original login/client/invoice forms, D1 assertions and cross-origin rejection.
+- [External-browser OAuth](../authentication/README.md): real browser callback, PKCE and Worker-issued HttpOnly session with a local test issuer.
+- `opennext/images.test.mjs` and `opennext/images.native.test.mjs`: real IMAGES transformation, WebP bytes/dimensions and native image rendering.
+- `void/native.test.mjs`: Android SSR/actions/client-only flow; on iOS, explicitly verifies the upstream custom-scheme router limitation.
+
+- [microfeed](upstream/microfeed/README.md): It seeds a published article in real local workerd D1, opens it from the original feed and reads the RSS feed.
+- [UptimeFlare](upstream/uptimeflare/README.md): It seeds monitor status and latency history in real local workerd D1, verifies the original status page, follows its Incidents link and selects a monitor filter.
+- [flare-stack-blog](upstream/flare-stack-blog/README.md): D1-backed articles, navbar styling, client-side navigation controls and article navigation. Android passes; iOS client initialization fails because Better Auth rejects the app-local URL scheme.
+
+Native tests use `UPSTREAM_PLATFORM=ios|android` and `UPSTREAM_DEVICE`. Run every test sharing `demo/opennext` serially, including its browser integration build. For multiple files use `node --test --test-concurrency=1 <files>` (runner options precede file names). OAuth uses its independent `demo/authentication` shell, but must not run alongside another test on the same device.
+
+`native/acceptance.mjs` owns only build/install/launch plumbing. It resets the test app’s data before each scenario (reinstall on iOS, `pm clear` on Android), so a previous login cannot bypass the scenario’s authentication flow. Each scenario owns its Worker, data and assertions. Artifacts are ignored by git. Its `elapsedFlowMs` is launch-to-scenario-completion time, not startup latency; simulator/emulator measurements are not physical-device performance results.
+
+The existing `opennext/native.test.mjs` also records a single Debug launch-to-hydration sample and host-process RSS (`*-performance.json`, raw `*-memory.txt`). The timing includes local HTTPS transport and host load; RSS excludes separate renderer/GPU processes. Use those artifacts to reproduce a simulator baseline, not to claim physical-device latency or total application memory.

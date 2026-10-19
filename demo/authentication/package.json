@@ -1,0 +1,21 @@
+{
+  "name": "workers-capacitor-authentication-example",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@rdlabo/workers-capacitor": "file:../.."
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/android": "8.5.3",
+    "vite": "7.3.7",
+    "typescript": "6.0.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
