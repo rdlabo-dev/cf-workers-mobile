@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     root: fileURLToPath(new URL(".", import.meta.url)),
     plugins: [
       workersCapacitorPlugin({
+        execution: "local",
         worker: `../../workers/${framework}/standard.ts`,
       }),
     ],

@@ -153,7 +153,7 @@ export function workerSource(
   factoryImport: string,
   selector?: string,
 ) {
-  return `import createWorker from ${JSON.stringify(factoryImport)};\n${selector ? `import { needsRemote } from ${JSON.stringify(selector)};` : ""}\nimport { installNodeGlobals } from ${JSON.stringify(globalsPath)};\nexport default { createWorker, ${selector ? "needsRemote," : ""} async loadDirect() {\n  const dispose = installNodeGlobals();\n  try {\n    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };\n  } catch (error) {\n    dispose();\n    throw error;\n  }\n} };`;
+  return `import createWorker from ${JSON.stringify(factoryImport)};\n${selector ? `import { needsRemote, requiresRemote } from ${JSON.stringify(selector)};` : ""}\nimport { installNodeGlobals } from ${JSON.stringify(globalsPath)};\nexport default { createWorker, ${selector ? "needsRemote, requiresRemote," : ""} async loadDirect() {\n  const dispose = installNodeGlobals();\n  try {\n    return { handler: (await import(${JSON.stringify(entry)})).default, dispose };\n  } catch (error) {\n    dispose();\n    throw error;\n  }\n} };`;
 }
 
 export const globalsInjectPath = fileURLToPath(

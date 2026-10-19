@@ -1,3 +1,8 @@
+export type {
+  WorkerExecution,
+  WorkerExecutionMode,
+  LocalRoute,
+} from "./server.js";
 import { readWorkerFiles } from "./files.js";
 import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
@@ -237,7 +242,8 @@ export function workersCapacitorPlugin(
   const entries = new Map<string, string>();
   const virtualFiles = async () =>
     readWorkerFiles(
-      options.worker && !(await server?.get())
+      options.worker &&
+        (options.execution === "local" || !(await server?.get()))
         ? resolve(root, options.worker)
         : undefined,
       root,
@@ -334,12 +340,7 @@ export function workersCapacitorPlugin(
         );
         if (!resolved || resolved.external)
           this.error("Cannot resolve Worker entry: " + path);
-        if (compilation)
-          this.warn(
-            compilation.mode === "worker"
-              ? `Server bindings: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
-              : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
-          );
+        if (compilation) this.warn(compilation.message);
         const entry = resolved.id;
         const generated = entry + entrySuffix;
         if (existsSync(generated))
@@ -349,9 +350,9 @@ export function workersCapacitorPlugin(
           );
         entries.set(generated, entry);
         return `import Constructor from ${JSON.stringify(generated + "?worker")};
-${compilation ? `import { needsRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
+${compilation ? `import { needsRemote, requiresRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
 import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
-export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote," : ""} async loadDirect() {
+export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote, requiresRemote," : ""} async loadDirect() {
   const dispose = installNodeGlobals();
   try {
     return { handler: (await import(${JSON.stringify(entry)})).default, dispose };

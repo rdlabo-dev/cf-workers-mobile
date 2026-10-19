@@ -579,3 +579,25 @@ it("rejects WebSocket upgrades before requesting credentials or sending HTTP", a
   expect(send).not.toHaveBeenCalled();
   expect(getToken).not.toHaveBeenCalled();
 });
+
+it("never runs local code if a selector requires an unconfigured remote", async () => {
+  const handler = { fetch: vi.fn(() => new Response("must not run")) };
+  const runtime = createFetchRuntime({
+    baseURL: "https://local.invalid/",
+    prefer: "direct",
+    worker: {
+      createWorker() {
+        throw new Error("must stay direct");
+      },
+      loadDirect: async () => handler,
+      needsRemote: () => true,
+      requiresRemote: false,
+    },
+  });
+  cleanups.push(() => runtime.dispose());
+  await runtime.ready;
+  await expect(runtime.fetch("https://local.invalid/")).rejects.toThrow(
+    "remote.origin",
+  );
+  expect(handler.fetch).not.toHaveBeenCalled();
+});

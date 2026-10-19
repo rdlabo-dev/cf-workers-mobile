@@ -15,6 +15,7 @@ await build({
   },
   plugins: [
     workersCapacitorPlugin({
+      execution: "local",
       worker: fileURLToPath(
         new URL("../../src/workers/hono/standard.ts", import.meta.url),
       ),

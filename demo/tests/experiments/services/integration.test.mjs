@@ -66,6 +66,7 @@ for (const tool of ["vite", "esbuild"])
           logLevel: "warn",
           plugins: [
             vitePlugin({
+              execution: [{ method: "*", path: "*" }],
               worker,
               workerConfig: "wrangler.json",
               kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" },
@@ -90,6 +91,7 @@ for (const tool of ["vite", "esbuild"])
           sourcemap: true,
           plugins: [
             esbuildPlugin({
+              execution: [{ method: "*", path: "*" }],
               worker,
               workerConfig: "wrangler.json",
               kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" },
@@ -444,6 +446,7 @@ test("Vite development dispatches service routes in both execution modes", async
     logLevel: "warn",
     plugins: [
       vitePlugin({
+        execution: [{ method: "*", path: "*" }],
         worker: fixture,
         workerConfig: "wrangler.json",
         kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" },

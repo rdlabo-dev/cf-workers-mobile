@@ -58,11 +58,9 @@ for (const [key, option, binding] of kinds) {
       resolve(root, "worker.ts"),
       `import {Hono} from 'hono'; const app=new Hono(); app.get('/health',c=>c.text('ok')); app.post('/remote',async c=>c.json(await c.env.${binding}.send('private-code-marker')));export default app;`,
     );
-    const compiled = await serverModules(
-      resolve(root, "worker.ts"),
-      root,
-      {},
-    ).get();
+    const compiled = await serverModules(resolve(root, "worker.ts"), root, {
+      execution: [{ method: "GET", path: "/health" }],
+    }).get();
     expect(compiled?.mode).toBe("routes");
     expect(compiled?.local).not.toContain("private-code-marker");
     const { needsRemote } = await selector(compiled!.selector);
@@ -124,6 +122,7 @@ it("keeps KV-only routes local when configured and mixed R2/KV operations remote
     `import {Hono} from 'hono';const app=new Hono();app.get('/local/:key',async c=>c.text(await c.env.KV.get(c.req.param('key'))));app.get('/cloud/:key',async c=>{const value=await c.env.KV.get(c.req.param('key'));const object=await c.env.BUCKET.get(c.req.param('key'));return c.json({value,object});});export default app;`,
   );
   const compiled = await serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
     workerConfig: "local.json",
     kvExecution: { KV: "local" },
   }).get();
@@ -138,7 +137,7 @@ it("keeps KV-only routes local when configured and mixed R2/KV operations remote
   expect(compiled!.local).not.toContain("BUCKET");
   expect(compiled!.local).toContain("KV.get");
 });
-it("does not create a remote boundary for a KV-only Worker", async () => {
+it("analyzes a KV-only Worker while retaining a supported local route", async () => {
   await writeFile(
     resolve(root, "kv.json"),
     JSON.stringify({ kv_namespaces: [{ binding: "KV" }] }),
@@ -149,15 +148,24 @@ it("does not create a remote boundary for a KV-only Worker", async () => {
   });
   expect(config.names).toEqual([]);
   expect(config.localBindings).toEqual(["KV"]);
+  await writeFile(
+    resolve(root, "worker.ts"),
+    `import {Hono} from 'hono'; const app = new Hono(); app.get('/value', async c => c.text(await c.env.KV.get('key'))); export default app;`,
+  );
   expect(
     await serverModules(resolve(root, "worker.ts"), root, {
+      execution: [{ method: "GET", path: "/value" }],
       workerConfig: "kv.json",
       kvExecution: { KV: "local" },
     }).get(),
-  ).toBeUndefined();
+  ).toMatchObject({
+    mode: "routes",
+    routes: [expect.objectContaining({ remote: false })],
+  });
   expect(
     (
       await serverBindings(root, {
+        execution: [{ method: "GET", path: "/value" }],
         workerConfig: "kv.json",
         kvBindings: ["OVERRIDE"],
         kvExecution: { OVERRIDE: "local" },
@@ -222,7 +230,9 @@ it("does not confuse dynamic R2/KV keys with Cookie header access", async () => 
     entry,
     `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('ok'));app.get('/object/:key',async c=>c.json(await c.env.BUCKET.get(c.req.param('key'))));app.delete('/key/:key',async c=>{await c.env.KV.delete(c.req.param('key'));return c.body(null,204);});export default app;`,
   );
-  const result = await compileServerWorker(entry, ["BUCKET", "KV"]);
+  const result = await compileServerWorker(entry, ["BUCKET", "KV"], {
+    execution: [{ method: "*", path: "*" }],
+  });
   expect(result.mode).toBe("routes");
   const { needsRemote } = await selector(result.selector);
   expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
@@ -248,6 +258,7 @@ it("keeps consumer-only Workers and their fetch handlers on the server", async (
     `export default {fetch(){return new Response('consumer-private-code')},queue(batch,env){return env.INTERNAL_SECRET}};`,
   );
   const result = await serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
     workerConfig: "consumer-only.json",
   }).get();
   expect(result?.mode).toBe("worker");
@@ -262,9 +273,9 @@ it("requires explicit KV policy and rejects invalid or conflicting policies", as
     resolve(root, workerConfig),
     JSON.stringify({ kv_namespaces: [{ binding: "KV" }] }),
   );
-  await expect(serverBindings(root, { workerConfig })).rejects.toThrow(
-    "Set kvExecution.KV",
-  );
+  await expect(
+    serverBindings(root, { workerConfig, execution: [] }),
+  ).rejects.toThrow("Set kvExecution.KV");
   for (const policy of [
     null,
     [],
@@ -295,6 +306,7 @@ it("requires explicit KV policy and rejects invalid or conflicting policies", as
     `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('ok'));app.get('/kv/:key',async c=>c.text(await c.env.KV.get(c.req.param('key'))));export default app;`,
   );
   const result = await serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
     workerConfig,
     kvExecution: { KV: "remote" },
   }).get();

@@ -87,6 +87,7 @@ export async function runNativeAcceptance({
       publicDir,
       plugins: [
         workersCapacitorPlugin({
+          execution: "network",
           worker,
           workerConfig,
           kvExecution,

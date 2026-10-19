@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => ({
       ),
     },
   },
-  plugins: [workersCapacitorPlugin({ worker: "./worker.ts" })],
+  plugins: [
+    workersCapacitorPlugin({ execution: "local", worker: "./worker.ts" }),
+  ],
   build: { target: "es2022" },
 }));

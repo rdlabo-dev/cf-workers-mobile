@@ -149,8 +149,9 @@ await runtime.ready;
 If the build report selects remote routes or whole-Worker remote execution, add
 `remote: { origin: "https://your-worker.example.com" }` to these options and connect
 your existing authentication. Remote configuration is required for that generated
-boundary. For a local-only build, omit `remote`; supplying it without a generated
-remote boundary is rejected. See the [binding configuration guide](cloudflare-bindings.md).
+boundary. For a local-only build, `remote` is optional: a build-generated source
+can retain the setting even when no request needs it. Explicit ESM wiring without
+a generated selector still rejects `remote`. See the [binding configuration guide](cloudflare-bindings.md).
 
 `baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
 
@@ -184,7 +185,9 @@ Check client initialization as well as SSR output. A client library that derives
 | Next.js / OpenNext                  | Build the existing cloud output and select `.open-next/worker.js`                      | Cloud dependencies can keep the entire generated Worker remote                   |
 | Cloud ASSETS                        | Configure `assetsExecution: "remote"`                                                  | Local ASSETS is not implemented; retain the existing cloud asset behavior        |
 
-For statically analyzable Hono applications, the build may keep independent routes local. If it cannot safely separate requests, it selects whole-Worker remote execution, including for general Fetch handlers and Workers Express. Inspect `workers-capacitor-d1.json` or `workers-capacitor-server.json` in the output. Do not remove bindings, bypass authentication or create another router to force local execution.
+The default `execution: "network"` keeps the existing Worker on the server. Do not ask the user to enumerate routes before basic integration works. When local execution is needed, an `execution` array explicitly permits selected Hono route implementations and retained dependencies to ship to the device. The build preserves server boundaries and can keep the whole Worker remote when separation is uncertain. Inspect `workers-capacitor-d1.json` or `workers-capacitor-server.json`; a nonempty selection with no local handlers emits a warning.
+
+Route patterns select Hono registrations, not incoming URLs. `/app/*` includes `/app` itself and matching descendants; patterns can also permit future registrations. Review that scope before using `method: "*"`. Never infer distribution permission from GET, HTML output, a REST API prefix or the absence of a known binding. A standalone application may explicitly use `execution: "local"`, which distributes the whole Worker without route analysis. Do not use it to bypass protected boundaries. See [execution configuration](cloudflare-bindings.md#choosing-execution).
 
 For example, a page that authenticates the user, queries D1 and returns SSR HTML can retain that entire sequence on the deployed Worker. The device renders the response and uses the application's existing interaction model. This requires connectivity; it does not make D1 available locally. See [D1 dispatch](d1-transparent-migration.md) and the [OpenNext sample](../demo/opennext/README.md). Remote execution is a supported way to preserve the application, not an incomplete migration requiring a subsequent redesign.
 

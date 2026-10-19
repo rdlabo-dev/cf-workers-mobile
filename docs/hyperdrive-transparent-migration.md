@@ -65,7 +65,14 @@ ORM or driver version.
 
 ## Execution and code removal
 
-Statically analyzable Hono routes independent of server operations stay local.
+The default `execution: "network"` keeps the whole Worker remote. To permit
+independent Hono routes to ship to the device, set an `execution` array in the
+build plugin, for example `execution: [{ method: "GET", path: "/" }]` when that
+registration and its dependencies may be distributed. The following analysis
+applies to that explicit selection. See [execution configuration](cloudflare-bindings.md#choosing-execution).
+
+Statically analyzable Hono routes independent of server operations can stay local
+when they also satisfy the [distribution contract](cloudflare-bindings.md#what-can-move-to-the-device).
 When a matching operation needs Hyperdrive, the whole request goes to the
 existing Worker before any local application middleware executes. Imported
 helpers and server driver imports are removed with their handlers before client

@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { build, type BuildOptions } from "esbuild";
 import { parseAst } from "rollup/parseAst";
+import { transformAsync, type types } from "@babel/core";
 import type {
   Node,
   Expression,
@@ -11,6 +12,14 @@ import type {
 export {
   serverBindings,
   type ServerBuildOptions,
+  type WorkerExecution,
+  type WorkerExecutionMode,
+  type LocalRoute,
+} from "../cloudflare/bindings/config.js";
+
+import type {
+  ServerBuildOptions,
+  LocalRoute,
 } from "../cloudflare/bindings/config.js";
 
 export interface ServerCompilation {
@@ -19,7 +28,13 @@ export interface ServerCompilation {
   local: string;
   selector: string;
   inputs: string[];
-  routes: { router: string; method: string; path: string; remote: boolean }[];
+  routes: {
+    router: string;
+    method: string;
+    path: string;
+    remote: boolean;
+    reason: string;
+  }[];
 }
 class WiderServerBoundary extends Error {}
 
@@ -75,19 +90,66 @@ export async function compileServerWorker(
     BuildOptions,
     "alias" | "tsconfig" | "define" | "conditions"
   > & {
+    execution?: ServerBuildOptions["execution"];
     localBindings?: string[];
     kvBindings?: string[];
     forceRemoteReason?: string;
   } = {},
 ): Promise<ServerCompilation> {
   const {
+    execution = "network",
     localBindings = [],
     kvBindings = [],
     forceRemoteReason,
     ...buildOptions
   } = options;
+  if (
+    execution !== "network" &&
+    execution !== "local" &&
+    !Array.isArray(execution)
+  )
+    throw new TypeError(
+      'execution must be "network", "local", or an array of route permissions',
+    );
+  if (
+    Array.isArray(execution) &&
+    execution.some(
+      (route) =>
+        !route ||
+        !/^(\*|GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
+        !(typeof route.path === "string"
+          ? route.path === "*" || route.path.startsWith("/")
+          : route.path instanceof RegExp),
+    )
+  )
+    throw new TypeError(
+      'execution routes require an uppercase HTTP method or "*" and a Hono registration path or RegExp',
+    );
+  if (execution === "local" && (bindings.length || forceRemoteReason))
+    throw new Error(
+      "local execution cannot use configured server bindings or server-only events; use network or route permissions",
+    );
   if (localBindings.some((name) => bindings.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
+  if (execution === "local")
+    return {
+      mode: "worker",
+      reason: "Entire Worker distribution explicitly permitted",
+      // Keep the host bundler's loaders, aliases and transforms for full local execution.
+      local: `export { default } from ${JSON.stringify(entry.replaceAll("\\", "/"))};`,
+      selector: "export function needsRemote() { return false; }",
+      inputs: [],
+      routes: [
+        {
+          router: "worker",
+          method: "all",
+          path: "*",
+          remote: false,
+          reason:
+            "Entire Worker distribution explicitly permitted; runtime compatibility is the application's responsibility",
+        },
+      ],
+    };
   const bundled = await build({
     ...buildOptions,
     absWorkingDir: dirname(entry),
@@ -97,9 +159,10 @@ export async function compileServerWorker(
     // Remote-only applications may import Cloudflare WASM modules and binary
     // assets (for example next/og). Keep these files in the dependency graph
     // for the client-import guard, without embedding unused server data.
-    loader: forceRemoteReason
-      ? { ".wasm": "empty", ".bin": "empty" }
-      : undefined,
+    loader:
+      forceRemoteReason || execution === "network"
+        ? { ".wasm": "empty", ".bin": "empty" }
+        : undefined,
     format: "esm",
     platform: "neutral",
     write: false,
@@ -114,8 +177,17 @@ export async function compileServerWorker(
     resolve(dirname(entry), file),
   );
   try {
+    if (execution === "network")
+      throw new WiderServerBoundary("Network execution explicitly selected");
     if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);
-    return partition(source, bindings, inputs, localBindings, kvBindings);
+    return await partition(
+      source,
+      bindings,
+      inputs,
+      localBindings,
+      kvBindings,
+      execution as readonly LocalRoute[],
+    );
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
     return {
@@ -125,17 +197,244 @@ export async function compileServerWorker(
       local:
         'export default { fetch() { throw new Error("Server-only Worker reached local dispatch"); } };',
       selector: "export function needsRemote() { return true; }",
-      routes: [{ router: "worker", method: "all", path: "*", remote: true }],
+      routes: [
+        {
+          router: "worker",
+          method: "all",
+          path: "*",
+          remote: true,
+          reason: error.message,
+        },
+      ],
     };
   }
 }
-function partition(
+// A missing server binding is not proof of a local dependency. Resolve lexical
+// bindings with Babel (already used by the build), including shadowed parameters.
+// Network, process, caches and unknown host globals deliberately have no local
+// contract here. Request dispatch stays on the server when they are referenced.
+async function unresolvedReferences(source: string) {
+  const globals = new Set([
+    "undefined",
+    "NaN",
+    "Infinity",
+    "JSON",
+    "String",
+    "Number",
+    "Boolean",
+    "BigInt",
+    "Array",
+    "Object",
+    "Math",
+    "URL",
+    "URLSearchParams",
+    "TextEncoder",
+    "TextDecoder",
+    "Response",
+    "Request",
+    "Headers",
+    "Promise",
+    "RegExp",
+    "Error",
+    "TypeError",
+    "RangeError",
+  ]);
+  const staticCalls: Record<string, string[]> = {
+    JSON: ["parse", "stringify"],
+    Math: [
+      "abs",
+      "ceil",
+      "floor",
+      "round",
+      "trunc",
+      "min",
+      "max",
+      "pow",
+      "sqrt",
+      "sign",
+      "random",
+    ],
+    Number: [
+      "isFinite",
+      "isInteger",
+      "isNaN",
+      "isSafeInteger",
+      "parseFloat",
+      "parseInt",
+    ],
+    String: ["fromCharCode", "fromCodePoint", "raw"],
+    Array: ["isArray", "from", "of"],
+    Object: ["is"],
+    Promise: ["resolve", "reject", "all", "allSettled", "race", "any"],
+    Response: ["json", "redirect", "error"],
+    URL: ["canParse", "parse"],
+  };
+  const staticValues: Record<string, string[]> = {
+    Math: ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT1_2", "SQRT2"],
+    Number: [
+      "EPSILON",
+      "MAX_SAFE_INTEGER",
+      "MIN_SAFE_INTEGER",
+      "MAX_VALUE",
+      "MIN_VALUE",
+      "NaN",
+      "NEGATIVE_INFINITY",
+      "POSITIVE_INFINITY",
+    ],
+  };
+  const unresolved = new Set<number>();
+  const references = new Map<number, string>();
+  await transformAsync(source, {
+    configFile: false,
+    babelrc: false,
+    sourceType: "module",
+    code: false,
+    ast: false,
+    plugins: [
+      () => ({
+        visitor: {
+          ThisExpression(path) {
+            unresolved.add(path.node.start!);
+          },
+          ObjectPattern(path) {
+            if (
+              path.node.properties.some(
+                (property) =>
+                  property.type === "ObjectProperty" &&
+                  (property.computed ||
+                    (property.key.type === "Identifier" &&
+                      ["constructor", "__proto__"].includes(
+                        property.key.name,
+                      )) ||
+                    (property.key.type === "StringLiteral" &&
+                      ["constructor", "__proto__"].includes(
+                        property.key.value,
+                      ))),
+              )
+            )
+              throw new WiderServerBoundary(
+                "Dynamic runtime access requires a single Worker boundary",
+              );
+            unresolved.add(path.node.start!);
+          },
+          SpreadElement(path) {
+            unresolved.add(path.node.start!);
+          },
+          MetaProperty(path) {
+            unresolved.add(path.node.start!);
+          },
+          AssignmentExpression(path) {
+            let target: types.Node = path.node.left;
+            while (target.type === "MemberExpression") target = target.object;
+            if (
+              target.type !== "Identifier" ||
+              !path.scope.getBinding(target.name)
+            )
+              throw new WiderServerBoundary(
+                "Writes to ambient state require a single Worker boundary",
+              );
+          },
+          UpdateExpression(path) {
+            let target: types.Node = path.node.argument;
+            while (target.type === "MemberExpression") target = target.object;
+            if (
+              target.type !== "Identifier" ||
+              !path.scope.getBinding(target.name)
+            )
+              throw new WiderServerBoundary(
+                "Writes to ambient state require a single Worker boundary",
+              );
+          },
+          ReferencedIdentifier(path) {
+            const name = path.node.name;
+            const binding = path.scope.getBinding(name);
+            if (!binding || binding.scope.path.isProgram())
+              references.set(path.node.start!, name);
+            if (binding) {
+              if (binding.kind === "module") {
+                const declaration = binding.path.parentPath;
+                if (
+                  declaration?.isImportDeclaration() &&
+                  [
+                    "hono",
+                    "hono/html",
+                    "hono/jsx",
+                    "hono/jsx/jsx-runtime",
+                  ].includes(declaration.node.source.value)
+                ) {
+                  const use = path.parentPath;
+                  if (
+                    !(
+                      ((use.isCallExpression() || use.isNewExpression()) &&
+                        use.node.callee === path.node) ||
+                      (use.isTaggedTemplateExpression() &&
+                        use.node.tag === path.node)
+                    )
+                  )
+                    throw new WiderServerBoundary(
+                      "Escaped rendering import requires a single Worker boundary",
+                    );
+                }
+              }
+              return;
+            }
+            if (["eval", "Function", "Reflect", "Proxy"].includes(name))
+              throw new WiderServerBoundary(
+                "Dynamic runtime access requires a single Worker boundary",
+              );
+            if (!globals.has(name)) {
+              unresolved.add(path.node.start!);
+              return;
+            }
+            if (["undefined", "NaN", "Infinity"].includes(name)) return;
+            const parent = path.parentPath;
+            if (
+              (parent.isCallExpression() || parent.isNewExpression()) &&
+              parent.node.callee === path.node &&
+              !["Math", "JSON"].includes(name)
+            )
+              return;
+            if (
+              parent.isMemberExpression() &&
+              parent.node.object === path.node
+            ) {
+              const key =
+                !parent.node.computed &&
+                parent.node.property.type === "Identifier"
+                  ? parent.node.property.name
+                  : parent.node.computed &&
+                      parent.node.property.type === "StringLiteral"
+                    ? parent.node.property.value
+                    : undefined;
+              if (key && staticValues[name]?.includes(key)) return;
+              const use = parent.parentPath;
+              if (
+                key &&
+                staticCalls[name]?.includes(key) &&
+                use.isCallExpression() &&
+                use.node.callee === parent.node
+              )
+                return;
+            }
+            // Do not chase aliases, reflection or arbitrary mutation of host objects.
+            throw new WiderServerBoundary(
+              "Escaped or unsupported use of a standard global requires a single Worker boundary",
+            );
+          },
+        },
+      }),
+    ],
+  });
+  return { unresolved, references };
+}
+async function partition(
   source: string,
   bindings: string[],
   inputs: string[],
   localBindings: string[],
   kvBindings: string[],
-): ServerCompilation {
+  routePermissions: readonly LocalRoute[],
+): Promise<ServerCompilation> {
   const program = parseAst(source);
   const text = (node: Node) => {
     const span = node as Node & { start: number; end: number };
@@ -168,8 +467,9 @@ function partition(
         declarations.set(specifier.local.name, statement);
         if (
           typeof statement.source.value !== "string" ||
-          (statement.source.value !== "hono" &&
-            !statement.source.value.startsWith("hono/"))
+          !["hono", "hono/html", "hono/jsx", "hono/jsx/jsx-runtime"].includes(
+            statement.source.value,
+          )
         )
           opaqueImports.add(specifier.local.name);
         if (
@@ -428,6 +728,14 @@ function partition(
           typeof call.arguments[0].value !== "string"
         )
           fail("basePath requires a static path");
+        if (
+          !/^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?)?$/.test(
+            call.arguments[0].value,
+          )
+        )
+          fail(
+            "Patterned basePath requires a single Worker distribution boundary",
+          );
         initializer += `.basePath(${text(call.arguments[0])})`;
       }
       routerInitializers.set(name, `const ${name} = ${initializer};`);
@@ -501,14 +809,24 @@ function partition(
         sequence.calls.map((call) => ({ router, call })),
       );
     }
+  const { unresolved, references } = await unresolvedReferences(source);
+  function dependencies(node: Node) {
+    const result = new Set<string>();
+    walk(node, (child) => {
+      const name = references.get((child as Node & { start: number }).start);
+      if (name) result.add(name);
+    });
+    return result;
+  }
   function closure(nodes: Node[]) {
-    const result = new Set(nodes.flatMap((node) => [...names(node)]));
+    const result = new Set(nodes.flatMap((node) => [...dependencies(node)]));
     for (const name of result) {
       const declaration = declarations.get(name);
       if (declaration && !routerNodes.has(name))
-        for (const dependency of names(declaration)) result.add(dependency);
+        for (const dependency of dependencies(declaration))
+          result.add(dependency);
       for (const value of writes.get(name) ?? [])
-        for (const dependency of names(value)) result.add(dependency);
+        for (const dependency of dependencies(value)) result.add(dependency);
     }
     return result;
   }
@@ -520,17 +838,15 @@ function partition(
   }
   function server(nodes: Node[]) {
     const dependencies = closure(nodes);
-    if (
-      [...dependencies].some(
-        (name) =>
-          bindings.includes(name) ||
-          environmentImports.has(name) ||
-          opaqueImports.has(name) ||
-          remoteState.has(name),
-      )
-    )
-      return true;
-    let remote = false;
+    let remote = [...dependencies].some(
+      (name) =>
+        bindings.includes(name) ||
+        environmentImports.has(name) ||
+        opaqueImports.has(name) ||
+        remoteState.has(name),
+    );
+    // A server-only handler can still affect other routes through runtime state.
+    // Always check whole-Worker boundaries, even after finding a remote binding.
     for (const node of [
       ...nodes,
       ...[...dependencies]
@@ -541,9 +857,13 @@ function partition(
         .filter((n): n is Node => !!n),
     ])
       walk(node, (child, parent) => {
+        if (unresolved.has((child as Node & { start: number }).start))
+          remote = true;
         const key = property(child);
         if (key && bindings.includes(key)) remote = true;
-        if (key === "constructor" || key === "__proto__") remote = true;
+        if (key === "constructor" || key === "__proto__")
+          fail("Dynamic runtime access requires a single Worker boundary");
+        if (["executionCtx", "event", "cf"].includes(key ?? "")) remote = true;
         // Passing an environment to unknown code or computing property names expands
         // the whole operation's server boundary, never retries a partially run route.
         if (
@@ -558,7 +878,7 @@ function partition(
           child.computed &&
           child.property.type !== "Literal"
         )
-          remote = true;
+          fail("Dynamic property access requires a single Worker boundary");
         if (
           child.type === "ImportExpression" ||
           (child.type === "Identifier" &&
@@ -567,6 +887,43 @@ function partition(
           remote = true;
       });
     return remote;
+  }
+  // Middleware has no independent distribution grant. Only an unconditional
+  // await next() can accompany a permitted route without changing authority.
+  function passthroughMiddleware(node: Node, seen = new Set<Node>()): boolean {
+    if (seen.has(node)) return false;
+    seen.add(node);
+    if (node.type === "Identifier") {
+      const value =
+        variables.get(node.name)?.init ?? declarations.get(node.name);
+      return !!value && passthroughMiddleware(value, seen);
+    }
+    if (
+      ![
+        "ArrowFunctionExpression",
+        "FunctionExpression",
+        "FunctionDeclaration",
+      ].includes(node.type)
+    )
+      return false;
+    const fn = node as import("estree").Function;
+    if (
+      fn.params.length !== 2 ||
+      fn.params.some((p) => p.type !== "Identifier") ||
+      fn.body.type !== "BlockStatement" ||
+      fn.body.body.length !== 1
+    )
+      return false;
+    const statement = fn.body.body[0]!;
+    return (
+      statement.type === "ExpressionStatement" &&
+      statement.expression.type === "AwaitExpression" &&
+      statement.expression.argument.type === "CallExpression" &&
+      statement.expression.argument.callee.type === "Identifier" &&
+      statement.expression.argument.callee.name ===
+        (fn.params[1] as import("estree").Identifier).name &&
+      statement.expression.argument.arguments.length === 0
+    );
   }
   function staticPath(node: Node, seen = new Set<string>()): boolean {
     if (node.type === "Literal") return typeof node.value === "string";
@@ -583,6 +940,58 @@ function partition(
     }
     return false;
   }
+  const granted = new Set<CallExpression>();
+  // Do not guess effective paths through mounts or aliases. They remain remote.
+  const entries = [...registrations.values()].flat();
+  for (const route of routePermissions) {
+    // Copy stateful expressions so each registration and rebuild is independent.
+    const pattern =
+      route.path instanceof RegExp
+        ? new RegExp(route.path.source, route.path.flags)
+        : undefined;
+    const matchesPath = (path: string | undefined) => {
+      if (path === undefined) return false;
+      if (typeof route.path === "string") {
+        if (path === route.path || route.path === "*" || route.path === "/*")
+          return true;
+        // Hono's trailing wildcard includes the base path. Only a literal
+        // prefix proves containment of another registration's entire pattern.
+        if (
+          route.path.endsWith("/*") &&
+          !/[:*{}?]/.test(route.path.slice(0, -2))
+        ) {
+          const base = route.path.slice(0, -2);
+          return path === base || path.startsWith(`${base}/`);
+        }
+        return false;
+      }
+      if (!pattern) return false;
+      pattern.lastIndex = 0;
+      return pattern.test(path);
+    };
+    const matches = entries.filter(
+      ({ router, call }) =>
+        router === root &&
+        !routerInitializers.get(root)?.includes(".basePath(") &&
+        (route.method === "*"
+          ? /^(get|head|post|put|patch|delete|options|all)$/.test(
+              property(call.callee) ?? "",
+            )
+          : property(call.callee) === route.method.toLowerCase()) &&
+        matchesPath(literal(call.arguments[0])),
+    );
+    if (!matches.length)
+      throw new Error(
+        `execution: cannot resolve ${route.method} ${route.path} to a direct Hono registration`,
+      );
+    for (const match of matches) granted.add(match.call);
+  }
+  function distributionAllowed(call: CallExpression, handlers: Node[]) {
+    if (property(call.callee) !== "use") return granted.has(call);
+    return handlers.every(
+      (argument) => staticPath(argument) || passthroughMiddleware(argument),
+    );
+  }
   // State shared with a remote operation must not be duplicated in a local
   // module instance. Expand the boundary before generating either router.
   let changed = true;
@@ -590,7 +999,11 @@ function partition(
     changed = false;
     for (const entries of registrations.values())
       for (const { call } of entries) {
-        if (!server(call.arguments)) continue;
+        if (
+          !server(call.arguments) &&
+          distributionAllowed(call, call.arguments)
+        )
+          continue;
         for (const name of closure(call.arguments))
           if (
             mutable.has(name) &&
@@ -609,6 +1022,130 @@ function partition(
           }
       }
   }
+  const candidates = [...registrations.values()]
+    .flat()
+    .filter(({ call }) => routeMethods.has(property(call.callee) ?? ""))
+    .sort(
+      (a, b) =>
+        (a.call as CallExpression & { end: number }).end -
+        (b.call as CallExpression & { end: number }).end,
+    )
+    .map((entry) => {
+      const method = property(entry.call.callee)!;
+      const pathCount =
+        method === "on"
+          ? 2
+          : method === "use" &&
+              entry.call.arguments[0] &&
+              !staticPath(entry.call.arguments[0])
+            ? 0
+            : 1;
+      const paths = entry.call.arguments.slice(0, pathCount);
+      const handlers = entry.call.arguments.slice(pathCount);
+      return {
+        ...entry,
+        method,
+        paths: method === "on" ? paths.slice(1) : paths,
+        handlers,
+        remote: server(handlers) || !distributionAllowed(entry.call, handlers),
+      };
+    });
+  function literal(node: Node | undefined): string | undefined {
+    if (node?.type === "Identifier")
+      return literal(variables.get(node.name)?.init ?? undefined);
+    return node?.type === "Literal" && typeof node.value === "string"
+      ? node.value
+      : undefined;
+  }
+  function disjoint(a: string | undefined, b: string | undefined): boolean {
+    if (a === undefined || b === undefined) return false;
+    const plain = (path: string) =>
+      path.startsWith("/") && !/[:*{}?]/.test(path) && !path.includes("//");
+    if (plain(a) && plain(b))
+      return a.replace(/\/$/, "") !== b.replace(/\/$/, "");
+    const prefix = (path: string) =>
+      (path.match(/^\/[^:*{}?]*/)?.[0] ?? "")
+        .split("//")[0]!
+        .replace(/\/$/, "");
+    const ap = prefix(a),
+      bp = prefix(b);
+    return (
+      (plain(a) && !a.startsWith(bp)) ||
+      (plain(b) && !b.startsWith(ap)) ||
+      (!ap.startsWith(bp) && !bp.startsWith(ap))
+    );
+  }
+  function rootOutsideMount(
+    a: (typeof candidates)[number],
+    b: (typeof candidates)[number],
+  ) {
+    if (a.router !== root || literal(a.paths[0]) !== "/") return false;
+    const mounts = [...registrations.values()]
+      .flat()
+      .filter(({ call }) => property(call.callee) === "route");
+    return (
+      mounts.length > 0 &&
+      mounts.every(
+        ({ router, call }) =>
+          router === root &&
+          call.arguments[1]?.type === "Identifier" &&
+          rootRouter(call.arguments[1].name) === b.router &&
+          /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(
+            literal(call.arguments[0]) ?? "",
+          ),
+      )
+    );
+  }
+
+  // Remove protected handlers from the distribution graph, not merely from
+  // request-time execution. Prefix checks only prove disjointness; uncertain
+  // overlap widens the boundary instead of recreating Hono's router.
+  const protectedCalls = new Set<CallExpression>();
+  let widened = true;
+  while (widened) {
+    widened = false;
+    for (let i = 0; i < candidates.length; i++)
+      for (let j = i + 1; j < candidates.length; j++) {
+        const a = candidates[i]!,
+          b = candidates[j]!;
+        if (a.remote && b.remote) continue;
+        // A proven passthrough registered before the server operation writes
+        // its headers even to an unauthenticated response. A later middleware
+        // can be protected by the earlier operation and must not be distributed.
+        if (
+          (!a.remote && a.method === "use") ||
+          (!a.remote && !b.remote && b.method === "use")
+        )
+          continue;
+        if (
+          !["all", "on", "use"].includes(a.method) &&
+          !["all", "on", "use"].includes(b.method) &&
+          a.method !== b.method &&
+          ![a.method, b.method].every((method) =>
+            ["get", "head"].includes(method),
+          )
+        )
+          continue;
+        if (a.router !== b.router) {
+          if (rootOutsideMount(a, b) || rootOutsideMount(b, a)) continue;
+          fail(
+            "Mounted route overlap requires a single Worker distribution boundary",
+          );
+        }
+        if (disjoint(literal(a.paths[0]), literal(b.paths[0]))) continue;
+        if (!a.remote && !b.remote)
+          fail(
+            "Overlapping local responses require a single Worker distribution boundary",
+          );
+        if (!a.remote) protectedCalls.add(a.call);
+        if (!b.remote) protectedCalls.add(b.call);
+        a.remote = b.remote = true;
+        widened = true;
+      }
+  }
+  const distributionRemote = new Map(
+    candidates.map(({ call, remote }) => [call, remote]),
+  );
   const localRoots: Node[] = [];
   const selectorRoots: Node[] = [];
   const localRegistrations = new Map<Node, string[]>();
@@ -652,16 +1189,7 @@ function partition(
       }
       if (method === "onError" || method === "notFound") {
         rejectRouterEscape(call.arguments);
-        const remote = server(call.arguments);
-        remoteErrors ||= remote;
-        if (!remote) {
-          localRoots.push(...call.arguments);
-          emit(
-            localRegistrations,
-            statement,
-            `${router}.${method}(${call.arguments.map(text).join(",")});`,
-          );
-        }
+        remoteErrors = true;
         continue;
       }
       if (!routeMethods.has(method))
@@ -681,7 +1209,7 @@ function partition(
           `dynamic path/method for ${router}.${method} cannot be matched before execution`,
         );
       rejectRouterEscape(handlers);
-      const remote = server(handlers);
+      const remote = distributionRemote.get(call)!;
       localRoots.push(...paths);
       if (!remote) localRoots.push(...handlers);
       selectorRoots.push(...paths);
@@ -690,11 +1218,20 @@ function partition(
         method,
         path: paths.map(text).join(",") || "*",
         remote,
+        reason: protectedCalls.has(call)
+          ? "Protected by an overlapping server handler or middleware; implementation is not distributed"
+          : remote
+            ? !granted.has(call)
+              ? "Route distribution was not permitted by execution"
+              : "Server dependency or dependency without a local execution contract or public rendering contract"
+            : granted.has(call)
+              ? "Route and retained dependencies explicitly permitted for distribution; no overlapping server boundary"
+              : "Passthrough middleware with no overlapping server boundary",
       });
       const prefix = paths.length ? paths.map(text).join(",") + "," : "";
       // Every candidate is visited, so a fallthrough to a server handler is selected
       // before local middleware, even when an earlier candidate could have responded.
-      const marker = `async (c,next) => { ${remote ? 'c.set("__cwRemote",true);' : ""} await next(); if(c.get("__cwRemote"))c.header("x-cw-remote","1"); }`;
+      const marker = `async (c,next) => { ${remote ? 'c.set("__cwRemote",true);' : ""} await next(); ${granted.has(call) ? 'c.header("x-cw-local-route","1");' : ""} if(c.get("__cwRemote"))c.header("x-cw-remote","1"); }`;
       emit(
         selectorRegistrations,
         statement,
@@ -732,7 +1269,6 @@ function partition(
     }
     return lines.join("\n");
   }
-  const hasRemote = remoteErrors || routes.some((route) => route.remote);
   if (remoteErrors)
     fail("Server-backed error/not-found handling can apply to every request");
   return {
@@ -740,8 +1276,8 @@ function partition(
     local: generate(needed, localRegistrations) + `\nexport default ${root};\n`,
     selector:
       generate(selectorNeeded, selectorRegistrations) +
-      `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return response.headers.get("x-cw-remote") === "1";`} }\n`,
+      `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return response.headers.get("x-cw-local-route") !== "1" || response.headers.get("x-cw-remote") === "1";`} }\n`,
     inputs,
-    routes: hasRemote ? routes : [],
+    routes,
   };
 }

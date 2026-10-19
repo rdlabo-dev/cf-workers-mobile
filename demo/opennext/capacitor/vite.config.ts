@@ -8,6 +8,7 @@ export default defineConfig({
   publicDir: here("../.open-next/assets"),
   plugins: [
     workersCapacitorPlugin({
+      execution: "network",
       worker: here("../.open-next/worker.js"),
       assetsExecution: "remote",
     }),

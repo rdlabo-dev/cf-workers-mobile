@@ -13,7 +13,7 @@ afterAll(async () => {
 });
 for (const framework of ["hono", "express"])
   for (const builder of ["vite", "esbuild", "esbuild-outfile"]) {
-    it(`${builder}/${framework}: emits assets for the public rendering entry`, async () => {
+    it(`${builder}/${framework}: defaults Worker execution to network while retaining bundled public assets`, async () => {
       const outdir = await mkdtemp(join(tmpdir(), "capacitor-documents-"));
       directories.push(outdir);
       const root = resolve("tests/fixtures/apps/public-documents");
@@ -63,6 +63,19 @@ for (const framework of ["hono", "express"])
       }
       expect(manifest).toContain("/rendering/module.js");
       expect(manifest).toContain("/rendering/style.css");
+      expect(manifest).toContain("/rendering/pixel.svg");
+      for (const asset of ["style.css", "pixel.svg"]) {
+        expect(await readFile(join(outdir, "rendering", asset), "utf8")).toBe(
+          await readFile(join(publicDir, "rendering", asset), "utf8"),
+        );
+      }
+      const report = JSON.parse(
+        await readFile(join(outdir, "workers-capacitor-server.json"), "utf8"),
+      );
+      expect(report.mode).toBe("worker");
+      expect(
+        report.routes.every((route: { remote: boolean }) => route.remote),
+      ).toBe(true);
       expect(await readFile(join(outdir, "rendering/module.js"), "utf8")).toBe(
         await readFile(join(publicDir, "rendering/module.js"), "utf8"),
       );

@@ -59,7 +59,9 @@ for (const config of configurations) {
       entry,
       `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('local'));app.post('/cloud',async c=>c.json(await c.env.CLOUD.run('private-cloud-operation')));export default app;`,
     );
-    const compiled = await serverModules(entry, root, {}).get();
+    const compiled = await serverModules(entry, root, {
+      execution: [{ method: "*", path: "*" }],
+    }).get();
     expect(compiled?.mode).toBe("routes");
     expect(compiled!.local).not.toContain("private-cloud-operation");
     const { needsRemote } = await selector(compiled!.selector);
@@ -137,7 +139,9 @@ it("keeps exported cloud classes and scheduled handlers wholly remote even witho
     { triggers: { crons: ["* * * * *"] } },
   ]) {
     await configuration(config);
-    const compiled = await serverModules(entry, root, {}).get();
+    const compiled = await serverModules(entry, root, {
+      execution: [{ method: "*", path: "*" }],
+    }).get();
     expect(compiled?.mode).toBe("worker");
     expect(compiled?.local).not.toContain("private-code");
   }
@@ -146,7 +150,9 @@ it("keeps exported cloud classes and scheduled handlers wholly remote even witho
 const assets = { binding: "ASSETS", run_worker_first: true };
 it("requires explicit remote ASSETS policy and rejects local policies", async () => {
   await configuration({ assets });
-  await expect(serverBindings(root, {})).rejects.toThrow("Set assetsExecution");
+  await expect(serverBindings(root, { execution: [] })).rejects.toThrow(
+    "Set assetsExecution",
+  );
   await expect(
     serverBindings(root, { assetsExecution: "local" as never }),
   ).rejects.toThrow("local ASSETS compatibility is not implemented");
@@ -177,6 +183,7 @@ it("preserves asset-first routing remotely and selectively dispatches worker-fir
     `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('ok'));app.get('/assets',c=>c.env.ASSETS.fetch(c.req.raw));app.get('/cloud',async c=>{await c.env.AI.run('private-model');return c.env.ASSETS.fetch(c.req.raw)});export default app;`,
   );
   const compiled = await serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
     assetsExecution: "remote",
   }).get();
   const { needsRemote } = await selector(compiled!.selector);
@@ -208,7 +215,10 @@ it("remote assets can import server WASM and binary files without shipping them 
   );
   await writeFile(resolve(root, "renderer.wasm"), "private-wasm");
   await writeFile(resolve(root, "font.bin"), "private-font");
-  const graph = serverModules(entry, root, { assetsExecution: "remote" });
+  const graph = serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
+    assetsExecution: "remote",
+  });
   const compiled = await graph.get();
   expect(compiled?.mode).toBe("worker");
   expect(compiled?.local).not.toMatch(/private-|renderer|font/);

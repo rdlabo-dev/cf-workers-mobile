@@ -15,6 +15,7 @@ await build({
   define: { "import.meta.env.VITE_REPORT_ORIGIN": "undefined" },
   plugins: [
     workersCapacitorPlugin({
+      execution: "local",
       worker: here("../../../opennext/.open-next/worker.js"),
       workerConfig: here("wrangler.json"),
     }),

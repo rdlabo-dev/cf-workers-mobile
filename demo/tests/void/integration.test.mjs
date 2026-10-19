@@ -76,6 +76,7 @@ window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: 
         publicDir: join(root, "dist/client"),
         plugins: [
           workersCapacitorPlugin({
+            execution: "network",
             worker: join(root, "dist/ssr/index.js"),
             workerConfig: join(root, "dist/ssr/wrangler.json"),
             assetsExecution: "remote",

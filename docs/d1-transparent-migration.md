@@ -49,12 +49,21 @@ management token in the client. Deploying the server remains a separate action.
 
 ## How execution is selected
 
+The default `execution: "network"` keeps the whole Worker remote. To permit
+independent Hono routes to ship to the device, set an `execution` array in the
+build plugin, for example `execution: [{ method: "GET", path: "/" }]` when that
+registration and its dependencies may be distributed. The following analysis
+applies to that explicit selection. See [execution configuration](cloudflare-bindings.md#choosing-execution).
+
 For statically analyzable Hono applications, the compiler follows local module
 imports and re-exports, helpers, mounted routers, chained registrations and
 middleware. It generates a selector with the same Hono matching rules. If any
 matching operation requires server execution, the entire request goes to the
 existing Worker **before any local application middleware or handler runs**.
-This also covers fallthrough and overlapping routes. Pure routes remain local.
+This also covers fallthrough and overlapping routes. Local candidates must also
+satisfy the [distribution contract](cloudflare-bindings.md#what-can-move-to-the-device).
+A pure function is not automatically public: protected handlers and dependencies
+outside that contract are excluded from the generated client code.
 
 D1 bindings, server `env` values, unknown dependency behavior, dynamic property
 access, and mutable state shared with server operations widen the server boundary.

@@ -14,7 +14,10 @@ await viteBuild({
   base: "./",
   root: resolve(root, "tests/fixtures/apps/build-tools"),
   plugins: [
-    vitePlugin({ worker: "../../workers/compatibility/node-contracts.ts" }),
+    vitePlugin({
+      execution: "local",
+      worker: "../../workers/compatibility/node-contracts.ts",
+    }),
   ],
   build: {
     outDir: resolve(root, "artifacts/build-tools/vite-node"),
@@ -52,7 +55,9 @@ await viteBuild({
     splitting: true,
     assetNames: "assets/[name]-[hash]",
     chunkNames: "chunks/[name]-[hash]",
-    plugins: [workersCapacitorPlugin({ worker: nodeWorker })],
+    plugins: [
+      workersCapacitorPlugin({ execution: "local", worker: nodeWorker }),
+    ],
   });
   await writeFile(
     resolve(outdir, "index.html"),
@@ -78,6 +83,7 @@ for (const framework of ["hono", "express"]) {
     chunkNames: "chunks/[name]-[hash]",
     plugins: [
       workersCapacitorPlugin({
+        execution: "local",
         worker: `tests/fixtures/workers/${framework}/standard.ts`,
       }),
     ],

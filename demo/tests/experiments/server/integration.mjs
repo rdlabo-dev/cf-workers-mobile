@@ -144,7 +144,12 @@ export function databaseIntegration(kind) {
       configFile: false,
       root,
       logLevel: "warn",
-      plugins: [vitePlugin({ worker: "worker.js" })],
+      plugins: [
+        vitePlugin({
+          worker: "worker.js",
+          execution: [{ method: "*", path: "*" }],
+        }),
+      ],
       server: {
         host: "127.0.0.1",
         port: 0,
@@ -285,6 +290,7 @@ export function databaseIntegration(kind) {
             logLevel: "warn",
             plugins: [
               vitePlugin({
+                execution: [{ method: "*", path: "*" }],
                 worker: entryWorker,
                 workerConfig: "wrangler.jsonc",
               }),
@@ -308,6 +314,7 @@ export function databaseIntegration(kind) {
             sourcemap: true,
             plugins: [
               esbuildPlugin({
+                execution: [{ method: "*", path: "*" }],
                 worker: entryWorker,
                 workerConfig: "wrangler.jsonc",
               }),

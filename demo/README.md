@@ -9,12 +9,18 @@ This demo shows the setup needed to run an existing Workers Fetch Handler inside
 ```ts
 plugins: [
   workersCapacitorPlugin({
+    execution: "local",
     worker: "./workers/hono/standard.ts",
     // To use Express, replace the line above with:
     // worker: "./workers/express/standard.ts",
   }),
 ];
 ```
+
+This standalone demo explicitly uses `execution: "local"`: its Worker and retained
+fixed data are permitted to ship to the device. Do not reuse that setting for a
+Worker containing secrets or server-only dependencies. The default `network` policy
+keeps the Worker on the deployed server; see [execution policies](../docs/cloudflare-bindings.md#choosing-execution).
 
 The path is relative to the configured Vite root, `src/`. The example uses [the Hono Worker](src/workers/hono/standard.ts). To try [Workers Express](src/workers/express/standard.ts), replace the active `worker` line with the commented `./workers/express/standard.ts` line in the Vite config. No changes to `main.ts` are needed.
 

@@ -6,6 +6,7 @@ export default defineConfig({
   root: here("."),
   plugins: [
     workersCapacitorPlugin({
+      execution: "network",
       worker: here("../../../opennext/.open-next/worker.js"),
       assetsExecution: "remote",
     }),

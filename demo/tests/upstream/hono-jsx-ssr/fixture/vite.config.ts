@@ -13,6 +13,8 @@ export default defineConfig({
       "upstream-worker": resolve(`./upstream/${meta.entry}`),
     },
   },
-  plugins: [workersCapacitorPlugin({ worker: "./worker.ts" })],
+  plugins: [
+    workersCapacitorPlugin({ execution: "local", worker: "./worker.ts" }),
+  ],
   build: { target: "es2022" },
 });

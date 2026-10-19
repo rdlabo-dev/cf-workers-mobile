@@ -4,7 +4,28 @@ import { resolve } from "node:path";
 import { parse as parseJSON, type ParseError } from "jsonc-parser";
 import { parse as parseTOML } from "smol-toml";
 
+/** Select whole-Worker execution or explicitly permit route distribution. */
+export type WorkerExecutionMode = "network" | "local";
+export type WorkerExecution = WorkerExecutionMode | readonly LocalRoute[];
+
+export interface LocalRoute {
+  method:
+    | "*"
+    | "GET"
+    | "HEAD"
+    | "POST"
+    | "PUT"
+    | "PATCH"
+    | "DELETE"
+    | "OPTIONS";
+  /** Hono registration pattern, literal-prefix wildcard, or registration-text RegExp. */
+  path: string | RegExp;
+}
+
 export interface ServerBuildOptions {
+  /** Defaults to network. local distributes the entire Worker; an array permits
+   * selected routes and retained dependencies, subject to server boundaries. */
+  execution?: WorkerExecution;
   /** Existing Wrangler JSON, JSONC or TOML configuration. Auto-detected in the build root. */
   workerConfig?: string;
   /** Binding names when configuration is supplied by another tool. No route annotations. */
@@ -106,7 +127,12 @@ export async function serverBindings(
   const hyperdrive = options.hyperdriveBindings ?? configured("hyperdrive");
   const r2 = options.r2Bindings ?? configured("r2_buckets");
   const kv = options.kvBindings ?? configured("kv_namespaces");
-  const policies = options.kvExecution === undefined ? {} : options.kvExecution;
+  const policies =
+    options.kvExecution === undefined
+      ? (options.execution ?? "network") === "network"
+        ? Object.fromEntries(kv.map((name) => [name, "remote"]))
+        : {}
+      : options.kvExecution;
   if (!policies || typeof policies !== "object" || Array.isArray(policies))
     throw new TypeError(
       "kvExecution must map binding names to local or remote",
@@ -248,7 +274,10 @@ export async function serverBindings(
   for (const assets of assetConfigs) {
     if (!assets || typeof assets !== "object" || Array.isArray(assets))
       throw new Error(`Invalid assets in ${file}`);
-    if (!options.assetsExecution)
+    if (
+      !options.assetsExecution &&
+      (options.execution ?? "network") !== "network"
+    )
       throw new Error(
         "Set assetsExecution to remote; local ASSETS compatibility is not implemented",
       );
@@ -326,6 +355,7 @@ export async function serverBindings(
     config: file,
     forceRemoteReason,
     reportFile:
+      !d1.length ||
       forceRemoteReason ||
       cloud.length ||
       options.remoteBindings?.length ||

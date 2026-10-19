@@ -13,7 +13,10 @@ export default defineConfig({
         return `export default Uint8Array.from(atob(${JSON.stringify(data)}), c => c.charCodeAt(0));`;
       },
     },
-    workersCapacitorPlugin({ worker: "../../workers/runtime/node-globals.ts" }),
+    workersCapacitorPlugin({
+      execution: "local",
+      worker: "../../workers/runtime/node-globals.ts",
+    }),
   ],
   // These frameworks are loaded by separate Worker fixtures during a run.
   // Prebundle both before testing so dependency discovery cannot reload a page.

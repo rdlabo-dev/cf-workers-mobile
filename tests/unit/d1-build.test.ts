@@ -17,7 +17,9 @@ afterAll(async () => {
 async function compile(files: Record<string, string>) {
   for (const [name, content] of Object.entries(files))
     await writeFile(resolve(root, name), content);
-  return compileServerWorker(resolve(root, "worker.ts"), ["DATABASE"]);
+  return compileServerWorker(resolve(root, "worker.ts"), ["DATABASE"], {
+    execution: [{ method: "*", path: "*" }],
+  });
 }
 async function selector(source: string) {
   const result = await build({
@@ -29,7 +31,10 @@ async function selector(source: string) {
   // Dynamic data imports bypass Vite's module transform, exercising emitted JS.
   return (await import(
     /* @vite-ignore */ `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`
-  )) as { needsRemote(request: Request): Promise<boolean> };
+  )) as {
+    needsRemote(request: Request): Promise<boolean>;
+    default: { fetch(request: Request): Response | Promise<Response> };
+  };
 }
 it("follows imported/re-exported handlers and mounted routers without route annotations", async () => {
   const result = await compile({
@@ -55,7 +60,7 @@ it("follows imported/re-exported handlers and mounted routers without route anno
   ).toBe(true);
   expect(
     await needsRemote(new Request("https://local.invalid/api/v1/unknown")),
-  ).toBe(false);
+  ).toBe(true);
 });
 it("selects D1 middleware and all overlapping fallthrough candidates before execution", async () => {
   const result = await compile({
@@ -155,6 +160,7 @@ it("keeps server environment and opaque package access remote unless a binding i
     `import { Hono } from 'hono'; const app = new Hono(); app.get('/secret', c => c.text(c.env.API_SECRET)); app.get('/local', c => c.text(c.env.LABEL)); export default app;`,
   );
   const result = await compileServerWorker(entry, ["DATABASE"], {
+    execution: [{ method: "*", path: "*" }],
     localBindings: ["LABEL"],
   });
   expect(result.local).not.toContain("API_SECRET");
@@ -166,7 +172,10 @@ it("keeps server environment and opaque package access remote unless a binding i
     false,
   );
   await expect(
-    compileServerWorker(entry, ["DATABASE"], { localBindings: ["DATABASE"] }),
+    compileServerWorker(entry, ["DATABASE"], {
+      execution: [{ method: "*", path: "*" }],
+      localBindings: ["DATABASE"],
+    }),
   ).rejects.toThrow("cannot also be a local binding");
 });
 
@@ -300,7 +309,7 @@ it("keeps cookie login/logout/profile and D1 in a single session boundary", asyn
   }
 });
 
-it("preserves local routes with statically named non-cookie headers", async () => {
+it("permits explicitly selected response headers without removing their fixed values", async () => {
   const result = await compile({
     "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
       app.get('/health', c => { c.header('x-worker', 'local'); return new Response(c.req.raw.headers.get('accept'), {headers: {'content-type': 'text/plain'}}); });
@@ -311,4 +320,220 @@ it("preserves local routes with statically named non-cookie headers", async () =
   expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
     false,
   );
+});
+
+it("moves a rendering route only when its transitive dependencies have a local contract", async () => {
+  const result = await compile({
+    "worker.ts": `import { Hono } from 'hono'; import { view } from './view'; import { identity } from './identity';
+      const app = new Hono();
+      app.get('/', c => c.html(view(c.req.query('name'))));
+      app.get('/identity', c => c.text(identity()));
+      app.get('/network', async c => c.text(await (await fetch('https://internal.invalid')).text()));
+      export default app;`,
+    "view.ts": `import { html } from 'hono/html'; export function view(name) { return html\`<h1>Hello \${name}</h1>\`; }`,
+    "identity.ts": `export function identity() { return hostIdentity.SERVER_IDENTITY; }`,
+  });
+  const { needsRemote } = await selector(result.selector);
+  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(false);
+  for (const path of ["/identity", "/network"])
+    expect(await needsRemote(new Request(`https://local.invalid${path}`))).toBe(
+      true,
+    );
+  expect(result.local).not.toMatch(/SERVER_IDENTITY|internal\.invalid/);
+  const { default: localWorker } = await selector(result.local);
+  const response = await localWorker.fetch(
+    new Request("https://local.invalid/?name=Ada"),
+  );
+  expect(await response.text()).toBe("<h1>Hello Ada</h1>");
+  expect(result.routes.find((route) => !route.remote)?.reason).toMatch(
+    /explicitly permitted/,
+  );
+  expect(result.routes.find((route) => route.remote)?.reason).toMatch(
+    /without a local execution contract/,
+  );
+});
+
+it("resolves function scopes instead of trusting every matching identifier name", async () => {
+  const result = await compile({
+    "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+      function render(hostConfig) { return hostConfig; }
+      app.get('/local', c => c.text(render('local')));
+      app.get('/server', c => { const local = (hostConfig) => hostConfig; return c.text(local(hostConfig.SECRET)); });
+      export default app;`,
+  });
+  const { needsRemote } = await selector(result.selector);
+  expect(await needsRemote(new Request("https://local.invalid/local"))).toBe(
+    false,
+  );
+  expect(await needsRemote(new Request("https://local.invalid/server"))).toBe(
+    true,
+  );
+  expect(result.local).not.toContain("SECRET");
+});
+
+it("does not treat every Hono package as a browser rendering dependency", async () => {
+  const result = await compile({
+    "worker.ts": `import { Hono } from 'hono'; import { env } from 'hono/adapter'; const app = new Hono();
+      app.get('/', c => c.text('local'));
+      app.get('/secret', c => c.text(env(c).SERVER_SECRET)); export default app;`,
+  });
+  const { needsRemote } = await selector(result.selector);
+  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(false);
+  expect(await needsRemote(new Request("https://local.invalid/secret"))).toBe(
+    true,
+  );
+  expect(result.local).not.toMatch(/hono\/adapter|SERVER_SECRET/);
+});
+
+it("keeps implicit host receivers on the server", async () => {
+  for (const expression of ["this.hostValue", "import.meta.hostValue"]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+        app.get('/', c => c.text('local'));
+        app.get('/host', function(c) { return c.text(${expression}); }); export default app;`,
+    });
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/"))).toBe(
+      false,
+    );
+    expect(await needsRemote(new Request("https://local.invalid/host"))).toBe(
+      true,
+    );
+    expect(result.local).not.toContain("hostValue");
+  }
+});
+
+it("does not split writes to ambient state into separate server and device instances", async () => {
+  for (const write of [
+    "hostState = 1",
+    "hostState++",
+    "Math.hostValue = 1",
+    "({value: hostState} = {value: 1})",
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+        app.get('/', c => c.text('local candidate'));
+        app.post('/write', c => { ${write}; return c.text('ok'); }); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    expect(result.reason).toMatch(/ambient state/);
+    expect(result.local).not.toContain("local candidate");
+  }
+});
+
+it("keeps remote mutations and readers of standard global objects in the same Worker", async () => {
+  for (const [mutation, reader] of [
+    ["Object.assign(Math, { random: () => 0 })", "Math.random()"],
+    [
+      "Object.defineProperty(Math, 'random', { value: () => 0 })",
+      "Math.random()",
+    ],
+    ["const state = Math; state.random = () => 0", "Math.random()"],
+    ["delete Math.random", "Math.random()"],
+    [
+      "const prototype = Object.getPrototypeOf(1); prototype.toString = () => 'changed'",
+      "Number(1).toString()",
+    ],
+  ]) {
+    const source = (
+      write: string,
+    ) => `import { Hono } from 'hono'; const app = new Hono();
+      app.get('/', c => c.text(String(${reader})));
+      app.post('/remote', async c => { ${write}; await c.env.DATABASE.exec('SELECT 1'); return c.text('ok'); }); export default app;`;
+    const baseline = await compile({ "worker.ts": source("") });
+    const baselineSelector = await selector(baseline.selector);
+    expect(
+      await baselineSelector.needsRemote(new Request("https://local.invalid/")),
+    ).toBe(false);
+    const result = await compile({ "worker.ts": source(mutation) });
+    expect(result.mode).toBe("worker");
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/"))).toBe(true);
+    expect(result.local).not.toContain("Math");
+  }
+});
+
+it("keeps destructured and Workers-specific context capabilities on the server", async () => {
+  for (const body of [
+    "const { env: e } = c; return c.text(e.PRIVATE_VALUE)",
+    "const { ...copy } = c; return c.json(copy)",
+    "return c.json({ ...c })",
+    "return c.text(c.executionCtx.props.PRIVATE_VALUE)",
+    "return c.text(c.event.PRIVATE_VALUE)",
+    "return c.text(c.req.raw.cf.country)",
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+        app.get('/public', c => c.text('local'));
+        app.get('/host', c => { ${body}; });
+        app.get('/db', c => c.json(c.env.DATABASE)); export default app;`,
+    });
+    const { needsRemote } = await selector(result.selector);
+    expect(await needsRemote(new Request("https://local.invalid/public"))).toBe(
+      false,
+    );
+    expect(await needsRemote(new Request("https://local.invalid/host"))).toBe(
+      true,
+    );
+    expect(result.local).not.toMatch(/PRIVATE_VALUE|executionCtx|\.cf|country/);
+  }
+});
+
+it("explicit route permission includes retained inputs to standard operations", async () => {
+  const result = await compile({
+    "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+      app.get('/', c => c.text(JSON.stringify({n: Math.floor(Number(c.req.query('n'))), valid: Number.isSafeInteger(1)})));
+      app.get('/db', c => c.json(c.env.DATABASE)); export default app;`,
+  });
+  const { needsRemote } = await selector(result.selector);
+  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(false);
+  expect(result.local).toContain("isSafeInteger");
+});
+
+it("does not separate a rendering import from server-side changes through an alias", async () => {
+  const result = await compile({
+    "worker.ts": `import { Hono } from 'hono'; import { html } from 'hono/html'; const app = new Hono();
+      app.get('/', c => c.html(html\`<h1>Public</h1>\`));
+      app.post('/remote', async c => { const alias = html; alias.flag = 1; await c.env.DATABASE.exec('SELECT 1'); return c.text('ok'); }); export default app;`,
+  });
+  expect(result.mode).toBe("worker");
+  expect(result.reason).toMatch(/Escaped rendering import/);
+});
+
+it("keeps dynamic code execution in a single Worker even when obtained by destructuring", async () => {
+  for (const execute of [
+    `const {constructor: C} = (() => {}); C('Math.random = () => 0')()`,
+    `const {'constructor': C} = (() => {}); C('Math.random = () => 0')()`,
+    `const C = (() => {}).constructor; C('Math.random = () => 0')()`,
+    `Function('Math.random = () => 0')()`,
+    `eval('Math.random = () => 0')`,
+  ]) {
+    const result = await compile({
+      "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
+        app.get('/', c => c.text(String(Math.random())));
+        app.post('/remote', async c => { ${execute}; await c.env.DATABASE.exec('SELECT 1'); return c.text('ok'); }); export default app;`,
+    });
+    expect(result.mode).toBe("worker");
+    expect(result.reason).toMatch(/Dynamic runtime/);
+  }
+});
+
+it("does not split runtime constructor access hidden behind a computed key", async () => {
+  const source = (
+    write: string,
+  ) => `import { Hono } from 'hono'; const app = new Hono();
+    app.get('/', c => c.text(Number(1).toString()));
+    app.post('/remote', async c => { ${write}; await c.env.DATABASE.exec('SELECT 1'); return c.text('ok'); }); export default app;`;
+  const baseline = await compile({ "worker.ts": source("") });
+  const baselineSelector = await selector(baseline.selector);
+  expect(
+    await baselineSelector.needsRemote(new Request("https://local.invalid/")),
+  ).toBe(false);
+  const result = await compile({
+    "worker.ts": source(
+      "const key = c.req.query('key'); const ctor = (1)[key]; ctor.prototype.toString = () => 'changed'",
+    ),
+  });
+  expect(result.mode).toBe("worker");
+  expect(result.reason).toMatch(/Dynamic property access/);
 });

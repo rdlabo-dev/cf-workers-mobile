@@ -36,6 +36,12 @@ entry. Use `render: "/"` for Worker-owned pages, or omit `render` when integrati
 an existing frontend with the API. Follow the [application integration guide](integration.md)
 for Capacitor setup, cloud bindings and authentication.
 
+Start with the default `execution: "network"` and the deployed Worker's
+`remote.origin`. To permit selected implementations to ship to the device, set
+`execution` to a route array. Hono paths such as `/app/*` are supported. Permission
+includes retained dependency data and does not override detected server boundaries.
+See [local route selection](cloudflare-bindings.md#selecting-local-routes).
+
 ### Workers Express
 
 The sample uses the real `express` package and the Workers entry style:
@@ -52,6 +58,13 @@ export default httpServerHandler({ port: 3000 });
 ```
 
 Use the [Vite](#vite) or [esbuild](#esbuild) plugin only in the Capacitor/browser build, never the Cloudflare build. It supplies Workers-compatible `node:http` and `node:net` adapters alongside browser polyfills; the [compatibility inventory](compatibility.md) records the verified baseline and modules. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
+
+The default `execution: "network"` keeps the Worker entirely remote and requires `remote.origin` in `workersCapacitor()`.
+For a deliberately standalone Express app, add `execution: "local"` to the
+Vite or esbuild plugin options below. This permits the entire Worker implementation
+and retained fixed data to ship to the device; do not use it with server secrets.
+Configured server bindings make `local` fail the build. See
+[execution policies](cloudflare-bindings.md#choosing-execution).
 
 #### TypeScript types
 
