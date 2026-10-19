@@ -62,7 +62,7 @@ jobs:
               npm run test:void
           - suite: upstream-minvoice
             commands: |
-              npm ci --prefix authentication
+              npm install --prefix authentication
               npm run typecheck --prefix authentication
               node tests/upstream/minvoice/prepare.mjs
               node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs

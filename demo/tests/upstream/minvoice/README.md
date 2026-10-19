@@ -7,10 +7,10 @@ The test runs its original Hono entry and SQL migrations in local workerd/D1. It
 The scenario signs in through the original form, creates a client and creates a draft invoice. Assertions check the saved database rows and reject a sandboxed cross-origin form submission. This is not acceptance of payment processors, email delivery, Cloudflare Access, PDF printing or every Minvoice feature.
 
 ```sh
-npm ci
+npm install
 npm run build
-npm ci --prefix demo
-npm ci --prefix demo/opennext
+npm install --prefix demo
+npm install --prefix demo/opennext
 node demo/tests/upstream/minvoice/prepare.mjs
 node --test demo/tests/upstream/minvoice/browser.test.mjs
 UPSTREAM_PLATFORM=ios UPSTREAM_DEVICE=<simulator-udid> node --test demo/tests/upstream/minvoice/native.test.mjs
