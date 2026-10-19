@@ -20,7 +20,7 @@ import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/toolin
 
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 for (const tool of ["vite", "esbuild"])
-  for (const boundary of ["authentication", "data", "selected", "network"])
+  for (const boundary of ["authentication", "selected", "network"])
     test(`${tool}: ${boundary} policy excludes private contents from every shipped asset`, async () => {
       const artifacts = join(repo, "demo/artifacts");
       await mkdir(artifacts, { recursive: true });

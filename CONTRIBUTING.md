@@ -114,7 +114,7 @@ the pinned official Hono sample. Selected third-party fixtures also build and ru
 through the public API on independent Android emulator jobs. iOS, live cloud-service
 checks and physical-device validation remain separate from required CI; see the
 [native test procedure](demo/tests/README.md).
-The document suite's expected WebKit failures are documented in
+The document suite's explicit WebKit comparison differences are documented in
 [compatibility limits](docs/compatibility.md); they are not successful behaviors.
 
 Require every case in a claimed-supported profile to pass, including cleanup.

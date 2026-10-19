@@ -156,7 +156,7 @@ export const streamWebContract: ContractSuite<typeof streamWebFeature> = {
     async constructors(api) {
       if (!(api.ReadableStream.prototype instanceof Object))
         throw new Error("ReadableStream missing");
-      for (const name of [
+      const names = [
         "ReadableStream",
         "WritableStream",
         "TransformStream",
@@ -170,7 +170,14 @@ export const streamWebContract: ContractSuite<typeof streamWebFeature> = {
         "TransformStreamDefaultController",
         "WritableStreamDefaultController",
         "WritableStreamDefaultWriter",
-      ] as const)
+        "CompressionStream",
+        "DecompressionStream",
+        "TextEncoderStream",
+        "TextDecoderStream",
+      ] as const;
+      if (Object.keys(api.default).sort().join() !== [...names].sort().join())
+        throw Error("Default export namespace mismatch");
+      for (const name of names)
         if (typeof api[name] !== "function") throw new Error(`${name} missing`);
       for (const [name, value] of Object.entries(api.default)) {
         if ((api as any)[name] !== value)

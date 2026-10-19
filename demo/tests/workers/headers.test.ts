@@ -28,6 +28,7 @@ it("matches native workerd Headers with the same module-owned contract", async (
     string,
     ContractResult
   >;
+  expect(Object.keys(reports).sort()).toEqual(["baseline", "candidate"]);
   for (const report of Object.values(reports)) {
     assertContract(report);
     expect(report.cases).toHaveLength(8);

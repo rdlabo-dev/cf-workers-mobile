@@ -46,7 +46,7 @@ const configurations = [
 ];
 for (const config of configurations) {
   const kind = Object.keys(config)[0];
-  it(`${kind}: detects named environments, strips server operations and preserves local routes`, async () => {
+  it(`${kind}: detects named environments and rejects invalid or conflicting configuration`, async () => {
     await configuration({ env: { production: config } });
     const found = await serverBindings(root, {});
     expect(found.names).toEqual(["CLOUD"]);
@@ -54,29 +54,32 @@ for (const config of configurations) {
     await expect(
       serverBindings(root, { localBindings: ["CLOUD"] }),
     ).rejects.toThrow("cannot also");
-    const entry = resolve(root, "worker.ts");
-    await writeFile(
-      entry,
-      `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('local'));app.post('/cloud',async c=>c.json(await c.env.CLOUD.run('private-cloud-operation')));export default app;`,
-    );
-    const compiled = await serverModules(entry, root, {
-      execution: [{ method: "*", path: "*" }],
-    }).get();
-    expect(compiled?.mode).toBe("routes");
-    expect(compiled!.local).not.toContain("private-cloud-operation");
-    const { needsRemote } = await selector(compiled!.selector);
-    expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
-      false,
-    );
-    expect(
-      await needsRemote(
-        new Request("https://local.invalid/cloud", { method: "POST" }),
-      ),
-    ).toBe(true);
     await configuration({ [kind]: null });
     await expect(serverBindings(root, {})).rejects.toThrow(`Invalid ${kind}`);
   });
 }
+it("strips discovered server operations and preserves local routes", async () => {
+  await configuration({ env: { production: configurations[0] } });
+  const entry = resolve(root, "worker.ts");
+  await writeFile(
+    entry,
+    `import {Hono} from 'hono';const app=new Hono();app.get('/health',c=>c.text('local'));app.post('/cloud',async c=>c.json(await c.env.CLOUD.run('private-cloud-operation')));export default app;`,
+  );
+  const compiled = await serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
+  }).get();
+  expect(compiled?.mode).toBe("routes");
+  expect(compiled!.local).not.toContain("private-cloud-operation");
+  const { needsRemote } = await selector(compiled!.selector);
+  expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
+    false,
+  );
+  expect(
+    await needsRemote(
+      new Request("https://local.invalid/cloud", { method: "POST" }),
+    ),
+  ).toBe(true);
+});
 it("detects TOML Durable Object names, AI singleton and Workflow arrays together", async () => {
   await writeFile(
     resolve(root, "named.toml"),

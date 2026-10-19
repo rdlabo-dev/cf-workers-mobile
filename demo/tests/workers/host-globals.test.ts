@@ -25,5 +25,6 @@ it.each(["encoding", "abort"])(
     ).json()) as ContractResult;
     expect(report.cases).toHaveLength(6);
     assertContract(report);
+    expect(report.cases.every((test) => test.status === "passed")).toBe(true);
   },
 );

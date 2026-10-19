@@ -26,6 +26,12 @@ it("compares Request/Response candidates against the pinned workerd contract", a
     string,
     ContractResult
   >;
+  expect(Object.keys(reports).sort()).toEqual([
+    "request",
+    "requestCandidate",
+    "response",
+    "responseCandidate",
+  ]);
   for (const report of Object.values(reports)) {
     assertContract(report);
     expect(report.cases).toHaveLength(8);

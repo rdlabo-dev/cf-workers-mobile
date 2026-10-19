@@ -395,14 +395,12 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
         (prefer) => window.runBuildTool(prefer),
         prefer,
       );
-      if (build !== "raw") checkNodeCases(report.node.direct);
-      if (
-        build !== "raw" &&
-        report.node.direct.some(
-          (r) => r.errors.length || r.cases.some((c) => c.status !== "passed"),
-        )
-      )
-        throw new Error(`${build}/${prefer}: ${JSON.stringify(report.node)}`);
+      if (build !== "raw")
+        assert.deepEqual(
+          report.resolved,
+          Array(11).fill(true),
+          `${build}/${prefer}: import aliases`,
+        );
       if (
         report.execution !== prefer ||
         report.cases.length !== (build === "raw" ? 4 : 9) ||

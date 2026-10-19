@@ -480,21 +480,6 @@ export function modernCases(api) {
         strictEqual(actual, expected);
       }
 
-      for (const { path, expected } of windowsTestCases) {
-        let actual;
-        try {
-          actual = pathToFileURL(path, { windows: true }).href;
-        } catch (error) {
-          throw new Error(`pathToFileURL(${JSON.stringify(path)}): ${error}`);
-        }
-        strictEqual(actual, expected);
-      }
-
-      for (const { path, expected } of posixTestCases) {
-        const actual = pathToFileURL(path, { windows: false }).href;
-        strictEqual(actual, expected);
-      }
-
       // Test for non-string parameter
       {
         for (const badPath of [

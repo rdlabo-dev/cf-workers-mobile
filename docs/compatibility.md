@@ -100,6 +100,8 @@ before relying on a result for a production integration.
 
 See [native document rendering](native-rendering-api.md#scope-and-limits) for
 navigation, form uploads, redirects, trust and lifecycle restrictions. Browser
-Service Worker comparisons include six expected WebKit failures for POST replay
-and redirect metadata; iOS uses a different native scheme bridge. Browser results
+Service Worker comparisons explicitly expect WebKit to lose replayed POST bodies
+and expose `redirected: false` for synthetic redirects. All other assertions remain
+required; these expectations record browser limitations, not supported behavior.
+iOS uses a different native scheme bridge. Browser results
 are not a substitute for iOS/Android validation.

@@ -27,6 +27,7 @@ it("compares structuredClone against the pinned workerd contract", async () => {
     string,
     ContractResult
   >;
+  expect(Object.keys(reports).sort()).toEqual(["candidate", "workers"]);
   for (const report of Object.values(reports)) {
     assertContract(report);
     expect(report.cases).toHaveLength(11);

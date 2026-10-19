@@ -1,6 +1,9 @@
 import * as asyncHooks from "../../src/compat/async-hooks/index";
 import { expect, it } from "vitest";
-import { runContract } from "workers-capacitor/shared/contracts/testing";
+import {
+  assertContract,
+  runContract,
+} from "workers-capacitor/shared/contracts/testing";
 import {
   AsyncHooksImplementation,
   asyncHooksContract,
@@ -11,7 +14,8 @@ it("async-hooks contract", async () => {
     new AsyncHooksImplementation(asyncHooks),
     asyncHooksContract,
   );
-  expect(report.cases.filter((c) => c.status === "failed")).toEqual([]);
+  assertContract(report);
+  expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
 });
 
 it("keeps stream source and sink receivers intact", async () => {

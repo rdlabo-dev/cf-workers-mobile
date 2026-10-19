@@ -4,12 +4,16 @@ import {
   diagnosticsContract,
   DiagnosticsImplementation,
 } from "../../src/compat/diagnostics-channel/index.spec.js";
-import { runContract } from "workers-capacitor/shared/contracts/testing";
+import {
+  assertContract,
+  runContract,
+} from "workers-capacitor/shared/contracts/testing";
 it("matches the Workers diagnostics contract", async () => {
   const report = await runContract(
     new DiagnosticsImplementation(api),
     diagnosticsContract,
   );
+  assertContract(report);
   expect(report.cases.filter((c) => c.status !== "passed")).toEqual([]);
 });
 
