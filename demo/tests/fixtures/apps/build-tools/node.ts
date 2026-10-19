@@ -1,7 +1,4 @@
-import {
-  workersCapacitor,
-  type ExecutionPreference,
-} from "@rdlabo/workers-capacitor";
+import { workersCapacitor, type ExecutionPreference } from "workers-capacitor";
 
 // The configured worker is tests/fixtures/workers/compatibility/node-contracts.ts
 // for this build; direct executes it in-page, worker executes it as a

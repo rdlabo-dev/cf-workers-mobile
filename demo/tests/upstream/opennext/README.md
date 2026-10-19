@@ -7,9 +7,9 @@ This fixture fetches the official OpenNext App Router test application at the co
 From the repository root:
 
 ```sh
-npm ci
+npm install
 npm run build
-npm ci --prefix demo
+npm install --prefix demo
 npx playwright install chromium webkit
 npm run test:upstream:opennext:prepare --prefix demo
 npm run test:upstream:opennext --prefix demo
@@ -26,7 +26,7 @@ The native test builds the generated upstream Worker with the public plugin and 
 It reuses the platform shell in `demo/opennext`, replacing its ignored `www` build with the upstream application entry. Run native tests serially, separately from other tests using that shell. Install Xcode/Android SDK and boot a simulator/emulator first:
 
 ```sh
-npm ci --prefix demo/opennext
+npm install --prefix demo/opennext
 UPSTREAM_PLATFORM=ios UPSTREAM_DEVICE=<simulator-udid> npm run test:upstream:opennext:native --prefix demo
 UPSTREAM_PLATFORM=android UPSTREAM_DEVICE=emulator-5554 npm run test:upstream:opennext:native --prefix demo
 ```

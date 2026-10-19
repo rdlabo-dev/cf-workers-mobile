@@ -24,7 +24,7 @@ named environments). The Vite/esbuild plugin reads binding names only; IDs and
 
 ```ts
 // Capacitor's vite.config.ts
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
 export default {
   plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],
 };
@@ -39,7 +39,7 @@ Hyperdrive can coexist. An explicit empty list disables discovery for that kind;
 do not disable it for server bindings the Worker actually uses.
 
 ```ts
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://local.invalid/",
   remote: {

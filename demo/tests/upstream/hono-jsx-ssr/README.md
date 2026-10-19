@@ -63,8 +63,8 @@ Upstream behavior relied on by the assertions:
 
 ## Reproduce
 
-From `demo/` (after the library `npm ci && npm run build` at the repository
-root and `npm ci` here):
+From `demo/` (after the library `npm install && npm run build` at the repository
+root and `npm install` here):
 
 ```sh
 # 1. Pinned sparse clone into demo/artifacts/upstream/hono-jsx-ssr/clone

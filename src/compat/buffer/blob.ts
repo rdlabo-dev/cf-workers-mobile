@@ -24,7 +24,7 @@ const nativeModified = Object.getOwnPropertyDescriptor(
   "lastModified",
 )!.get!;
 const types = new WeakMap<object, string>();
-const typeMetadata = Symbol.for("@rdlabo/workers-capacitor/blob-type");
+const typeMetadata = Symbol.for("workers-capacitor/blob-type");
 const modified = new WeakMap<object, number>();
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { ignoreBOM: true });

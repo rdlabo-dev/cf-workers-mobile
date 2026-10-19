@@ -23,7 +23,7 @@ The path is relative to the configured Vite root, `src/`. The example uses [the 
 [src/main.ts](src/main.ts) initializes the runtime and displays the HTML returned by `/`:
 
 ```ts
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
@@ -48,10 +48,10 @@ For Worker-owned documents on iOS and Android — where the same Worker HTML, ro
 From the repository root:
 
 ```sh
-npm ci
+npm install
 npm run build
 cd demo
-npm ci
+npm install
 npm run dev
 ```
 

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
-import type { ContractResult } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import type { ContractResult } from "workers-capacitor/shared/contracts/testing";
 
 import type { WebApiName } from "../validation/web-api-contracts";
 

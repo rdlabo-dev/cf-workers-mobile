@@ -69,7 +69,7 @@ export async function runNativeAcceptance({
     await writeFile(
       join(bootstrap, "main.js"),
       bootstrapCode ??
-        `import { workersCapacitor } from "@rdlabo/workers-capacitor"; const runtime = workersCapacitor({baseURL:${JSON.stringify(backend.url.origin + "/")},remote:{origin:${JSON.stringify(backend.url.origin)}},render:${JSON.stringify(render)}}); await runtime.ready;`,
+        `import { workersCapacitor } from "workers-capacitor"; const runtime = workersCapacitor({baseURL:${JSON.stringify(backend.url.origin + "/")},remote:{origin:${JSON.stringify(backend.url.origin)}},render:${JSON.stringify(render)}}); await runtime.ready;`,
     );
     await build({
       configFile: false,

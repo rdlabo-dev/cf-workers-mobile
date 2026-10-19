@@ -1,4 +1,4 @@
-import type { KVTextNamespace } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
+import type { KVTextNamespace } from "workers-capacitor/cloudflare/bindings/kv";
 /** The same handler runs against Workers KV and the WebView binding. */
 export default {
   async fetch(request: Request, env: { KV: KVTextNamespace }) {

@@ -1,6 +1,6 @@
 import { bindCallback } from "../async-hooks/callbacks.js";
 // Browser timers wrap large delays at 2^31; Workers clamps at 100 years.
-const nativeKey = Symbol.for("@rdlabo/workers-capacitor/native-timers");
+const nativeKey = Symbol.for("workers-capacitor/native-timers");
 type Native = {
   setTimeout: typeof globalThis.setTimeout;
   setInterval: typeof globalThis.setInterval;

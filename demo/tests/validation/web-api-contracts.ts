@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 import {
   EncodingImplementation,
   encodingContract,
@@ -7,7 +7,7 @@ import {
   AbortImplementation,
   abortContract,
 } from "../../../src/browser/abort/index.spec";
-import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import { runContract } from "workers-capacitor/shared/contracts/testing";
 import {
   HeadersImplementation,
   headersContract,

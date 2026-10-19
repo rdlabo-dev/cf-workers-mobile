@@ -173,7 +173,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Test the public API in Android WebView
         if: matrix.native
-        uses: reactivecircus/android-emulator-runner@ed009f5318f15b1cf93a191b856c4f1748a2d4c1
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: 36
           target: google_apis

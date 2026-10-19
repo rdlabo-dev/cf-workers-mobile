@@ -1,8 +1,8 @@
 export const nativeBlobConstructor = Symbol.for(
-  "@rdlabo/workers-capacitor/native-blob",
+  "workers-capacitor/native-blob",
 );
 export const nativeFileConstructor = Symbol.for(
-  "@rdlabo/workers-capacitor/native-file",
+  "workers-capacitor/native-file",
 );
 
 function original<T>(value: T, key: symbol): T {
@@ -22,7 +22,7 @@ export const platform = {
 };
 
 export const nativeStreamsSymbol = Symbol.for(
-  "@rdlabo/workers-capacitor/native-streams",
+  "workers-capacitor/native-streams",
 );
 const streamConstructors = {
   ReadableStream: globalThis.ReadableStream,

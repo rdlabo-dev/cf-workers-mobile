@@ -3,8 +3,8 @@ import * as promises from "node:dns/promises";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/shared/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+} from "workers-capacitor/shared/contracts";
+import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
 const api = { dns, promises };
 function same(a: unknown, b: unknown) {
   if (a !== b) throw Error(`${String(a)} != ${String(b)}`);
