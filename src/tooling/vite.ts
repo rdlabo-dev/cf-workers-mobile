@@ -337,7 +337,7 @@ export function workersCapacitorPlugin(
         if (compilation)
           this.warn(
             compilation.mode === "worker"
-              ? `Server bindings: all requests execute on the deployed Worker (${compilation.reason}). No Worker application code is distributed to Capacitor.`
+              ? `Server bindings: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
               : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
           );
         const entry = resolved.id;

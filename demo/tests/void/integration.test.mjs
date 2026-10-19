@@ -73,6 +73,7 @@ window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: 
       await build({
         configFile: false,
         root: temp,
+        publicDir: join(root, "dist/client"),
         plugins: [
           workersCapacitorPlugin({
             worker: join(root, "dist/ssr/index.js"),
@@ -96,11 +97,19 @@ window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: 
           "Server schema must not ship to the device",
         );
         assert.equal(
-          code.includes("No messages yet"),
+          code.includes("INSERT INTO"),
           false,
-          "Server application must be replaced, not bundled",
+          "Server SQL must not ship to the device",
         );
       }
+      const assets = JSON.parse(
+        await readFile(join(output, "workers-capacitor-assets.json"), "utf8"),
+      );
+      assert.ok(
+        assets.some(
+          (path) => path.startsWith("/assets/") && path.endsWith(".js"),
+        ),
+      );
       server = await preview({
         configFile: false,
         root: temp,
@@ -111,9 +120,28 @@ window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: 
         const browser = await engine.launch();
         try {
           const context = await browser.newContext();
-          // Only the network transport is replaced; real workerd executes all requests.
+          // Model the native host: bundled assets bypass the remote Worker.
+          // Native acceptance checks the actual iOS/Android document transport.
+          const localAssets = new Set();
           await context.route("https://void.invalid/**", async (route) => {
             const request = route.request();
+            const url = new URL(request.url());
+            if (assets.includes(url.pathname)) {
+              localAssets.add(url.pathname);
+              const response = await fetch(
+                new URL(
+                  url.pathname + url.search,
+                  server.resolvedUrls.local[0],
+                ),
+              );
+              assert.equal(response.status, 200);
+              await route.fulfill({
+                status: response.status,
+                headers: Object.fromEntries(response.headers),
+                body: Buffer.from(await response.arrayBuffer()),
+              });
+              return;
+            }
             const response = await worker.dispatchFetch(request.url(), {
               method: request.method(),
               headers: request.headers(),
@@ -174,6 +202,10 @@ window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: 
                 .first()
             ).n,
             1,
+          );
+          assert.ok(
+            [...localAssets].some((path) => path.endsWith(".js")),
+            "Hydration must load bundled JavaScript",
           );
           await db
             .prepare("DELETE FROM messages WHERE text = ?")

@@ -24,6 +24,7 @@ export async function runNativeAcceptance({
   artifacts,
   worker,
   workerConfig,
+  publicDir = false,
   kvExecution,
   remoteBindings,
   render = "/",
@@ -83,6 +84,7 @@ export async function runNativeAcceptance({
     await build({
       configFile: false,
       root: bootstrap,
+      publicDir,
       plugins: [
         workersCapacitorPlugin({
           worker,

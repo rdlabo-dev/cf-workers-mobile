@@ -8,7 +8,7 @@ these paths and keeps its test drivers outside the application.
 ## Execution and configuration
 
 - With D1 and asset-first routing, the generated OpenNext Worker executes
-  remotely as a whole. Configure `worker: ".open-next/worker.js"`,
+  remotely as a whole for requests not served by bundled assets. Configure `worker: ".open-next/worker.js"`,
   `assetsExecution: "remote"` and the deployed HTTPS `remote.origin`.
   No server application or virtual filesystem files are shipped to the device;
   `workerFiles` is unnecessary for this configuration.
@@ -18,6 +18,30 @@ these paths and keeps its test drivers outside the application.
 - The Vite plugin transforms builtin `require()` calls inside generated ESM
   `.mjs` files. This is a Capacitor build setting; the Cloudflare build stays
   independent.
+
+### Bundle client assets alongside remote pages
+
+In the Capacitor Vite configuration, set `publicDir` to the existing OpenNext asset output. The sample uses an absolute path resolved relative to its config file:
+
+```ts
+export default defineConfig({
+  root: here("."),
+  publicDir: here("../.open-next/assets"),
+  plugins: [
+    workersCapacitorPlugin({
+      worker: here("../.open-next/worker.js"),
+      assetsExecution: "remote",
+    }),
+  ],
+  build: { outDir: here("../www"), emptyOutDir: true },
+});
+```
+
+See the [complete configuration](../demo/opennext/capacitor/vite.config.ts) for imports and `here`. Bundled `/_next/static/` JavaScript, CSS and public images are served by Capacitor. HTML, RSC navigation, middleware, session handling, D1 operations and `/_next/image` remain on the Worker. Hydration and client events execute in the WebView using the bundled scripts. The build report's `mode: "worker"` describes the server handler; it does not mean every asset is remote.
+
+Use the same application build for the deployed Worker and the bundled assets, and preserve compatibility for older installed apps when deploying updates. Missing asset paths fall back to the Worker. Only copy public assets that can bypass server authentication and response-header rules; Capacitor does not implement Cloudflare `_headers` or `_redirects` for bundled files. Neither Vite `publicDir` nor a plain esbuild copy honors `.assetsignore`. Check that the copied output contains only public files; if it includes files excluded from Cloudflare delivery, stage only the intended public assets in a separate directory. Do not copy server-functions or prerender cache output into `publicDir`. A prerendered page may still need middleware, redirects or revalidation, so prerendering alone does not select a page for local execution. Initial page requests still require connectivity.
+
+With esbuild, copy the public asset output into the Capacitor output directory **before** calling `build()` with `workersCapacitorPlugin`. The plugin includes existing files in the document asset manifest. Keep the bootstrap `index.html` separate from framework pages and avoid path collisions. No additional asset API is needed.
 
 See the [Node inventory](compatibility.md) for remaining runtime restrictions.
 

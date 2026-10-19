@@ -78,7 +78,7 @@ configuration declaration is not automatically detected merely from its purpose.
 ## Remote ASSETS binding
 
 `assetsExecution: "remote"` is required when Wrangler declares an `assets`
-section. All asset processing remains on the deployed Worker, including HTML
+section. Processing through the ASSETS binding remains on the deployed Worker, including HTML
 handling, SPA/404 routing, control files, range/conditional requests and cache
 semantics. The client does not implement these APIs.
 
@@ -87,8 +87,7 @@ workersCapacitorPlugin({ worker: "src/worker.ts", assetsExecution: "remote" });
 ```
 
 Asset-first or pattern-based routing (and declarations without a binding name)
-keeps every request remote so client code cannot bypass the deployed routing
-order. With `run_worker_first: true` and a binding name, the normal conservative
+keeps Worker dispatch remote to preserve the deployed routing order. With `run_worker_first: true` and a binding name, the normal conservative
 analysis can keep independent routes local; any handler using `env.ASSETS` runs
 remotely. Nothing from the asset directory is automatically copied into Capacitor.
 
@@ -96,7 +95,7 @@ remotely. Nothing from the asset directory is automatically copied into Capacito
 implementation must satisfy the complete ASSETS contract, including HTML handling,
 control files, conditional/range behavior and workerd/native parity.
 `assetsExecution: "local"` fails explicitly rather than enabling a partial implementation.
-Existing document asset hosting is a different feature and remains unchanged.
+Bundled document assets are separate: Vite `publicDir` (or files copied before an esbuild build) registers exact local paths that bypass Worker dispatch. Use this only for public files that need no server middleware, authorization or Cloudflare response-header/control-file processing. The [OpenNext](opennext.md#bundle-client-assets-alongside-remote-pages) and [Void](void.md) examples bundle client scripts while retaining their server handlers remotely.
 
 ## Verification and limits
 

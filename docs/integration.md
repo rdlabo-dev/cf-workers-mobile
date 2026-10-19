@@ -63,7 +63,7 @@ Choose the smallest integration that preserves the application:
 
 - **Existing frontend calling Worker APIs:** keep that frontend and initialize the Fetch-only runtime before mounting it. No rendering migration is required.
 - **Worker returning HTML (Hono/TSX, Workers Express, OpenNext):** use native document rendering with `render`. Preserve its router and rendering where supported.
-- **Cloud-dependent requests:** configure remote execution and inspect the build report. Keep the existing handler unchanged; a whole-Worker remote result is acceptable when needed to preserve behavior.
+- **Cloud-dependent requests:** configure remote execution and inspect the build report. Keep the existing handler unchanged. Whole-Worker remote dispatch is a compatibility fallback; it does not require fetching every client asset remotely. Bundle the framework’s public client output where safe, and verify asset requests separately.
 
 ## 2. Install Capacitor and this package
 
@@ -203,6 +203,8 @@ Inspect where each query actually executes before proposing changes:
 For an application already structured as client rendering → API request → D1, keep that structure. Do not add another API layer, force SSR on, or replace its query library to integrate Capacitor. If the query uses Server Actions or another framework transport instead of an ordinary HTTP API, verify that transport against the documented framework limits rather than assuming identical support.
 
 Do not infer actual SSR from a flag, an HTTP 200 response or a string found in the response body. Check that the expected content exists as document elements before page scripts execute; text inside scripts or serialized RSC data is not rendered HTML. Initial HTML alone does not distinguish build-time prerendering from request-time SSR. Check framework build metadata for prerendered routes, and verify request-time rendering with fresh request-dependent values present in document elements. Without that evidence, report initial HTML with unknown rendering time. Then compare with JavaScript enabled and observe API/framework requests. A page may contain a server-rendered layout and client-only data regions simultaneously. Record the result per region and tested route, not as a universal application-wide SSR label.
+
+Bundle public client assets through Vite `publicDir`, or copy them into esbuild’s output before building. The document host serves those exact paths locally even when server handlers remain remote. Only copy files that need no server authorization or middleware; Cloudflare asset control files are not applied locally. See the [OpenNext](opennext.md#bundle-client-assets-alongside-remote-pages) and [Void](void.md) configurations. Keep server and bundled client versions compatible, including older installed apps.
 
 Component rendering and Worker dispatch are separate decisions. The build integration does not interpret `ssr: false` as a local-route instruction. A generated OpenNext Worker with cloud dependencies may still select whole-Worker remote execution for initial documents and API requests. Inspect the build report and test the actual requests; a client-rendered screen alone does not establish local startup or offline availability.
 
