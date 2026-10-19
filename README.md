@@ -2,29 +2,17 @@
 
 Bring Cloudflare Workers apps to iOS and Android.
 
-You built an app. Help more people find it.
+Let new users discover your app in the App Store and on Google Play. workers-capacitor helps you bring your existing Cloudflare Workers app to iOS and Android with minimal changes, while keeping your web app running.
 
-Your next users could discover your app in the App Store or on Google Play, install it, and give it a place on their home screen. workers-capacitor helps you bring your existing Cloudflare Workers app to those stores as an iOS or Android app, with minimal application changes.
+Void support is here with [Void 1.1.12, released on October 19, 2026](https://github.com/voidzero-dev/void/releases/tag/v1.1.12)! [Bring your Void app to mobile](docs/void.md).
 
-Keep the pages you designed, the routes you wrote, and the forms and data that make it yours. Your web app stays on Cloudflare Workers. Your mobile app gives people another way to discover and use it.
+## Get started
 
-Void support is here! With [Void 1.1.12, released on October 19, 2026](https://github.com/voidzero-dev/void/releases/tag/v1.1.12), you can now bring your Void app to iOS and Android with workers-capacitor. Take the app you built on the web and make it a mobile app! [Get started with Void](docs/void.md).
+Follow the [integration guide](docs/integration.md) to install Capacitor, connect your existing Worker and run your app. It covers both your first mobile app and an existing Capacitor project.
 
-## Start with your app
+0.1.0 Preview is available to try from a source-built package. Installation steps are in the guide; APIs may change before a stable release.
 
-[Capacitor](https://capacitorjs.com/) packages your web interface as an installable mobile app and connects it to native features through plugins. workers-capacitor connects your existing Workers pages and APIs to that app.
-
-| Your application        | Start here                                                                                           |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| Void React Pages + D1   | [Connect your generated Void Worker](docs/void.md)                                                   |
-| Hono or Workers Express | [Connect your existing Worker](docs/build-setup.md#frameworks) · [Rendering example](demo/rendering) |
-| Next.js / OpenNext      | [OpenNext integration](docs/opennext.md)                                                             |
-
-0.1.0 Preview — for trying integrations and giving feedback. Start with the [installation and integration guide](docs/integration.md) to add Capacitor, connect your Worker and run your app. It covers both existing Capacitor projects and your first mobile app. iOS development needs Xcode on macOS; Android development needs Android Studio and its SDK.
-
-### Working with an AI coding assistant?
-
-Open your existing application repository and give your assistant this prompt:
+If you use an AI coding assistant, open your application repository and give it this prompt:
 
 ```text
 Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
@@ -32,61 +20,30 @@ to bring this app to iOS and Android with workers-capacitor.
 Preserve its pages, routes and authentication; verify it on the target platforms.
 ```
 
-The same [step-by-step guide](docs/integration.md) works for manual setup.
+For your framework's configuration:
 
-## What changes in your application?
+- [Void React Pages + D1](docs/void.md)
+- [Hono and Workers Express](docs/build-setup.md#frameworks)
+- [Next.js / OpenNext](docs/opennext.md)
 
-Add a Capacitor build alongside your existing Cloudflare build, point it at your Worker entry, and initialize workers-capacitor. Your application continues to own its pages and routes.
+## How it fits your app
 
-For example, a Hono Worker exporting `app` can be connected through the Capacitor build's Vite configuration:
+[Capacitor](https://capacitorjs.com/) packages your web interface as an installable mobile app. workers-capacitor connects your existing Worker's pages and APIs to it, so you can keep your routes, forms and rendering approach. Capacitor plugins give your app access to native device features.
 
-```ts
-import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+Supported code can run on the device. Requests that need D1 or other cloud services run on your existing deployed Worker. D1 stays on Cloudflare. See [build setup](docs/build-setup.md) and [execution policies](docs/cloudflare-bindings.md) for the details.
 
-export default defineConfig({
-  plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
-});
-```
+Already have a separate frontend calling Worker APIs? Use the [Fetch-only integration](docs/runtime.md#fetch-only-integration).
 
-Then open its first page from the Capacitor entry:
+## Before publishing
 
-```ts
-import { workersCapacitor } from "workers-capacitor";
-
-const app = workersCapacitor({
-  baseURL: "https://worker.invalid",
-  render: "/",
-});
-await app.ready;
-```
-
-This is the local Worker example; `baseURL` is the logical origin the handler receives. For Void, OpenNext or cloud bindings such as D1, follow the linked framework guide to configure your existing deployed Worker as the remote endpoint. The [complete setup](docs/integration.md) includes installation, the bootstrap page, build scripts and native projects.
-
-Already have a frontend calling Worker APIs? Keep it, omit `render`, and use the [Fetch-only integration](docs/runtime.md#fetch-only-integration).
-
-## Your app, on the device and in the cloud
-
-Supported handlers can run on the device without an HTTP server. Requests that need cloud services run on your existing deployed Worker. D1 stays on Cloudflare; pages and forms can continue using it through that Worker.
-
-Worker-generated HTML becomes the app's page, including its client scripts and navigation. Keep your existing rendering model: adopting workers-capacitor does not require rewriting the application as an SPA. With Capacitor plugins, your app can also access native device features.
-
-The build reports which requests execute locally or remotely. See [execution policies](docs/cloudflare-bindings.md) and [runtime behavior](docs/runtime.md) when you need those details.
-
-## Before you ship
-
-Keep secrets on the server and authenticate requests from the app. Packaged code is readable by users, and rendered pages can access the app's Capacitor plugins. The [integration guide's security checks](docs/integration.md#5-security-the-device-is-not-a-trusted-server) cover these boundaries.
-
-Support depends on your application's APIs and authentication flow. Review the [known limitations](docs/compatibility.md) and test your own app on its target platforms. Preview APIs may change before a stable release.
-
-Tests cover browser, simulator/emulator and selected physical-device scenarios. Void 1.1.12 passes iOS simulator and Android emulator acceptance; physical iPhone checks also cover packaged Hono/Express and public-HTTPS OpenNext, D1, Images and a synthetic OAuth flow. See [verification scope and reproduction](demo/tests/README.md) for the exact boundaries.
+Keep secrets on the server and authenticate requests from the app. Follow the [security guidance](docs/integration.md#5-security-the-device-is-not-a-trusted-server), review the [known limitations](docs/compatibility.md), and test your app on its target platforms.
 
 ## Explore and contribute
 
-- [Examples](demo/README.md): see how applications connect to workers-capacitor.
-- [Build setup](docs/build-setup.md): Vite, esbuild and browser ES modules.
-- [Native rendering API](docs/native-rendering-api.md): pages, forms, assets and lifecycle.
-- [Development and testing](docs/development.md) · [Contributing](CONTRIBUTING.md).
+- [Examples](demo/README.md)
+- [Runtime behavior](docs/runtime.md) · [Native rendering API](docs/native-rendering-api.md)
+- [Development and testing](docs/development.md) · [Verification scope](demo/tests/README.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## License
 
