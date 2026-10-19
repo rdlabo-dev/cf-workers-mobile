@@ -1,10 +1,12 @@
 import { defineConfig } from "vite";
 import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
 import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
+const app = process.env.OPENNEXT_APP_ROOT ?? here("../../../opennext");
 export default defineConfig({
   root: here("."),
-  publicDir: here("../../../opennext/.open-next/assets"),
+  publicDir: resolve(app, ".open-next/assets"),
   plugins: [
     workersCapacitorPlugin({
       execution: [
@@ -12,8 +14,8 @@ export default defineConfig({
         { method: "GET", path: "/api/message" },
         { method: "GET", path: "/account" },
       ],
-      worker: here("../../../opennext/.open-next/worker.js"),
-      workerConfig: here("../../../opennext/wrangler.jsonc"),
+      worker: resolve(app, ".open-next/worker.js"),
+      workerConfig: resolve(app, "wrangler.jsonc"),
       assetsExecution: "remote",
     }),
   ],

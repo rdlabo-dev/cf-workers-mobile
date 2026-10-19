@@ -10,6 +10,7 @@ export async function startLiveBackend() {
       "Set HTTPS NATIVE_TEST_ORIGIN, NATIVE_TEST_ADMIN_TOKEN and NATIVE_TEST_DEVICE_TOKEN",
     );
   const reports = [];
+  const requests = [];
   const config = { mode: "flow", id: crypto.randomUUID() };
   let sessionCount;
   const control = async (body) => {
@@ -25,12 +26,18 @@ export async function startLiveBackend() {
     if (!response.ok)
       throw Error(`Live acceptance control: ${response.status}`);
     const state = await response.json();
+    if (config.execution === "routes" && !Array.isArray(state.requests))
+      throw Error(
+        "Route acceptance requires the updated Worker request-evidence endpoint",
+      );
     reports.splice(0, reports.length, ...state.reports);
+    requests.splice(0, requests.length, ...(state.requests ?? []));
     sessionCount = state.sessionCount;
   };
   return {
     url,
     reports,
+    requests,
     config,
     configure: () => control(config),
     refresh: () => control(),

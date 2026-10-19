@@ -28,4 +28,12 @@ OPENNEXT_PLATFORM=ios OPENNEXT_DEVICE=<iPhone-udid> \
 node --test demo/tests/opennext/native.test.mjs
 ```
 
-Keep the paired phone unlocked with Developer Mode enabled. Tests must run serially against this fixture because they intentionally reset its synthetic session and notes. They do not access existing application data. Reports are stored under `demo/artifacts/opennext-native`; the single Debug timing sample includes the public network and device launch tooling. Physical iOS memory is explicitly unmeasured.
+Keep the paired phone unlocked with Developer Mode enabled. Tests must run serially against this fixture because they intentionally reset its synthetic session and notes. They do not access existing application data. Reports are stored under `demo/artifacts/opennext-native`. The scenario gates functional behavior, not startup or memory performance.
+
+## Public route execution
+
+Set `OPENNEXT_SPLIT=1` on the native command to bundle selected public GET handlers and client assets while keeping the authenticated Worker for all remaining requests. The temporary device token is attached only to remote delivery. The administrative token stays on the host. The Worker stores method/path/RSC evidence in `acceptance_requests`; it does not store Authorization or Cookie headers.
+
+The generated `0002.sql` migration adds that evidence table. Apply both migrations to a fresh test database (or only unapplied migrations to an existing dedicated test database). `NATIVE_TEST_WORKER_NAME` selects a separate test deployment name when preparing the output. Never point the fixture at a production database: its control endpoint deliberately resets synthetic sessions, notes and reports.
+
+Before publishing, prepare with a placeholder D1 ID and run `node --test demo/tests/opennext/live/worker.test.mjs`. This local workerd test verifies unauthenticated rejection, separation of device and admin control privileges, valid device access and credential-free request evidence. It does not itself deploy or certify a production identity provider.

@@ -18,7 +18,10 @@ await build({
   format: "esm",
   target: "es2022",
   sourcemap: true,
-  define: { "import.meta.env.VITE_WORKER_ORIGIN": "undefined" },
+  define: {
+    "import.meta.env.VITE_WORKER_ORIGIN": "undefined",
+    "import.meta.env.VITE_TEST_DEVICE_TOKEN": "undefined",
+  },
   plugins: [
     workersCapacitorPlugin({
       worker: here("../../../opennext/.open-next/worker.js"),

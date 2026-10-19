@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const out = here("../../../artifacts/opennext-live");
+const workerName =
+  process.env.NATIVE_TEST_WORKER_NAME ?? "wc-native-opennext-acceptance";
+if (!/^[a-z0-9][a-z0-9-]{0,62}$/.test(workerName))
+  throw Error("Invalid NATIVE_TEST_WORKER_NAME");
 if (!process.env.NATIVE_TEST_D1_ID)
   throw Error("Set NATIVE_TEST_D1_ID to a dedicated test database");
 await mkdir(out, { recursive: true });
@@ -54,7 +58,7 @@ await writeFile(
   resolve(out, "cloudflare.config.ts"),
   `import { defineConfig, bindings } from "cf/config";
 export default defineConfig({ worker: {
-name: "wc-native-opennext-acceptance", entrypoint: "./worker.js", compatibilityDate: "2026-10-17", compatibilityFlags: ["nodejs_compat"], workersDev: true,
+name: ${JSON.stringify(workerName)}, entrypoint: "./worker.js", compatibilityDate: "2026-10-17", compatibilityFlags: ["nodejs_compat"], workersDev: true,
 assets: { runWorkerFirst: true },
 env: { DB: bindings.d1({ id: ${JSON.stringify(process.env.NATIVE_TEST_D1_ID)} }), ASSETS: bindings.assets(), IMAGES: bindings.images(), ADMIN_TOKEN: bindings.secret(), DEVICE_TOKEN: bindings.secret() }
 } });`,
@@ -70,4 +74,8 @@ await writeFile(
   resolve(out, "migrations/0001.sql"),
   (await readFile(here("../../../opennext/migrations/0001.sql"), "utf8")) +
     "\nCREATE TABLE acceptance_config (id INTEGER PRIMARY KEY, body TEXT NOT NULL);\nCREATE TABLE acceptance_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT NOT NULL);\n",
+);
+await writeFile(
+  resolve(out, "migrations/0002.sql"),
+  "CREATE TABLE acceptance_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT NOT NULL);\n",
 );

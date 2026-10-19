@@ -38,7 +38,7 @@ jobs:
   compatibility:
     name: compatibility (${{ matrix.suite }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.timeout || 25 }}
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +63,7 @@ jobs:
               npm install --prefix void
               npm run build --prefix void
               npm run test:void
-              npm run test:void:routes
+              node --test tests/void/routes/acceptance.test.mjs
           - suite: upstream-minvoice
             commands: |
               npm install --prefix authentication
@@ -133,12 +133,16 @@ jobs:
               npm run test:upstream:opennext:prepare
               npm run test:upstream:opennext
           - suite: opennext
+            timeout: 35
             commands: |
               npm install --prefix opennext
               npm run build:worker --prefix opennext
               npm run test:opennext
               npm run test:opennext:split
               node --test tests/opennext/images.test.mjs
+              NATIVE_TEST_D1_ID=00000000-0000-0000-0000-000000000001 node tests/opennext/live/prepare.mjs
+              node --test tests/opennext/live/worker.test.mjs
+              node tests/opennext/releases/prepare.mjs
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -163,14 +167,14 @@ jobs:
         working-directory: demo
 
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
-        if: matrix.native
+        if: matrix.native || matrix.suite == 'opennext'
         with:
           distribution: temurin
           java-version: "21"
       - run: npm install --prefix demo/opennext
         if: matrix.native
       - name: Enable emulator acceleration
-        if: matrix.native
+        if: matrix.native || matrix.suite == 'opennext'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
@@ -184,14 +188,29 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: UPSTREAM_PLATFORM=android UPSTREAM_DEVICE=emulator-5554 node --test demo/tests/upstream/${{ matrix.native }}/native.test.mjs
+      - name: Test OpenNext routes and release skew in Android WebView
+        if: matrix.suite == 'opennext'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            OPENNEXT_SPLIT=1 OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=emulator-5554 node --test demo/tests/opennext/native.test.mjs
+            OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=emulator-5554 node demo/tests/opennext/releases/native.mjs
       - name: Save native acceptance evidence
-        if: always() && matrix.native
+        if: always() && (matrix.native || matrix.suite == 'opennext')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: native-${{ matrix.native }}
+          name: native-${{ matrix.native || matrix.suite }}
           path: |
             demo/artifacts/upstream/${{ matrix.native }}/native/android-*.json
             demo/artifacts/upstream/${{ matrix.native }}/native/android-error.log
+            demo/artifacts/opennext-native/android-*.json
+            demo/artifacts/opennext-native/android-error.log
+            demo/artifacts/opennext-releases/native/android-*.json
+            demo/artifacts/opennext-releases/native/android-error.log
           retention-days: 7
 
   bindings:
