@@ -81,7 +81,7 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Until a package release is available, build and pack this repository with `npm ci`, `npm run build`, `npm pack`, then install the resulting `.tgz` in the application. Do not assume an npm release exists. In the application, install the actual file:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Until a package release is available, build and pack this repository with `npm install`, `npm run build`, `npm pack`, then install the resulting `.tgz` in the application. Do not assume an npm release exists. In the application, install the actual file:
 
 ```sh
 npm install /absolute/path/to/workers-capacitor-0.0.0-poc.1.tgz

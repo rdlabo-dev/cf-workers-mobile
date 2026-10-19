@@ -9,7 +9,7 @@ this PoC. No npm release is made by the packaging tests.
 Until a release is published, build and pack this repository:
 
 ```sh
-npm ci
+npm install
 npm run build
 npm pack
 ```

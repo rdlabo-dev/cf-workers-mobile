@@ -249,7 +249,7 @@ Requires Node 22.18+ (22.x) or 24.11+, npm, and the native SDKs for native tests
 ### Library and package tests
 
 ```sh
-npm ci
+npm install
 npm run build
 npm run typecheck
 npm test
@@ -286,7 +286,7 @@ Application Workers are organized as `demo/src/workers/<framework>/<scenario>.ts
 
 ```sh
 cd demo
-npm ci
+npm install
 npm run typecheck
 npm run build
 npx playwright install chromium webkit

@@ -39,8 +39,10 @@ for (const name of ["app-router", "shared"]) {
   await writeFile(path, JSON.stringify(pkg, null, 2));
 }
 const app = join(root, "e2e/app-router");
-await cp(join(here, "package-lock.json"), join(app, "package-lock.json"));
-execFileSync("npm", ["ci", "--install-links"], { cwd: app, stdio: "inherit" });
+execFileSync("npm", ["install", "--install-links"], {
+  cwd: app,
+  stdio: "inherit",
+});
 execFileSync(
   process.execPath,
   ["node_modules/@opennextjs/cloudflare/dist/cli/index.js", "build"],

@@ -11,3 +11,11 @@ artifacts/
 native/android/build/
 native/android/.gradle/
 .build/
+
+# Dependency lockfiles
+package-lock.json
+npm-shrinkwrap.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
