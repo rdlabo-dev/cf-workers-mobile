@@ -4,7 +4,7 @@ Bring Cloudflare Workers apps to iOS and Android.
 
 workers-capacitor connects existing Cloudflare Workers applications to Capacitor, so you can reuse your pages, routes and application logic in an iOS or Android app with minimal changes. Your web application stays on Workers, with a mobile version you can prepare for distribution through the App Store and Google Play.
 
-Void support is here with [Void 1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12)! [Bring your Void app to mobile](docs/void.md).
+[Void 1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12) adds Capacitor iOS navigation support! With this update, you can bring your Void app to iOS and Android using workers-capacitor. [Get started with Void](docs/void.md).
 
 ## Get your app onto your phone
 
