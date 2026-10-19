@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/shared/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+} from "workers-capacitor/shared/contracts";
+import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
 import * as api from "node:stream";
 type StreamAPI = typeof api &
   Pick<

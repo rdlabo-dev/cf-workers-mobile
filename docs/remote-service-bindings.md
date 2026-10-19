@@ -61,8 +61,8 @@ local bindings; KV uses `kvExecution` instead. Declaring a remote KV name in
 does not override another server dependency or whole-Worker fallback.
 
 ```ts
-import { openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
-import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
+import { openFeature } from "workers-capacitor/shared/contracts";
+import { LocalStorageKV } from "workers-capacitor/cloudflare/bindings/kv";
 const kv = await openFeature(new LocalStorageKV("my-app-settings"));
 // Pass env: { SETTINGS: kv.api } to workersCapacitor; SETTINGS must match Wrangler's name.
 // At shutdown: await runtime.dispose(); await kv.dispose();
@@ -156,6 +156,7 @@ node demo/tests/experiments/d1/native-run.mjs android <emulator-id> --services
 Use `--refresh` with an existing services-native consumer to reuse its native
 build directories while installing a new tarball. The harness reuses the D1 test
 app ID; do not run D1 and service native tests concurrently on the same device.
+
 ## Platform references
 
 - [Wrangler configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)

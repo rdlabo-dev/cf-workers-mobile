@@ -2,8 +2,8 @@ import os, * as namespace from "node:os";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/shared/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+} from "workers-capacitor/shared/contracts";
+import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
 import { expectedConstants } from "./constants.spec";
 const groups = [
   "exports",

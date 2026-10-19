@@ -1,7 +1,4 @@
-import {
-  workersCapacitor,
-  type ExecutionPreference,
-} from "@rdlabo/workers-capacitor";
+import { workersCapacitor, type ExecutionPreference } from "workers-capacitor";
 import { runContract } from "../../../validation/contracts/http";
 import { runLocalNodeContracts } from "../../../validation/node-modules";
 // Bare, node:-prefixed, subpath, named and default import forms must all

@@ -117,7 +117,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "@rdlabo/workers-capacitor": `file:./${packed.filename}`,
+        "workers-capacitor": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -149,8 +149,8 @@ assert.ok(
 );
 run("npm", ["install"], consumer);
 assert.equal(
-  await realpath(join(consumer, "node_modules/@rdlabo/workers-capacitor")),
-  join(consumer, "node_modules/@rdlabo/workers-capacitor"),
+  await realpath(join(consumer, "node_modules/workers-capacitor")),
+  join(consumer, "node_modules/workers-capacitor"),
   "Must install tarball, not link repo",
 );
 run("npm", ["run", "build"], consumer);

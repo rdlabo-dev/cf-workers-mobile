@@ -4,8 +4,8 @@ import * as namespace from "node:url";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/shared/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+} from "workers-capacitor/shared/contracts";
+import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
 import { legacyCases } from "./legacy.spec";
 import { modernCases } from "./modern.spec";
 import assert, {

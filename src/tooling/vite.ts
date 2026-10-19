@@ -278,7 +278,7 @@ export function workersCapacitorPlugin(
       name: "workers-capacitor-source",
       enforce: "pre",
       config: () => ({
-        optimizeDeps: { exclude: ["@rdlabo/workers-capacitor"] },
+        optimizeDeps: { exclude: ["workers-capacitor"] },
         worker: { format: "es" },
       }),
       configResolved(config) {

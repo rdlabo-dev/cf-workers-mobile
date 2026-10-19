@@ -2,8 +2,8 @@ import * as builtin from "node:trace_events";
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/shared/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+} from "workers-capacitor/shared/contracts";
+import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
 const api = builtin as unknown as typeof import("./index.js");
 function same(actual: unknown, expected: unknown) {
   if (actual !== expected)
