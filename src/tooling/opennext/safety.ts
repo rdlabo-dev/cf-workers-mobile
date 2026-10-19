@@ -44,7 +44,7 @@ export function publicEnvironment(source: string) {
 /** The only permitted context accessor is the one installed by our generated entry. */
 export function applicationCloudflareContext(code: string) {
   return (
-    /cloudflare:|getCloudflareContext/.test(code) ||
+    /["']cloudflare:[\w/-]+["']|getCloudflareContext/.test(code) ||
     code.split("__cloudflare-context__").length - 1 !== 1
   );
 }

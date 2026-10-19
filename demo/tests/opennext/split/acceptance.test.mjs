@@ -20,7 +20,7 @@ for (const bundler of ["vite", "esbuild"])
           "utf8",
         ),
       );
-      assert.equal(report.mode, "routes");
+      assert.equal(report.mode, "routes", report.reason);
       assert.equal(
         report.routes.find((route) => route.path === "/account").remote,
         true,

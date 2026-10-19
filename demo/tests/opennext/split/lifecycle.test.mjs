@@ -58,6 +58,7 @@ test(
               local ? "2 local handlers" : "No selected routes",
             ),
           ),
+        JSON.stringify(results.at(-1).warnings),
       );
       assert.deepEqual(
         (await readdir(cache)).sort(),

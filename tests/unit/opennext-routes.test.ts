@@ -24,6 +24,16 @@ it("rejects opaque application Cloudflare context access independently of the bi
   const host = 'Symbol.for("__cloudflare-context__")';
   expect(applicationCloudflareContext(host)).toBe(false);
   expect(
+    applicationCloudflareContext(
+      host + "; const config = {cloudflare: {useWorkerdCondition: true}}",
+    ),
+  ).toBe(false);
+  expect(
+    applicationCloudflareContext(
+      host + '; import {connect} from "cloudflare:sockets"',
+    ),
+  ).toBe(true);
+  expect(
     applicationCloudflareContext(host + "; getCloudflareContext().env[name]"),
   ).toBe(true);
   expect(
