@@ -180,6 +180,10 @@ import { kvContract } from "workers-capacitor/cloudflare/bindings/kv/testing";
 import { fetchContract, fetchContractWorker } from "workers-capacitor/cloudflare/workers/testing";
 import { LocalStorageKV } from "workers-capacitor/cloudflare/bindings/kv";
 import { workersCapacitorPlugin as buildPlugin } from "workers-capacitor/tooling/vite";
+buildPlugin({ worker: "worker.ts", execution: "local" });
+buildPlugin({ worker: "worker.ts", execution: [{ method: "*", path: "/app/*" }] });
+// @ts-expect-error Automatic distribution is not part of the execution contract.
+buildPlugin({ worker: "worker.ts", execution: "auto" });
 buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
 // @ts-expect-error Local ASSETS is not a completed compatibility unit.
 buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
@@ -290,7 +294,7 @@ try {
   await writeFile(
     join(temp, "vite.config.mjs"),
     `import { workersCapacitorPlugin } from 'workers-capacitor/tooling/vite';
-export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
+export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({execution:'local',worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
   );
   execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
     cwd: temp,

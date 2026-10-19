@@ -238,6 +238,7 @@ for (const [tool, mode] of [
         `import {workersCapacitor} from ${JSON.stringify(join(repo, "dist/index.js"))};let runtime,token='owner';window.start=async(prefer)=>{runtime=workersCapacitor({baseURL:'https://local.invalid',prefer,remote:{origin:${JSON.stringify(remote.origin)},getToken:()=>token}});await runtime.ready;return runtime.execution;};window.stop=()=>runtime.dispose();window.token=value=>token=value;window.request=async(path,init)=>{const r=await fetch(path,init);return {status:r.status,body:await r.text(),etag:r.headers.get('etag')}};`,
       );
       server = await createUI(root, main, tool, mode, {
+        execution: [{ method: "GET", path: "/health" }],
         worker,
         workerConfig: "wrangler.json",
         assetsExecution: "remote",
