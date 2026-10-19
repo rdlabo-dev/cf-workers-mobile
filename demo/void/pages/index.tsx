@@ -7,7 +7,8 @@ export default function HomePage({ messages }: Props) {
     <main>
       <h1>Welcome to Void</h1>
       <p>
-        This starter is running in Pages mode. The list below is loaded from your database in
+        This starter is running in Pages mode. The list below is loaded from
+        your database in
         <code> pages/index.server.ts</code>.
       </p>
       <p>
@@ -15,7 +16,8 @@ export default function HomePage({ messages }: Props) {
       </p>
       {messages.length === 0 ? (
         <p>
-          No messages yet. Run <code>void db seed</code> to load the sample row from
+          No messages yet. Run <code>void db seed</code> to load the sample row
+          from
           <code> db/seed.ts</code>.
         </p>
       ) : (
@@ -30,7 +32,13 @@ export default function HomePage({ messages }: Props) {
         </ul>
       )}
       <Form form={form}>
-        <label>Message <input value={form.data.text} onChange={event => form.setData("text", event.target.value)} /></label>
+        <label>
+          Message{" "}
+          <input
+            value={form.data.text}
+            onChange={(event) => form.setData("text", event.target.value)}
+          />
+        </label>
         <button disabled={form.pending}>Add message</button>
       </Form>
     </main>

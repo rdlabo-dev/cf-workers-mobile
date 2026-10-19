@@ -1,4 +1,7 @@
-import type { KVNamespace, KVValue } from "../../src/cloudflare/bindings/kv/index.js";
+import type {
+  KVNamespace,
+  KVValue,
+} from "../../src/cloudflare/bindings/kv/index.js";
 
 // Alternative backends are checked against the independent public contract.
 function checkBackend(api: KVNamespace) {

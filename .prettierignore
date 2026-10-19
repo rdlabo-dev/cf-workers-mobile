@@ -1,0 +1,12 @@
+# Build output and dependencies are also excluded by .gitignore.
+# Generated URL tables and parser are verified by their generation scripts.
+src/compat/url/idna-data.ts
+src/compat/url/standard-url.ts
+
+# Preserve upstream license and notice text.
+**/LICENSE*
+**/NOTICE*
+
+# Capacitor-generated native project scaffolding.
+demo/ios/
+demo/android/

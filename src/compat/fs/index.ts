@@ -8,8 +8,7 @@ const encoder = new TextEncoder();
 const files = new Map<string, Uint8Array>();
 
 function normalize(path: unknown): string {
-  if (typeof path !== "string")
-    throw new TypeError("path must be a string");
+  if (typeof path !== "string") throw new TypeError("path must be a string");
   const raw = path.startsWith("file://") ? new URL(path).pathname : path;
   const parts: string[] = [];
   for (const segment of raw.split("/")) {
@@ -269,8 +268,7 @@ export const promises = {
   readdir: (path: unknown) => Promise.resolve().then(() => readdirSync(path)),
   stat: (path: unknown) => Promise.resolve().then(() => statSync(path)),
   lstat: (path: unknown) => Promise.resolve().then(() => lstatSync(path)),
-  realpath: (path: unknown) =>
-    Promise.resolve().then(() => realpathSync(path)),
+  realpath: (path: unknown) => Promise.resolve().then(() => realpathSync(path)),
   access: (path: unknown) =>
     Promise.resolve().then(() => {
       if (!exists(toPath(path))) throw enoent("access", toPath(path));
