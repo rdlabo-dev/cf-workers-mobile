@@ -36,11 +36,12 @@ Already have a separate frontend calling Worker APIs? Use the [Fetch-only integr
 
 ## Next steps
 
-Once your app is running, make it feel at home on a phone:
+Your app is on screen! Now make it your own, one step at a time:
 
-- Keep buttons and content clear of the notch and home indicator. Start with the default insets, then adjust [iOS Safe Area](docs/native-rendering-api.md#ios-safe-area) for your layout.
-- Add a native touch, such as the camera, sharing or haptic feedback. Follow the [Capacitor plugin integration guide](docs/native-rendering-api.md#native-plugins).
-- Automate releases with [Capawesome Cloud](https://capawesome.io/docs/cloud/app-store-publishing/submit-automatically/): connect your repository, configure signing and store destinations, then trigger builds and store submissions from release tags.
+1. Add your app icon and splash screen so people recognize it on their home screen and when it opens. Follow [Capacitor's asset guide](https://capacitorjs.com/docs/guides/splash-screens-and-icons), then rebuild and run the app again to see your changes.
+2. Make the screen comfortable to use. Check that buttons stay clear of the notch and home indicator; adjust [iOS Safe Area](docs/native-rendering-api.md#ios-safe-area) if needed.
+3. Add a native feature when it helps your users, such as taking a photo, sharing or haptic feedback. Start with one [Capacitor plugin](docs/native-rendering-api.md#native-plugins).
+4. When you're ready to share, [Capawesome Cloud](https://capawesome.io/docs/cloud/getting-started/) can automate builds and store submissions. Start with its setup guide to prepare your first release.
 
 ## Before publishing
 
