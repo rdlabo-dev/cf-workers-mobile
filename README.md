@@ -6,7 +6,7 @@ You built a web app. Now put it on your phone.
 
 workers-capacitor brings your existing Workers application into an iOS or Android app with minimal application changes. Keep the pages you designed, the routes you wrote, and the forms and data that make it yours. Continue serving the web version from Cloudflare Workers, and add a mobile app alongside it.
 
-Void apps can make the same move. Void React Pages + D1 has been verified with Void 1.1.12 on an iOS simulator and Android emulator. [Connect your Void app](docs/void.md).
+Void support is here! With [Void 1.1.12, released on October 19, 2026](https://github.com/voidzero-dev/void/releases/tag/v1.1.12), you can now bring your Void app to iOS and Android with workers-capacitor. Take the app you built on the web and make it a mobile app! [Get started with Void](docs/void.md).
 
 ## Start with your app
 
