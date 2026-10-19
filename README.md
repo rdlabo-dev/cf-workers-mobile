@@ -61,16 +61,10 @@ The example below connects a Worker that returns HTML to an existing Capacitor 8
 
 ### Install
 
-The package's 0.1.0 Preview release is being prepared. Until it is published to npm, build a tarball from this repository:
+Install the latest release in your Capacitor application:
 
 ```sh
-# In this repository
-npm install
-npm run build
-npm pack
-
-# In your Capacitor application
-npm install /path/to/workers-capacitor-0.1.0.tgz
+npm install workers-capacitor
 ```
 
 Native integration uses Swift Package Manager on iOS and Gradle on Android. See the [native setup](docs/development.md#native-demo) for SDK requirements and Android resource rules.

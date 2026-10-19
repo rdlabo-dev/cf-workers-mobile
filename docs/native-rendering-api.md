@@ -2,24 +2,21 @@
 
 The package includes the native connection for Capacitor 8 (verified with 8.5.3).
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
-this Preview. No npm release is made by the packaging tests.
+this Preview.
 
 ## Installation
 
-Until a release is published, build and pack this repository:
+In your Capacitor application, install the latest release:
 
 ```sh
-npm install
-npm run build
-npm pack
+npm install workers-capacitor
 ```
 
-In a Capacitor application, install the resulting tarball, configure the Worker
-in the Vite/esbuild plugin, and call `workersCapacitor({ baseURL, render: "/" })`.
-Build the web assets before synchronizing:
+Configure the Worker in the Vite/esbuild plugin and call
+`workersCapacitor({ baseURL, render: "/" })`. Build the web assets before
+synchronizing:
 
 ```sh
-npm install /path/to/workers-capacitor-0.1.0.tgz
 npm run build
 npx cap sync
 npx cap run ios # or android
