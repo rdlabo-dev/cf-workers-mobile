@@ -26,13 +26,15 @@ flowchart LR
 
 A Capacitor WebView displays the HTML returned by your Worker. Opening a page, following a link or submitting a supported form reaches the same application routes. The response becomes a WebView document, with its scripts and resources.
 
-The build integration determines where requests execute:
+The build integration uses the application and its cloud binding configuration to select where requests execute:
 
 | Request                                                        | Execution                                                          |
 | -------------------------------------------------------------- | ------------------------------------------------------------------ |
 | A route whose dependencies support local execution             | The handler runs in JavaScript on the device.                      |
 | A route that needs D1, Hyperdrive, R2 or another cloud service | The whole request goes to your existing deployed Worker.           |
 | An application that cannot be safely separated                 | The whole Worker executes remotely; the build reports this choice. |
+
+This selection is based on configured cloud dependencies; it is not an automatic compatibility check for every API. Unsupported local code still needs investigation and does not automatically retry on the server.
 
 **D1 stays on Cloudflare.** The integration forwards requests that need it; your existing Worker still performs the database operations. The build excludes detected server-side implementations, including their SQL, from the device bundle. Authentication and authorization remain on the server.
 
@@ -42,7 +44,8 @@ See [cloud services and execution policies](docs/cloudflare-bindings.md), includ
 
 ## Build setup
 
-Start with your framework, then choose the tool for its Capacitor build.
+Start with your framework, then choose the tool for its separate Capacitor build.
+Keep the framework's existing cloud build and tool versions unchanged.
 [Framework setup and execution boundaries](docs/build-setup.md#frameworks) explain
 which entry to connect and where the application runs.
 

@@ -43,7 +43,10 @@ await app.ready;
 Fetch-only behavior. Document mode requires an HTTP(S) **origin** as `baseURL`,
 without an API path prefix. The Worker receives URLs under that logical origin;
 the visible page retains its Capacitor local URL (`capacitor://` on default iOS,
-`https://` on default Android). No remote fallback or local HTTP server is used.
+`https://` on default Android). The generated dispatch can select local execution
+or the configured remote Worker before invoking a handler; both paths return a
+document through the same native bridge. Local failures are not retried remotely,
+and no local HTTP server is started. See [remote execution setup](integration.md#3-configure-and-build-the-native-application).
 
 Hono and Workers Express use the same `worker.fetch(request, env, ctx)` boundary.
 Their application routers return complete HTML for pages and JSON for APIs. The

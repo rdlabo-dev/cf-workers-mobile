@@ -64,7 +64,7 @@ Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`,
 ## Void React Pages + D1
 
 Use Void / @void/react 1.1.12 or newer for Capacitor navigation on iOS and Android.
-See [Void integration](void.md) for the generated Worker setup and verification record.
+The repository's existing regression sample remains pinned to 1.1.11; its iOS test checks the old router limitation. See [Void integration](void.md) for the generated Worker setup and the separate patched-client verification record.
 
 ## OpenNext + D1
 

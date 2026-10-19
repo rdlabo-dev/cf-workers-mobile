@@ -75,6 +75,10 @@ Fetch-only integration of a separate frontend is a different use case.
 
 ## Tools
 
+These versions describe the separate Capacitor build. A framework's existing
+cloud build may use a different tool or version; keep it unchanged and connect
+its generated Worker as described in the framework guide.
+
 | Build              | Setup                                      | Input                                                                              |
 | ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------- |
 | Vite 7             | `workers-capacitor/tooling/vite` plugin    | TypeScript / JavaScript Worker entries, including framework output described above |

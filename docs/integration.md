@@ -46,6 +46,8 @@ Follow the security and verification steps below. Cloud deployments and app publ
 
 ## 1. Inspect the application and choose the integration
 
+Start with the [framework integration inventory](build-setup.md#frameworks). Angular SSR on Workers is not yet verified; build-tool support alone does not establish framework support. For Void, follow its generated-entry guide and version requirements.
+
 Read the Worker entry, build scripts, Wrangler configuration, page routes, middleware and authentication code. Record these decisions in the implementation plan, rather than adding a permanent progress document:
 
 - Which routes produce HTML, JSON and static assets?
@@ -135,15 +137,20 @@ This example uses Vite. For an existing esbuild build, use the [esbuild setup](b
 Adjust paths to the actual application. For OpenNext the entry is the generated `.open-next/worker.js`; build it first and explicitly configure remote ASSETS if used. Additional configuration is described in the [binding guide](cloudflare-bindings.md).
 
 ```ts
-// capacitor/main.ts — cookie-session example; no app startup side effects
+// capacitor/main.ts — local document setup
 import { workersCapacitor } from "workers-capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
-  remote: { origin: "https://your-worker.example.com" },
   render: "/",
 });
 await runtime.ready;
 ```
+
+If the build report selects remote routes or whole-Worker remote execution, add
+`remote: { origin: "https://your-worker.example.com" }` to these options and connect
+your existing authentication. Remote configuration is required for that generated
+boundary. For a local-only build, omit `remote`; supplying it without a generated
+remote boundary is rejected. See the [binding configuration guide](cloudflare-bindings.md).
 
 `baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
 
