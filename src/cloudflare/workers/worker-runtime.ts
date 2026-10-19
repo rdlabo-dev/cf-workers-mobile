@@ -162,21 +162,22 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
     private readonly source: WorkerSource<Env>,
   ) {
     super(options);
-    if (
-      source.needsRemote &&
-      source.requiresRemote !== false &&
-      !options.remote
-    )
-      throw new TypeError(
-        "This Worker contains server routes. Set remote.origin to the existing deployed Worker.",
-      );
     if (options.remote && !source.needsRemote)
       throw new TypeError(
         "remote requires build-generated server routes; configure the Worker's server bindings in the build plugin.",
       );
-    if (options.remote)
+    if (
+      options.remote ||
+      (source.needsRemote && source.requiresRemote !== false)
+    )
       this.remote = createRemoteWorker(
-        options.remote,
+        {
+          ...options.remote,
+          origin:
+            options.remote?.origin === undefined
+              ? new URL(options.baseURL).origin
+              : options.remote.origin,
+        },
         this.original.bind(globalThis),
       );
     this.ready = this.initialize(options, source);

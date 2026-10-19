@@ -66,7 +66,7 @@ With default Capacitor settings, `fetch("/api/hello")` follows these paths (assu
 | iOS      | `capacitor://localhost/api/hello` | `https://api.example.com/api/hello` |
 | Android  | `https://localhost/api/hello`     | `https://api.example.com/api/hello` |
 
-The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. Without a generated remote boundary these are local JavaScript calls; neither row sends an HTTP request to `api.example.com`. Requests selected for remote execution instead use the configured `remote.origin`.
+The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. Without a generated remote boundary these are local JavaScript calls; neither row sends an HTTP request to `api.example.com`. Requests selected for remote execution instead use `remote.origin`, defaulting to the `baseURL` origin when omitted. Remote options such as `getToken` can be supplied without an origin. Explicit overrides must be valid HTTPS origins and never fall back on validation failure.
 
 ### Endpoint examples
 

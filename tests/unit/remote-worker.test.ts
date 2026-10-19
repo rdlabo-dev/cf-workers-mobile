@@ -11,7 +11,7 @@ afterEach(async () => {
 });
 function setup(
   prefer: "direct" | "worker",
-  remote: RemoteWorkerOptions,
+  remote: RemoteWorkerOptions | undefined,
   send = vi.fn(async (_request: Request) => new Response("remote")),
 ) {
   vi.stubGlobal("fetch", send);
@@ -70,6 +70,52 @@ for (const prefer of ["direct", "worker"] as const) {
     );
   });
 }
+for (const remote of [undefined, { getToken: () => "session" }]) {
+  it(`infers the destination with ${remote ? "token options" : "no remote options"}`, async () => {
+    const { runtime, send, handler } = setup("direct", remote);
+    await runtime.ready;
+    await runtime.fetch("https://same.example/api/items?q=1", {
+      method: "POST",
+      body: "once",
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    const request = send.mock.calls[0][0];
+    expect(request.url).toBe("https://same.example/api/items?q=1");
+    expect(request.headers.get("authorization")).toBe(
+      remote ? "Bearer session" : null,
+    );
+    expect(await request.text()).toBe("once");
+    expect(handler.fetch).not.toHaveBeenCalled();
+  });
+}
+it("preserves path boundaries and external requests with an inferred destination", async () => {
+  const send = vi.fn(async () => new Response("external"));
+  vi.stubGlobal("fetch", send);
+  const select = vi.fn(() => true);
+  const runtime = createFetchRuntime({
+    baseURL: "https://same.example/api/",
+    prefer: "direct",
+    worker: {
+      createWorker: vi.fn(),
+      loadDirect: async () => ({ fetch: vi.fn() }),
+      needsRemote: select,
+    },
+  });
+  cleanups.push(() => runtime.dispose());
+  await runtime.ready;
+  for (const url of [
+    "https://same.example/api/hello?q=1",
+    "https://same.example/apiary",
+    "https://same.example/LICENSE",
+    "https://other.example/api/hello",
+  ])
+    await runtime.fetch(url);
+  expect(select).toHaveBeenCalledTimes(1);
+  expect((send.mock.calls[0] as unknown as [Request])[0].url).toBe(
+    "https://same.example/api/hello?q=1",
+  );
+  expect(send).toHaveBeenCalledTimes(4);
+});
 it("preserves an existing bearer session without a login provider and never retries 401", async () => {
   const send = vi.fn(
     async (_request: Request) => new Response(null, { status: 401 }),
@@ -84,6 +130,7 @@ it("preserves an existing bearer session without a login provider and never retr
   });
   expect(response.status).toBe(401);
   expect(send).toHaveBeenCalledTimes(1);
+  expect(send.mock.calls[0][0].url).toBe("https://server.example/api");
   expect(send.mock.calls[0][0].headers.get("authorization")).toBe(
     "Bearer existing",
   );
@@ -129,16 +176,18 @@ it("disposal rejects a pending credential lookup and cannot send into a replacem
   await Promise.resolve();
   expect(send).not.toHaveBeenCalled();
 });
-it("rejects ambiguous remote configuration before loading application code", () => {
+it("rejects invalid remote destinations before loading application code", () => {
   const source = {
     createWorker: vi.fn(),
     loadDirect: vi.fn(),
     needsRemote: () => true,
   };
   expect(() =>
-    createFetchRuntime({ baseURL: "https://local.example", worker: source }),
+    createFetchRuntime({ baseURL: "http://local.example", worker: source }),
   ).toThrow("remote.origin");
   for (const origin of [
+    null as unknown as string,
+    "",
     "http://example.com",
     "https://example.com/path",
     "https://user:password@example.com",
@@ -150,7 +199,7 @@ it("rejects ambiguous remote configuration before loading application code", () 
         worker: source,
         remote: { origin },
       }),
-    ).toThrow("HTTPS origin");
+    ).toThrow();
   expect(source.loadDirect).not.toHaveBeenCalled();
   expect(source.createWorker).not.toHaveBeenCalled();
 });
