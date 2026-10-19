@@ -334,6 +334,27 @@ test(
         return;
       }
       const complete = await waitReport("complete");
+      if (!live) {
+        const assets = JSON.parse(
+          await readFile(
+            join(root, "www/workers-capacitor-assets.json"),
+            "utf8",
+          ),
+        );
+        assert.ok(
+          assets.some(
+            (path) => path.startsWith("/_next/static/") && path.endsWith(".js"),
+          ),
+        );
+        assert.ok(assets.includes("/mark.svg"));
+        assert.deepEqual(
+          backend.requests.filter((request) =>
+            assets.includes(new URL(request.path, backend.url).pathname),
+          ),
+          [],
+          "Hydration, navigation, CSS and images must use bundled assets",
+        );
+      }
       assert.equal(complete.cookieVisible, false);
       assert.equal(complete.owner, "alice");
       assert.equal(complete.notes.results[0].value, "Native note");

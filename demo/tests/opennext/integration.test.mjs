@@ -1,4 +1,4 @@
-import { build } from "vite";
+import { build, preview } from "vite";
 import { fileURLToPath } from "node:url";
 import { readFile, readdir } from "node:fs/promises";
 import { test } from "node:test";
@@ -27,6 +27,7 @@ test(
     );
     assert.equal(prerender.routes["/details"], undefined);
     const backend = await startBackend();
+    let server;
     try {
       await build({
         configFile: fileURLToPath(
@@ -62,6 +63,41 @@ test(
           "Remote builds must not embed OpenNext server files",
         );
       }
+      const assets = JSON.parse(
+        await readFile(
+          new URL("workers-capacitor-assets.json", output),
+          "utf8",
+        ),
+      );
+      assert.ok(
+        assets.some(
+          (path) => path.startsWith("/_next/static/") && path.endsWith(".js"),
+        ),
+      );
+      server = await preview({
+        configFile: false,
+        root: fileURLToPath(new URL("../../opennext/", import.meta.url)),
+        build: { outDir: "www" },
+        preview: { host: "127.0.0.1", port: 0 },
+      });
+      const localAssets = new Set();
+      // Browser baseline models native asset delivery; the native test exercises
+      // the real document host and asserts no asset requests reach this backend.
+      const useBundledAssets = (context) =>
+        context.route(backend.url.origin + "/**", async (route) => {
+          const url = new URL(route.request().url());
+          if (!assets.includes(url.pathname)) return route.continue();
+          const response = await fetch(
+            new URL(url.pathname + url.search, server.resolvedUrls.local[0]),
+          );
+          assert.equal(response.status, 200);
+          localAssets.add(url.pathname);
+          await route.fulfill({
+            status: response.status,
+            headers: Object.fromEntries(response.headers),
+            body: Buffer.from(await response.arrayBuffer()),
+          });
+        });
       const response = await backend.fetch("/details");
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("x-sample-middleware"), "ran");
@@ -69,6 +105,7 @@ test(
         const browser = await engine.launch();
         try {
           const context = await browser.newContext({ ignoreHTTPSErrors: true });
+          await useBundledAssets(context);
           const page = await context.newPage();
           const about = await backend.fetch("/about");
           assert.equal(about.status, 200);
@@ -170,6 +207,7 @@ test(
             storageState: state,
             ignoreHTTPSErrors: true,
           });
+          await useBundledAssets(restarted);
           const restored = await restarted.newPage();
           await restored.goto(new URL("/account", backend.url).href);
           await expect(restored.locator("#owner")).toHaveText("alice");
@@ -192,7 +230,19 @@ test(
           await browser.close();
         }
       }
+      assert.ok([...localAssets].some((path) => path.endsWith(".js")));
+      assert.ok([...localAssets].some((path) => path.endsWith(".css")));
+      assert.ok(localAssets.has("/mark.svg"));
+      assert.deepEqual(
+        backend.requests.filter((request) =>
+          assets.includes(new URL(request.path, backend.url).pathname),
+        ),
+        [],
+        "Bundled assets must not reach the remote Worker",
+      );
     } finally {
+      if (server)
+        await new Promise((resolve) => server.httpServer.close(resolve));
       await backend.close();
     }
   },

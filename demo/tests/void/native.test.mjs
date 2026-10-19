@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { build } from "esbuild";
@@ -52,6 +52,7 @@ test(
     });
     await runNativeAcceptance({
       backend,
+      publicDir: join(root, "dist/client"),
       worker: join(root, "dist/ssr/index.js"),
       workerConfig: join(root, "dist/ssr/wrangler.json"),
       artifacts: fileURLToPath(
@@ -63,6 +64,29 @@ test(
           platform,
         );
         assert.ok(backend.reports.some((r) => r.stage === "action"));
+        const assets = JSON.parse(
+          await readFile(
+            new URL(
+              "../../opennext/www/workers-capacitor-assets.json",
+              import.meta.url,
+            ),
+            "utf8",
+          ),
+        );
+        const clientFiles = await readdir(join(root, "dist/client/assets"));
+        assert.ok(clientFiles.some((file) => file.endsWith(".js")));
+        for (const file of clientFiles)
+          assert.ok(
+            assets.includes("/assets/" + file),
+            `Missing bundled Void asset: ${file}`,
+          );
+        assert.deepEqual(
+          backend.requests.filter((request) =>
+            assets.includes(new URL(request.path, backend.url).pathname),
+          ),
+          [],
+          "Bundled assets must never reach the remote Worker",
+        );
         assert.equal(
           (
             await db

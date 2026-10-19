@@ -27,9 +27,13 @@ placeholder for local tests.
 ## Execution
 
 The normal Capacitor build reads `wrangler.jsonc`. Because this application uses
-D1 and asset-first routing, **the whole request executes on the remote Worker**.
+D1 and asset-first routing, page requests and API requests execute on the remote Worker.
+`publicDir` bundles `.open-next/assets` into the app: JavaScript, CSS and static
+images are served locally, including those used for hydration and navigation.
 Next.js server code, SQL and credentials are not shipped in the native bundle.
-The build report is `www/workers-capacitor-server.json`.
+The build report is `www/workers-capacitor-server.json`; its `worker` mode describes
+the server handler, not bundled asset delivery. Build both sides from the same
+application version. See [asset boundaries](../../docs/opennext.md#bundle-client-assets-alongside-remote-pages).
 
 `capacitor/main.ts` sets the deployed HTTPS origin and renders `/`. Next.js owns
 the HTML, navigation and client hydration. The small `capacitor/index.html` only
@@ -57,7 +61,7 @@ OPENNEXT_PLATFORM=ios OPENNEXT_DEVICE=<simulator-id> node --test tests/opennext/
 OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=<emulator-id> node --test tests/opennext/native.test.mjs
 ```
 
-The native remote scenario also checks calls, native events and rejected calls from a test-only Capacitor plugin before and after navigation and process restart. The plugin and driver live under `../tests/`; they are not application dependencies.
+The native scenario rejects any remote request for a bundled asset and also checks calls, native events and rejected calls from a test-only Capacitor plugin before and after navigation and process restart. The plugin and driver live under `../tests/`; they are not application dependencies.
 
 The browser integration uses workerd, a disposable D1 database and a local HTTPS
 endpoint. No Cloudflare account or deployed service is required. The default native tests

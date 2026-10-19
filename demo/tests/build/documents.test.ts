@@ -3,7 +3,7 @@ import { build as viteBuild } from "vite";
 import { build as esbuildBuild } from "esbuild";
 import { workersCapacitorPlugin as vitePlugin } from "workers-capacitor/tooling/vite";
 import { workersCapacitorPlugin as esbuildPlugin } from "workers-capacitor/tooling/esbuild";
-import { mkdtemp, readFile, rm, readdir } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 const directories: string[] = [];
@@ -20,15 +20,20 @@ for (const framework of ["hono", "express"])
       const worker = resolve(
         `tests/fixtures/workers/rendering/${framework}.${framework === "hono" ? "tsx" : "ts"}`,
       );
+      const publicDir = resolve("tests/fixtures/apps/native-documents/public");
       if (builder === "vite")
         await viteBuild({
           configFile: false,
           root,
+          publicDir,
           logLevel: "silent",
           plugins: [vitePlugin({ worker })],
           build: { outDir: outdir, emptyOutDir: true },
         });
-      else
+      else {
+        // esbuild has no publicDir: copy public assets before building so the
+        // plugin records them in the same native document manifest as Vite.
+        await cp(publicDir, outdir, { recursive: true });
         await esbuildBuild({
           entryPoints: [join(root, "main.ts")],
           bundle: true,
@@ -40,6 +45,7 @@ for (const framework of ["hono", "express"])
           plugins: [esbuildPlugin({ worker })],
           logLevel: "silent",
         });
+      }
       const manifest = JSON.parse(
         await readFile(join(outdir, "workers-capacitor-assets.json"), "utf8"),
       );
@@ -55,6 +61,11 @@ for (const framework of ["hono", "express"])
                 .replaceAll("\\", "/"),
           );
       }
+      expect(manifest).toContain("/rendering/module.js");
+      expect(manifest).toContain("/rendering/style.css");
+      expect(await readFile(join(outdir, "rendering/module.js"), "utf8")).toBe(
+        await readFile(join(publicDir, "rendering/module.js"), "utf8"),
+      );
       expect(manifest).toContain("/index.html");
       expect(manifest).toContain("/workers-capacitor-sw.js");
       expect(manifest).not.toContain("/");

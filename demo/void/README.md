@@ -14,6 +14,6 @@ npm run test:void --prefix demo
 
 Tests live in `../tests/void/` and create an ephemeral local D1 database. They do not deploy or access a Cloudflare account. Chromium and WebKit must be installed through Playwright. CI runs this sample in its own parallel compatibility job.
 
-See [Void integration and limits](../../docs/void.md) for connecting the generated Worker to Capacitor. iOS simulator and Android emulator tests cover SSR, hydration, form actions, D1 persistence and client-only rendering using the published packages without router patches. This sample has no authentication; do not deploy it as a production data endpoint.
+See [Void integration and limits](../../docs/void.md) for connecting the generated Worker to Capacitor. The Capacitor build copies `dist/client` through Vite’s `publicDir`; client assets are local while pages, loaders and actions remain remote. iOS simulator and Android emulator tests reject remote requests for bundled assets and cover SSR, hydration, form actions, D1 persistence and client-only rendering using the published packages without router patches. This sample has no authentication; do not deploy it as a production data endpoint.
 
 To run native acceptance, set `UPSTREAM_PLATFORM=ios|android` and `UPSTREAM_DEVICE` to a booted simulator/emulator, then run `node --test demo/tests/void/native.test.mjs` from the repository root. Run the two platforms serially because they share the test shell.
