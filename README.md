@@ -1,18 +1,12 @@
 # workers-capacitor
 
-**Bring Cloudflare Workers apps to iOS and Android.**
+Bring Cloudflare Workers apps to iOS and Android.
 
 You built a web app. Now put it on your phone.
 
 workers-capacitor brings your existing Workers application into an iOS or Android app with minimal application changes. Keep the pages you designed, the routes you wrote, and the forms and data that make it yours. Continue serving the web version from Cloudflare Workers, and add a mobile app alongside it.
 
-**Built with Void? Your app can make the same move.** Void React Pages + D1 works with the released Void 1.1.12 packages, including page rendering, interactive forms and navigation.
-
-<p align="center">
-  <img src="docs/assets/void-ios.png" width="260" alt="Void's React Pages starter running in an iOS simulator, displaying a message submitted through its form and saved in D1." />
-</p>
-
-_The Void starter running in an iOS simulator after submitting a message to D1. The same flow passes on Android. [Try the sample](demo/void) · [Connect your Void app](docs/void.md)_
+Void apps can make the same move. Void React Pages + D1 has been verified with Void 1.1.12 on an iOS simulator and Android emulator. [Connect your Void app](docs/void.md).
 
 ## Start with your app
 
@@ -24,7 +18,7 @@ _The Void starter running in an iOS simulator after submitting a message to D1. 
 | Hono or Workers Express | [Connect your existing Worker](docs/build-setup.md#frameworks) · [Rendering example](demo/rendering) |
 | Next.js / OpenNext      | [OpenNext integration](docs/opennext.md)                                                             |
 
-**0.1.0 Preview** — for trying integrations and giving feedback. Start with the [installation and integration guide](docs/integration.md) to add Capacitor, connect your Worker and run your app. It covers both existing Capacitor projects and your first mobile app. iOS development needs Xcode on macOS; Android development needs Android Studio and its SDK.
+0.1.0 Preview — for trying integrations and giving feedback. Start with the [installation and integration guide](docs/integration.md) to add Capacitor, connect your Worker and run your app. It covers both existing Capacitor projects and your first mobile app. iOS development needs Xcode on macOS; Android development needs Android Studio and its SDK.
 
 ### Working with an AI coding assistant?
 
