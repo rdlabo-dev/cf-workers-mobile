@@ -47,6 +47,8 @@ The `/session` path and 204 response above are an example application contract, 
 
 ## Acceptance tests
 
+For physical-device acceptance, use the [public HTTPS test issuer](../tests/authentication/live/README.md). Normal public Workers certificates require no certificate installation on the device. The local-certificate setup below is for simulator/emulator development only.
+
 The test issuer under `demo/tests/authentication` is local and uses a preauthenticated synthetic account. The real system browser follows its callback into the app, PKCE is checked, and a real workerd handler exchanges the resulting bearer token for an HttpOnly session. The public document API then renders the authenticated page using that session. The harness never deploys this issuer or contacts a real user's account. It is protocol/bridge acceptance, not a claim that every provider's login UI or policy has been verified.
 
 ```sh

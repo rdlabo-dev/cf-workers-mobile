@@ -13,10 +13,10 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
-    "void": "1.1.11",
+    "void": "1.1.12",
     "vite": "^8.0.10",
     "typescript": "^7.0.2",
-    "@void/react": "1.1.11",
+    "@void/react": "1.1.12",
     "oxc-transform-react": "^0.149.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3"

@@ -4,9 +4,11 @@
 
 Reuse your existing Worker's routes, HTML rendering and business logic in a Capacitor app, with minimal application changes. Configure the Worker entry in your Vite or esbuild build and initialize `workersCapacitor` in the app.
 
+**Built an app with Void? Bring it to iOS and Android.** Keep your React Pages and D1 logic on your Worker, and connect the app with workers-capacitor. [Get started with Void →](docs/void.md)
+
 Requests run locally in JavaScript where supported, without starting an HTTP server. Requests that need Cloudflare services can run on your existing deployed Worker. The package includes native WebView integration; it does not compile JavaScript to native code or recreate the Cloudflare runtime on the device.
 
-**0.1.0 Preview** is intended for integration and evaluation. APIs and compatibility boundaries may change before a stable release. Check the [application integration limits](docs/compatibility.md#application-integration-limits) before adopting it. Native scenarios have been tested in iOS simulators and Android emulators; physical-device acceptance remains outstanding.
+**0.1.0 Preview** is intended for integration and evaluation. APIs and compatibility boundaries may change before a stable release. Check the [application integration limits](docs/compatibility.md#application-integration-limits) before adopting it. Native scenarios have been tested in iOS simulators, Android emulators and on a Pixel 8a running Android 17. Selected packaged Hono/Express and remote OpenNext scenarios also run on an iPhone 15 Pro Max with iOS 27.0.1; this does not establish every application scenario on physical iOS.
 
 ## Contents
 
@@ -330,7 +332,7 @@ Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`,
 
 ### Void React Pages + D1
 
-[Void integration](docs/void.md) uses its generated Worker and configuration with the existing remote execution path. The React/D1 sample covers Chromium/WebKit, local workerd and Android document rendering. The pinned Void 1.1.11 router rejects the iOS custom scheme. Our [upstream fix for Capacitor navigation](https://github.com/voidzero-dev/void/pull/485) has been merged; the patched client passed iOS simulator and Android emulator integration tests, we are awaiting a Void release containing the fix and will revalidate that release before updating the supported baseline. Local Void execution remains unverified.
+[Void React Pages + D1](docs/void.md) is supported on iOS and Android through remote Worker execution with Void / @void/react **1.1.12**. The released packages pass SSR, hydration, form submission, D1 persistence and client-only page tests in an iOS simulator and Android emulator, with no router patches. See the guide for setup and verification scope.
 
 ### OpenNext + D1
 

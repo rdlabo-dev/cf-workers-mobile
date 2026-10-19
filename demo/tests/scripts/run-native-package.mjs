@@ -13,6 +13,29 @@ if (
   throw Error(
     "Usage: run-native-package.mjs ios|android hono|express <simulator UUID|emulator serial>",
   );
+const physicalIOS =
+  platform === "ios" && process.env.IOS_PHYSICAL_DEVICE === "1";
+if (physicalIOS && !process.env.IOS_DEVELOPMENT_TEAM)
+  throw Error("Set IOS_DEVELOPMENT_TEAM for physical iOS signing");
+const iosLaunch = (bundleId, console = false) =>
+  physicalIOS
+    ? [
+        "devicectl",
+        "device",
+        "process",
+        "launch",
+        "--device",
+        device,
+        ...(console ? ["--console", "--terminate-existing"] : []),
+        bundleId,
+      ]
+    : [
+        "simctl",
+        "launch",
+        ...(console ? ["--console-pty", "--terminate-running-process"] : []),
+        device,
+        bundleId,
+      ];
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const { consumer } = JSON.parse(
   await readFile(
@@ -79,13 +102,19 @@ const buildApp = async (label) => {
           "-configuration",
           "Debug",
           "-sdk",
-          "iphonesimulator",
+          physicalIOS ? "iphoneos" : "iphonesimulator",
           "-destination",
           `id=${device}`,
           "-derivedDataPath",
           join(output, "ios"),
           "-skipPackageUpdates",
-          "CODE_SIGNING_ALLOWED=NO",
+          ...(physicalIOS
+            ? [
+                "-allowProvisioningUpdates",
+                `DEVELOPMENT_TEAM=${process.env.IOS_DEVELOPMENT_TEAM}`,
+                "CODE_SIGN_STYLE=Automatic",
+              ]
+            : ["CODE_SIGNING_ALLOWED=NO"]),
           "build",
         ],
         { stdio: ["ignore", buildLog.fd, buildLog.fd] },
@@ -103,10 +132,13 @@ const buildApp = async (label) => {
 const installApp = () =>
   platform === "ios"
     ? run("xcrun", [
-        "simctl",
-        "install",
-        device,
-        join(output, "ios/Build/Products/Debug-iphonesimulator/App.app"),
+        ...(physicalIOS
+          ? ["devicectl", "device", "install", "app", "--device", device]
+          : ["simctl", "install", device]),
+        join(
+          output,
+          `ios/Build/Products/Debug-${physicalIOS ? "iphoneos" : "iphonesimulator"}/App.app`,
+        ),
       ])
     : adbRun([
         "install",
@@ -122,18 +154,10 @@ const receive = (chunk) => {
 };
 const launch = async () => {
   if (platform === "ios") {
-    child = spawn(
-      "xcrun",
-      [
-        "simctl",
-        "launch",
-        "--console-pty",
-        "--terminate-running-process",
-        device,
-        appId,
-      ],
-      { cwd: consumer, stdio: ["ignore", "pipe", "pipe"] },
-    );
+    child = spawn("xcrun", iosLaunch(appId, true), {
+      cwd: consumer,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
   } else {
     adbRun(["shell", "am", "force-stop", appId]);
     adbRun(["shell", "am", "start", "-n", appId + "/.MainActivity"]);
@@ -160,13 +184,13 @@ const terminate = async () => {
   try {
     // Pause first so WebView DOM storage commits the lifecycle stage before the
     // process is killed.
-    if (platform === "ios")
-      run("xcrun", ["simctl", "launch", device, "com.apple.Preferences"]);
+    if (platform === "ios") run("xcrun", iosLaunch("com.apple.Preferences"));
     else adbRun(["shell", "input", "keyevent", "KEYCODE_HOME"]);
     await sleep(1500);
   } catch {}
   try {
-    if (platform === "ios")
+    if (physicalIOS) child?.kill("SIGTERM");
+    else if (platform === "ios")
       run("xcrun", ["simctl", "terminate", device, appId]);
     else adbRun(["shell", "am", "force-stop", appId]);
   } catch {}
@@ -191,7 +215,16 @@ const waitMarker = (name, regex, timeout = 180000) =>
     );
     const poll = setInterval(() => {
       const match = log.slice(cursor).match(regex);
-      if (!match) return;
+      if (!match) {
+        if (child?.exitCode !== null && child?.exitCode !== undefined)
+          finish(
+            reject,
+            new Error(
+              `Native console exited before ${name}: ${log.slice(-4000)}`,
+            ),
+          );
+        return;
+      }
       cursor += match.index + match[0].length;
       finish(resolve, match);
     }, 100);
@@ -250,11 +283,10 @@ try {
   assert.equal(report.total, 50);
   assert.deepEqual(report.failed, []);
   // Background/foreground while the rendered document stays installed.
-  if (platform === "ios")
-    run("xcrun", ["simctl", "launch", device, "com.apple.Preferences"]);
+  if (platform === "ios") run("xcrun", iosLaunch("com.apple.Preferences"));
   else adbRun(["shell", "input", "keyevent", "KEYCODE_HOME"]);
   await sleep(2000);
-  if (platform === "ios") run("xcrun", ["simctl", "launch", device, appId]);
+  if (platform === "ios") run("xcrun", iosLaunch(appId));
   else adbRun(["shell", "am", "start", "-n", appId + "/.MainActivity"]);
   lifecycle.background = await waitLifecycle("background");
   await waitStop();
