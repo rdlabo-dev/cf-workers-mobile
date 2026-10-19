@@ -1,5 +1,9 @@
 # Contributing
 
+## Formatting
+
+Run `npm run format` from the repository root before submitting changes. `npm run format:check` checks the same files without modifying them and is required by the library CI job. Use the exact Prettier version in the root package; the demo uses the same configuration. Markdown prose keeps intentional line breaks (`proseWrap: "preserve"`). Generated files, native project scaffolding and upstream license text are excluded in `.prettierignore`.
+
 ## Complete compatibility units only
 
 We merge and release completed compatibility units. A useful subset, a working

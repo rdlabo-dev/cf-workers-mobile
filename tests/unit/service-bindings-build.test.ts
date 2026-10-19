@@ -2,7 +2,10 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
-import { serverBindings, compileServerWorker } from "../../src/tooling/server.js";
+import {
+  serverBindings,
+  compileServerWorker,
+} from "../../src/tooling/server.js";
 import { serverModules } from "../../src/tooling/server-modules.js";
 async function selector(source: string) {
   const result = await build({

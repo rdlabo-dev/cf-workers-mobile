@@ -1,29 +1,19 @@
 {
   "common": {
     "_http_common": {
-      "buildError": [
-        "Could not resolve \"node:_http_common\""
-      ]
+      "buildError": ["Could not resolve \"node:_http_common\""]
     },
     "_http_outgoing": {
-      "buildError": [
-        "Could not resolve \"node:_http_outgoing\""
-      ]
+      "buildError": ["Could not resolve \"node:_http_outgoing\""]
     },
     "_http_server": {
-      "buildError": [
-        "Could not resolve \"node:_http_server\""
-      ]
+      "buildError": ["Could not resolve \"node:_http_server\""]
     },
     "_stream_wrap": {
-      "buildError": [
-        "Could not resolve \"node:_stream_wrap\""
-      ]
+      "buildError": ["Could not resolve \"node:_stream_wrap\""]
     },
     "_tls_wrap": {
-      "buildError": [
-        "Could not resolve \"node:_tls_wrap\""
-      ]
+      "buildError": ["Could not resolve \"node:_tls_wrap\""]
     },
     "crypto": {
       "missing": [
@@ -68,12 +58,7 @@
         "verify",
         "webcrypto"
       ],
-      "extra": [
-        "createCredentials",
-        "listCiphers",
-        "prng",
-        "rng"
-      ]
+      "extra": ["createCredentials", "listCiphers", "prng", "rng"]
     },
     "events": {
       "missing": [
@@ -88,9 +73,7 @@
         "setMaxListeners",
         "usingDomains"
       ],
-      "extra": [
-        "init"
-      ]
+      "extra": ["init"]
     },
     "fs": {
       "missing": [
@@ -188,10 +171,7 @@
         "writev",
         "writevSync"
       ],
-      "extra": [
-        "clearVirtualFiles",
-        "registerVirtualFiles"
-      ]
+      "extra": ["clearVirtualFiles", "registerVirtualFiles"]
     },
     "fs/promises": {
       "missing": [
@@ -400,16 +380,11 @@
       "extra": []
     },
     "util": {
-      "missing": [
-        "getCallSite",
-        "getCallSites"
-      ],
+      "missing": ["getCallSite", "getCallSites"],
       "extra": []
     },
     "util/types": {
-      "buildError": [
-        "Could not resolve \"node:util/types\""
-      ]
+      "buildError": ["Could not resolve \"node:util/types\""]
     },
     "zlib": {
       "missing": [
@@ -548,27 +523,14 @@
   },
   "chromium": {
     "console": {
-      "missing": [
-        "Console"
-      ],
-      "extra": [
-        "memory"
-      ]
+      "missing": ["Console"],
+      "extra": ["memory"]
     }
   },
   "webkit": {
     "console": {
-      "missing": [
-        "Console",
-        "context",
-        "createTask"
-      ],
-      "extra": [
-        "record",
-        "recordEnd",
-        "screenshot",
-        "takeHeapSnapshot"
-      ]
+      "missing": ["Console", "context", "createTask"],
+      "extra": ["record", "recordEnd", "screenshot", "takeHeapSnapshot"]
     }
   }
 }

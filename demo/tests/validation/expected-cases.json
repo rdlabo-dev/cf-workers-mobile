@@ -1,10 +1,5 @@
 {
-  "fetch.basic": [
-    "request",
-    "response",
-    "missing",
-    "head"
-  ],
+  "fetch.basic": ["request", "response", "missing", "head"],
   "kv.local.v1": [
     "missing",
     "roundtrip",
@@ -25,10 +20,7 @@
     "unicodeKeys",
     "unicodeValues"
   ],
-  "engine.wasm-validation": [
-    "valid",
-    "invalid"
-  ],
+  "engine.wasm-validation": ["valid", "invalid"],
   "node.path": [
     "joinNormalize",
     "resolveAbsolute",
@@ -193,13 +185,7 @@
     "userInfo",
     "constants"
   ],
-  "node.tty": [
-    "exports",
-    "isatty",
-    "readStream",
-    "writeStream",
-    "callbacks"
-  ],
+  "node.tty": ["exports", "isatty", "readStream", "writeStream", "callbacks"],
   "node.wasi": [
     "exports",
     "unsupported",
@@ -210,18 +196,8 @@
     "returnOnExit",
     "prototype"
   ],
-  "node.punycode": [
-    "exports",
-    "rfcVectors",
-    "unicode",
-    "domains",
-    "errors"
-  ],
-  "node.constants": [
-    "exports",
-    "values",
-    "descriptors"
-  ],
+  "node.punycode": ["exports", "rfcVectors", "unicode", "domains", "errors"],
+  "node.constants": ["exports", "values", "descriptors"],
   "node.v8": [
     "exports",
     "statistics",
@@ -235,13 +211,7 @@
     "startupSnapshot",
     "queryObjects"
   ],
-  "node.http2": [
-    "exports",
-    "constants",
-    "settings",
-    "packing",
-    "unsupported"
-  ],
+  "node.http2": ["exports", "constants", "settings", "packing", "unsupported"],
   "node.vm": [
     "exports",
     "context",
@@ -261,13 +231,7 @@
     "forkValidation",
     "prototype"
   ],
-  "node.cluster": [
-    "exports",
-    "platform",
-    "unsupported",
-    "worker",
-    "events"
-  ],
+  "node.cluster": ["exports", "platform", "unsupported", "worker", "events"],
   "node.dgram": [
     "exports",
     "construction",
@@ -286,14 +250,7 @@
     "promisesIdentity",
     "prototypes"
   ],
-  "node.domain": [
-    "exports",
-    "creation",
-    "noops",
-    "run",
-    "callbacks",
-    "events"
-  ],
+  "node.domain": ["exports", "creation", "noops", "run", "callbacks", "events"],
   "node.readline": [
     "exports",
     "terminal",
@@ -312,12 +269,7 @@
     "recoverable",
     "prototype"
   ],
-  "node.sqlite": [
-    "exports",
-    "constants",
-    "constructors",
-    "backup"
-  ],
+  "node.sqlite": ["exports", "constants", "constructors", "backup"],
   "node.test": [
     "exports",
     "fn",
@@ -429,18 +381,9 @@
     "cloneError",
     "close"
   ],
-  "node._http_agent": [
-    "surface",
-    "identity"
-  ],
-  "node._http_client": [
-    "surface",
-    "identity"
-  ],
-  "node._http_incoming": [
-    "surface",
-    "identity"
-  ],
+  "node._http_agent": ["surface", "identity"],
+  "node._http_client": ["surface", "identity"],
+  "node._http_incoming": ["surface", "identity"],
   "node._tls_common": [
     "surface",
     "construction",
@@ -485,10 +428,7 @@
     "realpathSync",
     "enoent"
   ],
-  "node.module": [
-    "builtin",
-    "createRequire"
-  ],
+  "node.module": ["builtin", "createRequire"],
   "node.stream-web": [
     "constructors",
     "globals",
@@ -572,28 +512,10 @@
     "pipelineCallback",
     "bufferHelpers"
   ],
-  "node._stream_readable": [
-    "identity",
-    "behavior"
-  ],
-  "node._stream_writable": [
-    "identity",
-    "behavior"
-  ],
-  "node._stream_duplex": [
-    "identity",
-    "behavior"
-  ],
-  "node._stream_transform": [
-    "identity",
-    "behavior"
-  ],
-  "node._stream_passthrough": [
-    "identity",
-    "behavior"
-  ],
-  "node.stream/promises": [
-    "identity",
-    "pipeline"
-  ]
+  "node._stream_readable": ["identity", "behavior"],
+  "node._stream_writable": ["identity", "behavior"],
+  "node._stream_duplex": ["identity", "behavior"],
+  "node._stream_transform": ["identity", "behavior"],
+  "node._stream_passthrough": ["identity", "behavior"],
+  "node.stream/promises": ["identity", "pipeline"]
 }

@@ -100,7 +100,8 @@ it("rejects oversized writes before changing storage", async () => {
 });
 
 it("runs the reusable contract against implementations and detects lost writes", async () => {
-  const { kvContract } = await import("../../src/cloudflare/bindings/kv/contract");
+  const { kvContract } =
+    await import("../../src/cloudflare/bindings/kv/contract");
   const { runContract, assertContract } =
     await import("../../src/shared/contracts/testing");
   class IsolatedKV extends LocalStorageKV {

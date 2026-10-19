@@ -2,8 +2,7 @@ import { brotliCompressSync } from "node:zlib";
 import { expect, it, vi } from "vitest";
 // Exercise the published JS/WASM compilation, not a test-only WASM loader.
 const { decompressBrotli } = (await import(
-  new URL("../../../dist/shared/brotli/index.js", import.meta.url)
-    .href
+  new URL("../../../dist/shared/brotli/index.js", import.meta.url).href
 )) as typeof import("./index.js");
 
 function source(bytes: Uint8Array, size: number) {

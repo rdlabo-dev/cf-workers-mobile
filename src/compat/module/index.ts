@@ -18,9 +18,7 @@ export const builtinModules = [
   "util",
 ];
 export function isBuiltin(specifier: string): boolean {
-  const name = specifier.startsWith("node:")
-    ? specifier.slice(5)
-    : specifier;
+  const name = specifier.startsWith("node:") ? specifier.slice(5) : specifier;
   return builtinModules.includes(name);
 }
 export function createRequire(_filename: string | URL) {

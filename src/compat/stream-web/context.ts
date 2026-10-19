@@ -1,4 +1,7 @@
-import { nativeStreams, nativeStreamsSymbol } from "../../shared/globals/platform.js";
+import {
+  nativeStreams,
+  nativeStreamsSymbol,
+} from "../../shared/globals/platform.js";
 import { bindCallback } from "../async-hooks/callbacks.js";
 /** Capture stream callbacks without replacing the globals when ALS starts. */
 export function contextConstructor<T extends new (...args: any[]) => any>(
