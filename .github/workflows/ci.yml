@@ -29,6 +29,7 @@ jobs:
           cache-dependency-path: package.json
       - run: npm install
       - run: npm run format:check
+      - run: node --test .github/scripts/npm-release.test.mjs
       - run: npm run typecheck
       - run: node scripts/url-idna/bundle-url.mjs --check
       - run: npm run build

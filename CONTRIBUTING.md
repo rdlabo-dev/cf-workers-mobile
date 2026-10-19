@@ -125,3 +125,17 @@ registration lives in `src/tooling/shared.ts`, not separate Vite/esbuild lists.
 Keep exploratory probes outside required acceptance; use `test:node-boundaries`
 in the demo when investigating engine differences. Never promote a probe result
 or a namespace match to full behavioral support.
+
+## npm releases
+
+| Trigger                                                                   | npm dist-tag | Version                                    |
+| ------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
+| PR merged into `main`, after Compatibility succeeds for that merge commit | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
+| Stable tag such as `v0.1.1`                                               | `latest`     | `0.1.1`                                    |
+| Prerelease/revision tag such as `v0.2.0-rc.1`                             | `next`       | `0.2.0-rc.1`                               |
+
+Direct pushes and PR branches do not publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
+
+For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility to pass on main. Then tag that commit and push the tag, for example `git tag v0.1.1` followed by `git push origin v0.1.1`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
+
+The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `workers-capacitor`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
