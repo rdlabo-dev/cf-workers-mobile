@@ -1,11 +1,8 @@
 import { defineConfig } from "vite";
 import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
 import { fileURLToPath } from "node:url";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
-const server = here("../../../opennext/.open-next/server-functions/default");
-const files = await readdir(server, { recursive: true });
 // Test-only public-page profile: no cloud bindings are available in this runtime.
 export default defineConfig({
   root: here("."),
@@ -34,15 +31,6 @@ export default defineConfig({
           : "../../../opennext/.open-next/worker.js",
       ),
       workerConfig: here("wrangler.json"),
-      workerFiles: process.env.VITE_REPORT_ORIGIN
-        ? files
-            .filter(
-              (path) =>
-                path.endsWith("package.json") ||
-                (path.startsWith(".next/") && path.endsWith(".json")),
-            )
-            .map((path) => join(server, path))
-        : undefined,
     }),
   ],
   build: {

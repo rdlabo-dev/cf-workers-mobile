@@ -7,14 +7,44 @@ these paths and keeps its test drivers outside the application.
 
 ## Execution and configuration
 
+### Route execution
+
+For OpenNext 1.20.12 with Next.js 15.5.28 App Router output, the Vite and esbuild plugins can separate explicitly selected static GET routes. Point `worker` at the ordinary generated Worker; no additional preparation script or Worker wrapper is required:
+
+```ts
+workersCapacitorPlugin({
+  worker: "../.open-next/worker.js",
+  assetsExecution: "remote",
+  execution: [
+    { method: "GET", path: "/" },
+    { method: "GET", path: "/api/message" },
+  ],
+});
+```
+
+The plugin uses the existing `.next` and `.open-next` output to generate a separate local entry. It does not run `next build` or overwrite the deployed Worker. Permissions apply to route registration paths; wildcard and RegExp selection follow the same rules as Hono permissions. Actual request matching remains exact for the supported static routes.
+
+Routes matched by middleware, dynamic/grouped routes, unselected paths, non-GET methods, credential-bearing requests and Next protocol requests remain remote. RSC navigation, Server Actions and local middleware execution are not supported by this route-splitting path. The build report explains which registrations stay remote. If the selected output still needs a Cloudflare environment, the whole selection remains remote.
+
+This integration accepts the standard `defineCloudflareConfig` configuration with `incrementalCache`, `tagCache` and `queue` set to `"dummy"`. Other versions, custom OpenNext configuration, Next rewrites/headers/custom redirects/base paths, and non-public generated environment data remain remote. Keep the original Worker deployed and configure the runtime's `remote.origin` as usual. Generated runtime files must remain alongside the Worker entry.
+
+Route permission includes the selected implementation and retained dependencies. It is not secret detection: review shared code and fixed data before permitting distribution. The plugin isolates known Next-generated preview/action keys in the local output; that does not sanitize arbitrary application credentials. Explicit `workerFiles` and copied public assets remain the application's responsibility.
+
+The [route execution fixture](../demo/tests/opennext/split/README.md) covers Vite/esbuild and Chromium/WebKit. Native route-splitting acceptance remains unverified.
+
+### Whole-Worker execution
+
 - With D1 and asset-first routing, the generated OpenNext Worker executes
   remotely as a whole for requests not served by bundled assets. Configure `worker: ".open-next/worker.js"`,
   `assetsExecution: "remote"` and the deployed HTTPS `remote.origin`.
-  No server application or virtual filesystem files are shipped to the device;
-  `workerFiles` is unnecessary for this configuration.
+  The server application is excluded from the device bundle. Leave `workerFiles`
+  unset: explicitly selected files are still distributed and are unnecessary here.
 - Local execution uses the generated Worker in a Dedicated Worker. The sample's
   test-only profile covers public SSR pages, client hydration, static images/CSS,
   Next.js links and middleware. It does not provide D1 or local ASSETS.
+  This demonstrates execution, not a distributable AppShell: the generated
+  server JavaScript can still contain server-only code and Next-generated keys.
+  Removing filesystem metadata does not make that JavaScript safe to distribute.
 - The Vite plugin transforms builtin `require()` calls inside generated ESM
   `.mjs` files. This is a Capacitor build setting; the Cloudflare build stays
   independent.
@@ -58,28 +88,25 @@ See the [Node inventory](compatibility.md) for remaining runtime restrictions.
 | `node:util`                          | Module-owned util implementation and shared contracts, with remaining export/engine gaps listed in the inventory.                                                                                                                        |
 | Other `node:*`                       | Module-owned implementations plus dependency fallbacks; the current alias table is `src/tooling/shared.ts`. Importability is not whole-module acceptance; see the Node inventory.                                                        |
 
-## Embedding traced files (`workerFiles`)
+## Explicit runtime files (`workerFiles`)
 
-For a local generated OpenNext `worker.js` entry, both bundler plugins collect
-`.next` JSON manifests and traced `package.json` files automatically. Generated
-JavaScript, source maps, NFT traces and build-analysis output are not embedded
-as filesystem data. Remote Worker replacements do not collect server files.
+Server build directories are not copied into the device filesystem. A `.json`
+extension does not establish that a file is public: Next.js manifests can contain
+server-generated keys and configuration. The tested local renderer does not need
+these files copied alongside its bundled code.
 
-Additional application data read through `node:fs` must be listed in
-`workerFiles` as individual paths (not directories):
+Public application data read through `node:fs` can be selected with `workerFiles`
+as individual paths (not directories). These files are distributed verbatim;
+only select data intended for every app user:
 
 ```ts
 workersCapacitorPlugin({
-  worker: ".open-next/worker.js",
-  // Only needed when the application reads additional data files:
+  worker: "./src/worker.ts",
+  execution: "local", // Only for code and dependencies permitted on every device.
+  // Public data read by this local Worker:
   workerFiles: ["./templates/email.txt"],
 });
 ```
-
-The native local test wraps the generated entry to attach a test driver, so its
-[configuration](../demo/tests/opennext/local/vite.config.ts) supplies the same
-metadata explicitly. Automatic discovery applies to generated OpenNext entries,
-not arbitrary wrapper modules or arbitrary third-party runtime data.
 
 VFS lookups normalize separators and suffix-match, so absolute traced paths
 resolve regardless of the bundle's build-time directory.

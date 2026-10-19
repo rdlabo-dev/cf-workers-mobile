@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { build, type BuildOptions } from "esbuild";
 import { parseAst } from "rollup/parseAst";
+import { permitsPath } from "./route-permissions.js";
 import { transformAsync, type types } from "@babel/core";
 import type {
   Node,
@@ -944,31 +945,6 @@ async function partition(
   // Do not guess effective paths through mounts or aliases. They remain remote.
   const entries = [...registrations.values()].flat();
   for (const route of routePermissions) {
-    // Copy stateful expressions so each registration and rebuild is independent.
-    const pattern =
-      route.path instanceof RegExp
-        ? new RegExp(route.path.source, route.path.flags)
-        : undefined;
-    const matchesPath = (path: string | undefined) => {
-      if (path === undefined) return false;
-      if (typeof route.path === "string") {
-        if (path === route.path || route.path === "*" || route.path === "/*")
-          return true;
-        // Hono's trailing wildcard includes the base path. Only a literal
-        // prefix proves containment of another registration's entire pattern.
-        if (
-          route.path.endsWith("/*") &&
-          !/[:*{}?]/.test(route.path.slice(0, -2))
-        ) {
-          const base = route.path.slice(0, -2);
-          return path === base || path.startsWith(`${base}/`);
-        }
-        return false;
-      }
-      if (!pattern) return false;
-      pattern.lastIndex = 0;
-      return pattern.test(path);
-    };
     const matches = entries.filter(
       ({ router, call }) =>
         router === root &&
@@ -978,7 +954,7 @@ async function partition(
               property(call.callee) ?? "",
             )
           : property(call.callee) === route.method.toLowerCase()) &&
-        matchesPath(literal(call.arguments[0])),
+        permitsPath(route, literal(call.arguments[0])),
     );
     if (!matches.length)
       throw new Error(

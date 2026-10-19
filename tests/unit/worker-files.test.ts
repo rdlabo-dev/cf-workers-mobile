@@ -11,12 +11,14 @@ afterEach(async () => {
       .map((path) => rm(path, { recursive: true, force: true })),
   );
 });
-it("collects OpenNext runtime manifests and package metadata without bundling executable code or traces", async () => {
+it("embeds only explicitly selected public files, never adjacent server metadata", async () => {
   const root = await mkdtemp(join(tmpdir(), "worker-files-"));
   directories.push(root);
   const files = [
     ".next/required-server-files.json",
     ".next/server/app-paths-manifest.json",
+    ".next/server/server-reference-manifest.json",
+    ".next/prerender-manifest.json",
     "node_modules/next/package.json",
     "handler.mjs",
     "handler.mjs.meta.json",
@@ -30,35 +32,22 @@ it("collects OpenNext runtime manifests and package metadata without bundling ex
     await writeFile(path, file);
   }
   await writeFile(join(root, "template.txt"), "runtime template");
-  const embedded = JSON.parse(
-    (await readWorkerFiles(join(root, "worker.js"), root, ["template.txt"]))!,
-  );
+  const embedded = JSON.parse((await readWorkerFiles(root, ["template.txt"]))!);
   expect(
     Object.keys(embedded)
       .map((path) => path.slice(root.length + 1))
       .sort(),
-  ).toEqual([
-    "server-functions/default/.next/required-server-files.json",
-    "server-functions/default/.next/server/app-paths-manifest.json",
-    "server-functions/default/node_modules/next/package.json",
-    "template.txt",
-  ]);
+  ).toEqual(["template.txt"]);
   expect(
     Buffer.from(
       embedded[join(root, "template.txt")].base64,
       "base64",
     ).toString(),
   ).toBe("runtime template");
-  // A remote replacement must never embed the neighboring server's files.
-  expect(
-    await readWorkerFiles(
-      join(root, "worker.js.capacitor-server-local.js"),
-      root,
-    ),
-  ).toBeUndefined();
+  expect(await readWorkerFiles(root)).toBeUndefined();
 });
 it("does not add a filesystem to ordinary Workers", async () => {
   const root = await mkdtemp(join(tmpdir(), "worker-files-"));
   directories.push(root);
-  expect(await readWorkerFiles(join(root, "worker.js"), root)).toBeUndefined();
+  expect(await readWorkerFiles(root)).toBeUndefined();
 });
