@@ -64,6 +64,41 @@ for the entire request. Conservative whole-Worker fallback preserves shared
 state, additional exports, middleware and error handling. Review the generated
 `workers-capacitor-server.json` report.
 
+### What can move to the device
+
+When cloud bindings activate route partitioning, the existing Worker remains the
+baseline. A statically registered Hono handler can move only when its transitive
+dependencies resolve to application declarations, supported JavaScript/Web
+globals, or the supported Hono routing/rendering modules (`hono`, `hono/html`,
+`hono/jsx`, `hono/jsx/jsx-runtime`). Unknown host globals, outbound `fetch` and
+other package imports stay remote. `hono/adapter`, for example, is not a rendering
+dependency: it can access the server environment. No route annotations are needed.
+
+Standard globals are accepted only for supported direct calls, constructors,
+static method calls and constants (for example `JSON.stringify`,
+`Number.isSafeInteger` and `Math.floor`). Passing a global object as a value,
+aliasing it, reflection, mutation or unsupported static access keeps the whole
+Worker remote rather than attempting to follow arbitrary aliases. Supported Hono
+imports are also limited to direct calls, construction and template tags; passing
+them as values keeps the Worker remote. Dynamic code execution and access to a
+runtime constructor keep the whole Worker remote. Destructuring
+and object/array spread in a handler are not established local contracts and keep
+that handler remote. Workers-specific context access such as `executionCtx`,
+`event` and `Request.cf` also stays on the server.
+Unresolved computed property access keeps the whole Worker remote: it can acquire
+runtime capabilities or change shared prototypes, not just read application data.
+
+This dependency check is necessary, not sufficient. Binding access, overlapping
+middleware, fallthrough routes and shared state still determine the final request
+boundary. A locally eligible handler does not bypass server authentication on a
+matching middleware. Ambient state writes or uncertain routing keep the whole
+Worker remote. The report includes each registration's `reason`; its `remote`
+field describes that registration, not an authorization decision for a URL.
+
+The check does not certify arbitrary code as public or discover hardcoded secrets.
+It does not automatically partition Void or OpenNext generated server bundles,
+and `ssr: false` or prerendering is not a local execution contract.
+
 Durable Object HTTP and RPC calls inside the original HTTP handler are supported
 by this dispatch path. **WebSocket/HTTP upgrades are not supported by this
 transport** and reject explicitly. Use a separate connection to the deployed

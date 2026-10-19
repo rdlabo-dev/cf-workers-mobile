@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { build, type BuildOptions } from "esbuild";
 import { parseAst } from "rollup/parseAst";
+import { transformAsync, type types } from "@babel/core";
 import type {
   Node,
   Expression,
@@ -19,7 +20,13 @@ export interface ServerCompilation {
   local: string;
   selector: string;
   inputs: string[];
-  routes: { router: string; method: string; path: string; remote: boolean }[];
+  routes: {
+    router: string;
+    method: string;
+    path: string;
+    remote: boolean;
+    reason: string;
+  }[];
 }
 class WiderServerBoundary extends Error {}
 
@@ -115,7 +122,7 @@ export async function compileServerWorker(
   );
   try {
     if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);
-    return partition(source, bindings, inputs, localBindings, kvBindings);
+    return await partition(source, bindings, inputs, localBindings, kvBindings);
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
     return {
@@ -125,17 +132,240 @@ export async function compileServerWorker(
       local:
         'export default { fetch() { throw new Error("Server-only Worker reached local dispatch"); } };',
       selector: "export function needsRemote() { return true; }",
-      routes: [{ router: "worker", method: "all", path: "*", remote: true }],
+      routes: [
+        {
+          router: "worker",
+          method: "all",
+          path: "*",
+          remote: true,
+          reason: error.message,
+        },
+      ],
     };
   }
 }
-function partition(
+// A missing server binding is not proof of a local dependency. Resolve lexical
+// bindings with Babel (already used by the build), including shadowed parameters.
+// Network, process, caches and unknown host globals deliberately have no local
+// contract here. Request dispatch stays on the server when they are referenced.
+async function unresolvedReferences(source: string) {
+  const globals = new Set([
+    "undefined",
+    "NaN",
+    "Infinity",
+    "JSON",
+    "String",
+    "Number",
+    "Boolean",
+    "BigInt",
+    "Array",
+    "Object",
+    "Math",
+    "URL",
+    "URLSearchParams",
+    "TextEncoder",
+    "TextDecoder",
+    "Response",
+    "Request",
+    "Headers",
+    "Promise",
+    "RegExp",
+    "Error",
+    "TypeError",
+    "RangeError",
+  ]);
+  const staticCalls: Record<string, string[]> = {
+    JSON: ["parse", "stringify"],
+    Math: [
+      "abs",
+      "ceil",
+      "floor",
+      "round",
+      "trunc",
+      "min",
+      "max",
+      "pow",
+      "sqrt",
+      "sign",
+      "random",
+    ],
+    Number: [
+      "isFinite",
+      "isInteger",
+      "isNaN",
+      "isSafeInteger",
+      "parseFloat",
+      "parseInt",
+    ],
+    String: ["fromCharCode", "fromCodePoint", "raw"],
+    Array: ["isArray", "from", "of"],
+    Object: ["is"],
+    Promise: ["resolve", "reject", "all", "allSettled", "race", "any"],
+    Response: ["json", "redirect", "error"],
+    URL: ["canParse", "parse"],
+  };
+  const staticValues: Record<string, string[]> = {
+    Math: ["E", "LN2", "LN10", "LOG2E", "LOG10E", "PI", "SQRT1_2", "SQRT2"],
+    Number: [
+      "EPSILON",
+      "MAX_SAFE_INTEGER",
+      "MIN_SAFE_INTEGER",
+      "MAX_VALUE",
+      "MIN_VALUE",
+      "NaN",
+      "NEGATIVE_INFINITY",
+      "POSITIVE_INFINITY",
+    ],
+  };
+  const unresolved = new Set<number>();
+  await transformAsync(source, {
+    configFile: false,
+    babelrc: false,
+    sourceType: "module",
+    code: false,
+    ast: false,
+    plugins: [
+      () => ({
+        visitor: {
+          ThisExpression(path) {
+            unresolved.add(path.node.start!);
+          },
+          ObjectPattern(path) {
+            if (
+              path.node.properties.some(
+                (property) =>
+                  property.type === "ObjectProperty" &&
+                  (property.computed ||
+                    (property.key.type === "Identifier" &&
+                      ["constructor", "__proto__"].includes(
+                        property.key.name,
+                      )) ||
+                    (property.key.type === "StringLiteral" &&
+                      ["constructor", "__proto__"].includes(
+                        property.key.value,
+                      ))),
+              )
+            )
+              throw new WiderServerBoundary(
+                "Dynamic runtime access requires a single Worker boundary",
+              );
+            unresolved.add(path.node.start!);
+          },
+          SpreadElement(path) {
+            unresolved.add(path.node.start!);
+          },
+          MetaProperty(path) {
+            unresolved.add(path.node.start!);
+          },
+          AssignmentExpression(path) {
+            let target: types.Node = path.node.left;
+            while (target.type === "MemberExpression") target = target.object;
+            if (
+              target.type !== "Identifier" ||
+              !path.scope.getBinding(target.name)
+            )
+              throw new WiderServerBoundary(
+                "Writes to ambient state require a single Worker boundary",
+              );
+          },
+          UpdateExpression(path) {
+            let target: types.Node = path.node.argument;
+            while (target.type === "MemberExpression") target = target.object;
+            if (
+              target.type !== "Identifier" ||
+              !path.scope.getBinding(target.name)
+            )
+              throw new WiderServerBoundary(
+                "Writes to ambient state require a single Worker boundary",
+              );
+          },
+          ReferencedIdentifier(path) {
+            const name = path.node.name;
+            const binding = path.scope.getBinding(name);
+            if (binding) {
+              if (binding.kind === "module") {
+                const declaration = binding.path.parentPath;
+                if (
+                  declaration?.isImportDeclaration() &&
+                  [
+                    "hono",
+                    "hono/html",
+                    "hono/jsx",
+                    "hono/jsx/jsx-runtime",
+                  ].includes(declaration.node.source.value)
+                ) {
+                  const use = path.parentPath;
+                  if (
+                    !(
+                      ((use.isCallExpression() || use.isNewExpression()) &&
+                        use.node.callee === path.node) ||
+                      (use.isTaggedTemplateExpression() &&
+                        use.node.tag === path.node)
+                    )
+                  )
+                    throw new WiderServerBoundary(
+                      "Escaped rendering import requires a single Worker boundary",
+                    );
+                }
+              }
+              return;
+            }
+            if (["eval", "Function", "Reflect", "Proxy"].includes(name))
+              throw new WiderServerBoundary(
+                "Dynamic runtime access requires a single Worker boundary",
+              );
+            if (!globals.has(name)) {
+              unresolved.add(path.node.start!);
+              return;
+            }
+            if (["undefined", "NaN", "Infinity"].includes(name)) return;
+            const parent = path.parentPath;
+            if (
+              (parent.isCallExpression() || parent.isNewExpression()) &&
+              parent.node.callee === path.node &&
+              !["Math", "JSON"].includes(name)
+            )
+              return;
+            if (
+              parent.isMemberExpression() &&
+              parent.node.object === path.node
+            ) {
+              const key =
+                !parent.node.computed &&
+                parent.node.property.type === "Identifier"
+                  ? parent.node.property.name
+                  : parent.node.computed &&
+                      parent.node.property.type === "StringLiteral"
+                    ? parent.node.property.value
+                    : undefined;
+              if (key && staticValues[name]?.includes(key)) return;
+              const use = parent.parentPath;
+              if (
+                key &&
+                staticCalls[name]?.includes(key) &&
+                use.isCallExpression() &&
+                use.node.callee === parent.node
+              )
+                return;
+            }
+            // Do not chase aliases, reflection or arbitrary mutation of host objects.
+            throw new WiderServerBoundary(
+              "Escaped or unsupported use of a standard global requires a single Worker boundary",
+            );
+          },
+        },
+      }),
+    ],
+  });
+  return unresolved;
+}
+async function partition(
   source: string,
   bindings: string[],
   inputs: string[],
   localBindings: string[],
   kvBindings: string[],
-): ServerCompilation {
+): Promise<ServerCompilation> {
   const program = parseAst(source);
   const text = (node: Node) => {
     const span = node as Node & { start: number; end: number };
@@ -168,8 +398,9 @@ function partition(
         declarations.set(specifier.local.name, statement);
         if (
           typeof statement.source.value !== "string" ||
-          (statement.source.value !== "hono" &&
-            !statement.source.value.startsWith("hono/"))
+          !["hono", "hono/html", "hono/jsx", "hono/jsx/jsx-runtime"].includes(
+            statement.source.value,
+          )
         )
           opaqueImports.add(specifier.local.name);
         if (
@@ -501,6 +732,7 @@ function partition(
         sequence.calls.map((call) => ({ router, call })),
       );
     }
+  const unresolved = await unresolvedReferences(source);
   function closure(nodes: Node[]) {
     const result = new Set(nodes.flatMap((node) => [...names(node)]));
     for (const name of result) {
@@ -520,17 +752,15 @@ function partition(
   }
   function server(nodes: Node[]) {
     const dependencies = closure(nodes);
-    if (
-      [...dependencies].some(
-        (name) =>
-          bindings.includes(name) ||
-          environmentImports.has(name) ||
-          opaqueImports.has(name) ||
-          remoteState.has(name),
-      )
-    )
-      return true;
-    let remote = false;
+    let remote = [...dependencies].some(
+      (name) =>
+        bindings.includes(name) ||
+        environmentImports.has(name) ||
+        opaqueImports.has(name) ||
+        remoteState.has(name),
+    );
+    // A server-only handler can still affect other routes through runtime state.
+    // Always check whole-Worker boundaries, even after finding a remote binding.
     for (const node of [
       ...nodes,
       ...[...dependencies]
@@ -541,9 +771,13 @@ function partition(
         .filter((n): n is Node => !!n),
     ])
       walk(node, (child, parent) => {
+        if (unresolved.has((child as Node & { start: number }).start))
+          remote = true;
         const key = property(child);
         if (key && bindings.includes(key)) remote = true;
-        if (key === "constructor" || key === "__proto__") remote = true;
+        if (key === "constructor" || key === "__proto__")
+          fail("Dynamic runtime access requires a single Worker boundary");
+        if (["executionCtx", "event", "cf"].includes(key ?? "")) remote = true;
         // Passing an environment to unknown code or computing property names expands
         // the whole operation's server boundary, never retries a partially run route.
         if (
@@ -558,7 +792,7 @@ function partition(
           child.computed &&
           child.property.type !== "Literal"
         )
-          remote = true;
+          fail("Dynamic property access requires a single Worker boundary");
         if (
           child.type === "ImportExpression" ||
           (child.type === "Identifier" &&
@@ -690,6 +924,9 @@ function partition(
         method,
         path: paths.map(text).join(",") || "*",
         remote,
+        reason: remote
+          ? "Server dependency or dependency without a local execution contract"
+          : "Static Hono registration with resolved dependencies and supported globals; overlapping middleware and routes still apply",
       });
       const prefix = paths.length ? paths.map(text).join(",") + "," : "";
       // Every candidate is visited, so a fallthrough to a server handler is selected
@@ -732,7 +969,6 @@ function partition(
     }
     return lines.join("\n");
   }
-  const hasRemote = remoteErrors || routes.some((route) => route.remote);
   if (remoteErrors)
     fail("Server-backed error/not-found handling can apply to every request");
   return {
@@ -742,6 +978,6 @@ function partition(
       generate(selectorNeeded, selectorRegistrations) +
       `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return response.headers.get("x-cw-remote") === "1";`} }\n`,
     inputs,
-    routes: hasRemote ? routes : [],
+    routes,
   };
 }
