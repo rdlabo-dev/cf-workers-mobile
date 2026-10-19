@@ -65,7 +65,8 @@ ORM or driver version.
 
 ## Execution and code removal
 
-Statically analyzable Hono routes independent of server operations stay local.
+Statically analyzable Hono routes independent of server operations can stay local
+when they also satisfy the [distribution contract](cloudflare-bindings.md#what-can-move-to-the-device).
 When a matching operation needs Hyperdrive, the whole request goes to the
 existing Worker before any local application middleware executes. Imported
 helpers and server driver imports are removed with their handlers before client

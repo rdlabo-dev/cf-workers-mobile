@@ -350,8 +350,8 @@ it("moves a rendering route only when its transitive dependencies have a local c
 it("resolves function scopes instead of trusting every matching identifier name", async () => {
   const result = await compile({
     "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
-      function render(hostConfig) { return hostConfig.title; }
-      app.get('/local', c => c.text(render({title: 'local'})));
+      function render(hostConfig) { return hostConfig; }
+      app.get('/local', c => c.text(render('local')));
       app.get('/server', c => { const local = (hostConfig) => hostConfig; return c.text(local(hostConfig.SECRET)); });
       export default app;`,
   });
@@ -473,19 +473,15 @@ it("keeps destructured and Workers-specific context capabilities on the server",
   }
 });
 
-it("keeps supported direct standard operations local without allowing global aliases", async () => {
+it("does not confuse supported standard operations with permission to distribute their inputs", async () => {
   const result = await compile({
     "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
       app.get('/', c => c.text(JSON.stringify({n: Math.floor(Number(c.req.query('n'))), valid: Number.isSafeInteger(1)})));
       app.get('/db', c => c.json(c.env.DATABASE)); export default app;`,
   });
   const { needsRemote } = await selector(result.selector);
-  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(false);
-  const { default: worker } = await selector(result.local);
-  const response = await worker.fetch(
-    new Request("https://local.invalid/?n=1.7"),
-  );
-  expect(await response.json()).toEqual({ n: 1, valid: true });
+  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(true);
+  expect(result.local).not.toContain("isSafeInteger");
 });
 
 it("does not separate a rendering import from server-side changes through an alias", async () => {

@@ -66,38 +66,70 @@ state, additional exports, middleware and error handling. Review the generated
 
 ### What can move to the device
 
+The safety boundary is the original server behavior: moving code to the device
+must not broaden access to information or grant authority previously enforced by
+the server. Device bundles, including source maps, must be treated as readable and
+modifiable. A remotely dispatched route is not protected if its private data is
+still shipped in the local bundle.
+
+Response data and the code that produces it are different distribution units.
+For example, returning `settings.title` does not permit shipping
+`settings.apiSecret`, and returning a signature does not permit shipping its
+signing key. Likewise, data returned only after authentication must not become
+available to everyone who downloads the app. Runtime compatibility and purity
+alone establish none of these permissions.
+
 When cloud bindings activate route partitioning, the existing Worker remains the
-baseline. A statically registered Hono handler can move only when its transitive
-dependencies resolve to application declarations, supported JavaScript/Web
-globals, or the supported Hono routing/rendering modules (`hono`, `hono/html`,
-`hono/jsx`, `hono/jsx/jsx-runtime`). Unknown host globals, outbound `fetch` and
-other package imports stay remote. `hono/adapter`, for example, is not a rendering
-dependency: it can access the server environment. No route annotations are needed.
+baseline. Being able to execute a function in JavaScript is not enough to make its
+source distributable. A local candidate must also fit the supported response
+construction pattern: a straight-line `c.text`, `c.html`, `c.json`, `c.body` or
+`new Response`, using inline response values, request values, or explicitly local
+bindings. Simple helpers returning primitive values or `hono/html` templates are
+supported. A helper must use every argument and have no default parameters.
 
-Standard globals are accepted only for supported direct calls, constructors,
-static method calls and constants (for example `JSON.stringify`,
-`Number.isSafeInteger` and `Math.floor`). Passing a global object as a value,
-aliasing it, reflection, mutation or unsupported static access keeps the whole
-Worker remote rather than attempting to follow arbitrary aliases. Supported Hono
-imports are also limited to direct calls, construction and template tags; passing
-them as values keeps the Worker remote. Dynamic code execution and access to a
-runtime constructor keep the whole Worker remote. Destructuring
-and object/array spread in a handler are not established local contracts and keep
-that handler remote. Workers-specific context access such as `executionCtx`,
-`event` and `Request.cf` also stays on the server.
-Unresolved computed property access keeps the whole Worker remote: it can acquire
-runtime capabilities or change shared prototypes, not just read application data.
+Objects imported from application modules or JSON, object property projections,
+conditional helpers and arbitrary transformations stay on the server. Reading a
+public field is not permission to copy its siblings. Unsupported response options,
+ignored arguments and nonempty bodies with bodyless statuses also stay remote.
+Nested Response objects stay remote: serializing or coercing a Response does not
+necessarily expose its body, even though the body remains in the source.
+Public JSON literals are supported; duplicate properties and prototype fields are
+not. This intentionally favors a small distribution contract over a general
+JavaScript optimizer. JSX/component implementations outside this pattern remain
+remote, even when their dependencies can execute in a browser.
 
-This dependency check is necessary, not sufficient. Binding access, overlapping
-middleware, fallthrough routes and shared state still determine the final request
-boundary. A locally eligible handler does not bypass server authentication on a
-matching middleware. Ambient state writes or uncertain routing keep the whole
-Worker remote. The report includes each registration's `reason`; its `remote`
-field describes that registration, not an authorization decision for a URL.
+Execution checks still apply: unknown host globals, outbound `fetch`, opaque
+packages, `hono/adapter`, Workers-specific context and unknown environment values
+stay remote. Escaped globals or rendering imports, dynamic runtime capabilities,
+ambient mutation and unproven shared state can keep the whole Worker remote.
+Only lexical variable references pull declarations into generated code; matching
+property names do not import unrelated application data.
 
-The check does not certify arbitrary code as public or discover hardcoded secrets.
-It does not automatically partition Void or OpenNext generated server bundles,
-and `ssr: false` or prerendering is not a local execution contract.
+Remote middleware and overlapping handlers remove the protected handler and its
+exclusive dependencies from the client bundle, not just from local execution.
+The build uses conservative static path prefixes only to establish disjointness;
+it does not implement a second Hono router. Uncertain mounted-router boundaries
+and overlapping local responses keep the whole Worker remote. A middleware is
+locally eligible only for unconditional `await next()` and response-header writes.
+Disjoint public pages can still render locally. KV operations explicitly configured
+as local continue to use device storage; a request that also requires a cloud
+service executes entirely on the deployed Worker.
+
+The generated report includes each registration's `reason` and its final
+`remote` decision after distribution boundaries are applied. No new route
+annotations or configuration options are required.
+
+These checks do not classify the meaning of every literal. Values intentionally
+returned by an unprotected supported handler are treated as response data, not
+as secrets. Authentication implemented outside the Worker, such as an upstream
+access policy, is not inferred from its source. Do not rely on a private URL,
+obfuscation or a private source repository to protect bundled data. Do not place
+secrets in client `env`, bundler defines, `workerFiles` or public assets.
+
+Partitioning is activated by discovered/configured cloud dependencies; an app
+without those dependencies does not automatically receive this source-removal
+analysis. This is not a general secret scanner or automatic partitioning of Void
+or OpenNext bundles. `ssr: false` and prerendering are not distribution contracts.
 
 Durable Object HTTP and RPC calls inside the original HTTP handler are supported
 by this dispatch path. **WebSocket/HTTP upgrades are not supported by this
@@ -140,6 +172,14 @@ unit is build-generated HTTP dispatch, not local emulation of cloud binding APIs
 
 - `npm test`: binding discovery, policy errors, unknown binding diagnostics,
   server code exclusion, remote routing precedence and upgrade rejection.
+  Distribution cases inspect both minified JavaScript and source maps, including
+  protected HTML/JSON, mixed public/private configuration, helper branches,
+  ignored values and mounted/overlapping routes.
+- `npm run test:d1-migration` in `demo`: workerd/browser dispatch checks and
+  Vite/esbuild builds that retain independent public rendering while excluding
+  protected data from every emitted asset. The protected fixture also checks
+  original Hono behavior: unauthenticated requests receive 401 and authenticated
+  requests receive the private response.
 - `npm run test:cloudflare-bindings` in `demo`: real workerd Durable Object HTTP,
   RPC and storage, authorization rejection without state changes, remote ASSETS,
   Vite/esbuild artifact inspection, Chromium/WebKit direct/Worker modes, both

@@ -54,7 +54,10 @@ imports and re-exports, helpers, mounted routers, chained registrations and
 middleware. It generates a selector with the same Hono matching rules. If any
 matching operation requires server execution, the entire request goes to the
 existing Worker **before any local application middleware or handler runs**.
-This also covers fallthrough and overlapping routes. Pure routes remain local.
+This also covers fallthrough and overlapping routes. Local candidates must also
+satisfy the [distribution contract](cloudflare-bindings.md#what-can-move-to-the-device).
+A pure function is not automatically public: protected handlers and dependencies
+outside that contract are excluded from the generated client code.
 
 D1 bindings, server `env` values, unknown dependency behavior, dynamic property
 access, and mutable state shared with server operations widen the server boundary.

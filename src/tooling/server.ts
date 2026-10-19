@@ -218,6 +218,7 @@ async function unresolvedReferences(source: string) {
     ],
   };
   const unresolved = new Set<number>();
+  const references = new Map<number, string>();
   await transformAsync(source, {
     configFile: false,
     babelrc: false,
@@ -282,6 +283,8 @@ async function unresolvedReferences(source: string) {
           ReferencedIdentifier(path) {
             const name = path.node.name;
             const binding = path.scope.getBinding(name);
+            if (!binding || binding.scope.path.isProgram())
+              references.set(path.node.start!, name);
             if (binding) {
               if (binding.kind === "module") {
                 const declaration = binding.path.parentPath;
@@ -357,7 +360,7 @@ async function unresolvedReferences(source: string) {
       }),
     ],
   });
-  return unresolved;
+  return { unresolved, references };
 }
 async function partition(
   source: string,
@@ -659,6 +662,14 @@ async function partition(
           typeof call.arguments[0].value !== "string"
         )
           fail("basePath requires a static path");
+        if (
+          !/^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?)?$/.test(
+            call.arguments[0].value,
+          )
+        )
+          fail(
+            "Patterned basePath requires a single Worker distribution boundary",
+          );
         initializer += `.basePath(${text(call.arguments[0])})`;
       }
       routerInitializers.set(name, `const ${name} = ${initializer};`);
@@ -732,15 +743,24 @@ async function partition(
         sequence.calls.map((call) => ({ router, call })),
       );
     }
-  const unresolved = await unresolvedReferences(source);
+  const { unresolved, references } = await unresolvedReferences(source);
+  function dependencies(node: Node) {
+    const result = new Set<string>();
+    walk(node, (child) => {
+      const name = references.get((child as Node & { start: number }).start);
+      if (name) result.add(name);
+    });
+    return result;
+  }
   function closure(nodes: Node[]) {
-    const result = new Set(nodes.flatMap((node) => [...names(node)]));
+    const result = new Set(nodes.flatMap((node) => [...dependencies(node)]));
     for (const name of result) {
       const declaration = declarations.get(name);
       if (declaration && !routerNodes.has(name))
-        for (const dependency of names(declaration)) result.add(dependency);
+        for (const dependency of dependencies(declaration))
+          result.add(dependency);
       for (const value of writes.get(name) ?? [])
-        for (const dependency of names(value)) result.add(dependency);
+        for (const dependency of dependencies(value)) result.add(dependency);
     }
     return result;
   }
@@ -802,6 +822,390 @@ async function partition(
       });
     return remote;
   }
+  // Execution compatibility does not establish permission to distribute a
+  // dependency. Only move supported response construction whose retained data
+  // reaches the response; overlapping server guards are checked separately.
+  // Objects, unused branches and defaults can carry non-response data.
+  function distributableResponseHandler(
+    node: Node,
+    seen = new Set<Node>(),
+    helper = false,
+    middleware = false,
+  ): boolean {
+    if (node.type === "Identifier") {
+      const declaration = declarations.get(node.name);
+      const value = variables.get(node.name)?.init ?? declaration;
+      return (
+        !!value && distributableResponseHandler(value, seen, helper, middleware)
+      );
+    }
+    if (
+      seen.has(node) ||
+      (node.type !== "ArrowFunctionExpression" &&
+        node.type !== "FunctionExpression" &&
+        node.type !== "FunctionDeclaration")
+    )
+      return false;
+    seen = new Set(seen).add(node);
+    if (node.params.some((parameter) => parameter.type !== "Identifier"))
+      return false;
+    const parameters = node.params.map(
+      (parameter) => (parameter as { name: string }).name,
+    );
+    const context = helper ? undefined : parameters[0];
+    const next = helper ? undefined : parameters[1];
+    function memberPath(value: Node): string | undefined {
+      if (value.type === "Identifier") return value.name;
+      if (value.type !== "MemberExpression") return;
+      const parent = memberPath(value.object);
+      const key = property(value);
+      return parent && key ? `${parent}.${key}` : undefined;
+    }
+    function status(value: Node) {
+      return (
+        value.type === "Literal" &&
+        typeof value.value === "number" &&
+        value.value >= 200 &&
+        value.value <= 599 &&
+        ![204, 205, 304].includes(value.value)
+      );
+    }
+    function headerValues(value: Node): boolean {
+      return (
+        value.type === "ObjectExpression" &&
+        expression(value, true) &&
+        value.properties.every(
+          (item) => item.type === "Property" && expression(item.value),
+        )
+      );
+    }
+    function responseInit(value: Node): boolean {
+      if (value.type !== "ObjectExpression" || !expression(value, true))
+        return false;
+      return value.properties.every((item) => {
+        if (item.type !== "Property") return false;
+        const key =
+          item.key.type === "Identifier"
+            ? item.key.name
+            : item.key.type === "Literal"
+              ? String(item.key.value)
+              : "";
+        if (key === "status") return status(item.value);
+        if (key === "statusText") return expression(item.value);
+        return key === "headers" && headerValues(item.value);
+      });
+    }
+    function expression(
+      value: Node,
+      structured = false,
+      responseRoot = false,
+    ): boolean {
+      switch (value.type) {
+        case "Literal":
+          return (
+            !("regex" in value) &&
+            (value.value === null ||
+              ["string", "number", "boolean"].includes(typeof value.value))
+          );
+        case "Identifier":
+          return helper && parameters.includes(value.name);
+        case "TemplateLiteral":
+          return value.expressions.every((item) => expression(item));
+        case "ArrayExpression":
+          return (
+            structured &&
+            value.elements.every((item) => !!item && expression(item, true))
+          );
+        case "ObjectExpression": {
+          const keys = new Set<string>();
+          return (
+            structured &&
+            value.properties.every((item) => {
+              if (
+                item.type !== "Property" ||
+                item.computed ||
+                item.kind !== "init" ||
+                item.method
+              )
+                return false;
+              const key =
+                item.key.type === "Identifier"
+                  ? item.key.name
+                  : item.key.type === "Literal"
+                    ? String(item.key.value)
+                    : undefined;
+              if (key === undefined || key === "__proto__" || keys.has(key))
+                return false;
+              keys.add(key);
+              return expression(item.value, true);
+            })
+          );
+        }
+        case "AwaitExpression":
+          return expression(value.argument, structured);
+        case "LogicalExpression": {
+          const left = value.left;
+          const receiver =
+            left.type === "AwaitExpression" &&
+            left.argument.type === "CallExpression"
+              ? memberPath(left.argument.callee)
+              : undefined;
+          return (
+            value.operator === "??" &&
+            expression(value.left, structured) &&
+            value.right.type === "Literal" &&
+            (value.right.value === "" ||
+              value.right.value === null ||
+              localBindings.some(
+                (name) => receiver === `${context}.env.${name}.get`,
+              ))
+          );
+        }
+        case "MemberExpression": {
+          const path = memberPath(value);
+          return (
+            !!context &&
+            (path === `${context}.req.path` ||
+              path === `${context}.req.url` ||
+              localBindings.some((name) => path === `${context}.env.${name}`))
+          );
+        }
+        case "TaggedTemplateExpression": {
+          if (
+            value.tag.type !== "Identifier" ||
+            parameters.includes(value.tag.name)
+          )
+            return false;
+          const tag = value.tag.name;
+          const imported = declarations.get(tag);
+          return (
+            imported?.type === "ImportDeclaration" &&
+            imported.source.value === "hono/html" &&
+            imported.specifiers.some(
+              (item) =>
+                item.type === "ImportSpecifier" &&
+                item.local.name === tag &&
+                item.imported.type === "Identifier" &&
+                item.imported.name === "html",
+            ) &&
+            expression(value.quasi)
+          );
+        }
+        case "CallExpression":
+        case "NewExpression": {
+          const path = memberPath(value.callee);
+          if (
+            value.callee.type === "Identifier" &&
+            declarations.has(value.callee.name)
+          ) {
+            if (value.type !== "CallExpression") return false;
+            const target =
+              variables.get(value.callee.name)?.init ??
+              declarations.get(value.callee.name);
+            return (
+              !!target &&
+              distributableResponseHandler(target, seen, true) &&
+              (target.type === "ArrowFunctionExpression" ||
+                target.type === "FunctionExpression" ||
+                target.type === "FunctionDeclaration") &&
+              target.params.length === value.arguments.length &&
+              value.arguments.every((item) => expression(item))
+            );
+          }
+          if (
+            context &&
+            path &&
+            ["text", "html", "json", "body"].some(
+              (method) => path === `${context}.${method}`,
+            )
+          )
+            return (
+              responseRoot &&
+              value.type === "CallExpression" &&
+              value.arguments.length > 0 &&
+              value.arguments.length <= 3 &&
+              value.arguments.every((item, index) =>
+                index === 0
+                  ? expression(item, path === `${context}.json`)
+                  : index === 1
+                    ? status(item) ||
+                      (value.arguments[0]?.type === "Literal" &&
+                        value.arguments[0].value === null &&
+                        item.type === "Literal" &&
+                        item.value === 204) ||
+                      responseInit(item)
+                    : headerValues(item),
+              )
+            );
+          if (
+            context &&
+            path &&
+            [
+              "req.query",
+              "req.param",
+              "req.header",
+              "req.raw.headers.get",
+            ].some((method) => path === `${context}.${method}`)
+          )
+            return (
+              value.type === "CallExpression" &&
+              value.arguments.length === 1 &&
+              value.arguments[0]?.type === "Literal" &&
+              typeof value.arguments[0].value === "string"
+            );
+          if (
+            context &&
+            value.type === "CallExpression" &&
+            path &&
+            localBindings.some((name) =>
+              ["get", "getWithMetadata", "put", "delete", "list"].some(
+                (method) => path === `${context}.env.${name}.${method}`,
+              ),
+            )
+          )
+            return value.arguments.every((item) => expression(item));
+          if (
+            context &&
+            value.type === "CallExpression" &&
+            ["text", "json"].some(
+              (method) => path === `${context}.req.${method}`,
+            )
+          )
+            return value.arguments.length === 0;
+          if (
+            value.type === "CallExpression" &&
+            path === "String" &&
+            !parameters.includes("String")
+          )
+            return (
+              value.arguments.length === 1 && expression(value.arguments[0]!)
+            );
+          if (
+            value.type === "CallExpression" &&
+            path === "Math.random" &&
+            !parameters.includes("Math")
+          )
+            return value.arguments.length === 0;
+          if (
+            value.type === "CallExpression" &&
+            path === "Number" &&
+            !parameters.includes("Number")
+          )
+            return (
+              value.arguments.length === 1 &&
+              value.arguments[0]?.type === "Literal" &&
+              typeof value.arguments[0].value === "number"
+            );
+          if (
+            value.type === "CallExpression" &&
+            value.callee.type === "MemberExpression" &&
+            property(value.callee) === "toString" &&
+            value.callee.object.type === "CallExpression" &&
+            value.callee.object.callee.type === "Identifier" &&
+            value.callee.object.callee.name === "Number"
+          )
+            return (
+              value.arguments.length === 0 && expression(value.callee.object)
+            );
+          return (
+            responseRoot &&
+            !helper &&
+            value.type === "NewExpression" &&
+            path === "Response" &&
+            value.arguments.length >= 1 &&
+            value.arguments.length <= 2 &&
+            value.arguments.every((item, index) =>
+              index === 0 ? expression(item) : responseInit(item),
+            )
+          );
+        }
+        default:
+          return false;
+      }
+    }
+    function response(value: Node): boolean {
+      return (
+        expression(value, false, true) &&
+        ((value.type === "NewExpression" &&
+          memberPath(value.callee) === "Response") ||
+          (value.type === "CallExpression" &&
+            ["text", "html", "json", "body"].some(
+              (method) => memberPath(value.callee) === `${context}.${method}`,
+            )))
+      );
+    }
+    if (node.body.type !== "BlockStatement") {
+      const output = node.body;
+      return (
+        (!helper ||
+          parameters.every((parameter) => names(output).has(parameter))) &&
+        (helper ? expression(output) : !middleware && response(output))
+      );
+    }
+    if (helper) {
+      if (
+        node.body.body.length !== 1 ||
+        node.body.body[0].type !== "ReturnStatement" ||
+        !node.body.body[0].argument
+      )
+        return false;
+      const output = node.body.body[0].argument;
+      if (parameters.some((parameter) => !names(output).has(parameter)))
+        return false;
+      return expression(output);
+    }
+    const statements = node.body.body;
+    if (middleware) {
+      if (
+        parameters.length !== 2 ||
+        statements.filter(
+          (statement) =>
+            statement.type === "ExpressionStatement" &&
+            statement.expression.type === "AwaitExpression",
+        ).length !== 1
+      )
+        return false;
+    } else if (statements.at(-1)?.type !== "ReturnStatement") return false;
+    return (
+      statements.length > 0 &&
+      statements.every((statement, index) => {
+        if (statement.type === "ReturnStatement")
+          return (
+            !middleware &&
+            index === statements.length - 1 &&
+            !!statement.argument &&
+            response(statement.argument)
+          );
+        if (statement.type !== "ExpressionStatement") return false;
+        const value = statement.expression;
+        if (value.type === "AwaitExpression")
+          return (
+            value.argument.type === "CallExpression" &&
+            ((value.argument.callee.type === "Identifier" &&
+              value.argument.callee.name === next &&
+              !value.argument.arguments.length) ||
+              (!middleware &&
+                localBindings.some((name) =>
+                  ["put", "delete"].some(
+                    (method) =>
+                      memberPath(
+                        value.argument.type === "CallExpression"
+                          ? value.argument.callee
+                          : value.argument,
+                      ) === `${context}.env.${name}.${method}`,
+                  ),
+                ) &&
+                expression(value.argument)))
+          );
+        return (
+          value.type === "CallExpression" &&
+          memberPath(value.callee) === `${context}.header` &&
+          value.arguments.length === 2 &&
+          value.arguments.every((item) => expression(item))
+        );
+      })
+    );
+  }
   function staticPath(node: Node, seen = new Set<string>()): boolean {
     if (node.type === "Literal") return typeof node.value === "string";
     if (node.type === "ArrayExpression")
@@ -824,7 +1228,20 @@ async function partition(
     changed = false;
     for (const entries of registrations.values())
       for (const { call } of entries) {
-        if (!server(call.arguments)) continue;
+        if (
+          !server(call.arguments) &&
+          call.arguments.every(
+            (argument) =>
+              staticPath(argument) ||
+              distributableResponseHandler(
+                argument,
+                new Set(),
+                false,
+                property(call.callee) === "use",
+              ),
+          )
+        )
+          continue;
         for (const name of closure(call.arguments))
           if (
             mutable.has(name) &&
@@ -843,6 +1260,139 @@ async function partition(
           }
       }
   }
+  const candidates = [...registrations.values()]
+    .flat()
+    .filter(({ call }) => routeMethods.has(property(call.callee) ?? ""))
+    .sort(
+      (a, b) =>
+        (a.call as CallExpression & { end: number }).end -
+        (b.call as CallExpression & { end: number }).end,
+    )
+    .map((entry) => {
+      const method = property(entry.call.callee)!;
+      const pathCount =
+        method === "on"
+          ? 2
+          : method === "use" &&
+              entry.call.arguments[0] &&
+              !staticPath(entry.call.arguments[0])
+            ? 0
+            : 1;
+      const paths = entry.call.arguments.slice(0, pathCount);
+      const handlers = entry.call.arguments.slice(pathCount);
+      return {
+        ...entry,
+        method,
+        paths: method === "on" ? paths.slice(1) : paths,
+        handlers,
+        remote:
+          server(handlers) ||
+          !handlers.every((handler) =>
+            distributableResponseHandler(
+              handler,
+              new Set(),
+              false,
+              method === "use",
+            ),
+          ),
+      };
+    });
+  function literal(node: Node | undefined): string | undefined {
+    if (node?.type === "Identifier")
+      return literal(variables.get(node.name)?.init ?? undefined);
+    return node?.type === "Literal" && typeof node.value === "string"
+      ? node.value
+      : undefined;
+  }
+  function disjoint(a: string | undefined, b: string | undefined): boolean {
+    if (a === undefined || b === undefined) return false;
+    const plain = (path: string) =>
+      /^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?)?$/.test(path);
+    if (plain(a) && plain(b))
+      return a.replace(/\/$/, "") !== b.replace(/\/$/, "");
+    const prefix = (path: string) =>
+      (path.match(/^\/[A-Za-z0-9_/-]*/)?.[0] ?? "")
+        .split("//")[0]!
+        .replace(/\/$/, "");
+    const ap = prefix(a),
+      bp = prefix(b);
+    return (
+      (plain(a) && !a.startsWith(bp)) ||
+      (plain(b) && !b.startsWith(ap)) ||
+      (!ap.startsWith(bp) && !bp.startsWith(ap))
+    );
+  }
+  function rootOutsideMount(
+    a: (typeof candidates)[number],
+    b: (typeof candidates)[number],
+  ) {
+    if (a.router !== root || literal(a.paths[0]) !== "/") return false;
+    const mounts = [...registrations.values()]
+      .flat()
+      .filter(({ call }) => property(call.callee) === "route");
+    return (
+      mounts.length > 0 &&
+      mounts.every(
+        ({ router, call }) =>
+          router === root &&
+          call.arguments[1]?.type === "Identifier" &&
+          rootRouter(call.arguments[1].name) === b.router &&
+          /^\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(
+            literal(call.arguments[0]) ?? "",
+          ),
+      )
+    );
+  }
+
+  // Remove protected handlers from the distribution graph, not merely from
+  // request-time execution. Prefix checks only prove disjointness; uncertain
+  // overlap widens the boundary instead of recreating Hono's router.
+  const protectedCalls = new Set<CallExpression>();
+  let widened = true;
+  while (widened) {
+    widened = false;
+    for (let i = 0; i < candidates.length; i++)
+      for (let j = i + 1; j < candidates.length; j++) {
+        const a = candidates[i]!,
+          b = candidates[j]!;
+        if (a.remote && b.remote) continue;
+        // A proven passthrough registered before the server operation writes
+        // its headers even to an unauthenticated response. A later middleware
+        // can be protected by the earlier operation and must not be distributed.
+        if (
+          (!a.remote && a.method === "use") ||
+          (!a.remote && !b.remote && b.method === "use")
+        )
+          continue;
+        if (
+          !["all", "on", "use"].includes(a.method) &&
+          !["all", "on", "use"].includes(b.method) &&
+          a.method !== b.method &&
+          ![a.method, b.method].every((method) =>
+            ["get", "head"].includes(method),
+          )
+        )
+          continue;
+        if (a.router !== b.router) {
+          if (rootOutsideMount(a, b) || rootOutsideMount(b, a)) continue;
+          fail(
+            "Mounted route overlap requires a single Worker distribution boundary",
+          );
+        }
+        if (disjoint(literal(a.paths[0]), literal(b.paths[0]))) continue;
+        if (!a.remote && !b.remote)
+          fail(
+            "Overlapping local responses require a single Worker distribution boundary",
+          );
+        if (!a.remote) protectedCalls.add(a.call);
+        if (!b.remote) protectedCalls.add(b.call);
+        a.remote = b.remote = true;
+        widened = true;
+      }
+  }
+  const distributionRemote = new Map(
+    candidates.map(({ call, remote }) => [call, remote]),
+  );
   const localRoots: Node[] = [];
   const selectorRoots: Node[] = [];
   const localRegistrations = new Map<Node, string[]>();
@@ -886,7 +1436,11 @@ async function partition(
       }
       if (method === "onError" || method === "notFound") {
         rejectRouterEscape(call.arguments);
-        const remote = server(call.arguments);
+        const remote =
+          server(call.arguments) ||
+          !call.arguments.every((handler) =>
+            distributableResponseHandler(handler),
+          );
         remoteErrors ||= remote;
         if (!remote) {
           localRoots.push(...call.arguments);
@@ -915,7 +1469,7 @@ async function partition(
           `dynamic path/method for ${router}.${method} cannot be matched before execution`,
         );
       rejectRouterEscape(handlers);
-      const remote = server(handlers);
+      const remote = distributionRemote.get(call)!;
       localRoots.push(...paths);
       if (!remote) localRoots.push(...handlers);
       selectorRoots.push(...paths);
@@ -924,9 +1478,11 @@ async function partition(
         method,
         path: paths.map(text).join(",") || "*",
         remote,
-        reason: remote
-          ? "Server dependency or dependency without a local execution contract"
-          : "Static Hono registration with resolved dependencies and supported globals; overlapping middleware and routes still apply",
+        reason: protectedCalls.has(call)
+          ? "Protected by an overlapping server handler or middleware; implementation is not distributed"
+          : remote
+            ? "Server dependency or dependency without a local execution contract or public rendering contract"
+            : "Straight-line response construction with resolved dependencies; no overlapping server boundary",
       });
       const prefix = paths.length ? paths.map(text).join(",") + "," : "";
       // Every candidate is visited, so a fallthrough to a server handler is selected
