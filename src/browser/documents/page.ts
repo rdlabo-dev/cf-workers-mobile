@@ -1,5 +1,6 @@
 import { readDocumentBody, encodeDocumentBytes } from "./body.js";
 import "./form-body.js";
+import "./links.js";
 import { documentConfig, isDocumentURL } from "./page-config.js";
 import { FetchRuntime } from "../../cloudflare/workers/runtime.js";
 

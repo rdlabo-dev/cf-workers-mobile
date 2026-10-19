@@ -30,6 +30,7 @@ function setup(cache = new Map<string, Response>()) {
     MessageChannel,
     ReadableStream,
     atob,
+    crypto,
     setTimeout,
     clearTimeout,
     fetch: nativeFetch,
@@ -217,4 +218,120 @@ it("pulls streamed document bytes only when consumed and cancels the host stream
     action: "cancel",
     streamId: "live",
   });
+});
+
+it("aborts the host request while response headers are pending", async () => {
+  const sw = setup();
+  let release!: (value: any) => void;
+  sw.dispatch.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  sw.dispatch.mockResolvedValue({ done: true } as any);
+  const controller = new AbortController();
+  const pending = sw.fetch(
+    new Request("https://localhost/slow", { signal: controller.signal }),
+  )!;
+  const rejected = expect(pending).rejects.toThrow("cancelled");
+  await vi.waitFor(() => expect(sw.dispatch).toHaveBeenCalledOnce());
+  const id = (sw.dispatch.mock.calls[0][0] as any).id;
+  controller.abort(new Error("cancelled"));
+  await rejected;
+  await vi.waitFor(() =>
+    expect(sw.dispatch).toHaveBeenLastCalledWith({
+      action: "cancel",
+      streamId: id,
+    }),
+  );
+  release({ streamId: id });
+});
+
+it("cancels a host request whose response headers time out", async () => {
+  vi.useFakeTimers();
+  let release!: (value: any) => void;
+  try {
+    const sw = setup();
+    sw.dispatch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    sw.dispatch.mockResolvedValue({ done: true } as any);
+    const pending = sw.fetch(new Request("https://localhost/slow"))!;
+    const rejected = expect(pending).rejects.toThrow("Worker response timeout");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sw.dispatch).toHaveBeenCalledOnce();
+    const id = (sw.dispatch.mock.calls[0][0] as any).id;
+    await vi.advanceTimersByTimeAsync(30000);
+    await rejected;
+    expect(sw.dispatch).toHaveBeenLastCalledWith({
+      action: "cancel",
+      streamId: id,
+    });
+    release({ streamId: id });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("bounds pending headers without blocking stream reads or queued cancellation", async () => {
+  const sw = setup();
+  const releases: (() => void)[] = [];
+  sw.dispatch.mockImplementation(async (request: any) => {
+    if (request.action === "pull")
+      return { body: btoa("chunk"), done: false } as any;
+    if (request.action === "cancel") return { done: true } as any;
+    if (request.url.endsWith("/next"))
+      return { status: 200, headers: {}, body: "next" } as any;
+    return new Promise((resolve) =>
+      releases.push(() =>
+        resolve({
+          status: 200,
+          headers: {},
+          streamId: request.id,
+        } as any),
+      ),
+    );
+  });
+  const first = Array.from(
+    { length: 6 },
+    (_, i) => sw.fetch(new Request("https://localhost/" + i))!,
+  );
+  await vi.waitFor(() => expect(releases).toHaveLength(6));
+  const controller = new AbortController();
+  const cancelled = sw.fetch(
+    new Request("https://localhost/cancelled", { signal: controller.signal }),
+  )!;
+  const rejected = expect(cancelled).rejects.toThrow("cancelled");
+  const next = sw.fetch(new Request("https://localhost/next"))!;
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(sw.dispatch).toHaveBeenCalledTimes(6);
+  controller.abort(new Error("cancelled"));
+  await rejected;
+  releases.forEach((release) => release());
+  const responses = await Promise.all(first);
+  expect(await (await next).text()).toBe("next");
+  const more = Array.from(
+    { length: 6 },
+    (_, i) => sw.fetch(new Request("https://localhost/pending/" + i))!,
+  );
+  await vi.waitFor(() => expect(releases).toHaveLength(12));
+  const reader = responses[0].body!.getReader();
+  expect(new TextDecoder().decode((await reader.read()).value)).toBe("chunk");
+  await reader.cancel();
+  await Promise.all(
+    responses.slice(1).map((response) => response.body!.cancel()),
+  );
+  expect(
+    sw.dispatch.mock.calls.some(([request]) =>
+      request.url?.endsWith("/cancelled"),
+    ),
+  ).toBe(false);
+  releases.slice(6).forEach((release) => release());
+  await Promise.all(
+    (await Promise.all(more)).map((response) => response.body!.cancel()),
+  );
 });

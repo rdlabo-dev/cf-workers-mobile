@@ -72,12 +72,9 @@ on a native test command to exercise that profile's rendering and navigation.
 
 ## Limits
 
-- Native form navigation does not supply an HTTP `Origin` header. Applications
-  relying only on that header must adapt their CSRF protection; the runtime does
-  not invent an Origin. This sample uses tokens on both Web and Capacitor.
+- Observed Origin headers are preserved. iOS recovers a missing form Origin only from a verified local main-frame initiator. Other requests may omit it; this sample retains CSRF tokens on both Web and Capacitor.
 
-- Images use `next/image` with `unoptimized: true`; `/_next/image` optimization
-  is not covered.
+- `/images` uses `next/image` with the `IMAGES` binding. The image tests verify WebP conversion and resizing through `/_next/image`; production Cloudflare Images deployment and custom image loaders are not covered.
 - Incremental cache, tag cache and queue use OpenNext's dummy adapters.
 - Server Actions, streaming Suspense and arbitrary third-party Next.js plugins
   are outside this sample's coverage.

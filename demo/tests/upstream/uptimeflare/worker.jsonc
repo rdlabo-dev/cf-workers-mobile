@@ -1,0 +1,16 @@
+{
+  "main": "../../../artifacts/upstream/uptimeflare/clone/.vercel/output/static/_worker.js/index.js",
+  "compatibility_date": "2025-04-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "UPTIMEFLARE_D1",
+      "database_name": "acceptance",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+    },
+  ],
+  "assets": {
+    "directory": "../../../artifacts/upstream/uptimeflare/clone/.vercel/output/static",
+    "binding": "ASSETS",
+  },
+}

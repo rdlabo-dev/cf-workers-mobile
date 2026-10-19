@@ -7,20 +7,21 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export async function startBackend({ native = false } = {}) {
-  const pluginDriver = native
-    ? (
-        await build({
-          entryPoints: [
-            fileURLToPath(new URL("plugin-driver.ts", import.meta.url)),
-          ],
-          bundle: true,
-          format: "iife",
-          platform: "browser",
-          write: false,
-        })
-      ).outputFiles[0].text
-    : "";
+export async function startBackend({ native = false, driver } = {}) {
+  const pluginDriver =
+    native && !driver
+      ? (
+          await build({
+            entryPoints: [
+              fileURLToPath(new URL("plugin-driver.ts", import.meta.url)),
+            ],
+            bundle: true,
+            format: "iife",
+            platform: "browser",
+            write: false,
+          })
+        ).outputFiles[0].text
+      : "";
   const reports = [];
   const requests = [];
   const config = { mode: "flow", id: crypto.randomUUID() };
@@ -44,6 +45,7 @@ export async function startBackend({ native = false } = {}) {
       compatibilityDate: "2026-10-17",
       compatibilityFlags: ["nodejs_compat"],
       d1Databases: ["DB"],
+      images: { binding: "IMAGES" },
       assets: {
         directory: join(root, ".open-next/assets"),
         binding: "ASSETS",
@@ -116,7 +118,8 @@ export async function startBackend({ native = false } = {}) {
           if (native && req.url === "/__acceptance/driver.js") {
             res.setHeader("content-type", "text/javascript");
             res.end(
-              await readFile(new URL("native-driver.js", import.meta.url)),
+              driver ??
+                (await readFile(new URL("native-driver.js", import.meta.url))),
             );
             return;
           }

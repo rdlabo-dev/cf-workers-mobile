@@ -136,9 +136,7 @@ Worker responses. External redirects are rejected. On iOS, the page-side Fetch
 bridge models redirect metadata with JavaScript properties rather than browser
 internal Response slots. The iOS multipart form supplement covers same-window
 local POST submissions; named windows and iframe targets are not supported.
-Native form navigation may omit the HTTP `Origin` header; the adapter does not
-synthesize it. Applications using Origin-only CSRF checks must adapt their
-protection, for example with a validated CSRF token.
+Observed Origin and Fetch Metadata headers are preserved. When iOS omits a form Origin, the bridge recovers it only from a verified local main-frame WebKit security origin. Opaque or unknown initiators remain untrusted. Other native requests can still omit Origin; retain CSRF protection, such as a validated token. Origin is not authentication.
 
 The native host/child lifecycle, pending-request timeouts and explicit disposal
 are implemented. App process termination/relaunch, background/foreground,
@@ -183,3 +181,9 @@ run at the Capacitor local origin and can access the application's native plugin
 just like bundled HTML. Rendering is not a sandbox for untrusted HTML; applications
 must escape untrusted values and must not render arbitrary remote HTML as trusted
 application pages. This trust model applies to both iOS and Android.
+
+### Absolute article links
+
+Ordinary main-frame links to the configured `baseURL` origin navigate to the corresponding local document path, preserving query and fragment. Match `baseURL` to the application's Worker origin when it generates absolute links. Relative links keep their normal behavior.
+
+The handler respects framework-handled clicks, modifier keys, downloads and non-self targets. It does not rewrite external origins, iframe links, absolute form actions or arbitrary programmatic navigation. Android requires WebView document-start script support for this behavior; iOS uses the existing document-start script.

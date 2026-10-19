@@ -87,9 +87,6 @@ The [official App Router acceptance fixture](../demo/tests/upstream/opennext/REA
 - **Bindings:** use the [remote binding configuration](cloudflare-bindings.md) for cloud services or explicit local KV in direct mode. ASSETS remains remote-only. These general integrations do not establish OpenNext cache/binding compatibility; the smoke configuration uses dummy caches.
 - `createRequire` loads `.json` only; executable traced files must already be
   bundled by OpenNext (they are).
-- Image optimization (`/_next/image`, `cdn-cgi`) is outside the sample's scope;
-  its `next/image` configuration uses `unoptimized: true`.
-- Native form navigation may omit `Origin`. Origin-only CSRF validation rejects
-  those requests; the runtime does not synthesize this header. The sample uses
-  a random token and a Secure, HttpOnly `__Host-` cookie on both Web and Capacitor.
-- Native test reports include bundle size and launch-to-hydration time. Physical-device startup performance and memory use remain unverified.
+- `/_next/image` uses the remote Worker's IMAGES binding. The `/images` fixture checks actual PNG-to-WebP transformation and output dimensions through native rendering. Custom `cdn-cgi` loaders and deployed Images service behavior remain separate from local workerd acceptance.
+- The document host preserves observed Origin/Fetch Metadata. iOS recovers a missing form Origin only for a verified local main-frame initiator; opaque or unknown initiators remain untrusted. Keep CSRF validation. The sample uses a random token and a Secure, HttpOnly `__Host-` cookie.
+- The OpenNext native harness records bundle size, launch-to-hydration time (including the local HTTPS round trip), and host-process RSS after hydration in `demo/artifacts/opennext-native/*-performance.json`. These are single-sample Debug simulator/emulator baselines. RSS excludes separate WebView renderer/GPU processes; it is not total or peak application memory. Physical-device startup performance and memory remain unverified.

@@ -28,7 +28,10 @@ export function readable(
       async pull(controller: any) {
         try {
           reader ??= source.getReader();
-          const result = await reader.read();
+          let result = await reader.read();
+          // Host default streams may emit empty chunks; byte controllers reject them.
+          while (!result.done && byteStream && result.value.byteLength === 0)
+            result = await reader.read();
           if (result.done) {
             controller.close();
             controller.byobRequest?.respond(0);

@@ -109,11 +109,17 @@ export function startRendering(
         ? (await import("./page-source.js")).pageScript
         : "";
     if (closed) throw new Error("Document rendering disposed");
+    const linksScript =
+      native.getPlatform() === "android"
+        ? (await import("./links-source.js")).linksScript
+        : "";
+    if (closed) throw new Error("Document rendering disposed");
     started = true;
     await call("start", {
       baseURL: new URL(baseURL).origin,
       entry: render,
       pageScript,
+      linksScript,
       assets,
       bootstrapURL: new URL(
         "/index.html?__workers_capacitor_host=1",

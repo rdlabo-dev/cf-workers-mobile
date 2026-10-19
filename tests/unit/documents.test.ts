@@ -326,7 +326,8 @@ it("returns document headers before EOF and reads bounded chunks on demand", asy
 });
 
 it("does not resurrect a document stream after cancellation while awaiting headers", async () => {
-  const { installDocumentHost } = await import("../../src/browser/documents/host");
+  const { installDocumentHost } =
+    await import("../../src/browser/documents/host");
   let finish!: (response: Response) => void;
   const cancelled = vi.fn();
   const dispose = installDocumentHost(
@@ -367,7 +368,8 @@ it("does not resurrect a document stream after cancellation while awaiting heade
 });
 
 it("does not dispatch a document request after disposal during startup", async () => {
-  const { installDocumentHost } = await import("../../src/browser/documents/host");
+  const { installDocumentHost } =
+    await import("../../src/browser/documents/host");
   let ready!: () => void;
   const fetcher = vi.fn(async () => new Response("late"));
   const dispose = installDocumentHost(
@@ -392,3 +394,44 @@ it("does not dispatch a document request after disposal during startup", async (
   await rejected;
   expect(fetcher).not.toHaveBeenCalled();
 });
+
+it.each(["capacitor://localhost", "https://foreign.example", "null"])(
+  "preserves observed Origin %s through the document host",
+  async (origin) => {
+    const NativeRequest = globalThis.Request;
+    // Browsers silently remove forbidden headers when constructing Request.
+    // Node's Request does not, so model that guard for this regression.
+    vi.stubGlobal(
+      "Request",
+      class extends NativeRequest {
+        constructor(input: RequestInfo | URL, init?: RequestInit) {
+          const headers = new Headers(init?.headers);
+          headers.delete("origin");
+          headers.delete("sec-fetch-site");
+          super(input, { ...init, headers });
+        }
+      },
+    );
+    runtime = workersCapacitor({
+      ...options,
+      worker: {
+        fetch: (request) =>
+          Response.json({
+            origin: request.headers.get("origin"),
+            site: request.headers.get("sec-fetch-site"),
+          }),
+      },
+    });
+    await runtime.ready;
+    const result = await (globalThis as any).__workersCapacitorDispatch({
+      url: "capacitor://localhost/submit",
+      method: "POST",
+      headers: { origin, "sec-fetch-site": "cross-site" },
+      body: btoa("data"),
+    });
+    expect(JSON.parse(atob(result.body))).toEqual({
+      origin,
+      site: "cross-site",
+    });
+  },
+);

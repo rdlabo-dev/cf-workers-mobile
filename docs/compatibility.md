@@ -72,6 +72,29 @@ connection with `Connection: close`; there is no implicit retry after sending.
 
 ## Document rendering
 
+Remote HTML is rendered at the app-local origin (`capacitor://localhost` on iOS,
+normally `https://localhost` on Android). Remote execution keeps server code and
+cloud services on the Worker; it does not turn the WebView into that site's origin
+or supply every browser authentication feature. Check hydration and interactive
+controls, not only a successful HTML response.
+
+### Application integration limits
+
+| Feature | Current boundary | Integration guidance |
+| --- | --- | --- |
+| Better Auth with an inferred client base URL | The pinned flare-stack-blog application fails client initialization on iOS because Better Auth rejects `capacitor://localhost`. Android's HTTP(S) origin does not hit this rejection. | An explicit HTTPS authentication endpoint initializes the client, but its full login/cookie flow has not been validated here. Do not assume that setting alone completes migration. See the [reproduction](../demo/tests/upstream/flare-stack-blog/README.md). |
+| Passkeys / WebAuthn and PRF | Native passkey registration in pknotes fails on both tested platforms. Chromium's virtual authenticator acceptance does not establish native support. | Native credential integration, app/domain association and PRF availability need separate validation. Remote rendering cannot bypass relying-party origin checks. Native support is deferred, not proven technically impossible. See the [authentication boundary](../demo/tests/upstream/pknotes/README.md). |
+| Void React Pages 1.1.11 on iOS | The client router rejects the native `capacitor:` scheme; initial SSR output does not establish working navigation. | Android and iOS have different results. Keep the [Void integration limits](void.md#verification-boundary) in view; renaming the custom scheme does not make it HTTPS. |
+| External-browser OAuth | The example verifies a local test issuer, PKCE, callback handling and session exchange. Real provider policies, refresh-token storage and cold-start resume are not covered. | Use the provider's native SDK where available. System-browser cookies are not automatically shared with the WebView. See the [authentication example](../demo/authentication/README.md). |
+| Analytics Engine and other cloud-only services | Analytics Engine executes in Cloudflare; there is no local dataset implementation. Counterscale's live scenario requires a provisioned account, events and an analytics read token. | Keep privileged tokens on the backend and authenticate device requests. The default CI authentication scenario does not exercise live analytics. See [Counterscale setup](../demo/tests/upstream/counterscale/README.md). |
+| Image optimization and device performance | The OpenNext fixture covers remote IMAGES handling in local workerd, not a deployed Images service. Performance samples use Debug simulators/emulators. | Verify production image configuration and measure startup and memory on physical devices before making performance claims. See [OpenNext gaps](opennext.md#current-gaps). |
+
+Pinned third-party fixtures exercise specific user flows without editing their
+application source; they are not certification of every feature or future version.
+Most use local workerd behind HTTPS as the remote backend. Live Analytics Engine
+is an explicitly configured exception. See the [scenario scopes](../demo/tests/README.md#application-acceptance)
+before relying on a result for a production integration.
+
 See [native document rendering](native-rendering-api.md#scope-and-limits) for
 navigation, form uploads, redirects, trust and lifecycle restrictions. Browser
 Service Worker comparisons include six expected WebKit failures for POST replay

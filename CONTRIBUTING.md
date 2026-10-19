@@ -107,8 +107,10 @@ this check, and blocks force pushes and deletion. Workflow configuration is in
 Library checks include types, adjacent contracts and reproducible URL generation.
 Integration checks use pinned local workerd, Chromium/WebKit, both build tools,
 forced stream fallbacks and a fresh installed tarball. The upstream job clones
-the pinned official Hono sample. Native plugin discovery runs in CI; native
-compilation and iOS/Android execution require the [native test procedure](demo/tests/README.md).
+the pinned official Hono sample. Selected third-party fixtures also build and run
+through the public API on independent Android emulator jobs. iOS, live cloud-service
+checks and physical-device validation remain separate from required CI; see the
+[native test procedure](demo/tests/README.md).
 The document suite's expected WebKit failures are documented in
 [compatibility limits](docs/compatibility.md); they are not successful behaviors.
 

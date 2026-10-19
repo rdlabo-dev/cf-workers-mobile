@@ -1,6 +1,6 @@
 # Void React Pages
 
-[Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. The integration below targets **Void / @void/react 1.1.11, React Pages and D1**, using the existing remote Worker. It does not establish local Void runtime compatibility or native iOS/Android acceptance.
+[Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. The integration below targets **Void / @void/react 1.1.11, React Pages and D1**, using the existing remote Worker. Android native acceptance covers this configuration. iOS currently has the router limitation below; local Void runtime compatibility is not established.
 
 ## Build and connect
 
@@ -31,7 +31,7 @@ const runtime = workersCapacitor({
 await runtime.ready;
 ```
 
-The existing Worker handles page requests, loaders, actions and assets remotely. D1 access stays there. The library's document host displays the response as a document; see the [integration guide](integration.md) for Capacitor installation, authentication and document rendering. The native rendering configuration above still needs Void-specific acceptance testing.
+The existing Worker handles page requests, loaders, actions and assets remotely. D1 access stays there. The library's document host displays the response as a document; see the [integration guide](integration.md) for Capacitor installation, authentication and document rendering. The native test uses this same configuration.
 
 ## SSR and client-only pages
 
@@ -41,6 +41,10 @@ The existing Worker handles page requests, loaders, actions and assets remotely.
 
 The [standalone sample](../demo/void/README.md) and its tests cover the generated Worker in local workerd with D1, the Capacitor remote build and fetch transport, initial SSR HTML, React hydration and a form action with a database assertion in Chromium and WebKit. A client-only page reuses the same D1 loader and is absent from initial HTML but appears after client rendering. Tests also check that server schema/application code is absent from the device build.
 
-The browser test substitutes network delivery with local workerd. It does not verify deployment, production authentication, native document rendering, device networking, or native plugin events. Void iOS/Android acceptance is still required before claiming native support. Vue, Svelte, Solid, other Void bindings and local execution are unverified.
+The browser test substitutes network delivery with local workerd. The native test (`demo/tests/void/native.test.mjs`) uses HTTPS and the public document API to exercise D1-backed SSR, hydration, form insertion with a database assertion, and client-only rendering on Android.
+
+**iOS limitation:** Void 1.1.11 rejects `capacitor:` URLs in its client router (`Void Router: refusing to navigate to a capacitor: URL.`). Initial server HTML can arrive, but form/router navigation fails. Capacitor iOS uses a custom scheme; changing its name does not make it HTTP(S). [`server.iosScheme`](https://capacitorjs.com/docs/config) cannot use `http` or `https`, which WKWebView already handles. Do not claim native iOS support, override `URL.protocol`, or remove Void's URL security check to hide this incompatibility. Upstream support for same-origin native schemes is needed.
+
+Deployment, production authentication, native plugin events, Vue, Svelte, Solid, other Void bindings and local execution are unverified.
 
 Authentication and authorization remain application responsibilities. The sample has no authentication and must not be deployed as a production data endpoint. Server-code removal is not a general secret detector; never embed credentials in client pages, public variables or Capacitor configuration.

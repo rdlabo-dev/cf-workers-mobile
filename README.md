@@ -307,7 +307,7 @@ Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`,
 
 ### Void React Pages + D1
 
-[Void integration](docs/void.md) uses its generated Worker and configuration with the existing remote execution path. The React/D1 sample covers Chromium/WebKit and local workerd; Void-specific native acceptance and local execution remain unverified.
+[Void integration](docs/void.md) uses its generated Worker and configuration with the existing remote execution path. The React/D1 sample covers Chromium/WebKit, local workerd and Android document rendering. Void 1.1.11 rejects the iOS custom scheme in its router; iOS navigation and local execution are not supported by this integration.
 
 ### OpenNext + D1
 
@@ -360,6 +360,9 @@ CI runs library/type checks, real local workerd contracts, Chromium/WebKit integ
 
 See [compatibility and limitations](docs/compatibility.md) for incomplete Node
 modules, Workers APIs, cloud services and native transport restrictions.
+The [application integration limits](docs/compatibility.md#application-integration-limits)
+also cover Better Auth on iOS, passkeys, external-browser OAuth, Void routing,
+live analytics and the boundary between simulator checks and physical devices.
 
 ### Framework and platform limits
 

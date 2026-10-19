@@ -73,6 +73,7 @@ final class DocumentNavigationDelegate: NSObject, WKNavigationDelegate {
         if action.targetFrame?.isMainFrame == true {
             documents.cancelFetchStreams()
             documents.documentURL = action.request.url
+            documents.documentOrigin = documents.localInitiator(action.sourceFrame)
         }
         if let original = original, original.responds(to: NSSelectorFromString("webView:decidePolicyForNavigationAction:decisionHandler:")) {
             original.webView?(webView, decidePolicyFor: action, decisionHandler: decisionHandler)
@@ -90,6 +91,17 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     private var closed = false
     weak var page: WKWebView?
     var documentURL: URL?
+    var documentOrigin: String?
+    private var documentOrigins: [String: String] = [:]
+    // WebKit omits Origin for custom-scheme form navigations. Recover only a
+    // verified, non-opaque local main-frame initiator; never infer it from the
+    // destination URL or from a JavaScript-supplied header.
+    func localInitiator(_ frame: WKFrameInfo) -> String? {
+        let origin = frame.securityOrigin
+        guard frame.isMainFrame, origin.protocol == localURL.scheme,
+              origin.host == localURL.host, origin.port == (localURL.port ?? 0) else { return nil }
+        return "\(origin.protocol)://\(origin.host)" + (origin.port == 0 ? "" : ":\(origin.port)")
+    }
     private var documentTasks = Set<String>()
     private var redirects = 0
     private var fetchReplies: [String: (Any?, String?) -> Void] = [:]
@@ -127,7 +139,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         for id in fetchReplies.keys { cancelStream(id) }
         closed = true
         for task in tasks.values { task.didFailWithError(URLError(.cancelled)) }
-        tasks.removeAll(); documentTasks.removeAll(); awaitingHeaders.removeAll()
+        tasks.removeAll(); documentTasks.removeAll(); documentOrigins.removeAll(); awaitingHeaders.removeAll()
         for reply in fetchReplies.values { reply(nil, "Document runtime disposed") }
         fetchReplies.removeAll(); fetchRequests.removeAll()
     }
@@ -140,11 +152,16 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
         let id = UUID().uuidString
         tasks[id] = task
         awaitingHeaders.insert(id)
-        if task.request.url == documentURL { documentTasks.insert(id); documentURL = nil }
+        if task.request.url == documentURL {
+            documentTasks.insert(id)
+            if let origin = documentOrigin { documentOrigins[id] = origin }
+            documentURL = nil; documentOrigin = nil
+        }
         if ready { dispatch(id, task) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
             if self?.awaitingHeaders.remove(id) != nil, let expired = self?.tasks.removeValue(forKey: id) {
                 self?.documentTasks.remove(id)
+                self?.documentOrigins.removeValue(forKey: id)
                 self?.cancelStream(id)
                 expired.didFailWithError(URLError(.timedOut))
             }
@@ -153,12 +170,19 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {
         guard handles(task) else { assets.webView(webView, stop: task); return }
         for (id, current) in tasks where current === task {
-            tasks.removeValue(forKey: id); documentTasks.remove(id); awaitingHeaders.remove(id); cancelStream(id)
+            tasks.removeValue(forKey: id); documentTasks.remove(id); documentOrigins.removeValue(forKey: id); awaitingHeaders.remove(id); cancelStream(id)
         }
     }
     private func dispatch(_ id: String, _ task: WKURLSchemeTask) {
         var request: [String: Any] = ["id": id, "url": task.request.url!.absoluteString,
             "method": task.request.httpMethod ?? "GET", "headers": task.request.allHTTPHeaderFields ?? [:], "document": documentTasks.contains(id), "stream": true]
+        if let origin = documentOrigins.removeValue(forKey: id),
+           !["GET", "HEAD", "OPTIONS"].contains(task.request.httpMethod ?? "GET"),
+           task.request.value(forHTTPHeaderField: "Origin") == nil {
+            var headers = task.request.allHTTPHeaderFields ?? [:]
+            headers["Origin"] = origin
+            request["headers"] = headers
+        }
         if let body = task.request.httpBody {
             guard body.count <= 8 * 1024 * 1024 else { fail(id, URLError(.dataLengthExceedsMaximum)); return }
             request["body"] = body.base64EncodedString()
@@ -195,6 +219,7 @@ final class DocumentSchemeHandler: NSObject, WKURLSchemeHandler, WKScriptMessage
     private func fail(_ id: String, _ error: Error) {
         cancelStream(id)
         awaitingHeaders.remove(id)
+        documentOrigins.removeValue(forKey: id)
         if documentTasks.remove(id) != nil { redirects = 0 }
         tasks.removeValue(forKey: id)?.didFailWithError(error)
     }
