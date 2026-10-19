@@ -103,24 +103,29 @@ workersCapacitorPlugin({
 
 `localRoutes` is available only with `manual`. Use uppercase HTTP methods (or
 `"*"` for all methods) and
-either exact Hono registration paths or JavaScript regular expressions:
+exact Hono registration paths, a trailing `/*`, or JavaScript regular expressions:
 
 ```ts
 localRoutes: [
   { method: "GET", path: "/" },
+  { method: "*", path: "/app/*" },
   { method: "GET", path: /^\/pages\// },
   { method: "*", path: /^\/notes\// },
 ],
 ```
 
-A regular expression tests the registered path at build time, not the incoming
+`"/app/*"` selects registrations starting with `/app/`, including nested paths
+such as `/app/news/:id`. It does not select `/app`, `/application`, or
+`/app-private`; add `/app` separately if needed. Only a trailing `/*` has wildcard
+meaning; other strings remain exact matches. This is not a general glob syntax.
+
+A regular expression or wildcard tests the registered path at build time, not the incoming
 URL. For example, `/^\/pages\//` permits both `/pages/about` and
 `/pages/news/:id`; Hono still matches actual requests and route parameters.
 Use `^` and `$` when you need to anchor the match. Matching future registrations
 also receive permission, so keep patterns narrow. Each match starts at index zero,
 including expressions with `g` or `y`; the supplied expression is not mutated.
-Strings remain exact matches, not regular expressions or URL globs. Neither form
-is an authorization rule. Currently, manual selection requires direct
+These settings are not authorization rules. Currently, manual selection requires direct
 registrations on the exported Hono router; mounted routes, `basePath`, and `on()`
 registrations are not resolved for manual permission. For an analyzable Hono
 graph, an unresolved selection fails the build rather than broadening permission.

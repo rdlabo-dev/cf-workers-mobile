@@ -134,6 +134,57 @@ it("manual does not bypass authentication middleware", async () => {
     `import {Hono} from 'hono'; const app=new Hono(); app.use('/private',async(c,next)=>{if(c.req.header('authorization')!==c.env.SECRET)return c.text('denied',401);await next();});app.get('/private',c=>c.text('PROTECTED_CONTENT'));export default app;`,
   );
 });
+it("manual selects descendants with a trailing path wildcard, without widening to siblings or unknown URLs", async () => {
+  await fixture(
+    { execution: "manual", localRoutes: [{ method: "*", path: "/app/*" }] },
+    async (graph) => {
+      const result = (await graph.get())!;
+      const { needsRemote } = await load(result.selector);
+      for (const [path, method] of [
+        ["/app/home", "GET"],
+        ["/app/news/123", "GET"],
+        ["/app/notes", "POST"],
+      ]) {
+        expect(
+          await needsRemote(
+            new Request(`https://local.invalid${path}`, { method }),
+          ),
+        ).toBe(false);
+      }
+      for (const path of [
+        "/app",
+        // The existing overlap guard conservatively keeps /app/ remote too.
+        "/app/",
+        "/application",
+        "/app-private",
+        "/app/cloud",
+        "/app/missing",
+      ]) {
+        expect(
+          await needsRemote(new Request(`https://local.invalid${path}`)),
+        ).toBe(true);
+      }
+      expect(result.local + result.selector).not.toContain("UNSELECTED_DATA");
+      expect(
+        await (
+          await (
+            await load(result.local)
+          ).default.fetch(new Request("https://local.invalid/app/news/123"))
+        ).text(),
+      ).toBe("123");
+    },
+    `import {Hono} from 'hono'; const app=new Hono();
+    app.get('/app/',c=>c.text('home'));
+    app.get('/app/home',c=>c.text('home'));
+    app.get('/app/news/:id',c=>c.text(c.req.param('id')));
+    app.post('/app/notes',async c=>c.text(await c.req.text()));
+    app.get('/app/cloud',c=>c.text(c.env.SECRET));
+    app.get('/app',c=>c.text('UNSELECTED_DATA'));
+    app.get('/application',c=>c.text('UNSELECTED_DATA'));
+    app.get('/app-private',c=>c.text('UNSELECTED_DATA'));
+    export default app;`,
+  );
+});
 it.each(["/notes", /^\/notes$/])(
   "manual accepts all methods for path %s without overriding server boundaries",
   async (path) => {

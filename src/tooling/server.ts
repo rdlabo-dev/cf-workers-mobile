@@ -1287,7 +1287,12 @@ async function partition(
           : undefined;
       const matchesPath = (path: string | undefined) => {
         if (path === undefined) return false;
-        if (!pattern) return path === route.path;
+        if (typeof route.path === "string") {
+          return route.path.endsWith("/*")
+            ? path.startsWith(route.path.slice(0, -1))
+            : path === route.path;
+        }
+        if (!pattern) return false;
         pattern.lastIndex = 0;
         return pattern.test(path);
       };
