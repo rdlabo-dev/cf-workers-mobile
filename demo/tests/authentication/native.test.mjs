@@ -5,17 +5,20 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { runNativeAcceptance } from "../native/acceptance.mjs";
 import { startBackend, redirectUri } from "./backend.mjs";
+import { startLiveBackend } from "./live/backend.mjs";
 const here = fileURLToPath(new URL(".", import.meta.url));
 const shell = fileURLToPath(new URL("../../authentication/", import.meta.url));
 test(
   "system browser OAuth with PKCE and Worker-owned HttpOnly session",
   { timeout: 600000 },
   async () => {
-    const backend = await startBackend();
+    const backend = process.env.NATIVE_TEST_OAUTH_ORIGIN
+      ? await startLiveBackend()
+      : await startBackend();
     const options = {
       authorizationEndpoint: new URL("/authorize", backend.url).href,
       tokenEndpoint: new URL("/token", backend.url).href,
-      clientId: "native-test",
+      clientId: backend.clientId ?? "native-test",
       redirectUri,
       scope: "profile",
     };

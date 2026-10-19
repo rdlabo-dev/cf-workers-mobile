@@ -6,6 +6,7 @@ import {
   readFile,
   writeFile,
   cp,
+  rm,
   readdir,
   stat,
   access,
@@ -35,6 +36,8 @@ export async function runNativeAcceptance({
   configureNative,
   timeout = 60000,
 }) {
+  const physicalIOS =
+    platform === "ios" && process.env.IOS_PHYSICAL_DEVICE === "1";
   const iosBuild = join(shell, "ios/build");
   const run = async (command, args, cwd = shell) => {
     try {
@@ -59,6 +62,12 @@ export async function runNativeAcceptance({
   try {
     if (!["ios", "android"].includes(platform) || !device)
       throw Error("Set UPSTREAM_PLATFORM=ios|android and UPSTREAM_DEVICE");
+    if (physicalIOS && !process.env.IOS_DEVELOPMENT_TEAM)
+      throw Error("Set IOS_DEVELOPMENT_TEAM for physical iOS signing");
+    if (physicalIOS && backend.ca)
+      throw Error(
+        "Physical iOS acceptance requires a deployed HTTPS backend; local test CAs are simulator-only",
+      );
     await mkdir(artifacts, { recursive: true });
     const bootstrap = join(artifacts, "bootstrap");
     await mkdir(bootstrap, { recursive: true });
@@ -98,10 +107,14 @@ export async function runNativeAcceptance({
       const debug = join(shell, "android/app/src/debug");
       await mkdir(join(debug, "res/raw"), { recursive: true });
       await mkdir(join(debug, "res/xml"), { recursive: true });
-      await cp(backend.ca, join(debug, "res/raw/opennext_ca.pem"));
+      if (backend.ca)
+        await cp(backend.ca, join(debug, "res/raw/opennext_ca.pem"));
+      else await rm(join(debug, "res/raw/opennext_ca.pem"), { force: true });
       await writeFile(
         join(debug, "res/xml/opennext_security.xml"),
-        '<network-security-config><base-config><trust-anchors><certificates src="system"/></trust-anchors></base-config><debug-overrides><trust-anchors><certificates src="@raw/opennext_ca"/></trust-anchors></debug-overrides></network-security-config>',
+        backend.ca
+          ? '<network-security-config><base-config><trust-anchors><certificates src="system"/></trust-anchors></base-config><debug-overrides><trust-anchors><certificates src="@raw/opennext_ca"/></trust-anchors></debug-overrides></network-security-config>'
+          : '<network-security-config><base-config><trust-anchors><certificates src="system"/></trust-anchors></base-config></network-security-config>',
       );
       await writeFile(
         join(debug, "AndroidManifest.xml"),
@@ -123,13 +136,14 @@ export async function runNativeAcceptance({
     if (configureNative) await configureNative({ shell, platform, run });
     await run("npx", ["cap", "sync", platform]);
     if (platform === "ios") {
-      await run("xcrun", [
-        "simctl",
-        "keychain",
-        device,
-        "add-root-cert",
-        backend.ca,
-      ]);
+      if (!physicalIOS && backend.ca)
+        await run("xcrun", [
+          "simctl",
+          "keychain",
+          device,
+          "add-root-cert",
+          backend.ca,
+        ]);
       await run("xcodebuild", [
         "-quiet",
         "-project",
@@ -139,21 +153,53 @@ export async function runNativeAcceptance({
         "-configuration",
         "Debug",
         "-sdk",
-        "iphonesimulator",
+        physicalIOS ? "iphoneos" : "iphonesimulator",
         "-destination",
         `id=${device}`,
         "-derivedDataPath",
         iosBuild,
-        "CODE_SIGNING_ALLOWED=NO",
+        ...(physicalIOS
+          ? [
+              "-allowProvisioningUpdates",
+              `DEVELOPMENT_TEAM=${process.env.IOS_DEVELOPMENT_TEAM}`,
+              "CODE_SIGN_STYLE=Automatic",
+            ]
+          : ["CODE_SIGNING_ALLOWED=NO"]),
         "build",
       ]);
       // Match Android pm clear: each scenario starts with fresh application data.
-      await run("xcrun", ["simctl", "uninstall", device, appId]);
+      if (physicalIOS) {
+        const { stdout } = await run("xcrun", [
+          "devicectl",
+          "device",
+          "info",
+          "apps",
+          "--device",
+          device,
+          "--bundle-id",
+          appId,
+          "--json-output",
+          "-",
+        ]);
+        if (JSON.parse(stdout).result.apps.length)
+          await run("xcrun", [
+            "devicectl",
+            "device",
+            "uninstall",
+            "app",
+            "--device",
+            device,
+            appId,
+          ]);
+      } else await run("xcrun", ["simctl", "uninstall", device, appId]);
       await run("xcrun", [
-        "simctl",
-        "install",
-        device,
-        join(iosBuild, "Build/Products/Debug-iphonesimulator/App.app"),
+        ...(physicalIOS
+          ? ["devicectl", "device", "install", "app", "--device", device]
+          : ["simctl", "install", device]),
+        join(
+          iosBuild,
+          `Build/Products/Debug-${physicalIOS ? "iphoneos" : "iphonesimulator"}/App.app`,
+        ),
       ]);
     } else {
       await run(
@@ -180,10 +226,17 @@ export async function runNativeAcceptance({
     const launched = Date.now();
     if (platform === "ios")
       await run("xcrun", [
-        "simctl",
-        "launch",
-        "--terminate-running-process",
-        device,
+        ...(physicalIOS
+          ? [
+              "devicectl",
+              "device",
+              "process",
+              "launch",
+              "--terminate-existing",
+              "--device",
+              device,
+            ]
+          : ["simctl", "launch", "--terminate-running-process", device]),
         appId,
       ]);
     else
@@ -198,6 +251,7 @@ export async function runNativeAcceptance({
       ]);
     const deadline = Date.now() + timeout;
     while (!backend.reports.some((r) => r.stage === "complete")) {
+      await backend.refresh?.();
       assert.equal(
         backend.reports.find((r) => r.stage === "failure"),
         undefined,
@@ -207,7 +261,7 @@ export async function runNativeAcceptance({
         Date.now() < deadline,
         JSON.stringify({
           reports: backend.reports,
-          requests: backend.requests.slice(-15),
+          requests: backend.requests?.slice(-15),
         }),
       );
       await new Promise((resolve) => setTimeout(resolve, 100));

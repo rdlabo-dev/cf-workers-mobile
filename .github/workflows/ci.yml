@@ -67,7 +67,7 @@ jobs:
               npm install --prefix authentication
               npm run typecheck --prefix authentication
               node tests/upstream/minvoice/prepare.mjs
-              node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs
+              node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs tests/authentication/live/worker.test.mjs
           - suite: upstream-0bin
             native: 0bin
             node: 24.21.0

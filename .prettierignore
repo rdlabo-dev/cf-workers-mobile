@@ -10,3 +10,13 @@ src/compat/url/standard-url.ts
 # Capacitor-generated native project scaffolding.
 demo/ios/
 demo/android/
+demo/*/ios/
+demo/*/android/
+
+# Framework output ignored by the independent demos.
+demo/*/www/
+demo/*/.next/
+demo/*/.open-next/
+demo/*/.void/
+demo/*/next-env.d.ts
+demo/*/.void-wrangler.jsonc

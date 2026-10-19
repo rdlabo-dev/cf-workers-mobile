@@ -221,16 +221,22 @@ Each application's `browser.test.mjs` establishes the unchanged upstream Worker'
 - [Sink](upstream/sink/README.md): original Nuxt login and link creation UI with D1 assertions.
 - [FlareDrive](upstream/flaredrive/README.md): original file listing and authenticated WebDAV/R2 round trip; HTTP Basic login prompts are outside this scenario.
 - [Minvoice](upstream/minvoice/README.md): pinned third-party source, original login/client/invoice forms, D1 assertions and cross-origin rejection.
-- [External-browser OAuth](../authentication/README.md): real browser callback, PKCE and Worker-issued HttpOnly session with a local test issuer.
+- [External-browser OAuth](../authentication/README.md): real browser callback, PKCE and Worker-issued HttpOnly session with local or public-HTTPS synthetic test issuers.
 - `opennext/images.test.mjs` and `opennext/images.native.test.mjs`: real IMAGES transformation, WebP bytes/dimensions and native image rendering.
-- `void/native.test.mjs`: Android SSR/actions/client-only flow; on iOS, explicitly verifies the upstream custom-scheme router limitation.
+- `void/native.test.mjs`: iOS/Android SSR, hydration, form actions, D1 persistence and client-only flow with released Void 1.1.12.
 
 - [microfeed](upstream/microfeed/README.md): It seeds a published article in real local workerd D1, opens it from the original feed and reads the RSS feed.
 - [UptimeFlare](upstream/uptimeflare/README.md): It seeds monitor status and latency history in real local workerd D1, verifies the original status page, follows its Incidents link and selects a monitor filter.
 - [flare-stack-blog](upstream/flare-stack-blog/README.md): D1-backed articles, navbar styling, client-side navigation controls and article navigation. Android passes; iOS client initialization fails because Better Auth rejects the app-local URL scheme.
 
-Native tests use `UPSTREAM_PLATFORM=ios|android` and `UPSTREAM_DEVICE`. Run every test sharing `demo/opennext` serially, including its browser integration build. For multiple files use `node --test --test-concurrency=1 <files>` (runner options precede file names). OAuth uses its independent `demo/authentication` shell, but must not run alongside another test on the same device.
+Native tests use `UPSTREAM_PLATFORM=ios|android` and `UPSTREAM_DEVICE` (the Android serial from `adb devices`, for either an emulator or a connected physical device). Run every test sharing `demo/opennext` serially, including its browser integration build. For multiple files use `node --test --test-concurrency=1 <files>` (runner options precede file names). OAuth uses its independent `demo/authentication` shell, but must not run alongside another test on the same device.
 
 `native/acceptance.mjs` owns only build/install/launch plumbing. It resets the test app’s data before each scenario (reinstall on iOS, `pm clear` on Android), so a previous login cannot bypass the scenario’s authentication flow. Each scenario owns its Worker, data and assertions. Artifacts are ignored by git. Its `elapsedFlowMs` is launch-to-scenario-completion time, not startup latency; simulator/emulator measurements are not physical-device performance results.
 
-The existing `opennext/native.test.mjs` also records a single Debug launch-to-hydration sample and host-process RSS (`*-performance.json`, raw `*-memory.txt`). The timing includes local HTTPS transport and host load; RSS excludes separate renderer/GPU processes. Use those artifacts to reproduce a simulator baseline, not to claim physical-device latency or total application memory.
+The existing `opennext/native.test.mjs` also records a single Debug launch-to-hydration sample and host-process RSS (`*-performance.json`, raw `*-memory.txt`). The timing includes transport, launch tooling and host load; RSS excludes separate renderer/GPU processes. Physical iOS does not collect RSS. The artifact records the execution environment; Android distinguishes an emulator from a physical device. A single Debug run is not a release-build latency benchmark or a total application memory measurement.
+
+### Physical iOS devices
+
+The native runners also accept a paired iPhone UDID when `IOS_PHYSICAL_DEVICE=1` and `IOS_DEVELOPMENT_TEAM=<your-team-id>` are set. Enable Developer Mode and keep the phone unlocked. The runners sign a Debug build with your local Xcode account and use `devicectl` to install and launch it; they do not change library native source. The packaged Hono/Express scenarios need no test server.
+
+Physical-device remote acceptance uses a deployed HTTPS Worker with a publicly trusted certificate, not a CA installed on the phone. For OpenNext, use `NATIVE_TEST_ORIGIN`, `NATIVE_TEST_ADMIN_TOKEN` (host only) and `NATIVE_TEST_DEVICE_TOKEN` (a temporary credential scoped to the test deployment). See [live OpenNext acceptance](opennext/live/README.md) and [live OAuth acceptance](authentication/live/README.md). Never ship test credentials, test report endpoints or certificate bypasses in a consumer application. Physical iOS memory is not collected: the report uses `null` instead of querying the unrelated Mac process with the same PID.

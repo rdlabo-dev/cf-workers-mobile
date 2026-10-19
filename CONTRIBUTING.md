@@ -6,9 +6,7 @@ Run `npm run format` from the repository root before submitting changes. `npm ru
 
 ## Complete compatibility units only
 
-We merge and release completed compatibility units. A useful subset, a working
-framework demo, or passing tests for selected methods is not enough to accept a
-new compatibility implementation.
+New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The only release exception is the existing implementation included in [0.1.0 Preview](#010-preview-exception).
 
 For Node.js compatibility, the acceptance unit is a module, including its Workers
 exports, subpaths and observable behavior. For a binding or Web API, define the
@@ -71,10 +69,11 @@ not ship it behind an experimental flag as a substitute for finishing it. Design
 notes and reproducible experiments can be reviewed independently without adding
 unfinished production behavior.
 
-Existing PoC implementations are completion debt, not exceptions to this policy.
-Their existing behavior is not automatically certified by this rule. Complete
-and verify each unit before a release includes it; do not claim the whole package
-is release-ready merely because one unit passes.
+### 0.1.0 Preview exception
+
+0.1.0 Preview may include existing compatibility implementations with the limitations documented in the [compatibility inventory](docs/compatibility.md). Their inclusion does not establish complete module compatibility or certify untested behavior. Keep missing exports, unsupported operations and verification boundaries visible; a passing application scenario does not make its dependencies complete.
+
+This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
 
 ## Layout and tests
 

@@ -27,22 +27,16 @@ On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker
 ## Prompt to give your AI assistant
 
 ```text
-Follow docs/integration.md from rdlabo-dev/workers-capacitor to integrate this application with Capacitor using workers-capacitor.
-
-Inspect the existing code first, then install/configure the required dependencies, connect the existing Worker entry and verify the app on the target platforms.
-Preserve the cloud build and existing authentication. Keep changes minimal.
-
-First attempt integration without changing the Worker application code. For D1 and other cloud dependencies, configure the supported remote dispatch to the existing Worker and inspect its build report. Preserve SSR, routing and authentication, including when the whole request must execute remotely.
-Only change application code after identifying a specific incompatibility that configuration cannot resolve. Explain that incompatibility and make the smallest correction. Do not redesign the application as an App Shell or SPA, split SSR into APIs, or replace authentication merely to integrate Capacitor.
-
-Follow the security section.
-Report files changed, verification results and remaining limitations, distinguishing local execution from remote execution.
-Do not deploy cloud resources or publish the app without explicit authorization.
+Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
+to bring this app to iOS and Android with workers-capacitor.
+Preserve its pages, routes and authentication; verify it on the target platforms.
 ```
 
 Provide the target platforms, app ID/name, and an existing test Worker origin if available. The assistant should infer entries, framework and scripts from the repository, asking only for missing product choices or access it cannot infer.
 
 ## Workflow
+
+Follow the security and verification steps below. Cloud deployments and app publication require explicit user authorization.
 
 1. Inspect the application and select native HTML rendering or Fetch-only integration.
 2. Install Capacitor and this package in the application.
@@ -51,6 +45,8 @@ Provide the target platforms, app ID/name, and an existing test Worker origin if
 5. Check security and verify the actual application flow.
 
 ## 1. Inspect the application and choose the integration
+
+Start with the [framework integration inventory](build-setup.md#frameworks). Angular SSR on Workers is not yet verified; build-tool support alone does not establish framework support. For Void, follow its generated-entry guide and version requirements.
 
 Read the Worker entry, build scripts, Wrangler configuration, page routes, middleware and authentication code. Record these decisions in the implementation plan, rather than adding a permanent progress document:
 
@@ -81,11 +77,21 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Until a package release is available, build and pack this repository with `npm install`, `npm run build`, `npm pack`, then install the resulting `.tgz` in the application. Do not assume an npm release exists. In the application, install the actual file:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. The 0.1.0 Preview package is not yet published to npm. Build a tarball from this repository:
 
 ```sh
+# In a checkout of workers-capacitor
+npm install
+npm run build
+npm pack
+
+# In your application
 npm install /absolute/path/to/workers-capacitor-0.1.0.tgz
 ```
+
+After npm publication, use `npm install workers-capacitor@0.1.0` instead.
+
+Before building a native target, check the [native SDK requirements and Android Gradle resource rules](development.md#native-demo). The Android resource rules belong in the application's `android/app/build.gradle`.
 
 Keep Capacitor/native projects in the application package, not in the library's source tree. Reuse existing dependencies and scripts rather than scaffolding a second application unnecessarily.
 
@@ -134,22 +140,27 @@ export default defineConfig({
 });
 ```
 
-This example uses Vite. For an existing esbuild build, use the [esbuild setup](../README.md#esbuild) instead. Do not introduce Vite solely to replace a supported build. Plain browser ESM is available for browser-compatible JavaScript, but does not perform the native document asset setup automatically.
+This example uses Vite. For an existing esbuild build, use the [esbuild setup](build-setup.md#esbuild) instead. Do not introduce Vite solely to replace a supported build. Plain browser ESM is available for browser-compatible JavaScript, but does not perform the native document asset setup automatically.
 
 Adjust paths to the actual application. For OpenNext the entry is the generated `.open-next/worker.js`; build it first and explicitly configure remote ASSETS if used. Additional configuration is described in the [binding guide](cloudflare-bindings.md).
 
 ```ts
-// capacitor/main.ts — cookie-session example; no app startup side effects
+// capacitor/main.ts — local document setup
 import { workersCapacitor } from "workers-capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
-  remote: { origin: "https://your-worker.example.com" },
   render: "/",
 });
 await runtime.ready;
 ```
 
-`baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](../README.md#url-contract).
+If the build report selects remote routes or whole-Worker remote execution, add
+`remote: { origin: "https://your-worker.example.com" }` to these options and connect
+your existing authentication. Remote configuration is required for that generated
+boundary. For a local-only build, omit `remote`; supplying it without a generated
+remote boundary is rejected. See the [binding configuration guide](cloudflare-bindings.md).
+
+`baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
 
 `render` selects native document rendering, including links and forms; it is not an option specifically for forms. For an existing separately built frontend, omit `render`, initialize the Fetch-only runtime before mounting the UI, and use an API-only `baseURL` boundary such as `https://your-worker.example.com/api/`. Keep that frontend outside the API boundary. The plugin entry must be the corresponding API Worker; inspect its remote-dispatch report too.
 

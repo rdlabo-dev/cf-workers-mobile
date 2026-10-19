@@ -9,9 +9,7 @@ import { nativeBackend } from "../native/backend.mjs";
 import { runNativeAcceptance } from "../native/acceptance.mjs";
 const root = fileURLToPath(new URL("../../void/", import.meta.url));
 test(
-  process.env.UPSTREAM_PLATFORM === "ios"
-    ? "Void iOS boundary: native scheme is rejected by the upstream router"
-    : "Void native SSR, hydration, form action and client-only rendering",
+  "Void native SSR, hydration, form action and client-only rendering",
   { timeout: 600000 },
   async () => {
     const compiled = await build({
@@ -52,7 +50,7 @@ test(
       ),
       dispose: () => worker.dispose(),
     });
-    const acceptance = runNativeAcceptance({
+    await runNativeAcceptance({
       backend,
       worker: join(root, "dist/ssr/index.js"),
       workerConfig: join(root, "dist/ssr/wrangler.json"),
@@ -76,12 +74,5 @@ test(
         );
       },
     });
-    if (process.env.UPSTREAM_PLATFORM === "ios") {
-      await assert.rejects(
-        acceptance,
-        /Void Router: refusing to navigate to a capacitor: URL/,
-      );
-      assert.ok(backend.reports.some((r) => r.stage === "rendered"));
-    } else await acceptance;
   },
 );

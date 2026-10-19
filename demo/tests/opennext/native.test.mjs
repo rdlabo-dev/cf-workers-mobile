@@ -15,6 +15,7 @@ import {
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { startBackend } from "./backend.mjs";
+import { startLiveBackend } from "./live/backend.mjs";
 const exec = promisify(execFile);
 const platform = process.env.OPENNEXT_PLATFORM;
 const device = process.env.OPENNEXT_DEVICE;
@@ -24,6 +25,10 @@ const root = fileURLToPath(new URL("../../opennext/", import.meta.url));
 const artifacts = fileURLToPath(
   new URL("../../artifacts/opennext-native/", import.meta.url),
 );
+const physicalIOS =
+  platform === "ios" && process.env.IOS_PHYSICAL_DEVICE === "1";
+if (physicalIOS && !process.env.IOS_DEVELOPMENT_TEAM)
+  throw Error("Set IOS_DEVELOPMENT_TEAM for physical iOS signing");
 const local = process.env.OPENNEXT_LOCAL === "1";
 const appId = "jp.rdlabo.workerscapacitor.opennext";
 test(
@@ -31,7 +36,18 @@ test(
   { timeout: 600000 },
   async () => {
     await mkdir(artifacts, { recursive: true });
-    const backend = await startBackend({ native: true });
+    const live = Boolean(process.env.NATIVE_TEST_ORIGIN);
+    if (live && local)
+      throw Error(
+        "The deployed acceptance profile tests remote execution; omit OPENNEXT_LOCAL",
+      );
+    if (physicalIOS && !live)
+      throw Error(
+        "Physical iOS remote acceptance requires NATIVE_TEST_ORIGIN with a publicly trusted certificate",
+      );
+    const backend = live
+      ? await startLiveBackend()
+      : await startBackend({ native: true });
     const run = async (command, args, cwd = root) => {
       try {
         const result = await exec(command, args, {
@@ -40,6 +56,7 @@ test(
           env: {
             ...process.env,
             VITE_WORKER_ORIGIN: backend.url.origin,
+            VITE_TEST_DEVICE_TOKEN: process.env.NATIVE_TEST_DEVICE_TOKEN ?? "",
             VITE_REPORT_ORIGIN: local ? backend.url.origin : "",
             JAVA_HOME:
               process.env.JAVA_HOME ||
@@ -58,6 +75,7 @@ test(
     const waitReport = async (stage) => {
       const end = Date.now() + 60000;
       while (Date.now() < end) {
+        await backend.refresh?.();
         const failure = backend.reports.find(
           (report) => report.stage === "failure",
         );
@@ -98,6 +116,12 @@ test(
         await cp(join(root, "../artifacts/opennext-local"), join(root, "www"), {
           recursive: true,
         });
+      } else if (live) {
+        await run(
+          "npx",
+          ["vite", "build", "--config", "tests/opennext/live/vite.config.ts"],
+          join(root, ".."),
+        );
       } else await run("npm", ["run", "build:capacitor"]);
       try {
         await access(join(root, platform));
@@ -108,10 +132,14 @@ test(
         const debug = join(root, "android/app/src/debug");
         await mkdir(join(debug, "res/raw"), { recursive: true });
         await mkdir(join(debug, "res/xml"), { recursive: true });
-        await cp(backend.ca, join(debug, "res/raw/opennext_ca.pem"));
+        if (backend.ca)
+          await cp(backend.ca, join(debug, "res/raw/opennext_ca.pem"));
+        else await rm(join(debug, "res/raw/opennext_ca.pem"), { force: true });
         await writeFile(
           join(debug, "res/xml/opennext_security.xml"),
-          '<network-security-config><base-config><trust-anchors><certificates src="system"/></trust-anchors></base-config><debug-overrides><trust-anchors><certificates src="@raw/opennext_ca"/></trust-anchors></debug-overrides></network-security-config>',
+          backend.ca
+            ? '<network-security-config><base-config><trust-anchors><certificates src="system"/></trust-anchors></base-config><debug-overrides><trust-anchors><certificates src="@raw/opennext_ca"/></trust-anchors></debug-overrides></network-security-config>'
+            : '<network-security-config><base-config><trust-anchors><certificates src="system"/></trust-anchors></base-config></network-security-config>',
         );
         await writeFile(
           join(debug, "AndroidManifest.xml"),
@@ -130,13 +158,14 @@ test(
       }
       await run("npx", ["cap", "sync", platform]);
       if (platform === "ios") {
-        await run("xcrun", [
-          "simctl",
-          "keychain",
-          device,
-          "add-root-cert",
-          backend.ca,
-        ]);
+        if (!physicalIOS && backend.ca)
+          await run("xcrun", [
+            "simctl",
+            "keychain",
+            device,
+            "add-root-cert",
+            backend.ca,
+          ]);
         await run("xcodebuild", [
           "-quiet",
           "-project",
@@ -146,19 +175,28 @@ test(
           "-configuration",
           "Debug",
           "-sdk",
-          "iphonesimulator",
+          physicalIOS ? "iphoneos" : "iphonesimulator",
           "-destination",
           `id=${device}`,
           "-derivedDataPath",
           join(artifacts, "ios"),
-          "CODE_SIGNING_ALLOWED=NO",
+          ...(physicalIOS
+            ? [
+                "-allowProvisioningUpdates",
+                `DEVELOPMENT_TEAM=${process.env.IOS_DEVELOPMENT_TEAM}`,
+                "CODE_SIGN_STYLE=Automatic",
+              ]
+            : ["CODE_SIGNING_ALLOWED=NO"]),
           "build",
         ]);
         await run("xcrun", [
-          "simctl",
-          "install",
-          device,
-          join(artifacts, "ios/Build/Products/Debug-iphonesimulator/App.app"),
+          ...(physicalIOS
+            ? ["devicectl", "device", "install", "app", "--device", device]
+            : ["simctl", "install", device]),
+          join(
+            artifacts,
+            `ios/Build/Products/Debug-${physicalIOS ? "iphoneos" : "iphonesimulator"}/App.app`,
+          ),
         ]);
       } else {
         await run(
@@ -184,16 +222,26 @@ test(
       }
       let iosPid;
       const launch = async () => {
+        await backend.configure?.();
         if (platform === "ios") {
           const output = await run("xcrun", [
-            "simctl",
-            "launch",
-            "--terminate-running-process",
-            device,
+            ...(physicalIOS
+              ? [
+                  "devicectl",
+                  "device",
+                  "process",
+                  "launch",
+                  "--terminate-existing",
+                  "--device",
+                  device,
+                ]
+              : ["simctl", "launch", "--terminate-running-process", device]),
             appId,
           ]);
-          iosPid = output.trim().split(": ").at(-1);
-          assert.match(iosPid, /^\d+$/);
+          if (!physicalIOS) {
+            iosPid = output.trim().split(": ").at(-1);
+            assert.match(iosPid, /^\d+$/);
+          }
         } else {
           await run("adb", ["-s", device, "shell", "am", "force-stop", appId]);
           await run("adb", [
@@ -221,9 +269,10 @@ test(
         .filter((info) => info.isFile())
         .reduce((sum, info) => sum + info.size, 0);
       // Process RSS excludes separate WebView renderer/GPU processes. This is
-      // a simulator/emulator debug baseline, not a physical-device memory budget.
-      const memory =
-        platform === "ios"
+      // a single Debug sample, not a production memory budget.
+      const memory = physicalIOS
+        ? "Not collected: host ps cannot measure an iPhone process.\n"
+        : platform === "ios"
           ? await run("ps", ["-o", "rss=", "-p", iosPid])
           : await run("adb", [
               "-s",
@@ -233,11 +282,13 @@ test(
               "meminfo",
               appId,
             ]);
-      const hostProcessRssKiB =
-        platform === "ios"
+      const hostProcessRssKiB = physicalIOS
+        ? null
+        : platform === "ios"
           ? Number(memory.trim())
           : Number(memory.match(/TOTAL RSS:\s*(\d+)/)?.[1]);
-      assert.ok(Number.isFinite(hostProcessRssKiB) && hostProcessRssKiB > 0);
+      if (!physicalIOS)
+        assert.ok(Number.isFinite(hostProcessRssKiB) && hostProcessRssKiB > 0);
       await writeFile(join(artifacts, `${platform}-memory.txt`), memory);
       await writeFile(
         join(artifacts, `${platform}-performance.json`),
@@ -246,14 +297,28 @@ test(
             platform,
             device,
             configuration: "Debug",
-            environment: "simulator/emulator",
+            environment:
+              physicalIOS ||
+              (platform === "android" &&
+                (
+                  await run("adb", [
+                    "-s",
+                    device,
+                    "shell",
+                    "getprop",
+                    "ro.kernel.qemu",
+                  ])
+                ).trim() !== "1")
+                ? "physical device"
+                : "simulator/emulator",
             execution: local ? "local" : "remote",
             launchToHydrationMs: hydrated.launchToHydrationMs,
             bundleBytes: hydrated.bundleBytes,
             hostProcessRssKiB,
             samples: 1,
-            memoryScope:
-              "host process RSS only; excludes renderer/GPU processes",
+            memoryScope: physicalIOS
+              ? "not collected on physical iOS"
+              : "host process RSS only; excludes renderer/GPU processes",
           },
           null,
           2,
@@ -299,11 +364,13 @@ test(
         assert.equal(report.rejected, true);
       }
       assert.equal(
-        (
-          await backend.db
-            .prepare("SELECT count(*) AS count FROM sessions")
-            .first()
-        ).count,
+        live
+          ? backend.sessionCount()
+          : (
+              await backend.db
+                .prepare("SELECT count(*) AS count FROM sessions")
+                .first()
+            ).count,
         0,
       );
     } finally {

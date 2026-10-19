@@ -2,24 +2,17 @@
 
 The package includes the native connection for Capacitor 8 (verified with 8.5.3).
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
-this Preview. No npm release is made by the packaging tests.
+this Preview.
 
 ## Installation
 
-Until a release is published, build and pack this repository:
+Install the package in your Capacitor application using the [Preview installation steps](integration.md#2-install-capacitor-and-this-package).
+
+Configure the Worker in the Vite/esbuild plugin and call
+`workersCapacitor({ baseURL, render: "/" })`. Build the web assets before
+synchronizing:
 
 ```sh
-npm install
-npm run build
-npm pack
-```
-
-In a Capacitor application, install the resulting tarball, configure the Worker
-in the Vite/esbuild plugin, and call `workersCapacitor({ baseURL, render: "/" })`.
-Build the web assets before synchronizing:
-
-```sh
-npm install /path/to/workers-capacitor-0.1.0.tgz
 npm run build
 npx cap sync
 npx cap run ios # or android
@@ -46,7 +39,10 @@ await app.ready;
 Fetch-only behavior. Document mode requires an HTTP(S) **origin** as `baseURL`,
 without an API path prefix. The Worker receives URLs under that logical origin;
 the visible page retains its Capacitor local URL (`capacitor://` on default iOS,
-`https://` on default Android). No remote fallback or local HTTP server is used.
+`https://` on default Android). The generated dispatch can select local execution
+or the configured remote Worker before invoking a handler; both paths return a
+document through the same native bridge. Local failures are not retried remotely,
+and no local HTTP server is started. See [remote execution setup](integration.md#3-configure-and-build-the-native-application).
 
 Hono and Workers Express use the same `worker.fetch(request, env, ctx)` boundary.
 Their application routers return complete HTML for pages and JSON for APIs. The
@@ -78,6 +74,16 @@ const config: CapacitorConfig = {
 Run `npx cap sync ios` after changing this setting. This default applies to the
 native Worker document view; the ordinary Fetch-only WebView retains Capacitor's
 normal behavior. No new `workersCapacitor` option is required.
+
+## Native plugins
+
+Choose a feature that helps your users, such as taking a photo, opening the share sheet or feeling feedback after an action. Browse the [official Capacitor plugins](https://capacitorjs.com/docs/apis) and follow the selected plugin's installation and permission setup.
+
+1. Install a plugin version compatible with Capacitor 8 in your application, configure its required iOS/Android permissions, rebuild the web assets and run `npx cap sync`.
+2. Call the plugin from the page's client-side JavaScript in response to a user action. Keep these calls out of SSR and Worker handlers: the native feature belongs to the device. For a remotely rendered page, include the plugin's JavaScript in that page's client build and its native package in the Capacitor application.
+3. Check the feature on each target platform, including permission denial, navigation away and back, and app resume. Register page listeners when the page mounts and remove them when it unmounts; a new document needs new listeners. If the same page runs on the web, provide the plugin's supported web behavior or an alternative UI.
+
+See [Using Plugins](https://capacitorjs.com/docs/basics/using-plugins) for the Capacitor workflow and [plugin lifecycle boundaries](integration.md#treat-packaged-code-and-data-as-extractable) for this library's document host.
 
 ## Build configuration
 
@@ -141,9 +147,10 @@ Observed Origin and Fetch Metadata headers are preserved. When iOS omits a form 
 The native host/child lifecycle, pending-request timeouts and explicit disposal
 are implemented. App process termination/relaunch, background/foreground,
 asset-update reinstalls without data deletion, and shutdown followed by
-reinitialization are covered by the packaged native fixture. Physical
-devices, WebView crash recovery, memory pressure and arbitrary third-party
-plugin lifecycle behavior require separate validation.
+reinitialization are covered by the packaged native fixture, including selected
+physical-device scenarios. Validate your application on its target devices;
+WebView crash recovery, memory pressure and arbitrary third-party plugin lifecycle
+behavior remain outside this coverage.
 
 ## Demo and validation
 
