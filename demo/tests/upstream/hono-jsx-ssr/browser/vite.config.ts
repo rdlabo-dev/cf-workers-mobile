@@ -5,7 +5,9 @@ import { workerEntry } from "../sample";
 
 export default defineConfig({
   root: fileURLToPath(new URL("./", import.meta.url)),
-  plugins: [workersCapacitorPlugin({ worker: workerEntry })],
+  plugins: [
+    workersCapacitorPlugin({ execution: "local", worker: workerEntry }),
+  ],
   build: {
     outDir: fileURLToPath(
       new URL(

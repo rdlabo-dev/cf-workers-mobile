@@ -14,6 +14,8 @@ export {
   type ServerBuildOptions,
 } from "../cloudflare/bindings/config.js";
 
+import type { ServerBuildOptions } from "../cloudflare/bindings/config.js";
+
 export interface ServerCompilation {
   mode: "routes" | "worker";
   reason?: string;
@@ -82,19 +84,64 @@ export async function compileServerWorker(
     BuildOptions,
     "alias" | "tsconfig" | "define" | "conditions"
   > & {
+    execution?: ServerBuildOptions["execution"];
+    localRoutes?: ServerBuildOptions["localRoutes"];
     localBindings?: string[];
     kvBindings?: string[];
     forceRemoteReason?: string;
   } = {},
 ): Promise<ServerCompilation> {
   const {
+    execution = "auto",
+    localRoutes,
     localBindings = [],
     kvBindings = [],
     forceRemoteReason,
     ...buildOptions
   } = options;
+  if (!["auto", "network", "manual", "local"].includes(execution))
+    throw new TypeError("Unknown Worker execution policy");
+  if (localRoutes !== undefined && execution !== "manual")
+    throw new TypeError('localRoutes requires execution: "manual"');
+  if (
+    execution === "manual" &&
+    (!Array.isArray(localRoutes) ||
+      localRoutes.some(
+        (route) =>
+          !route ||
+          !/^(GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
+          typeof route.path !== "string" ||
+          !route.path.startsWith("/"),
+      ))
+  )
+    throw new TypeError(
+      "manual execution requires localRoutes with an uppercase HTTP method and an absolute registration path",
+    );
+  if (execution === "local" && (bindings.length || forceRemoteReason))
+    throw new Error(
+      "local execution cannot use configured server bindings or server-only events; use auto, network or manual",
+    );
   if (localBindings.some((name) => bindings.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
+  if (execution === "local")
+    return {
+      mode: "worker",
+      reason: "Entire Worker distribution explicitly permitted",
+      // Keep the host bundler's loaders, aliases and transforms for full local execution.
+      local: `export { default } from ${JSON.stringify(entry.replaceAll("\\", "/"))};`,
+      selector: "export function needsRemote() { return false; }",
+      inputs: [],
+      routes: [
+        {
+          router: "worker",
+          method: "all",
+          path: "*",
+          remote: false,
+          reason:
+            "Entire Worker distribution explicitly permitted; runtime compatibility is the application's responsibility",
+        },
+      ],
+    };
   const bundled = await build({
     ...buildOptions,
     absWorkingDir: dirname(entry),
@@ -104,9 +151,10 @@ export async function compileServerWorker(
     // Remote-only applications may import Cloudflare WASM modules and binary
     // assets (for example next/og). Keep these files in the dependency graph
     // for the client-import guard, without embedding unused server data.
-    loader: forceRemoteReason
-      ? { ".wasm": "empty", ".bin": "empty" }
-      : undefined,
+    loader:
+      forceRemoteReason || execution === "network"
+        ? { ".wasm": "empty", ".bin": "empty" }
+        : undefined,
     format: "esm",
     platform: "neutral",
     write: false,
@@ -121,8 +169,17 @@ export async function compileServerWorker(
     resolve(dirname(entry), file),
   );
   try {
+    if (execution === "network")
+      throw new WiderServerBoundary("Network execution explicitly selected");
     if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);
-    return await partition(source, bindings, inputs, localBindings, kvBindings);
+    return await partition(
+      source,
+      bindings,
+      inputs,
+      localBindings,
+      kvBindings,
+      execution === "manual" ? localRoutes : undefined,
+    );
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
     return {
@@ -368,6 +425,7 @@ async function partition(
   inputs: string[],
   localBindings: string[],
   kvBindings: string[],
+  localRoutes?: ServerBuildOptions["localRoutes"],
 ): Promise<ServerCompilation> {
   const program = parseAst(source);
   const text = (node: Node) => {
@@ -870,30 +928,30 @@ async function partition(
         ![204, 205, 304].includes(value.value)
       );
     }
+    // Header writes can discard earlier values, including across middleware.
+    // Do not infer distribution permission from mutable response headers.
     function headerValues(value: Node): boolean {
+      return value.type === "ObjectExpression" && value.properties.length === 0;
+    }
+    function responseInit(value: Node): boolean {
       return (
         value.type === "ObjectExpression" &&
         expression(value, true) &&
         value.properties.every(
-          (item) => item.type === "Property" && expression(item.value),
+          (item) =>
+            item.type === "Property" &&
+            !item.computed &&
+            propertyName(item.key) === "status" &&
+            status(item.value),
         )
       );
     }
-    function responseInit(value: Node): boolean {
-      if (value.type !== "ObjectExpression" || !expression(value, true))
-        return false;
-      return value.properties.every((item) => {
-        if (item.type !== "Property") return false;
-        const key =
-          item.key.type === "Identifier"
-            ? item.key.name
-            : item.key.type === "Literal"
-              ? String(item.key.value)
-              : "";
-        if (key === "status") return status(item.value);
-        if (key === "statusText") return expression(item.value);
-        return key === "headers" && headerValues(item.value);
-      });
+    function propertyName(value: Node): string | undefined {
+      return value.type === "Identifier"
+        ? value.name
+        : value.type === "Literal"
+          ? String(value.value)
+          : undefined;
     }
     function expression(
       value: Node,
@@ -1197,12 +1255,7 @@ async function partition(
                 ) &&
                 expression(value.argument)))
           );
-        return (
-          value.type === "CallExpression" &&
-          memberPath(value.callee) === `${context}.header` &&
-          value.arguments.length === 2 &&
-          value.arguments.every((item) => expression(item))
-        );
+        return false;
       })
     );
   }
@@ -1221,6 +1274,39 @@ async function partition(
     }
     return false;
   }
+  const granted = new Set<CallExpression>();
+  if (localRoutes) {
+    // Do not guess effective paths through mounts or aliases. They remain remote.
+    const entries = [...registrations.values()].flat();
+    for (const route of localRoutes) {
+      const matches = entries.filter(
+        ({ router, call }) =>
+          router === root &&
+          !routerInitializers.get(root)?.includes(".basePath(") &&
+          property(call.callee) === route.method.toLowerCase() &&
+          literal(call.arguments[0]) === route.path,
+      );
+      if (!matches.length)
+        throw new Error(
+          `localRoutes: cannot resolve ${route.method} ${route.path} to a direct Hono registration`,
+        );
+      for (const match of matches) granted.add(match.call);
+    }
+  }
+  function distributionAllowed(call: CallExpression, handlers: Node[]) {
+    if (localRoutes && property(call.callee) !== "use")
+      return granted.has(call);
+    return handlers.every(
+      (argument) =>
+        staticPath(argument) ||
+        distributableResponseHandler(
+          argument,
+          new Set(),
+          false,
+          property(call.callee) === "use",
+        ),
+    );
+  }
   // State shared with a remote operation must not be duplicated in a local
   // module instance. Expand the boundary before generating either router.
   let changed = true;
@@ -1230,16 +1316,7 @@ async function partition(
       for (const { call } of entries) {
         if (
           !server(call.arguments) &&
-          call.arguments.every(
-            (argument) =>
-              staticPath(argument) ||
-              distributableResponseHandler(
-                argument,
-                new Set(),
-                false,
-                property(call.callee) === "use",
-              ),
-          )
+          distributionAllowed(call, call.arguments)
         )
           continue;
         for (const name of closure(call.arguments))
@@ -1285,16 +1362,7 @@ async function partition(
         method,
         paths: method === "on" ? paths.slice(1) : paths,
         handlers,
-        remote:
-          server(handlers) ||
-          !handlers.every((handler) =>
-            distributableResponseHandler(
-              handler,
-              new Set(),
-              false,
-              method === "use",
-            ),
-          ),
+        remote: server(handlers) || !distributionAllowed(entry.call, handlers),
       };
     });
   function literal(node: Node | undefined): string | undefined {
@@ -1437,6 +1505,7 @@ async function partition(
       if (method === "onError" || method === "notFound") {
         rejectRouterEscape(call.arguments);
         const remote =
+          localRoutes !== undefined ||
           server(call.arguments) ||
           !call.arguments.every((handler) =>
             distributableResponseHandler(handler),
@@ -1481,13 +1550,17 @@ async function partition(
         reason: protectedCalls.has(call)
           ? "Protected by an overlapping server handler or middleware; implementation is not distributed"
           : remote
-            ? "Server dependency or dependency without a local execution contract or public rendering contract"
-            : "Straight-line response construction with resolved dependencies; no overlapping server boundary",
+            ? localRoutes && !granted.has(call)
+              ? "Route distribution was not permitted by localRoutes"
+              : "Server dependency or dependency without a local execution contract or public rendering contract"
+            : granted.has(call)
+              ? "Route and retained dependencies explicitly permitted for distribution; no overlapping server boundary"
+              : "Straight-line response construction with resolved dependencies; no overlapping server boundary",
       });
       const prefix = paths.length ? paths.map(text).join(",") + "," : "";
       // Every candidate is visited, so a fallthrough to a server handler is selected
       // before local middleware, even when an earlier candidate could have responded.
-      const marker = `async (c,next) => { ${remote ? 'c.set("__cwRemote",true);' : ""} await next(); if(c.get("__cwRemote"))c.header("x-cw-remote","1"); }`;
+      const marker = `async (c,next) => { ${remote ? 'c.set("__cwRemote",true);' : ""} await next(); ${granted.has(call) ? 'c.header("x-cw-local-route","1");' : ""} if(c.get("__cwRemote"))c.header("x-cw-remote","1"); }`;
       emit(
         selectorRegistrations,
         statement,
@@ -1532,7 +1605,7 @@ async function partition(
     local: generate(needed, localRegistrations) + `\nexport default ${root};\n`,
     selector:
       generate(selectorNeeded, selectorRegistrations) +
-      `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return response.headers.get("x-cw-remote") === "1";`} }\n`,
+      `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return ${localRoutes ? 'response.headers.get("x-cw-local-route") !== "1" || ' : ""}response.headers.get("x-cw-remote") === "1";`} }\n`,
     inputs,
     routes,
   };

@@ -36,14 +36,19 @@ export function serverModules(
       }
     }
     const bindings = await serverBindings(configurationRoot, options);
-    if (!bindings.names.length && !bindings.forceRemoteReason) return;
+
     const compilation = await compileServerWorker(entry, bindings.names, {
+      execution: options.execution,
+      localRoutes: options.localRoutes,
       localBindings: bindings.localBindings,
       kvBindings: bindings.kvBindings,
       forceRemoteReason: bindings.forceRemoteReason,
     });
     return {
       ...compilation,
+      requiresRemote:
+        options.execution === "manual" ||
+        compilation.routes.some((route) => route.remote),
       reportFile: bindings.reportFile,
       inputs: [
         ...compilation.inputs,
@@ -70,7 +75,11 @@ export function serverModules(
           "Server build configuration disappeared; restart the build",
         );
       return {
-        code: id === localEntry ? result.local : result.selector,
+        code:
+          id === localEntry
+            ? result.local
+            : result.selector +
+              `\nexport const requiresRemote = ${result.requiresRemote};`,
         inputs: result.inputs,
       };
     },

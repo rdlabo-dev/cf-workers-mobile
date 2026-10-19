@@ -162,7 +162,11 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
     private readonly source: WorkerSource<Env>,
   ) {
     super(options);
-    if (source.needsRemote && !options.remote)
+    if (
+      source.needsRemote &&
+      source.requiresRemote !== false &&
+      !options.remote
+    )
       throw new TypeError(
         "This Worker contains server routes. Set remote.origin to the existing deployed Worker.",
       );
@@ -246,10 +250,16 @@ export class PreferredFetchRuntime<Env> extends FetchRuntime<Env> {
     await this.ready;
     if (this.closed) throw new Error("Worker runtime disposed");
     request.signal.throwIfAborted();
-    const remote = this.remote && (await this.source.needsRemote!(request));
+    const remote = await this.source.needsRemote?.(request);
     request.signal.throwIfAborted();
     if (this.closed) throw new Error("Worker runtime disposed");
-    if (remote) return this.remote!.fetch(request);
+    if (remote) {
+      if (!this.remote)
+        throw new TypeError(
+          "Remote dispatch requires remote.origin; local fallback is not permitted.",
+        );
+      return this.remote.fetch(request);
+    }
     return this.handler!.fetch(request, env, ctx);
   }
   protected override close() {

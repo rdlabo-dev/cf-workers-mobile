@@ -64,6 +64,62 @@ for the entire request. Conservative whole-Worker fallback preserves shared
 state, additional exports, middleware and error handling. Review the generated
 `workers-capacitor-server.json` report.
 
+### Choosing execution
+
+The Vite and esbuild plugins accept the same `execution` policy. Start with
+`auto` (the default); use `network` when server execution is preferable, and
+`manual` when you want to explicitly permit selected routes. `local` is for
+applications deliberately designed to run entirely on the device.
+
+| Policy    | Distribution permission and execution                                                                                                                                                                |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto`    | Analyze every Worker, including applications without Cloudflare bindings. Only supported Hono responses with a provable distribution boundary become local; unresolved cases remain on the server.   |
+| `network` | Keep the entire Worker on the server. Its implementation and fixed data are excluded from the client Worker graph.                                                                                   |
+| `manual`  | Permit selected routes and their retained dependencies to be distributed. Unselected routes stay remote; permission does not override detected server dependencies or overlapping server middleware. |
+| `local`   | Permit distribution of the entire Worker implementation and fixed data. There is no automatic server fallback or source-removal analysis.                                                            |
+
+```ts
+workersCapacitorPlugin({
+  worker: "src/worker.ts",
+  execution: "manual",
+  localRoutes: [
+    { method: "GET", path: "/" },
+    { method: "POST", path: "/notes" },
+  ],
+});
+```
+
+`localRoutes` is available only with `manual`. Use uppercase HTTP methods and
+exact Hono registration paths, including route parameters if present. It is not
+a URL glob or an authorization rule. Currently, manual selection requires direct
+registrations on the exported Hono router; mounted routes, `basePath`, and `on()`
+registrations are not resolved for manual permission. For an analyzable Hono
+graph, an unresolved selection fails the build rather than broadening permission.
+An unsupported Worker graph stays entirely remote. An empty list permits no routes.
+
+Permission includes retained fixed data, not just response bodies. For example,
+permitting a handler that reads `settings.title` can distribute private siblings
+in `settings`. Keep secret-containing modules outside manually permitted routes.
+This includes inline authentication: permitting a route containing a hard-coded
+token check permits that token and the guarded fixed data to be distributed.
+`manual` is not an authentication detector. Leave such routes out of `localRoutes`
+(or select `network`) to keep them server-side. Recognized server dependencies
+and overlapping remote middleware still prevent local execution.
+POST can be local for standalone device operations; HTTP methods do not establish
+whether code is safe to distribute.
+
+`local` rejects configured server bindings and server-only lifecycle requirements.
+It cannot detect every undeclared credential or unsupported dependency; the whole
+Worker source may be visible to the device owner. Use it only after reviewing that
+source and testing the application's runtime dependencies. It does not emulate D1,
+Firebase Admin or other server services.
+
+Remote execution still requires the runtime's `remote.origin` and server-side
+authentication and authorization. `network` removes the Worker-source distribution
+decision, not the need to secure requests. KV and ASSETS stay remote by default in
+`network` mode. Client assets, client `env`, and separately embedded files remain
+outside Worker-source removal.
+
 ### What can move to the device
 
 The safety boundary is the original server behavior: moving code to the device
@@ -79,8 +135,7 @@ signing key. Likewise, data returned only after authentication must not become
 available to everyone who downloads the app. Runtime compatibility and purity
 alone establish none of these permissions.
 
-When cloud bindings activate route partitioning, the existing Worker remains the
-baseline. Being able to execute a function in JavaScript is not enough to make its
+In `auto`, the existing Worker remains the baseline. Being able to execute a function in JavaScript is not enough to make its
 source distributable. A local candidate must also fit the supported response
 construction pattern: a straight-line `c.text`, `c.html`, `c.json`, `c.body` or
 `new Response`, using inline response values, request values, or explicitly local
@@ -110,14 +165,16 @@ exclusive dependencies from the client bundle, not just from local execution.
 The build uses conservative static path prefixes only to establish disjointness;
 it does not implement a second Hono router. Uncertain mounted-router boundaries
 and overlapping local responses keep the whole Worker remote. A middleware is
-locally eligible only for unconditional `await next()` and response-header writes.
+locally eligible only for unconditional `await next()`. Response-header writes
+and custom response headers remain remote in `auto`: later writes can discard
+earlier values that would otherwise remain in distributed source.
 Disjoint public pages can still render locally. KV operations explicitly configured
 as local continue to use device storage; a request that also requires a cloud
 service executes entirely on the deployed Worker.
 
 The generated report includes each registration's `reason` and its final
-`remote` decision after distribution boundaries are applied. No new route
-annotations or configuration options are required.
+`remote` decision after distribution boundaries are applied. `auto` requires no route
+annotations or publication settings.
 
 These checks do not classify the meaning of every literal. Values intentionally
 returned by an unprotected supported handler are treated as response data, not
@@ -126,10 +183,9 @@ access policy, is not inferred from its source. Do not rely on a private URL,
 obfuscation or a private source repository to protect bundled data. Do not place
 secrets in client `env`, bundler defines, `workerFiles` or public assets.
 
-Partitioning is activated by discovered/configured cloud dependencies; an app
-without those dependencies does not automatically receive this source-removal
-analysis. This is not a general secret scanner or automatic partitioning of Void
-or OpenNext bundles. `ssr: false` and prerendering are not distribution contracts.
+Analysis does not depend on a Cloudflare binding declaration. Unknown Worker
+shapes stay remote in `auto`; this is not a general secret scanner or automatic
+partitioning of Void or OpenNext bundles. `ssr: false` and prerendering are not distribution contracts.
 
 Durable Object HTTP and RPC calls inside the original HTTP handler are supported
 by this dispatch path. **WebSocket/HTTP upgrades are not supported by this

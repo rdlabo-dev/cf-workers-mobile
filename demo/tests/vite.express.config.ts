@@ -7,7 +7,10 @@ import demo from "../vite.config";
 export default defineConfig({
   ...demo,
   plugins: [
-    workersCapacitorPlugin({ worker: "./workers/express/standard.ts" }),
+    workersCapacitorPlugin({
+      execution: "local",
+      worker: "./workers/express/standard.ts",
+    }),
   ],
   build: {
     ...demo.build,

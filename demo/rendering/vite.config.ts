@@ -5,6 +5,7 @@ export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [
     workersCapacitorPlugin({
+      execution: "local",
       worker: "./workers/hono.tsx",
       // Replace with './workers/express.ts' to use Workers Express.
     }),

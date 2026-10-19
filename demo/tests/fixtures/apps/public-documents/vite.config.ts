@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => ({
   publicDir: here("../native-documents/public"),
   plugins: [
     workersCapacitorPlugin({
+      execution: "local",
       worker: here(
         `../../workers/rendering/${mode === "express" ? "express.ts" : "hono.tsx"}`,
       ),

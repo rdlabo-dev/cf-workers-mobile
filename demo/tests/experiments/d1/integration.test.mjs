@@ -20,8 +20,8 @@ import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/toolin
 
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 for (const tool of ["vite", "esbuild"])
-  for (const boundary of ["authentication", "data"])
-    test(`${tool}: excludes private ${boundary} contents from every shipped asset`, async () => {
+  for (const boundary of ["authentication", "data", "manual", "network"])
+    test(`${tool}: ${boundary} policy excludes private contents from every shipped asset`, async () => {
       const artifacts = join(repo, "demo/artifacts");
       await mkdir(artifacts, { recursive: true });
       const root = await mkdtemp(join(artifacts, "distribution-"));
@@ -44,6 +44,14 @@ for (const tool of ["vite", "esbuild"])
         const options = {
           worker: join(root, "worker.js"),
           workerConfig: "wrangler.json",
+          ...(boundary === "manual"
+            ? {
+                execution: "manual",
+                localRoutes: [{ method: "GET", path: "/" }],
+              }
+            : boundary === "network"
+              ? { execution: "network" }
+              : {}),
         };
         const outdir = join(root, "out");
         if (tool === "vite")
@@ -94,9 +102,10 @@ for (const tool of ["vite", "esbuild"])
           )
             publicControl = true;
         }
-        assert.ok(
+        assert.equal(
           publicControl,
-          "independent public rendering must remain on the device",
+          boundary !== "network",
+          "only network policy removes independent public rendering",
         );
         if (boundary === "authentication") {
           const original = await build({

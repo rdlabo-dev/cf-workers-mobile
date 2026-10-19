@@ -39,7 +39,10 @@ for (const name of Object.keys(baseline.modules)) {
       outfile: "demo/artifacts/node-inventory/probe.js",
       logLevel: "silent",
       plugins: [
-        workersCapacitorPlugin({ worker: "demo/src/workers/hono/standard.ts" }),
+        workersCapacitorPlugin({
+          execution: "local",
+          worker: "demo/src/workers/hono/standard.ts",
+        }),
       ],
     });
     sources.set(name, { source: result.outputFiles[0].text });

@@ -336,9 +336,11 @@ export function workersCapacitorPlugin(
           this.error("Cannot resolve Worker entry: " + path);
         if (compilation)
           this.warn(
-            compilation.mode === "worker"
-              ? `Server bindings: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
-              : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
+            options.execution === "local"
+              ? "Local execution: the entire Worker source and its retained fixed data are distributed to the device."
+              : compilation.mode === "worker"
+                ? `Server bindings: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
+                : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
           );
         const entry = resolved.id;
         const generated = entry + entrySuffix;
@@ -349,9 +351,9 @@ export function workersCapacitorPlugin(
           );
         entries.set(generated, entry);
         return `import Constructor from ${JSON.stringify(generated + "?worker")};
-${compilation ? `import { needsRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
+${compilation ? `import { needsRemote, requiresRemote } from ${JSON.stringify(server!.selectorEntry)};` : ""}
 import { installNodeGlobals } from ${JSON.stringify(globalsPath)};
-export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote," : ""} async loadDirect() {
+export default { createWorker: () => new Constructor(), ${compilation ? "needsRemote, requiresRemote," : ""} async loadDirect() {
   const dispose = installNodeGlobals();
   try {
     return { handler: (await import(${JSON.stringify(entry)})).default, dispose };

@@ -27,6 +27,7 @@ export default defineConfig({
       },
     },
     workersCapacitorPlugin({
+      execution: "local",
       worker: here(
         process.env.VITE_REPORT_ORIGIN
           ? "worker.ts"

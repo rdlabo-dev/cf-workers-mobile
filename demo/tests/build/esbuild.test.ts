@@ -26,7 +26,7 @@ it("watches Worker dependencies and emits a new asset without writing output", a
     format: "esm",
     write: false,
     plugins: [
-      workersCapacitorPlugin({ worker: "worker.js" }),
+      workersCapacitorPlugin({ execution: "local", worker: "worker.js" }),
       {
         name: "capture",
         setup(build) {
@@ -76,7 +76,9 @@ it.each([true, false])(
         platform: "browser",
         write: false,
         loader: { ".js": "jsx" },
-        plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
+        plugins: [
+          workersCapacitorPlugin({ execution: "local", worker: "unused.js" }),
+        ],
       });
       expect(result.errors).toEqual([]);
       expect(result.outputFiles[0].text).toContain("createElement");
@@ -107,7 +109,9 @@ it("does not transform source files explicitly loaded as text", async () => {
       platform: "browser",
       write: false,
       loader: { ".ts": "text" },
-      plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
+      plugins: [
+        workersCapacitorPlugin({ execution: "local", worker: "unused.js" }),
+      ],
     });
     expect(result.outputFiles[0].text).toContain(
       "async <this is not JavaScript>",
@@ -138,7 +142,9 @@ it.each([true, false])(
         platform: "browser",
         write: false,
         tsconfigRaw: { compilerOptions: { experimentalDecorators: legacy } },
-        plugins: [workersCapacitorPlugin({ worker: "unused.js" })],
+        plugins: [
+          workersCapacitorPlugin({ execution: "local", worker: "unused.js" }),
+        ],
       });
       expect(result.errors).toEqual([]);
       expect(result.outputFiles[0].text).toContain("Service");

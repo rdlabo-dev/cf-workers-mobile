@@ -138,7 +138,7 @@ it("keeps KV-only routes local when configured and mixed R2/KV operations remote
   expect(compiled!.local).not.toContain("BUCKET");
   expect(compiled!.local).toContain("KV.get");
 });
-it("does not create a remote boundary for a KV-only Worker", async () => {
+it("analyzes a KV-only Worker while retaining a supported local route", async () => {
   await writeFile(
     resolve(root, "kv.json"),
     JSON.stringify({ kv_namespaces: [{ binding: "KV" }] }),
@@ -149,12 +149,19 @@ it("does not create a remote boundary for a KV-only Worker", async () => {
   });
   expect(config.names).toEqual([]);
   expect(config.localBindings).toEqual(["KV"]);
+  await writeFile(
+    resolve(root, "worker.ts"),
+    `import {Hono} from 'hono'; const app = new Hono(); app.get('/value', async c => c.text(await c.env.KV.get('key'))); export default app;`,
+  );
   expect(
     await serverModules(resolve(root, "worker.ts"), root, {
       workerConfig: "kv.json",
       kvExecution: { KV: "local" },
     }).get(),
-  ).toBeUndefined();
+  ).toMatchObject({
+    mode: "routes",
+    routes: [expect.objectContaining({ remote: false })],
+  });
   expect(
     (
       await serverBindings(root, {

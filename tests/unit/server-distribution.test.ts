@@ -7,6 +7,77 @@ const secret = "PRIVATE_CANARY_4ef927a";
 const cases: readonly (readonly [string, string, boolean, string?, string?])[] =
   [
     [
+      "import-service-account",
+      `import account from './service-account.json'; app.get('/target', c => c.text(account.project_id));`,
+      true,
+    ],
+    [
+      "require-service-account",
+      `const account = require('./service-account.json'); app.get('/target', c => c.text(account.project_id));`,
+      true,
+    ],
+    [
+      "import-credentials-module",
+      `import {account} from './credentials'; app.get('/target', c => c.text(account.project_id));`,
+      true,
+    ],
+    [
+      "reexport-credentials-module",
+      `import {account} from './credentials-barrel'; app.get('/target', c => c.text(account.project_id));`,
+      true,
+    ],
+    [
+      "require-credentials-module",
+      `const account = require('./credentials.cjs'); app.get('/target', c => c.text(account.project_id));`,
+      true,
+    ],
+    [
+      "dynamic-import-credentials",
+      `app.get('/target', async c => c.text((await import('./service-account.json')).default.project_id));`,
+      true,
+    ],
+    [
+      "firebase-admin-initialization",
+      `import {verify} from './firebase-auth'; app.get('/target', async c => c.json(await verify(c.req.header('authorization'))));`,
+      true,
+    ],
+    [
+      "firebase-admin-auth-guard",
+      `import {verify} from './firebase-auth'; app.use('/target',async(c,next)=>{await verify(c.req.header('authorization'));await next();}); app.get('/target', c => c.text('protected'));`,
+      true,
+    ],
+    [
+      "firebase-admin-require",
+      `const {initializeApp,cert} = require('firebase-admin/app'); const account = require('./service-account.json'); const admin = initializeApp({credential:cert(account)}); app.get('/target', c => c.json(admin));`,
+      true,
+    ],
+    [
+      "unused-service-account-import",
+      `import account from './service-account.json'; app.get('/target', c => c.text('public'));`,
+      false,
+    ],
+    [
+      "overwritten-response-header",
+      `app.get('/target',c=>{c.header('x-meta','${secret}');c.header('x-meta','public');return c.text('public');});`,
+      true,
+      "/target",
+      "public",
+    ],
+    [
+      "overwritten-middleware-header",
+      `app.use('/target',async(c,next)=>{await next();c.header('x-meta','public');});app.get('/target',c=>{c.header('x-meta','${secret}');return c.text('public');});`,
+      true,
+      "/target",
+      "public",
+    ],
+    [
+      "overwritten-response-init-header",
+      `app.get('/target',c=>{c.header('x-meta','${secret}');return c.text('public',200,{'x-meta':'public'});});`,
+      true,
+      "/target",
+      "public",
+    ],
+    [
       "response-object-coercion",
       `app.get('/target', c => c.text(String(new Response('${secret}'))));`,
       true,
@@ -351,7 +422,7 @@ const cases: readonly (readonly [string, string, boolean, string?, string?])[] =
     ],
     [
       "named-public-passthrough",
-      `async function headers(c,next){await next();c.header('x-public','yes');} app.use('*',headers); app.get('/target',c=>c.text('public'));`,
+      `async function headers(c,next){await next();} app.use('*',headers); app.get('/target',c=>c.text('public'));`,
       false,
     ],
   ];
@@ -377,6 +448,36 @@ app.get('/public', c => c.text('public')); app.get('/db', c => c.json(c.env.DATA
       await writeFile(
         resolve(root, "settings.json"),
         JSON.stringify({ title: "public", privateKey: secret }),
+      );
+      const account = JSON.stringify({
+        type: "service_account",
+        project_id: "public-project",
+        private_key_id: "synthetic-key-id",
+        private_key: `-----BEGIN PRIVATE KEY-----\n${secret}\n-----END PRIVATE KEY-----`,
+        client_email: "synthetic@example.invalid",
+      });
+      await writeFile(resolve(root, "service-account.json"), account);
+      await writeFile(
+        resolve(root, "credentials.ts"),
+        `export const account = ${account};`,
+      );
+      await writeFile(
+        resolve(root, "credentials-barrel.ts"),
+        "export { account } from './credentials';",
+      );
+      await writeFile(
+        resolve(root, "credentials.cjs"),
+        `module.exports = ${account};`,
+      );
+      await writeFile(
+        resolve(root, "firebase-auth.ts"),
+        `
+        import { initializeApp, cert } from 'firebase-admin/app';
+        import { getAuth } from 'firebase-admin/auth';
+        import account from './service-account.json';
+        const admin = initializeApp({credential: cert(account)});
+        export function verify(token) { return getAuth(admin).verifyIdToken(token); }
+      `,
       );
       const result = await compileServerWorker(resolve(root, "worker.ts"), [
         "DATABASE",

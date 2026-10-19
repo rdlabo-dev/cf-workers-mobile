@@ -149,8 +149,9 @@ await runtime.ready;
 If the build report selects remote routes or whole-Worker remote execution, add
 `remote: { origin: "https://your-worker.example.com" }` to these options and connect
 your existing authentication. Remote configuration is required for that generated
-boundary. For a local-only build, omit `remote`; supplying it without a generated
-remote boundary is rejected. See the [binding configuration guide](cloudflare-bindings.md).
+boundary. For a local-only build, `remote` is optional: a build-generated source
+can retain the setting even when no request needs it. Explicit ESM wiring without
+a generated selector still rejects `remote`. See the [binding configuration guide](cloudflare-bindings.md).
 
 `baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
 

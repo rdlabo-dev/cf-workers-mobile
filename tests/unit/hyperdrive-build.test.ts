@@ -186,7 +186,7 @@ it("keeps top-level pools and shared database state wholly server-side", async (
     ).needsRemote(new Request("https://local.invalid/health")),
   ).toBe(true);
 });
-it("leaves Workers without configured server bindings unchanged", async () => {
+it("analyzes Workers even without configured server bindings", async () => {
   const directory = resolve(root, "plain");
   await mkdir(directory);
   const entry = resolve(directory, "index.ts");
@@ -196,6 +196,9 @@ it("leaves Workers without configured server bindings unchanged", async () => {
       d1Bindings: [],
       hyperdriveBindings: [],
     }).get(),
-  ).toBeUndefined();
+  ).toMatchObject({
+    mode: "worker",
+    selector: "export function needsRemote() { return true; }",
+  });
   expect(await readFile(entry, "utf8")).toContain('new Response("ok")');
 });

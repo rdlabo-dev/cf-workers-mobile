@@ -303,7 +303,7 @@ it("keeps cookie login/logout/profile and D1 in a single session boundary", asyn
   }
 });
 
-it("preserves local routes with statically named non-cookie headers", async () => {
+it("keeps header construction remote without inferring distribution from header names", async () => {
   const result = await compile({
     "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
       app.get('/health', c => { c.header('x-worker', 'local'); return new Response(c.req.raw.headers.get('accept'), {headers: {'content-type': 'text/plain'}}); });
@@ -312,7 +312,7 @@ it("preserves local routes with statically named non-cookie headers", async () =
   expect(result.mode).toBe("routes");
   const { needsRemote } = await selector(result.selector);
   expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
-    false,
+    true,
   );
 });
 
