@@ -40,16 +40,34 @@ The local path uses a compatibility layer for supported Workers and Node.js APIs
 
 See [cloud services and execution policies](docs/cloudflare-bindings.md), including [local or remote KV](docs/remote-service-bindings.md).
 
-## Bring your app
+## Build setup
 
-Choose the entry point that matches your application:
+Start with your framework, then choose the tool for its Capacitor build.
+[Framework setup and execution boundaries](docs/build-setup.md#frameworks) explain
+which entry to connect and where the application runs.
 
-| Your application                                                      | Start here                                                                                             |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Workers application returning HTML, including Hono or Workers Express | [Existing application integration](docs/integration.md) — preserve the pages, routes and forms.        |
-| Void React Pages + D1                                                 | [Void integration](docs/void.md) — connect its generated Worker and configuration.                     |
-| Next.js deployed through OpenNext                                     | [OpenNext integration](docs/opennext.md) — use the existing Worker; check the local/remote boundaries. |
-| An existing frontend calling a Workers API                            | [Fetch-only integration](#already-have-a-frontend) — initialize before mounting the UI.                |
+### Frameworks
+
+| Framework              | Integration                                                                                                              | Guide                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| **Hono**               | Local pages and APIs; cloud-dependent requests run remotely.                                                             | [Hono](docs/build-setup.md#hono)                       |
+| **Workers Express**    | Local pages and APIs using the Workers Express entry; cloud-dependent requests run remotely.                             | [Workers Express](docs/build-setup.md#workers-express) |
+| **Void React Pages**   | Remote SSR, loaders and actions with client hydration and forms. Requires v1.1.12 or newer; see the verification record. | [Void](docs/void.md)                                   |
+| **Next.js / OpenNext** | Remote D1-backed application; a separate local profile covers public pages.                                              | [OpenNext](docs/opennext.md)                           |
+
+**Angular on Workers** is planned for existing Angular SSR applications deployed
+to Workers. Its dedicated setup and acceptance sample are not yet verified;
+see the [integration status](docs/build-setup.md#angular-on-workers).
+
+### Tools
+
+| Tool               | Capacitor build setup                                                                                                             |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| Vite 7             | [Vite plugin](docs/build-setup.md#vite)                                                                                           |
+| esbuild 0.28       | [esbuild plugin](docs/build-setup.md#esbuild)                                                                                     |
+| Browser ES Modules | [Explicit source](docs/build-setup.md#browser-es-modules-no-bundler) for browser-compatible JavaScript and Fetch-only integration |
+
+Already have a separately built frontend? Use [Fetch-only integration](#already-have-a-frontend).
 
 ## Quick start
 
