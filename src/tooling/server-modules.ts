@@ -1,5 +1,6 @@
 import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
+import { compileOpenNext } from "./opennext/index.js";
 import {
   compileServerWorker,
   serverBindings,
@@ -37,12 +38,21 @@ export function serverModules(
     }
     const bindings = await serverBindings(configurationRoot, options);
 
-    const compilation = await compileServerWorker(entry, bindings.names, {
-      execution: options.execution,
-      localBindings: bindings.localBindings,
-      kvBindings: bindings.kvBindings,
-      forceRemoteReason: bindings.forceRemoteReason,
-    });
+    const framework =
+      Array.isArray(options.execution) &&
+      (!bindings.forceRemoteReason ||
+        bindings.forceRemoteReason ===
+          "Asset-first routing executes on the deployed Worker")
+        ? await compileOpenNext(entry, options.execution, bindings.names)
+        : undefined;
+    const compilation =
+      framework ??
+      (await compileServerWorker(entry, bindings.names, {
+        execution: options.execution,
+        localBindings: bindings.localBindings,
+        kvBindings: bindings.kvBindings,
+        forceRemoteReason: bindings.forceRemoteReason,
+      }));
     const localCount = compilation.routes.filter(
       (route) => !route.remote && route.method !== "use",
     ).length;

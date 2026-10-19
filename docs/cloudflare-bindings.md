@@ -159,7 +159,7 @@ Patterns also permit matching registrations added in future builds. A method of
 `"*"` includes future POST and DELETE operations at those paths. Use narrow
 patterns when broader distribution permission is not intended.
 
-Current selection supports direct registrations on the exported Hono router.
+Hono selection supports direct registrations on the exported router. OpenNext uses a separate [generated-build profile](opennext.md#route-execution) with static GET and version restrictions.
 Mounted routes (`app.route()`), `basePath`, and `on()` are not resolved for grants.
 The build does not infer containment between arbitrary Hono patterns:
 `"/posts/:id"` does not grant a separate `"/posts/:slug"` or `"/posts/123"`
@@ -210,8 +210,7 @@ also bypass Worker routing and must be public. Remote operations still need
 server-side authentication and authorization; neither execution form replaces them.
 KV and ASSETS default to remote in network mode. Other execution forms require
 explicit binding policies where applicable. Unsupported Worker shapes fall back
-to network when using route selection; this does not establish automatic partitioning
-of Void or OpenNext bundles.
+to network when using route selection. OpenNext has a [limited generated-build integration](opennext.md#route-execution); Void and other unsupported framework graphs remain remote.
 
 Durable Object HTTP and RPC calls inside the original HTTP handler are supported
 by this dispatch path. **WebSocket/HTTP upgrades are not supported by this

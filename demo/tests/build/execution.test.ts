@@ -14,12 +14,15 @@ for (const tool of ["vite", "esbuild"] as const)
       const root = await mkdtemp(resolve(tmpdir(), "execution-files-"));
       try {
         const metadata = JSON.stringify({
-          publicMarker: "EXPLICIT_LOCAL_METADATA",
+          secretMarker: "SERVER_METADATA_MUST_NOT_SHIP",
         });
         const generated = resolve(root, "generated");
         const next = resolve(generated, "server-functions/default/.next");
         await mkdir(next, { recursive: true });
         await writeFile(resolve(next, "required-server-files.json"), metadata);
+        await writeFile(resolve(next, "prerender-manifest.json"), metadata);
+        const publicFile = "Explicit public runtime template";
+        await writeFile(resolve(root, "template.txt"), publicFile);
         await writeFile(
           resolve(generated, "worker.js"),
           `export default {fetch(){return new Response('public')}};`,
@@ -29,7 +32,11 @@ for (const tool of ["vite", "esbuild"] as const)
           entry,
           `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("workers-capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:'https://local.invalid/'});`,
         );
-        const options = { worker: resolve(generated, "worker.js"), execution };
+        const options = {
+          worker: resolve(generated, "worker.js"),
+          execution,
+          workerFiles: ["template.txt"],
+        };
         let output: string;
         if (tool === "esbuild") {
           const result = await esbuild({
@@ -40,6 +47,7 @@ for (const tool of ["vite", "esbuild"] as const)
             platform: "browser",
             outdir: resolve(root, "out"),
             write: false,
+            sourcemap: true,
             logLevel: "silent",
             plugins: [esbuildPlugin(options)],
           });
@@ -51,7 +59,11 @@ for (const tool of ["vite", "esbuild"] as const)
             publicDir: false,
             logLevel: "silent",
             plugins: [vitePlugin(options)],
-            build: { write: false, rollupOptions: { input: entry } },
+            build: {
+              write: false,
+              sourcemap: true,
+              rollupOptions: { input: entry },
+            },
           });
           output = (Array.isArray(result) ? result : [result])
             .flatMap((bundle) => ("output" in bundle ? bundle.output : []))
@@ -60,9 +72,9 @@ for (const tool of ["vite", "esbuild"] as const)
             )
             .join("\n");
         }
-        expect(output.includes(Buffer.from(metadata).toString("base64"))).toBe(
-          execution === "local",
-        );
+        expect(output).toContain(Buffer.from(publicFile).toString("base64"));
+        expect(output).not.toContain("SERVER_METADATA_MUST_NOT_SHIP");
+        expect(output).not.toContain(Buffer.from(metadata).toString("base64"));
       } finally {
         await rm(root, { recursive: true, force: true });
       }

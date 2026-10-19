@@ -228,8 +228,8 @@ export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
   worker?: string;
   /**
    * Additional files embedded into the worker's read-only virtual filesystem.
-   * OpenNext manifests and package metadata are collected automatically for
-   * a local generated worker.js entry. Application data files remain explicit.
+   * Only explicitly selected public files are included; server build metadata
+   * is never discovered recursively.
    * Paths resolve relative to the Vite root; the
    * normalized absolute path is the lookup key, with suffix matching so
    * bundled runtimes find entries regardless of their cwd assumptions.
@@ -240,15 +240,7 @@ export function workersCapacitorPlugin(
   options: WorkersCapacitorPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
-  const virtualFiles = async () =>
-    readWorkerFiles(
-      options.worker &&
-        (options.execution === "local" || !(await server?.get()))
-        ? resolve(root, options.worker)
-        : undefined,
-      root,
-      options.workerFiles,
-    );
+  const virtualFiles = () => readWorkerFiles(root, options.workerFiles);
   let root: string;
   let publicDir: string;
   let server: ReturnType<typeof serverModules> | undefined;

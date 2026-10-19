@@ -63,10 +63,10 @@ export interface WorkersCapacitorPluginOptions extends ServerBuildOptions {
   /** Workers entry relative to absWorkingDir (or cwd), or an absolute path. */
   worker: string;
   /**
-   * Files embedded into the worker's read-only virtual filesystem
+   * Explicit public files embedded into the worker's read-only virtual filesystem
    * (node:fs compat). Paths resolve relative to absWorkingDir.
+   * Server build metadata is not collected.
    */
-  /** Additional runtime data files; local OpenNext manifests/package metadata are automatic. */
   workerFiles?: string[];
 }
 
@@ -148,12 +148,7 @@ export function workersCapacitorPlugin(
         if (compilation) return { warnings: [{ text: compilation.message }] };
       });
       await serverPlugin.setup(build);
-      const virtualFiles = () =>
-        readWorkerFiles(
-          options.execution === "local" ? originalEntry : entry,
-          root,
-          options.workerFiles,
-        );
+      const virtualFiles = () => readWorkerFiles(root, options.workerFiles);
       await compatibilityPlugin().setup(build);
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;
@@ -208,6 +203,7 @@ export function workersCapacitorPlugin(
             ],
             logLevel: "silent",
           });
+          const compilation = await server.get();
           const inputs = Object.keys(result.metafile.inputs)
             .filter((path) => path !== "workers-capacitor-entry.js")
             .map((path) => resolve(root, path));
@@ -220,6 +216,7 @@ export function workersCapacitorPlugin(
             loader: "file",
             watchFiles: [
               ...inputs,
+              ...compilation.inputs,
               ...(config.tsconfig ? [resolve(root, config.tsconfig)] : []),
             ],
             watchDirs: [...new Set(inputs.map(dirname))],

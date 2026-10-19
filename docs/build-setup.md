@@ -16,7 +16,7 @@ for API and application restrictions.
 | Hono               | Local Fetch handlers and HTML pages; routing, forms and request/response behavior are exercised in the Hono fixtures. Cloud-dependent requests use remote dispatch.                                             | [Hono entry](#hono), [native rendering example](../demo/rendering)                       |
 | Workers Express    | Local execution through `cloudflare:node`; API and HTML rendering fixtures. Cloud-dependent requests use remote dispatch.                                                                                       | [Workers Express entry](#workers-express), [native rendering example](../demo/rendering) |
 | Void React Pages   | SSR, loaders and actions on the remote Worker; client hydration and forms in the WebView. Use Void / @void/react 1.1.12 or newer; published 1.1.12 packages pass iOS simulator and Android emulator acceptance. | [Void setup and verification](void.md)                                                   |
-| Next.js / OpenNext | D1-backed sample uses the whole remote Worker. A separate local profile verifies public SSR pages, hydration, links and assets; it does not establish local D1 or ASSETS support.                               | [OpenNext setup and limits](opennext.md)                                                 |
+| Next.js / OpenNext | Network execution is the default. Supported generated builds can select static GET routes locally while keeping D1, middleware and Next protocol requests remote; see the version and configuration limits.     | [OpenNext setup and limits](opennext.md)                                                 |
 
 ### Hono
 
