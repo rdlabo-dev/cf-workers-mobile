@@ -87,6 +87,8 @@ Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager
 npm install /absolute/path/to/workers-capacitor-0.1.0.tgz
 ```
 
+Before building a native target, check the [native SDK requirements and Android Gradle resource rules](development.md#native-demo). The Android resource rules belong in the application's `android/app/build.gradle`.
+
 Keep Capacitor/native projects in the application package, not in the library's source tree. Reuse existing dependencies and scripts rather than scaffolding a second application unnecessarily.
 
 ## 3. Configure and build the native application
@@ -134,7 +136,7 @@ export default defineConfig({
 });
 ```
 
-This example uses Vite. For an existing esbuild build, use the [esbuild setup](../README.md#esbuild) instead. Do not introduce Vite solely to replace a supported build. Plain browser ESM is available for browser-compatible JavaScript, but does not perform the native document asset setup automatically.
+This example uses Vite. For an existing esbuild build, use the [esbuild setup](build-setup.md#esbuild) instead. Do not introduce Vite solely to replace a supported build. Plain browser ESM is available for browser-compatible JavaScript, but does not perform the native document asset setup automatically.
 
 Adjust paths to the actual application. For OpenNext the entry is the generated `.open-next/worker.js`; build it first and explicitly configure remote ASSETS if used. Additional configuration is described in the [binding guide](cloudflare-bindings.md).
 
@@ -149,7 +151,7 @@ const runtime = workersCapacitor({
 await runtime.ready;
 ```
 
-`baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](../README.md#url-contract).
+`baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
 
 `render` selects native document rendering, including links and forms; it is not an option specifically for forms. For an existing separately built frontend, omit `render`, initialize the Fetch-only runtime before mounting the UI, and use an API-only `baseURL` boundary such as `https://your-worker.example.com/api/`. Keep that frontend outside the API boundary. The plugin entry must be the corresponding API Worker; inspect its remote-dispatch report too.
 

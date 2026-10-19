@@ -1,6 +1,8 @@
 # Void React Pages
 
-[Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. The integration below targets **Void / @void/react 1.1.11, React Pages and D1**, using the existing remote Worker. Android native acceptance covers this configuration. iOS currently has the router limitation below; local Void runtime compatibility is not established.
+[Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. Use **Void / @void/react 1.1.12 or newer** for React Pages and D1 integration on iOS and Android. [Void v1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12) includes the Capacitor iOS navigation fix. Page requests, loaders and actions run on the existing remote Worker; local Void runtime compatibility is not established.
+
+The existing sample remains pinned to 1.1.11. The verification record below distinguishes that baseline and the tested patched client from the 1.1.12 release requirement.
 
 ## Build and connect
 
@@ -43,7 +45,9 @@ The [standalone sample](../demo/void/README.md) and its tests cover the generate
 
 The browser test substitutes network delivery with local workerd. The native test (`demo/tests/void/native.test.mjs`) uses HTTPS and the public document API to exercise D1-backed SSR, hydration, form insertion with a database assertion, and client-only rendering on Android.
 
-**iOS limitation:** Void 1.1.11 rejects `capacitor:` URLs in its client router (`Void Router: refusing to navigate to a capacitor: URL.`). Initial server HTML can arrive, but form/router navigation fails. Capacitor iOS uses a custom scheme; changing its name does not make it HTTP(S). [`server.iosScheme`](https://capacitorjs.com/docs/config) cannot use `http` or `https`, which WKWebView already handles. Do not claim native iOS support, override `URL.protocol`, or remove Void's URL security check to hide this incompatibility. Our [upstream PR #485](https://github.com/voidzero-dev/void/pull/485) adds Capacitor navigation support and has been merged. The patched client passed rendering, hydration, forms, D1 persistence and client-only page navigation in an iOS 26.1 simulator and Android API 36.1 emulator. We are awaiting a Void release containing the fix. Until that release is revalidated, the supported baseline remains the pinned 1.1.11 configuration described above.
+**Version and verification:** Void 1.1.11 rejects `capacitor:` URLs in its client router, so initial HTML alone does not establish working iOS navigation. Our [upstream PR #485](https://github.com/voidzero-dev/void/pull/485) adds Capacitor navigation support and is included in [v1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12). Use 1.1.12 or newer rather than overriding `URL.protocol` or removing the router's URL security check.
+
+The patched client passed rendering, hydration, forms, D1 persistence and client-only page navigation in an iOS 26.1 simulator and Android API 36.1 emulator. Those results are the existing verification evidence; the published 1.1.12 artifacts have not been rerun as part of this documentation change. The sample and its pinned dependencies remain a historical baseline until that upgrade is verified.
 
 Deployment, production authentication, native plugin events, Vue, Svelte, Solid, other Void bindings and local execution are unverified.
 
