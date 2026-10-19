@@ -1,8 +1,8 @@
 {
   "name": "workers-capacitor",
-  "version": "0.0.0-poc.1",
+  "version": "0.1.0",
   "license": "MIT",
-  "description": "Run Workers fetch handlers inside Capacitor WebViews",
+  "description": "Bring Cloudflare Workers apps to iOS and Android.",
   "type": "module",
   "files": [
     "dist",
