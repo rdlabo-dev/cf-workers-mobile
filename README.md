@@ -10,7 +10,7 @@ workers-capacitor connects existing Cloudflare Workers applications to Capacitor
 
 Start with the app you already have. The [integration guide](docs/integration.md) takes you from your existing Workers project to opening it on iOS or Android, including Capacitor setup if this is your first mobile app.
 
-0.1.0 Preview is available to try from a source-built package. Installation steps are in the guide; APIs may change before a stable release.
+0.1.0 is a Preview release. Follow the installation steps in the guide; APIs may change before a stable release.
 
 If you use an AI coding assistant, open your application repository and give it this prompt:
 

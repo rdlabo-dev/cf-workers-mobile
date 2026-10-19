@@ -3,6 +3,28 @@
   "version": "0.1.0",
   "license": "MIT",
   "description": "Bring Cloudflare Workers apps to iOS and Android.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rdlabo-dev/workers-capacitor.git"
+  },
+  "homepage": "https://github.com/rdlabo-dev/workers-capacitor#readme",
+  "bugs": {
+    "url": "https://github.com/rdlabo-dev/workers-capacitor/issues"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "capacitor",
+    "ios",
+    "android"
+  ],
+  "engines": {
+    "node": "^22.18.0 || >=24.11.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "latest"
+  },
   "type": "module",
   "files": [
     "dist",
@@ -66,7 +88,8 @@
     "test:package": "node scripts/test-package.mjs",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "@rollup/plugin-inject": "^5.0.5",

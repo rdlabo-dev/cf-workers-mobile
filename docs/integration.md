@@ -77,19 +77,11 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. The 0.1.0 Preview package is not yet published to npm. Build a tarball from this repository:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Install the 0.1.0 Preview release from npm:
 
 ```sh
-# In a checkout of workers-capacitor
-npm install
-npm run build
-npm pack
-
-# In your application
-npm install /absolute/path/to/workers-capacitor-0.1.0.tgz
+npm install workers-capacitor
 ```
-
-After npm publication, use `npm install workers-capacitor@0.1.0` instead.
 
 Before building a native target, check the [native SDK requirements and Android Gradle resource rules](development.md#native-demo). The Android resource rules belong in the application's `android/app/build.gradle`.
 
