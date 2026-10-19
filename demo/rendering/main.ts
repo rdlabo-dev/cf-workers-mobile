@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 // The configured Worker supplies the complete HTML document and owns routing.
 const app = workersCapacitor({
   baseURL: "https://worker.invalid",

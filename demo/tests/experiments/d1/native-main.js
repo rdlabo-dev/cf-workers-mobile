@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 import { Capacitor } from "@capacitor/core";
 import settings from "./server.json";
 const platform = Capacitor.getPlatform();

@@ -1,7 +1,7 @@
 import { kvRequest } from "../../../validation/kv";
 import { runFeatures } from "../../../validation/run-features";
 import { Capacitor } from "@capacitor/core";
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 import { runFrameworkContract } from "./frameworks";
 
 const isolation = () =>

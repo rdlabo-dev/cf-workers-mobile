@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 const app = workersCapacitor({
   baseURL: "https://worker.invalid",
   render: "/pages/home",

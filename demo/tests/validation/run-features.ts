@@ -1,13 +1,16 @@
 import { verifyKVPersistence } from "./kv";
-import { FetchImplementation } from "@rdlabo/workers-capacitor/cloudflare/workers";
-import { assertContract, runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import { FetchImplementation } from "workers-capacitor/cloudflare/workers";
+import {
+  assertContract,
+  runContract,
+} from "workers-capacitor/shared/contracts/testing";
 import worker from "../fixtures/workers/compatibility/fetch";
 const isolated = () =>
   new Worker(new URL("./entries/fetch.ts", import.meta.url), {
     type: "module",
   });
-import { fetchContract } from "@rdlabo/workers-capacitor/cloudflare/workers/testing";
-import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
+import { fetchContract } from "workers-capacitor/cloudflare/workers/testing";
+import { kvContract } from "workers-capacitor/cloudflare/bindings/kv/testing";
 import { wasmContract } from "./contracts/wasm";
 import { runLocalNodeContracts } from "./node-modules";
 import { runNodeContractsInWorker } from "./node-worker";

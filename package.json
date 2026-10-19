@@ -1,5 +1,5 @@
 {
-  "name": "@rdlabo/workers-capacitor",
+  "name": "workers-capacitor",
   "version": "0.0.0-poc.1",
   "license": "MIT",
   "description": "Run Workers fetch handlers inside Capacitor WebViews",

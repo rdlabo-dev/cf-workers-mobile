@@ -7,7 +7,7 @@ The starter page, loader, action, API route and schema retain their upstream beh
 Use Node 24.21.0 or newer. From the repository root, after building the library and installing demo dependencies:
 
 ```sh
-npm ci --prefix demo/void
+npm install --prefix demo/void
 npm run build --prefix demo/void
 npm run test:void --prefix demo
 ```

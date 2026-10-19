@@ -67,7 +67,7 @@ test(
       );
       await writeFile(
         join(temp, "main.js"),
-        `import { workersCapacitor } from "@rdlabo/workers-capacitor";
+        `import { workersCapacitor } from "workers-capacitor";
 window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: { origin: "https://void.invalid" } });`,
       );
       await build({

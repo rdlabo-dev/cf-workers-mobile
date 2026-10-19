@@ -128,13 +128,13 @@ for (const entry of [
 // Never copy library implementation sources from the checkout.
 for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
   await cp(
-    join(temp, "node_modules/@rdlabo/workers-capacitor/dist", domain),
+    join(temp, "node_modules/workers-capacitor/dist", domain),
     join(temp, "src", domain),
     { recursive: true },
   );
 }
 await cp(
-  join(temp, "node_modules/@rdlabo/workers-capacitor/dist/environment.js"),
+  join(temp, "node_modules/workers-capacitor/dist/environment.js"),
   join(temp, "src/environment.js"),
 );
 // Discover module-owned specs by convention. Only test sources come from the
@@ -151,7 +151,7 @@ for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
 await writeFile(
   join(temp, "vite.config.mjs"),
   `import { readFile } from 'node:fs/promises';
-import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/tooling/vite';
+import { workersCapacitorPlugin } from 'workers-capacitor/tooling/vite';
 export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},workersCapacitorPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
 );
 execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
@@ -160,30 +160,30 @@ execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
 });
 await writeFile(
   join(temp, "consumer.ts"),
-  `/// <reference types="@rdlabo/workers-capacitor/cloudflare/apis/types" />
+  `/// <reference types="workers-capacitor/cloudflare/apis/types" />
 import worker from "./demo/src/workers/hono/standard";
 import { httpServerHandler } from "cloudflare:node";
 const handler = httpServerHandler({ port: 3000 });
 const response: Promise<Response> = handler.fetch(new Request("https://worker.invalid/api"));
 // @ts-expect-error Logical ports must be numeric.
 httpServerHandler({ port: "3000" });
-import { workersCapacitor, FetchRuntime, type WorkerContext } from "@rdlabo/workers-capacitor";
+import { workersCapacitor, FetchRuntime, type WorkerContext } from "workers-capacitor";
 class ExampleRuntime extends FetchRuntime<{ label: string }> {
   protected dispatch(request: Request, env: { label: string }, ctx: WorkerContext) {
     ctx.waitUntil(Promise.resolve());
     return new Response(env.label + request.method);
   }
 }
-import { defineFeature, FeatureImplementation, openFeature } from "@rdlabo/workers-capacitor/shared/contracts";
-import { runContract, type ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
-import { kvContract } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv/testing";
-import { fetchContract, fetchContractWorker } from "@rdlabo/workers-capacitor/cloudflare/workers/testing";
-import { LocalStorageKV } from "@rdlabo/workers-capacitor/cloudflare/bindings/kv";
-import { workersCapacitorPlugin as buildPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
+import { defineFeature, FeatureImplementation, openFeature } from "workers-capacitor/shared/contracts";
+import { runContract, type ContractSuite } from "workers-capacitor/shared/contracts/testing";
+import { kvContract } from "workers-capacitor/cloudflare/bindings/kv/testing";
+import { fetchContract, fetchContractWorker } from "workers-capacitor/cloudflare/workers/testing";
+import { LocalStorageKV } from "workers-capacitor/cloudflare/bindings/kv";
+import { workersCapacitorPlugin as buildPlugin } from "workers-capacitor/tooling/vite";
 buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
 // @ts-expect-error Local ASSETS is not a completed compatibility unit.
 buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
-import { FetchImplementation } from "@rdlabo/workers-capacitor/cloudflare/workers";
+import { FetchImplementation } from "workers-capacitor/cloudflare/workers";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();
 const bytes: Promise<ArrayBuffer | null> = kv.get("key", "arrayBuffer");
@@ -289,7 +289,7 @@ try {
   // Rebuild the same installed tarball consumer using the public isolated import.
   await writeFile(
     join(temp, "vite.config.mjs"),
-    `import { workersCapacitorPlugin } from '@rdlabo/workers-capacitor/tooling/vite';
+    `import { workersCapacitorPlugin } from 'workers-capacitor/tooling/vite';
 export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
   );
   execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {

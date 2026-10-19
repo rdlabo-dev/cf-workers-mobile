@@ -9,10 +9,10 @@ outside the application, in [`../tests/opennext`](../tests/opennext).
 From the repository root, build the library first:
 
 ```sh
-npm ci
+npm install
 npm run build
 cd demo/opennext
-npm ci
+npm install
 npm run build:worker
 VITE_WORKER_ORIGIN=https://your-worker.example.com npm run build:capacitor
 npx cap add ios

@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@capacitor/core": "8.5.3",
-    "@rdlabo/workers-capacitor": "file:../..",
+    "workers-capacitor": "file:../..",
     "next": "15.5.28",
     "react": "19.3.1",
     "react-dom": "19.3.1"

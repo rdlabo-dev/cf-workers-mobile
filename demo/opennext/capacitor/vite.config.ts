@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
 import { fileURLToPath } from "node:url";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({

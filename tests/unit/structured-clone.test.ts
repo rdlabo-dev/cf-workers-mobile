@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { assertContract, runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+import {
+  assertContract,
+  runContract,
+} from "workers-capacitor/shared/contracts/testing";
 import {
   localStructuredCloneApi,
   StructuredCloneImplementation,

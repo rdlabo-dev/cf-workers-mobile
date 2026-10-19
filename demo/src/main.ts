@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 
 // The Worker entry is configured in vite.config.ts.
 const runtime = workersCapacitor({
