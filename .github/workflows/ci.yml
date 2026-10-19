@@ -26,7 +26,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+          cache-dependency-path: package.json
+      - run: npm install
       - run: npm run typecheck
       - run: node scripts/url-idna/bundle-url.mjs --check
       - run: npm run build
@@ -57,7 +58,7 @@ jobs:
           - suite: void
             node: 24.21.0
             commands: |
-              npm ci --prefix void
+              npm install --prefix void
               npm run build --prefix void
               npm run test:void
           - suite: upstream-minvoice
@@ -130,7 +131,7 @@ jobs:
               npm run test:upstream:opennext
           - suite: opennext
             commands: |
-              npm ci --prefix opennext
+              npm install --prefix opennext
               npm run build:worker --prefix opennext
               npm run test:opennext
               node --test tests/opennext/images.test.mjs
@@ -143,11 +144,11 @@ jobs:
           node-version: ${{ matrix.node || '22' }}
           cache: npm
           cache-dependency-path: |
-            package-lock.json
-            demo/package-lock.json
-      - run: npm ci
+            package.json
+            demo/package.json
+      - run: npm install
       - run: npm run build
-      - run: npm ci
+      - run: npm install
         working-directory: demo
       - run: npm run typecheck
         working-directory: demo
@@ -162,7 +163,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - run: npm ci --prefix demo/opennext
+      - run: npm install --prefix demo/opennext
         if: matrix.native
       - name: Enable emulator acceleration
         if: matrix.native
@@ -214,11 +215,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            package-lock.json
-            demo/package-lock.json
-      - run: npm ci
+            package.json
+            demo/package.json
+      - run: npm install
       - run: npm run build
-      - run: npm ci
+      - run: npm install
         working-directory: demo
       - run: npm run typecheck
         working-directory: demo
@@ -247,11 +248,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            package-lock.json
-            demo/package-lock.json
-      - run: npm ci
+            package.json
+            demo/package.json
+      - run: npm install
       - run: npm run build
-      - run: npm ci
+      - run: npm install
         working-directory: demo
       - run: npm run typecheck
         working-directory: demo
@@ -273,7 +274,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+          cache-dependency-path: package.json
+      - run: npm install
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:package
@@ -292,11 +294,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: |
-            package-lock.json
-            demo/package-lock.json
-      - run: npm ci
+            package.json
+            demo/package.json
+      - run: npm install
       - run: npm run build
-      - run: npm ci
+      - run: npm install
         working-directory: demo
       - name: Fetch the pinned official Hono sample
         run: npm run test:upstream:prepare -- hono-jsx-ssr --clone-only
