@@ -19,7 +19,7 @@ in the Vite/esbuild plugin, and call `workersCapacitor({ baseURL, render: "/" })
 Build the web assets before synchronizing:
 
 ```sh
-npm install /path/to/rdlabo-workers-capacitor-0.0.0-poc.1.tgz
+npm install /path/to/workers-capacitor-0.0.0-poc.1.tgz
 npm run build
 npx cap sync
 npx cap run ios # or android
@@ -33,7 +33,7 @@ installing Capacitor.
 ## Application entry
 
 ```ts
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 
 const app = workersCapacitor({
   baseURL: "https://worker.invalid",

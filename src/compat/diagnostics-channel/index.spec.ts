@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "@rdlabo/workers-capacitor/shared/contracts";
-import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
+} from "workers-capacitor/shared/contracts";
+import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
 import * as namespace from "node:diagnostics_channel";
 import { AsyncLocalStorage as HostAsyncLocalStorage } from "node:async_hooks";
 const AsyncLocalStorage =

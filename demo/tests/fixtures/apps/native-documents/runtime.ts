@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 
 // This Window is an offscreen runtime host, not the rendered application.
 // Keeping it alive lets the visible WebView use real document navigation.

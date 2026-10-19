@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 import hono from "../fixtures/workers/hono/standard";
 import express from "../fixtures/workers/express/standard";
 import { runContract, type Result } from "./contracts/http";

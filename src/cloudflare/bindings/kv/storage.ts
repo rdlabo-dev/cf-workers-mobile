@@ -80,7 +80,7 @@ export class StorageNamespace implements KVNamespace {
     namespace: string,
     private readonly storage: Storage,
   ) {
-    this.prefix = `@rdlabo/workers-capacitor/kv-v1/${JSON.stringify(namespace)}:`;
+    this.prefix = `workers-capacitor/kv-v1/${JSON.stringify(namespace)}:`;
   }
   private record(key: string): RecordValue | null {
     const name = this.prefix + keyName(key);

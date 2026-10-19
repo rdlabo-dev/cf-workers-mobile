@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 import worker from "./static-node-worker";
 
 async function run() {

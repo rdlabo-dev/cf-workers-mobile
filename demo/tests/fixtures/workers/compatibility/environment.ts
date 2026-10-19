@@ -1,4 +1,4 @@
-import { getExecutionEnvironment } from "@rdlabo/workers-capacitor/environment";
+import { getExecutionEnvironment } from "workers-capacitor/environment";
 import { AsyncLocalStorage } from "node:async_hooks";
 export default {
   async fetch() {

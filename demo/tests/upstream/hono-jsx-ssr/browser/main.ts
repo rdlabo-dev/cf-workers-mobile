@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 
 const prefer =
   new URL(location.href).searchParams.get("prefer") === "direct"

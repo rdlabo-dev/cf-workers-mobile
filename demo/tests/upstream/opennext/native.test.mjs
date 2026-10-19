@@ -63,7 +63,7 @@ test(
       );
       await writeFile(
         join(bootstrap, "main.js"),
-        `import { workersCapacitor } from "@rdlabo/workers-capacitor"; const runtime = workersCapacitor({baseURL:"https://worker.invalid/",remote:{origin:${JSON.stringify(backend.url.origin)}},render:"/server-actions"}); await runtime.ready;`,
+        `import { workersCapacitor } from "workers-capacitor"; const runtime = workersCapacitor({baseURL:"https://worker.invalid/",remote:{origin:${JSON.stringify(backend.url.origin)}},render:"/server-actions"}); await runtime.ready;`,
       );
       await build({
         configFile: false,

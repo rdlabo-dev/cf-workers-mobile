@@ -1,4 +1,4 @@
-import { workersCapacitor } from "@rdlabo/workers-capacitor";
+import { workersCapacitor } from "workers-capacitor";
 localStorage.removeItem("packaged-stop");
 let app = workersCapacitor({
   baseURL: "https://worker.invalid",
