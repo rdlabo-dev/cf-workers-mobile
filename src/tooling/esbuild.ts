@@ -3,6 +3,7 @@ export type {
   WorkerExecutionMode,
   LocalRoute,
 } from "./server.js";
+import { serverOnlyFiles } from "./server-only.js";
 import { readWorkerFiles } from "./files.js";
 import { asyncContextPlugin, lowerAsync } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
@@ -89,6 +90,7 @@ export function workersCapacitorPlugin(
           "workersCapacitorPlugin requires worker, bundle: true, format: 'esm', browser platform and outdir or outfile.",
         );
       const root = config.absWorkingDir ?? process.cwd();
+      let denied = serverOnlyFiles(root, options.serverOnly);
       // Written builds include document assets automatically. In-memory builds
       // remain available for tooling and Fetch-only consumers.
       if (config.write !== false) {
@@ -123,6 +125,10 @@ export function workersCapacitorPlugin(
       const serverPlugin: Plugin = {
         name: "workers-capacitor-server",
         setup(build) {
+          build.onLoad({ filter: /.*/, namespace: "file" }, ({ path }) => {
+            denied.assertPublic(path);
+            return undefined;
+          });
           build.onResolve(
             { filter: /\.capacitor-server-(local|selector)\.js$/ },
             ({ path }) => (server.owns(path) ? { path } : undefined),
@@ -141,6 +147,9 @@ export function workersCapacitorPlugin(
         },
       };
       build.onStart(async () => {
+        denied = serverOnlyFiles(root, options.serverOnly);
+        for (const file of options.workerFiles ?? [])
+          denied.assertPublic(resolve(root, file));
         server.reset();
         const compilation = await server.get();
         entry = compilation ? server.localEntry : originalEntry;
@@ -148,7 +157,8 @@ export function workersCapacitorPlugin(
         if (compilation) return { warnings: [{ text: compilation.message }] };
       });
       await serverPlugin.setup(build);
-      const virtualFiles = () => readWorkerFiles(root, options.workerFiles);
+      const virtualFiles = () =>
+        readWorkerFiles(root, options.workerFiles, options.serverOnly);
       await compatibilityPlugin().setup(build);
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;

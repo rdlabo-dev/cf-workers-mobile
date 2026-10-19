@@ -23,6 +23,8 @@ export interface LocalRoute {
 }
 
 export interface ServerBuildOptions {
+  /** Exact server-only file paths, relative to the bundler root. Symlinks resolve to the same file. */
+  serverOnly?: string[];
   /** Defaults to network. local distributes the entire Worker; an array permits
    * selected routes and retained dependencies, subject to server boundaries. */
   execution?: WorkerExecution;

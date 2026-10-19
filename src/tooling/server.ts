@@ -1,6 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { build, type BuildOptions } from "esbuild";
 import { parseAst } from "rollup/parseAst";
+import { serverOnlyFiles } from "./server-only.js";
 import { permitsPath } from "./route-permissions.js";
 import { transformAsync, type types } from "@babel/core";
 import type {
@@ -95,6 +96,7 @@ export async function compileServerWorker(
     localBindings?: string[];
     kvBindings?: string[];
     forceRemoteReason?: string;
+    serverOnly?: string[];
   } = {},
 ): Promise<ServerCompilation> {
   const {
@@ -102,6 +104,7 @@ export async function compileServerWorker(
     localBindings = [],
     kvBindings = [],
     forceRemoteReason,
+    serverOnly = [],
     ...buildOptions
   } = options;
   if (
@@ -151,8 +154,22 @@ export async function compileServerWorker(
         },
       ],
     };
+  const denied = serverOnlyFiles(dirname(entry), serverOnly);
+  const privateInputs = new Set<string>();
   const bundled = await build({
     ...buildOptions,
+    plugins: [
+      {
+        name: "server-only-boundary",
+        setup(build) {
+          build.onLoad({ filter: /.*/ }, ({ path }) => {
+            if (!denied.matches(path)) return;
+            privateInputs.add(path);
+            return { contents: "", loader: "empty" };
+          });
+        },
+      },
+    ],
     absWorkingDir: dirname(entry),
     entryPoints: [entry],
     bundle: true,
@@ -178,6 +195,10 @@ export async function compileServerWorker(
     resolve(dirname(entry), file),
   );
   try {
+    if (privateInputs.size)
+      throw new WiderServerBoundary(
+        `Declared server-only dependency: ${[...privateInputs].join(", ")}`,
+      );
     if (execution === "network")
       throw new WiderServerBoundary("Network execution explicitly selected");
     if (forceRemoteReason) throw new WiderServerBoundary(forceRemoteReason);

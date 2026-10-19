@@ -40,6 +40,7 @@ export function serverModules(
     const bindings = await serverBindings(configurationRoot, options);
 
     const framework =
+      !options.serverOnly?.length &&
       Array.isArray(options.execution) &&
       (!bindings.forceRemoteReason ||
         bindings.forceRemoteReason ===
@@ -51,6 +52,7 @@ export function serverModules(
       framework ??
       (await compileServerWorker(entry, bindings.names, {
         execution: options.execution,
+        serverOnly: options.serverOnly?.map((path) => resolve(root, path)),
         localBindings: bindings.localBindings,
         kvBindings: bindings.kvBindings,
         forceRemoteReason: bindings.forceRemoteReason,
