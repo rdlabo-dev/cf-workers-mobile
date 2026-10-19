@@ -39,16 +39,32 @@ export function serverModules(
 
     const compilation = await compileServerWorker(entry, bindings.names, {
       execution: options.execution,
-      localRoutes: options.localRoutes,
       localBindings: bindings.localBindings,
       kvBindings: bindings.kvBindings,
       forceRemoteReason: bindings.forceRemoteReason,
     });
+    const localCount = compilation.routes.filter(
+      (route) => !route.remote && route.method !== "use",
+    ).length;
+    const remoteCount = compilation.routes.filter(
+      (route) => route.remote,
+    ).length;
+    const message =
+      options.execution === "local"
+        ? "Local execution: the entire Worker source and its retained fixed data are distributed to the device."
+        : Array.isArray(options.execution) &&
+            options.execution.length > 0 &&
+            localCount === 0
+          ? `No selected routes can execute locally. Requests will use the deployed Worker. See ${bindings.reportFile} for reasons.`
+          : compilation.mode === "worker"
+            ? `Network execution: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
+            : `Execution selection: ${localCount} local handlers, ${remoteCount} remote route/middleware registrations. See ${bindings.reportFile} for reasons.`;
     return {
       ...compilation,
       requiresRemote:
-        options.execution === "manual" ||
+        Array.isArray(options.execution) ||
         compilation.routes.some((route) => route.remote),
+      message,
       reportFile: bindings.reportFile,
       inputs: [
         ...compilation.inputs,

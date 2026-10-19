@@ -4,24 +4,28 @@ import { resolve } from "node:path";
 import { parse as parseJSON, type ParseError } from "jsonc-parser";
 import { parse as parseTOML } from "smol-toml";
 
+/** Select whole-Worker execution or explicitly permit route distribution. */
+export type WorkerExecutionMode = "network" | "local";
+export type WorkerExecution = WorkerExecutionMode | readonly LocalRoute[];
+
+export interface LocalRoute {
+  method:
+    | "*"
+    | "GET"
+    | "HEAD"
+    | "POST"
+    | "PUT"
+    | "PATCH"
+    | "DELETE"
+    | "OPTIONS";
+  /** Hono registration pattern, literal-prefix wildcard, or registration-text RegExp. */
+  path: string | RegExp;
+}
+
 export interface ServerBuildOptions {
-  /** auto analyzes distribution; network ships no Worker implementation;
-   * manual permits selected routes; local permits the entire Worker source. */
-  execution?: "auto" | "network" | "manual" | "local";
-  /** Distribution permission for Hono registration paths (exact patterns, literal-prefix wildcards, or RegExp).
-   * Only used with execution: "manual". Includes retained dependency data. */
-  localRoutes?: {
-    method:
-      | "*"
-      | "GET"
-      | "HEAD"
-      | "POST"
-      | "PUT"
-      | "PATCH"
-      | "DELETE"
-      | "OPTIONS";
-    path: string | RegExp;
-  }[];
+  /** Defaults to network. local distributes the entire Worker; an array permits
+   * selected routes and retained dependencies, subject to server boundaries. */
+  execution?: WorkerExecution;
   /** Existing Wrangler JSON, JSONC or TOML configuration. Auto-detected in the build root. */
   workerConfig?: string;
   /** Binding names when configuration is supplied by another tool. No route annotations. */
@@ -125,7 +129,7 @@ export async function serverBindings(
   const kv = options.kvBindings ?? configured("kv_namespaces");
   const policies =
     options.kvExecution === undefined
-      ? options.execution === "network"
+      ? (options.execution ?? "network") === "network"
         ? Object.fromEntries(kv.map((name) => [name, "remote"]))
         : {}
       : options.kvExecution;
@@ -270,7 +274,10 @@ export async function serverBindings(
   for (const assets of assetConfigs) {
     if (!assets || typeof assets !== "object" || Array.isArray(assets))
       throw new Error(`Invalid assets in ${file}`);
-    if (!options.assetsExecution && options.execution !== "network")
+    if (
+      !options.assetsExecution &&
+      (options.execution ?? "network") !== "network"
+    )
       throw new Error(
         "Set assetsExecution to remote; local ASSETS compatibility is not implemented",
       );

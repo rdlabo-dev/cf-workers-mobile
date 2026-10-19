@@ -1,3 +1,8 @@
+export type {
+  WorkerExecution,
+  WorkerExecutionMode,
+  LocalRoute,
+} from "./server.js";
 import { readWorkerFiles } from "./files.js";
 import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
@@ -335,14 +340,7 @@ export function workersCapacitorPlugin(
         );
         if (!resolved || resolved.external)
           this.error("Cannot resolve Worker entry: " + path);
-        if (compilation)
-          this.warn(
-            options.execution === "local"
-              ? "Local execution: the entire Worker source and its retained fixed data are distributed to the device."
-              : compilation.mode === "worker"
-                ? `Server bindings: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
-                : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
-          );
+        if (compilation) this.warn(compilation.message);
         const entry = resolved.id;
         const generated = entry + entrySuffix;
         if (existsSync(generated))

@@ -1,3 +1,8 @@
+export type {
+  WorkerExecution,
+  WorkerExecutionMode,
+  LocalRoute,
+} from "./server.js";
 import { readWorkerFiles } from "./files.js";
 import { asyncContextPlugin, lowerAsync } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
@@ -140,19 +145,7 @@ export function workersCapacitorPlugin(
         const compilation = await server.get();
         entry = compilation ? server.localEntry : originalEntry;
         selector = compilation ? server.selectorEntry : undefined;
-        if (compilation)
-          return {
-            warnings: [
-              {
-                text:
-                  options.execution === "local"
-                    ? "Local execution: the entire Worker source and its retained fixed data are distributed to the device."
-                    : compilation.mode === "worker"
-                      ? `Server bindings: requests not served by bundled assets execute on the deployed Worker (${compilation.reason}). No server Worker code is distributed to Capacitor.`
-                      : `Server bindings: ${compilation.routes.filter((route) => route.remote).length} server route/middleware registrations selected before local execution.`,
-              },
-            ],
-          };
+        if (compilation) return { warnings: [{ text: compilation.message }] };
       });
       await serverPlugin.setup(build);
       const virtualFiles = () =>

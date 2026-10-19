@@ -44,22 +44,21 @@ async function load(source: string) {
     /* @vite-ignore */ `data:text/javascript;base64,${Buffer.from(result.outputFiles[0]!.text).toString("base64")}`
   );
 }
-it("auto checks non-response data and unknown env without any cloud binding declaration", async () => {
-  await fixture({}, async (graph) => {
-    const result = (await graph.get())!;
-    expect(result.local).not.toContain("DISTRIBUTION_PERMISSION_CANARY");
-    const { needsRemote } = await load(result.selector);
-    expect(await needsRemote(new Request("https://local.invalid/"))).toBe(
-      false,
-    );
-    expect(
-      await needsRemote(new Request("https://local.invalid/configured")),
-    ).toBe(true);
-    expect(await needsRemote(new Request("https://local.invalid/cloud"))).toBe(
-      true,
-    );
-  });
-});
+it.each([undefined, []])(
+  "network is the default and empty routes permit no distribution: %j",
+  async (execution) => {
+    await fixture({ execution }, async (graph) => {
+      const result = (await graph.get())!;
+      expect(result.local).not.toContain("DISTRIBUTION_PERMISSION_CANARY");
+      const { needsRemote } = await load(result.selector);
+      for (const path of ["/", "/configured", "/cloud", "/missing"])
+        expect(
+          await needsRemote(new Request(`https://local.invalid${path}`)),
+        ).toBe(true);
+      expect(result.requiresRemote).toBe(true);
+    });
+  },
+);
 it("network emits no Worker implementation", async () => {
   await fixture(
     { execution: "network" },
@@ -78,11 +77,10 @@ it("network emits no Worker implementation", async () => {
     { kv_namespaces: [{ binding: "KV" }], assets: { directory: "public" } },
   );
 });
-it("manual grants dependency distribution only to selected methods and routes", async () => {
+it("route selection grants dependency distribution only to selected methods and routes", async () => {
   await fixture(
     {
-      execution: "manual",
-      localRoutes: [
+      execution: [
         { method: "GET", path: "/configured" },
         { method: "POST", path: "/notes" },
         { method: "GET", path: "/cloud" },
@@ -120,9 +118,9 @@ it("manual grants dependency distribution only to selected methods and routes", 
     },
   );
 });
-it("manual does not bypass authentication middleware", async () => {
+it("route selection does not bypass authentication middleware", async () => {
   await fixture(
-    { execution: "manual", localRoutes: [{ method: "GET", path: "/private" }] },
+    { execution: [{ method: "GET", path: "/private" }] },
     async (graph) => {
       const result = (await graph.get())!;
       expect(result.local).not.toContain("PROTECTED_CONTENT");
@@ -135,9 +133,9 @@ it("manual does not bypass authentication middleware", async () => {
     `import {Hono} from 'hono'; const app=new Hono(); app.use('/private',async(c,next)=>{if(c.req.header('authorization')!==c.env.SECRET)return c.text('denied',401);await next();});app.get('/private',c=>c.text('PROTECTED_CONTENT'));export default app;`,
   );
 });
-it("manual selects descendants with a trailing path wildcard, without widening to siblings or unknown URLs", async () => {
+it("route selection selects descendants with a trailing path wildcard, without widening to siblings or unknown URLs", async () => {
   await fixture(
-    { execution: "manual", localRoutes: [{ method: "*", path: "/app/*" }] },
+    { execution: [{ method: "*", path: "/app/*" }] },
     async (graph) => {
       const result = (await graph.get())!;
       const { needsRemote } = await load(result.selector);
@@ -183,8 +181,8 @@ it("manual selects descendants with a trailing path wildcard, without widening t
     export default app;`,
   );
 });
-it.each(["/app/*", "/*", "*"])(
-  "manual wildcard %s agrees with Hono for literal registrations",
+it.each(["/app/*", "/v1.0/*", "/@me/*", "/*", "*"])(
+  "route selection wildcard %s agrees with Hono for literal registrations",
   async (path) => {
     const hono = new Hono();
     hono.get(path, (c) => c.text("matched"));
@@ -195,10 +193,12 @@ it.each(["/app/*", "/*", "*"])(
       "/app/news/123",
       "/application",
       "/app-private",
+      "/v1.0/page",
+      "/@me/profile",
     ]) {
       const expectedLocal = (await hono.request(registration)).status === 200;
       await fixture(
-        { execution: "manual", localRoutes: [{ method: "GET", path }] },
+        { execution: [{ method: "GET", path }] },
         async (graph) => {
           const result = (await graph.get())!;
           const { needsRemote } = await load(result.selector);
@@ -213,18 +213,20 @@ it.each(["/app/*", "/*", "*"])(
         },
         `import {Hono} from 'hono'; const app=new Hono();
         app.get('/app/anchor',c=>c.text('anchor'));
+        app.get('/v1.0/anchor',c=>c.text('anchor'));
+        app.get('/@me/anchor',c=>c.text('anchor'));
         app.get(${JSON.stringify(registration)},c=>c.text('ROUTE_IMPLEMENTATION'));
         export default app;`,
       );
     }
   },
 );
-it("manual preserves Hono's parameter constraints for an explicitly selected registration", async () => {
+it("route selection preserves Hono's parameter constraints for an explicitly selected registration", async () => {
   const path = "/posts/:id{[0-9]+}";
   const hono = new Hono();
   hono.get(path, (c) => c.text(c.req.param("id")));
   await fixture(
-    { execution: "manual", localRoutes: [{ method: "GET", path }] },
+    { execution: [{ method: "GET", path }] },
     async (graph) => {
       const result = (await graph.get())!;
       const { needsRemote } = await load(result.selector);
@@ -248,8 +250,7 @@ it("manual preserves Hono's parameter constraints for an explicitly selected reg
 it("does not infer permission by treating a dynamic registration as a literal URL", async () => {
   await fixture(
     {
-      execution: "manual",
-      localRoutes: [{ method: "GET", path: "/app/:id/*" }],
+      execution: [{ method: "GET", path: "/app/:id/*" }],
     },
     async (graph) => {
       await expect(graph.get()).rejects.toThrow("cannot resolve");
@@ -259,12 +260,11 @@ it("does not infer permission by treating a dynamic registration as a literal UR
   );
 });
 it.each(["/notes", /^\/notes$/])(
-  "manual accepts all methods for path %s without overriding server boundaries",
+  "route selection accepts all methods for path %s without overriding server boundaries",
   async (path) => {
     await fixture(
       {
-        execution: "manual",
-        localRoutes: [
+        execution: [
           { method: "*", path },
           { method: "*", path: "/any" },
         ],
@@ -320,12 +320,12 @@ it.each(["/notes", /^\/notes$/])(
   },
 );
 it.each(["", "g", "y"])(
-  "manual matches registration paths with RegExp flags=%s without publishing other routes",
+  "route selection matches registration paths with RegExp flags=%s without publishing other routes",
   async (flags) => {
     const path = new RegExp("^/pages/", flags);
     path.lastIndex = 4;
     await fixture(
-      { execution: "manual", localRoutes: [{ method: "GET", path }] },
+      { execution: [{ method: "GET", path }] },
       async (graph) => {
         const result = (await graph.get())!;
         expect(path.lastIndex).toBe(4);
@@ -367,55 +367,48 @@ it.each(["", "g", "y"])(
     );
   },
 );
-it.each(["auto", "manual"] as const)(
-  "%s keeps a separate REST API and unselected private pages on the server",
-  async (execution) => {
-    await fixture(
-      execution === "manual"
-        ? { execution, localRoutes: [{ method: "GET", path: "/" }] }
-        : {},
-      async (graph) => {
-        const result = (await graph.get())!;
-        expect(result.local + result.selector).not.toContain(
-          "PRIVATE_PAGE_DATA",
-        );
-        expect(result.local + result.selector).not.toContain(
-          "SELECT secret FROM accounts",
-        );
-        const { needsRemote } = await load(result.selector);
-        expect(await needsRemote(new Request("https://local.invalid/"))).toBe(
-          false,
-        );
-        for (const [path, method] of [
-          ["/api/accounts", "GET"],
-          ["/api/accounts", "POST"],
-          ["/account", "GET"],
-        ]) {
-          expect(
-            await needsRemote(
-              new Request(`https://local.invalid${path}`, { method }),
-            ),
-          ).toBe(true);
-        }
+it("route selection keeps a separate REST API and unselected private pages on the server", async () => {
+  await fixture(
+    { execution: [{ method: "GET", path: "/" }] },
+    async (graph) => {
+      const result = (await graph.get())!;
+      expect(result.local + result.selector).not.toContain("PRIVATE_PAGE_DATA");
+      expect(result.local + result.selector).not.toContain(
+        "SELECT secret FROM accounts",
+      );
+      const { needsRemote } = await load(result.selector);
+      expect(await needsRemote(new Request("https://local.invalid/"))).toBe(
+        false,
+      );
+      for (const [path, method] of [
+        ["/api/accounts", "GET"],
+        ["/api/accounts", "POST"],
+        ["/account", "GET"],
+      ]) {
         expect(
+          await needsRemote(
+            new Request(`https://local.invalid${path}`, { method }),
+          ),
+        ).toBe(true);
+      }
+      expect(
+        await (
           await (
-            await (
-              await load(result.local)
-            ).default.fetch(new Request("https://local.invalid/"))
-          ).text(),
-        ).toBe("<h1>News</h1>");
-      },
-      `import {Hono} from 'hono';
+            await load(result.local)
+          ).default.fetch(new Request("https://local.invalid/"))
+        ).text(),
+      ).toBe("<h1>News</h1>");
+    },
+    `import {Hono} from 'hono';
       const app=new Hono();
       app.get('/',c=>c.html('<h1>News</h1>'));
       app.get('/api/accounts',async c=>c.json(await c.env.DB.prepare('SELECT secret FROM accounts').all()));
       app.post('/api/accounts',async c=>c.json(await c.env.DB.prepare('INSERT INTO accounts DEFAULT VALUES').run()));
       app.get('/account',c=>c.req.header('authorization')===c.env.SECRET ? c.text('PRIVATE_PAGE_DATA') : c.text('denied',401));
       export default app;`,
-      { d1_databases: [{ binding: "DB" }] },
-    );
-  },
-);
+    { d1_databases: [{ binding: "DB" }] },
+  );
+});
 it("local explicitly distributes the whole Worker and supports standalone POST", async () => {
   await fixture({ execution: "local" }, async (graph) => {
     const result = (await graph.get())!;
@@ -439,10 +432,10 @@ it("local explicitly distributes the whole Worker and supports standalone POST",
 });
 it.each([
   { execution: "local", remoteBindings: ["SECRET"] },
-  { execution: "manual", localRoutes: [{ method: "GET", path: "/typo" }] },
-  { execution: "manual", localRoutes: [{ method: "GET", path: /^\/typo\// }] },
-  { execution: "manual", localRoutes: [{ method: "GET", path: 123 }] },
-  { execution: "auto", localRoutes: [{ method: "GET", path: "/" }] },
+  { execution: [{ method: "GET", path: "/typo" }] },
+  { execution: [{ method: "GET", path: /^\/typo\// }] },
+  { execution: [{ method: "GET", path: 123 }] },
+  { execution: "auto" },
   { execution: "manual" },
 ] as ServerBuildOptions[])(
   "rejects conflicting or unresolved configuration: %j",
@@ -453,7 +446,7 @@ it.each([
   },
 );
 
-it("auto excludes Admin SDK credentials even without Cloudflare configuration", async () => {
+it("default network excludes Admin SDK credentials even without Cloudflare configuration", async () => {
   await fixture(
     {},
     async (graph) => {
@@ -473,10 +466,10 @@ it("auto excludes Admin SDK credentials even without Cloudflare configuration", 
 });
 
 it.each([false, true])(
-  "an all-local auto build starts with remote configured=%s",
+  "a full local build starts with remote configured=%s",
   async (configured) => {
     await fixture(
-      {},
+      { execution: "local" },
       async (graph) => {
         const result = (await graph.get())!;
         const selector = await load(
@@ -512,3 +505,14 @@ it.each([false, true])(
     );
   },
 );
+
+it("reports a nonempty selection that cannot run locally", async () => {
+  await fixture(
+    { execution: [{ method: "GET", path: "/cloud" }] },
+    async (graph) => {
+      expect((await graph.get()).message).toContain(
+        "No selected routes can execute locally",
+      );
+    },
+  );
+});

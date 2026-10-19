@@ -4,7 +4,8 @@
 
 The unit is build-generated HTTP dispatch of an existing Worker's fetch handler
 when it uses R2, remote-configured KV, Service Bindings or Queue producers.
-KV-only requests follow the binding execution policy. Remote binding methods
+KV-only requests use local storage only when their route is selected for local
+execution and the binding policy is local. Remote binding methods
 execute unchanged inside the deployed Worker. This does not install local R2,
 KV synchronization, a client RPC proxy, or a queue consumer in Capacitor.
 
@@ -23,9 +24,14 @@ Vite or esbuild plugin:
 ```ts
 workersCapacitorPlugin({
   worker: "src/worker.ts",
+  execution: [{ method: "*", path: "/settings/*" }],
   kvExecution: { SETTINGS: "local", SHARED: "remote" },
 });
 ```
+
+The example assumes existing `/settings/` registrations whose implementation and
+retained dependencies may ship to the device. Adjust the selection to the app;
+see [execution configuration](cloudflare-bindings.md#choosing-execution).
 
 The compiler discovers `r2_buckets[].binding`, `kv_namespaces[].binding`,
 `services[].binding` and `queues.producers[].binding`, including named Wrangler
@@ -35,16 +41,18 @@ credentials and connection strings are not runtime client configuration.
 
 For nonstandard configuration locations, supply `workerConfig`. Explicit
 `r2Bindings`, `kvBindings`, `serviceBindings` and `queueBindings` arrays override
-discovery for their respective kind only. Set `kvExecution` to `local` or `remote`
-for every discovered (or explicitly listed) KV name. Missing policies, unknown
-names and invalid values fail the build; there is no implicit KV execution default.
+discovery for their respective kind only. With a route-selection array or whole-Worker local execution, set `kvExecution`
+to `local` or `remote` for every discovered (or explicitly listed) KV name.
+Missing policies, unknown names and invalid values fail the build. The default
+network execution keeps all requests remote and defaults KV policies to remote.
 `kvBindings` lists names, while `kvExecution` chooses their location. R2, Service
 Bindings, Queue producers, D1 and Hyperdrive require the server. A name shared
 between KV and a server binding remains server-only.
 
 Execution location determines the binding instance:
 
-- A KV-only route whose bindings are configured `local` uses runtime `env`.
+- An explicitly selected, locally executable KV-only route whose bindings are
+  configured `local` uses runtime `env`. Unselected routes stay remote.
 - A KV-only route using any `remote` KV binding is dispatched to the existing
   Worker. All operations in that request use the remote environment.
 - A route using R2 and KV is dispatched as one request. Both bindings execute on
@@ -87,7 +95,7 @@ const runtime = workersCapacitor({
 ```
 
 Selected requests go to this origin with the original path, query, method and
-body before local execution. Safe unrelated routes remain local. If partitioning
+body before local execution. Explicitly permitted independent routes may remain local. If partitioning
 cannot be proven safe, the entire Worker is dispatched remotely. Inspect
 `workers-capacitor-server.json` for that decision. Wrangler Queue consumer
 configuration forces whole-Worker dispatch, including consumer-only projects;

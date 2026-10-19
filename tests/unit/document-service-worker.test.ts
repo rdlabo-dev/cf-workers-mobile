@@ -128,6 +128,22 @@ it("uses the current asset manifest after an application update", async () => {
   ).toBe("asset");
   expect(sw.dispatch).toHaveBeenCalledTimes(1);
 });
+it("serves only manifested public assets locally, not arbitrary image or CSS URLs", async () => {
+  const sw = setup();
+  sw.setAssets(["/assets/style.css", "/assets/pixel.svg"]);
+  for (const path of ["/assets/style.css", "/assets/pixel.svg"]) {
+    expect(
+      await (await sw.fetch(new Request(`https://localhost${path}`)))!.text(),
+    ).toBe("asset");
+  }
+  expect(sw.dispatch).not.toHaveBeenCalled();
+  for (const path of ["/private/style.css", "/private/avatar.svg"]) {
+    expect(
+      await (await sw.fetch(new Request(`https://localhost${path}`)))!.text(),
+    ).toBe("worker");
+  }
+  expect(sw.dispatch).toHaveBeenCalledTimes(2);
+});
 it("rewrites local redirects and rejects external redirect destinations", async () => {
   const sw = setup();
   sw.dispatch.mockResolvedValueOnce({

@@ -36,12 +36,11 @@ entry. Use `render: "/"` for Worker-owned pages, or omit `render` when integrati
 an existing frontend with the API. Follow the [application integration guide](integration.md)
 for Capacitor setup, cloud bindings and authentication.
 
-Start with the default `execution: "auto"`; no route list is required. To choose
-which route implementations may ship to the device, use the build plugin's
-`execution: "manual"` and `localRoutes`. Exact paths, `/app/*` prefixes and regular
-expressions are supported. This permission includes retained dependency data and
-does not override detected server dependencies. See [local route selection](cloudflare-bindings.md#selecting-local-routes)
-before enabling it.
+Start with the default `execution: "network"` and the deployed Worker's
+`remote.origin`. To permit selected implementations to ship to the device, set
+`execution` to a route array. Hono paths such as `/app/*` are supported. Permission
+includes retained dependency data and does not override detected server boundaries.
+See [local route selection](cloudflare-bindings.md#selecting-local-routes).
 
 ### Workers Express
 
@@ -60,8 +59,7 @@ export default httpServerHandler({ port: 3000 });
 
 Use the [Vite](#vite) or [esbuild](#esbuild) plugin only in the Capacitor/browser build, never the Cloudflare build. It supplies Workers-compatible `node:http` and `node:net` adapters alongside browser polyfills; the [compatibility inventory](compatibility.md) records the verified baseline and modules. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
 
-The default `execution: "auto"` only partitions supported Hono routes. An Express
-Worker stays entirely remote and requires `remote.origin` in `workersCapacitor()`.
+The default `execution: "network"` keeps the Worker entirely remote and requires `remote.origin` in `workersCapacitor()`.
 For a deliberately standalone Express app, add `execution: "local"` to the
 Vite or esbuild plugin options below. This permits the entire Worker implementation
 and retained fixed data to ship to the device; do not use it with server secrets.

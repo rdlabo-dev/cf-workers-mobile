@@ -17,7 +17,9 @@ afterAll(async () => {
 async function compile(files: Record<string, string>) {
   for (const [name, content] of Object.entries(files))
     await writeFile(resolve(root, name), content);
-  return compileServerWorker(resolve(root, "worker.ts"), ["DATABASE"]);
+  return compileServerWorker(resolve(root, "worker.ts"), ["DATABASE"], {
+    execution: [{ method: "*", path: "*" }],
+  });
 }
 async function selector(source: string) {
   const result = await build({
@@ -58,7 +60,7 @@ it("follows imported/re-exported handlers and mounted routers without route anno
   ).toBe(true);
   expect(
     await needsRemote(new Request("https://local.invalid/api/v1/unknown")),
-  ).toBe(false);
+  ).toBe(true);
 });
 it("selects D1 middleware and all overlapping fallthrough candidates before execution", async () => {
   const result = await compile({
@@ -158,6 +160,7 @@ it("keeps server environment and opaque package access remote unless a binding i
     `import { Hono } from 'hono'; const app = new Hono(); app.get('/secret', c => c.text(c.env.API_SECRET)); app.get('/local', c => c.text(c.env.LABEL)); export default app;`,
   );
   const result = await compileServerWorker(entry, ["DATABASE"], {
+    execution: [{ method: "*", path: "*" }],
     localBindings: ["LABEL"],
   });
   expect(result.local).not.toContain("API_SECRET");
@@ -169,7 +172,10 @@ it("keeps server environment and opaque package access remote unless a binding i
     false,
   );
   await expect(
-    compileServerWorker(entry, ["DATABASE"], { localBindings: ["DATABASE"] }),
+    compileServerWorker(entry, ["DATABASE"], {
+      execution: [{ method: "*", path: "*" }],
+      localBindings: ["DATABASE"],
+    }),
   ).rejects.toThrow("cannot also be a local binding");
 });
 
@@ -303,7 +309,7 @@ it("keeps cookie login/logout/profile and D1 in a single session boundary", asyn
   }
 });
 
-it("keeps header construction remote without inferring distribution from header names", async () => {
+it("permits explicitly selected response headers without removing their fixed values", async () => {
   const result = await compile({
     "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
       app.get('/health', c => { c.header('x-worker', 'local'); return new Response(c.req.raw.headers.get('accept'), {headers: {'content-type': 'text/plain'}}); });
@@ -312,7 +318,7 @@ it("keeps header construction remote without inferring distribution from header 
   expect(result.mode).toBe("routes");
   const { needsRemote } = await selector(result.selector);
   expect(await needsRemote(new Request("https://local.invalid/health"))).toBe(
-    true,
+    false,
   );
 });
 
@@ -340,7 +346,7 @@ it("moves a rendering route only when its transitive dependencies have a local c
   );
   expect(await response.text()).toBe("<h1>Hello Ada</h1>");
   expect(result.routes.find((route) => !route.remote)?.reason).toMatch(
-    /resolved dependencies/,
+    /explicitly permitted/,
   );
   expect(result.routes.find((route) => route.remote)?.reason).toMatch(
     /without a local execution contract/,
@@ -473,15 +479,15 @@ it("keeps destructured and Workers-specific context capabilities on the server",
   }
 });
 
-it("does not confuse supported standard operations with permission to distribute their inputs", async () => {
+it("explicit route permission includes retained inputs to standard operations", async () => {
   const result = await compile({
     "worker.ts": `import { Hono } from 'hono'; const app = new Hono();
       app.get('/', c => c.text(JSON.stringify({n: Math.floor(Number(c.req.query('n'))), valid: Number.isSafeInteger(1)})));
       app.get('/db', c => c.json(c.env.DATABASE)); export default app;`,
   });
   const { needsRemote } = await selector(result.selector);
-  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(true);
-  expect(result.local).not.toContain("isSafeInteger");
+  expect(await needsRemote(new Request("https://local.invalid/"))).toBe(false);
+  expect(result.local).toContain("isSafeInteger");
 });
 
 it("does not separate a rendering import from server-side changes through an alias", async () => {

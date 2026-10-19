@@ -120,7 +120,10 @@ it("discovers bindings next to a nested Worker even with an explicit D1 list", a
     entry,
     `export default { fetch(req, env) { return new Response(env.SQL.connectionString); } };`,
   );
-  const graph = serverModules(entry, root, { d1Bindings: [] });
+  const graph = serverModules(entry, root, {
+    execution: [{ method: "*", path: "*" }],
+    d1Bindings: [],
+  });
   const result = await graph.get();
   expect(result?.mode).toBe("worker");
   expect(result?.local).not.toContain("connectionString");
@@ -148,7 +151,9 @@ it("removes database drivers, ORM helpers and SQL while preserving independent l
       export async function query(binding) { const {connectionString,host,user,password,port,database} = binding;
       const client = driver({connectionString,host,user,password,port,database}); return client.query('SELECT private_hyperdrive_marker'); }`,
     );
-    const result = await compileServerWorker(entry, ["SQL"]);
+    const result = await compileServerWorker(entry, ["SQL"], {
+      execution: [{ method: "*", path: "*" }],
+    });
     expect(result.mode).toBe("routes");
     expect(result.local + result.selector).not.toMatch(
       /private_hyperdrive_marker|connectionString|password|mysql2|drizzle-orm|from "pg"|from "postgres"/,
@@ -175,7 +180,9 @@ it("keeps top-level pools and shared database state wholly server-side", async (
     const pool = new Pool({connectionString:env.SQL.connectionString}); const app = new Hono();
     app.get('/health', c => c.text('ok')); app.get('/rows', async c => c.json(await pool.query('SELECT private_pool_marker'))); export default app;`,
   );
-  const result = await compileServerWorker(entry, ["SQL"]);
+  const result = await compileServerWorker(entry, ["SQL"], {
+    execution: [{ method: "*", path: "*" }],
+  });
   expect(result.mode).toBe("worker");
   expect(result.local + result.selector).not.toMatch(
     /Pool|connectionString|private_pool_marker/,

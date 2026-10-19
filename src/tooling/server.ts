@@ -12,9 +12,15 @@ import type {
 export {
   serverBindings,
   type ServerBuildOptions,
+  type WorkerExecution,
+  type WorkerExecutionMode,
+  type LocalRoute,
 } from "../cloudflare/bindings/config.js";
 
-import type { ServerBuildOptions } from "../cloudflare/bindings/config.js";
+import type {
+  ServerBuildOptions,
+  LocalRoute,
+} from "../cloudflare/bindings/config.js";
 
 export interface ServerCompilation {
   mode: "routes" | "worker";
@@ -85,42 +91,43 @@ export async function compileServerWorker(
     "alias" | "tsconfig" | "define" | "conditions"
   > & {
     execution?: ServerBuildOptions["execution"];
-    localRoutes?: ServerBuildOptions["localRoutes"];
     localBindings?: string[];
     kvBindings?: string[];
     forceRemoteReason?: string;
   } = {},
 ): Promise<ServerCompilation> {
   const {
-    execution = "auto",
-    localRoutes,
+    execution = "network",
     localBindings = [],
     kvBindings = [],
     forceRemoteReason,
     ...buildOptions
   } = options;
-  if (!["auto", "network", "manual", "local"].includes(execution))
-    throw new TypeError("Unknown Worker execution policy");
-  if (localRoutes !== undefined && execution !== "manual")
-    throw new TypeError('localRoutes requires execution: "manual"');
   if (
-    execution === "manual" &&
-    (!Array.isArray(localRoutes) ||
-      localRoutes.some(
-        (route) =>
-          !route ||
-          !/^(\*|GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
-          !(typeof route.path === "string"
-            ? route.path === "*" || route.path.startsWith("/")
-            : route.path instanceof RegExp),
-      ))
+    execution !== "network" &&
+    execution !== "local" &&
+    !Array.isArray(execution)
   )
     throw new TypeError(
-      'manual execution requires localRoutes with an uppercase HTTP method or "*" and an absolute registration path or RegExp',
+      'execution must be "network", "local", or an array of route permissions',
+    );
+  if (
+    Array.isArray(execution) &&
+    execution.some(
+      (route) =>
+        !route ||
+        !/^(\*|GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
+        !(typeof route.path === "string"
+          ? route.path === "*" || route.path.startsWith("/")
+          : route.path instanceof RegExp),
+    )
+  )
+    throw new TypeError(
+      'execution routes require an uppercase HTTP method or "*" and a Hono registration path or RegExp',
     );
   if (execution === "local" && (bindings.length || forceRemoteReason))
     throw new Error(
-      "local execution cannot use configured server bindings or server-only events; use auto, network or manual",
+      "local execution cannot use configured server bindings or server-only events; use network or route permissions",
     );
   if (localBindings.some((name) => bindings.includes(name)))
     throw new Error("A server binding cannot also be a local binding");
@@ -179,7 +186,7 @@ export async function compileServerWorker(
       inputs,
       localBindings,
       kvBindings,
-      execution === "manual" ? localRoutes : undefined,
+      execution as readonly LocalRoute[],
     );
   } catch (error) {
     if (!(error instanceof WiderServerBoundary)) throw error;
@@ -426,7 +433,7 @@ async function partition(
   inputs: string[],
   localBindings: string[],
   kvBindings: string[],
-  localRoutes?: ServerBuildOptions["localRoutes"],
+  routePermissions: readonly LocalRoute[],
 ): Promise<ServerCompilation> {
   const program = parseAst(source);
   const text = (node: Node) => {
@@ -881,383 +888,41 @@ async function partition(
       });
     return remote;
   }
-  // Execution compatibility does not establish permission to distribute a
-  // dependency. Only move supported response construction whose retained data
-  // reaches the response; overlapping server guards are checked separately.
-  // Objects, unused branches and defaults can carry non-response data.
-  function distributableResponseHandler(
-    node: Node,
-    seen = new Set<Node>(),
-    helper = false,
-    middleware = false,
-  ): boolean {
+  // Middleware has no independent distribution grant. Only an unconditional
+  // await next() can accompany a permitted route without changing authority.
+  function passthroughMiddleware(node: Node, seen = new Set<Node>()): boolean {
+    if (seen.has(node)) return false;
+    seen.add(node);
     if (node.type === "Identifier") {
-      const declaration = declarations.get(node.name);
-      const value = variables.get(node.name)?.init ?? declaration;
-      return (
-        !!value && distributableResponseHandler(value, seen, helper, middleware)
-      );
+      const value =
+        variables.get(node.name)?.init ?? declarations.get(node.name);
+      return !!value && passthroughMiddleware(value, seen);
     }
     if (
-      seen.has(node) ||
-      (node.type !== "ArrowFunctionExpression" &&
-        node.type !== "FunctionExpression" &&
-        node.type !== "FunctionDeclaration")
+      ![
+        "ArrowFunctionExpression",
+        "FunctionExpression",
+        "FunctionDeclaration",
+      ].includes(node.type)
     )
       return false;
-    seen = new Set(seen).add(node);
-    if (node.params.some((parameter) => parameter.type !== "Identifier"))
+    const fn = node as import("estree").Function;
+    if (
+      fn.params.length !== 2 ||
+      fn.params.some((p) => p.type !== "Identifier") ||
+      fn.body.type !== "BlockStatement" ||
+      fn.body.body.length !== 1
+    )
       return false;
-    const parameters = node.params.map(
-      (parameter) => (parameter as { name: string }).name,
-    );
-    const context = helper ? undefined : parameters[0];
-    const next = helper ? undefined : parameters[1];
-    function memberPath(value: Node): string | undefined {
-      if (value.type === "Identifier") return value.name;
-      if (value.type !== "MemberExpression") return;
-      const parent = memberPath(value.object);
-      const key = property(value);
-      return parent && key ? `${parent}.${key}` : undefined;
-    }
-    function status(value: Node) {
-      return (
-        value.type === "Literal" &&
-        typeof value.value === "number" &&
-        value.value >= 200 &&
-        value.value <= 599 &&
-        ![204, 205, 304].includes(value.value)
-      );
-    }
-    // Header writes can discard earlier values, including across middleware.
-    // Do not infer distribution permission from mutable response headers.
-    function headerValues(value: Node): boolean {
-      return value.type === "ObjectExpression" && value.properties.length === 0;
-    }
-    function responseInit(value: Node): boolean {
-      return (
-        value.type === "ObjectExpression" &&
-        expression(value, true) &&
-        value.properties.every(
-          (item) =>
-            item.type === "Property" &&
-            !item.computed &&
-            propertyName(item.key) === "status" &&
-            status(item.value),
-        )
-      );
-    }
-    function propertyName(value: Node): string | undefined {
-      return value.type === "Identifier"
-        ? value.name
-        : value.type === "Literal"
-          ? String(value.value)
-          : undefined;
-    }
-    function expression(
-      value: Node,
-      structured = false,
-      responseRoot = false,
-    ): boolean {
-      switch (value.type) {
-        case "Literal":
-          return (
-            !("regex" in value) &&
-            (value.value === null ||
-              ["string", "number", "boolean"].includes(typeof value.value))
-          );
-        case "Identifier":
-          return helper && parameters.includes(value.name);
-        case "TemplateLiteral":
-          return value.expressions.every((item) => expression(item));
-        case "ArrayExpression":
-          return (
-            structured &&
-            value.elements.every((item) => !!item && expression(item, true))
-          );
-        case "ObjectExpression": {
-          const keys = new Set<string>();
-          return (
-            structured &&
-            value.properties.every((item) => {
-              if (
-                item.type !== "Property" ||
-                item.computed ||
-                item.kind !== "init" ||
-                item.method
-              )
-                return false;
-              const key =
-                item.key.type === "Identifier"
-                  ? item.key.name
-                  : item.key.type === "Literal"
-                    ? String(item.key.value)
-                    : undefined;
-              if (key === undefined || key === "__proto__" || keys.has(key))
-                return false;
-              keys.add(key);
-              return expression(item.value, true);
-            })
-          );
-        }
-        case "AwaitExpression":
-          return expression(value.argument, structured);
-        case "LogicalExpression": {
-          const left = value.left;
-          const receiver =
-            left.type === "AwaitExpression" &&
-            left.argument.type === "CallExpression"
-              ? memberPath(left.argument.callee)
-              : undefined;
-          return (
-            value.operator === "??" &&
-            expression(value.left, structured) &&
-            value.right.type === "Literal" &&
-            (value.right.value === "" ||
-              value.right.value === null ||
-              localBindings.some(
-                (name) => receiver === `${context}.env.${name}.get`,
-              ))
-          );
-        }
-        case "MemberExpression": {
-          const path = memberPath(value);
-          return (
-            !!context &&
-            (path === `${context}.req.path` ||
-              path === `${context}.req.url` ||
-              localBindings.some((name) => path === `${context}.env.${name}`))
-          );
-        }
-        case "TaggedTemplateExpression": {
-          if (
-            value.tag.type !== "Identifier" ||
-            parameters.includes(value.tag.name)
-          )
-            return false;
-          const tag = value.tag.name;
-          const imported = declarations.get(tag);
-          return (
-            imported?.type === "ImportDeclaration" &&
-            imported.source.value === "hono/html" &&
-            imported.specifiers.some(
-              (item) =>
-                item.type === "ImportSpecifier" &&
-                item.local.name === tag &&
-                item.imported.type === "Identifier" &&
-                item.imported.name === "html",
-            ) &&
-            expression(value.quasi)
-          );
-        }
-        case "CallExpression":
-        case "NewExpression": {
-          const path = memberPath(value.callee);
-          if (
-            value.callee.type === "Identifier" &&
-            declarations.has(value.callee.name)
-          ) {
-            if (value.type !== "CallExpression") return false;
-            const target =
-              variables.get(value.callee.name)?.init ??
-              declarations.get(value.callee.name);
-            return (
-              !!target &&
-              distributableResponseHandler(target, seen, true) &&
-              (target.type === "ArrowFunctionExpression" ||
-                target.type === "FunctionExpression" ||
-                target.type === "FunctionDeclaration") &&
-              target.params.length === value.arguments.length &&
-              value.arguments.every((item) => expression(item))
-            );
-          }
-          if (
-            context &&
-            path &&
-            ["text", "html", "json", "body"].some(
-              (method) => path === `${context}.${method}`,
-            )
-          )
-            return (
-              responseRoot &&
-              value.type === "CallExpression" &&
-              value.arguments.length > 0 &&
-              value.arguments.length <= 3 &&
-              value.arguments.every((item, index) =>
-                index === 0
-                  ? expression(item, path === `${context}.json`)
-                  : index === 1
-                    ? status(item) ||
-                      (value.arguments[0]?.type === "Literal" &&
-                        value.arguments[0].value === null &&
-                        item.type === "Literal" &&
-                        item.value === 204) ||
-                      responseInit(item)
-                    : headerValues(item),
-              )
-            );
-          if (
-            context &&
-            path &&
-            [
-              "req.query",
-              "req.param",
-              "req.header",
-              "req.raw.headers.get",
-            ].some((method) => path === `${context}.${method}`)
-          )
-            return (
-              value.type === "CallExpression" &&
-              value.arguments.length === 1 &&
-              value.arguments[0]?.type === "Literal" &&
-              typeof value.arguments[0].value === "string"
-            );
-          if (
-            context &&
-            value.type === "CallExpression" &&
-            path &&
-            localBindings.some((name) =>
-              ["get", "getWithMetadata", "put", "delete", "list"].some(
-                (method) => path === `${context}.env.${name}.${method}`,
-              ),
-            )
-          )
-            return value.arguments.every((item) => expression(item));
-          if (
-            context &&
-            value.type === "CallExpression" &&
-            ["text", "json"].some(
-              (method) => path === `${context}.req.${method}`,
-            )
-          )
-            return value.arguments.length === 0;
-          if (
-            value.type === "CallExpression" &&
-            path === "String" &&
-            !parameters.includes("String")
-          )
-            return (
-              value.arguments.length === 1 && expression(value.arguments[0]!)
-            );
-          if (
-            value.type === "CallExpression" &&
-            path === "Math.random" &&
-            !parameters.includes("Math")
-          )
-            return value.arguments.length === 0;
-          if (
-            value.type === "CallExpression" &&
-            path === "Number" &&
-            !parameters.includes("Number")
-          )
-            return (
-              value.arguments.length === 1 &&
-              value.arguments[0]?.type === "Literal" &&
-              typeof value.arguments[0].value === "number"
-            );
-          if (
-            value.type === "CallExpression" &&
-            value.callee.type === "MemberExpression" &&
-            property(value.callee) === "toString" &&
-            value.callee.object.type === "CallExpression" &&
-            value.callee.object.callee.type === "Identifier" &&
-            value.callee.object.callee.name === "Number"
-          )
-            return (
-              value.arguments.length === 0 && expression(value.callee.object)
-            );
-          return (
-            responseRoot &&
-            !helper &&
-            value.type === "NewExpression" &&
-            path === "Response" &&
-            value.arguments.length >= 1 &&
-            value.arguments.length <= 2 &&
-            value.arguments.every((item, index) =>
-              index === 0 ? expression(item) : responseInit(item),
-            )
-          );
-        }
-        default:
-          return false;
-      }
-    }
-    function response(value: Node): boolean {
-      return (
-        expression(value, false, true) &&
-        ((value.type === "NewExpression" &&
-          memberPath(value.callee) === "Response") ||
-          (value.type === "CallExpression" &&
-            ["text", "html", "json", "body"].some(
-              (method) => memberPath(value.callee) === `${context}.${method}`,
-            )))
-      );
-    }
-    if (node.body.type !== "BlockStatement") {
-      const output = node.body;
-      return (
-        (!helper ||
-          parameters.every((parameter) => names(output).has(parameter))) &&
-        (helper ? expression(output) : !middleware && response(output))
-      );
-    }
-    if (helper) {
-      if (
-        node.body.body.length !== 1 ||
-        node.body.body[0].type !== "ReturnStatement" ||
-        !node.body.body[0].argument
-      )
-        return false;
-      const output = node.body.body[0].argument;
-      if (parameters.some((parameter) => !names(output).has(parameter)))
-        return false;
-      return expression(output);
-    }
-    const statements = node.body.body;
-    if (middleware) {
-      if (
-        parameters.length !== 2 ||
-        statements.filter(
-          (statement) =>
-            statement.type === "ExpressionStatement" &&
-            statement.expression.type === "AwaitExpression",
-        ).length !== 1
-      )
-        return false;
-    } else if (statements.at(-1)?.type !== "ReturnStatement") return false;
+    const statement = fn.body.body[0]!;
     return (
-      statements.length > 0 &&
-      statements.every((statement, index) => {
-        if (statement.type === "ReturnStatement")
-          return (
-            !middleware &&
-            index === statements.length - 1 &&
-            !!statement.argument &&
-            response(statement.argument)
-          );
-        if (statement.type !== "ExpressionStatement") return false;
-        const value = statement.expression;
-        if (value.type === "AwaitExpression")
-          return (
-            value.argument.type === "CallExpression" &&
-            ((value.argument.callee.type === "Identifier" &&
-              value.argument.callee.name === next &&
-              !value.argument.arguments.length) ||
-              (!middleware &&
-                localBindings.some((name) =>
-                  ["put", "delete"].some(
-                    (method) =>
-                      memberPath(
-                        value.argument.type === "CallExpression"
-                          ? value.argument.callee
-                          : value.argument,
-                      ) === `${context}.env.${name}.${method}`,
-                  ),
-                ) &&
-                expression(value.argument)))
-          );
-        return false;
-      })
+      statement.type === "ExpressionStatement" &&
+      statement.expression.type === "AwaitExpression" &&
+      statement.expression.argument.type === "CallExpression" &&
+      statement.expression.argument.callee.type === "Identifier" &&
+      statement.expression.argument.callee.name ===
+        (fn.params[1] as import("estree").Identifier).name &&
+      statement.expression.argument.arguments.length === 0
     );
   }
   function staticPath(node: Node, seen = new Set<string>()): boolean {
@@ -1276,62 +941,55 @@ async function partition(
     return false;
   }
   const granted = new Set<CallExpression>();
-  if (localRoutes) {
-    // Do not guess effective paths through mounts or aliases. They remain remote.
-    const entries = [...registrations.values()].flat();
-    for (const route of localRoutes) {
-      // Copy stateful expressions so each registration and rebuild is independent.
-      const pattern =
-        route.path instanceof RegExp
-          ? new RegExp(route.path.source, route.path.flags)
-          : undefined;
-      const matchesPath = (path: string | undefined) => {
-        if (path === undefined) return false;
-        if (typeof route.path === "string") {
-          if (path === route.path || route.path === "*" || route.path === "/*")
-            return true;
-          // Hono's trailing wildcard includes the base path. Only a literal
-          // prefix proves containment of another registration's entire pattern.
-          if (/^\/[A-Za-z0-9_/-]+\/\*$/.test(route.path)) {
-            const base = route.path.slice(0, -2);
-            return path === base || path.startsWith(`${base}/`);
-          }
-          return false;
+  // Do not guess effective paths through mounts or aliases. They remain remote.
+  const entries = [...registrations.values()].flat();
+  for (const route of routePermissions) {
+    // Copy stateful expressions so each registration and rebuild is independent.
+    const pattern =
+      route.path instanceof RegExp
+        ? new RegExp(route.path.source, route.path.flags)
+        : undefined;
+    const matchesPath = (path: string | undefined) => {
+      if (path === undefined) return false;
+      if (typeof route.path === "string") {
+        if (path === route.path || route.path === "*" || route.path === "/*")
+          return true;
+        // Hono's trailing wildcard includes the base path. Only a literal
+        // prefix proves containment of another registration's entire pattern.
+        if (
+          route.path.endsWith("/*") &&
+          !/[:*{}?]/.test(route.path.slice(0, -2))
+        ) {
+          const base = route.path.slice(0, -2);
+          return path === base || path.startsWith(`${base}/`);
         }
-        if (!pattern) return false;
-        pattern.lastIndex = 0;
-        return pattern.test(path);
-      };
-      const matches = entries.filter(
-        ({ router, call }) =>
-          router === root &&
-          !routerInitializers.get(root)?.includes(".basePath(") &&
-          (route.method === "*"
-            ? /^(get|head|post|put|patch|delete|options|all)$/.test(
-                property(call.callee) ?? "",
-              )
-            : property(call.callee) === route.method.toLowerCase()) &&
-          matchesPath(literal(call.arguments[0])),
+        return false;
+      }
+      if (!pattern) return false;
+      pattern.lastIndex = 0;
+      return pattern.test(path);
+    };
+    const matches = entries.filter(
+      ({ router, call }) =>
+        router === root &&
+        !routerInitializers.get(root)?.includes(".basePath(") &&
+        (route.method === "*"
+          ? /^(get|head|post|put|patch|delete|options|all)$/.test(
+              property(call.callee) ?? "",
+            )
+          : property(call.callee) === route.method.toLowerCase()) &&
+        matchesPath(literal(call.arguments[0])),
+    );
+    if (!matches.length)
+      throw new Error(
+        `execution: cannot resolve ${route.method} ${route.path} to a direct Hono registration`,
       );
-      if (!matches.length)
-        throw new Error(
-          `localRoutes: cannot resolve ${route.method} ${route.path} to a direct Hono registration`,
-        );
-      for (const match of matches) granted.add(match.call);
-    }
+    for (const match of matches) granted.add(match.call);
   }
   function distributionAllowed(call: CallExpression, handlers: Node[]) {
-    if (localRoutes && property(call.callee) !== "use")
-      return granted.has(call);
+    if (property(call.callee) !== "use") return granted.has(call);
     return handlers.every(
-      (argument) =>
-        staticPath(argument) ||
-        distributableResponseHandler(
-          argument,
-          new Set(),
-          false,
-          property(call.callee) === "use",
-        ),
+      (argument) => staticPath(argument) || passthroughMiddleware(argument),
     );
   }
   // State shared with a remote operation must not be duplicated in a local
@@ -1402,11 +1060,11 @@ async function partition(
   function disjoint(a: string | undefined, b: string | undefined): boolean {
     if (a === undefined || b === undefined) return false;
     const plain = (path: string) =>
-      /^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*\/?)?$/.test(path);
+      path.startsWith("/") && !/[:*{}?]/.test(path) && !path.includes("//");
     if (plain(a) && plain(b))
       return a.replace(/\/$/, "") !== b.replace(/\/$/, "");
     const prefix = (path: string) =>
-      (path.match(/^\/[A-Za-z0-9_/-]*/)?.[0] ?? "")
+      (path.match(/^\/[^:*{}?]*/)?.[0] ?? "")
         .split("//")[0]!
         .replace(/\/$/, "");
     const ap = prefix(a),
@@ -1531,21 +1189,7 @@ async function partition(
       }
       if (method === "onError" || method === "notFound") {
         rejectRouterEscape(call.arguments);
-        const remote =
-          localRoutes !== undefined ||
-          server(call.arguments) ||
-          !call.arguments.every((handler) =>
-            distributableResponseHandler(handler),
-          );
-        remoteErrors ||= remote;
-        if (!remote) {
-          localRoots.push(...call.arguments);
-          emit(
-            localRegistrations,
-            statement,
-            `${router}.${method}(${call.arguments.map(text).join(",")});`,
-          );
-        }
+        remoteErrors = true;
         continue;
       }
       if (!routeMethods.has(method))
@@ -1577,12 +1221,12 @@ async function partition(
         reason: protectedCalls.has(call)
           ? "Protected by an overlapping server handler or middleware; implementation is not distributed"
           : remote
-            ? localRoutes && !granted.has(call)
-              ? "Route distribution was not permitted by localRoutes"
+            ? !granted.has(call)
+              ? "Route distribution was not permitted by execution"
               : "Server dependency or dependency without a local execution contract or public rendering contract"
             : granted.has(call)
               ? "Route and retained dependencies explicitly permitted for distribution; no overlapping server boundary"
-              : "Straight-line response construction with resolved dependencies; no overlapping server boundary",
+              : "Passthrough middleware with no overlapping server boundary",
       });
       const prefix = paths.length ? paths.map(text).join(",") + "," : "";
       // Every candidate is visited, so a fallthrough to a server handler is selected
@@ -1632,7 +1276,7 @@ async function partition(
     local: generate(needed, localRegistrations) + `\nexport default ${root};\n`,
     selector:
       generate(selectorNeeded, selectorRegistrations) +
-      `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return ${localRoutes ? 'response.headers.get("x-cw-local-route") !== "1" || ' : ""}response.headers.get("x-cw-remote") === "1";`} }\n`,
+      `\nexport async function needsRemote(request) { ${remoteErrors ? "return true;" : `const response = await ${root}.fetch(new Request(request.url, {method: request.method})); if(response.status >= 500) throw new Error("Remote route selection failed"); return response.headers.get("x-cw-local-route") !== "1" || response.headers.get("x-cw-remote") === "1";`} }\n`,
     inputs,
     routes,
   };

@@ -49,6 +49,12 @@ management token in the client. Deploying the server remains a separate action.
 
 ## How execution is selected
 
+The default `execution: "network"` keeps the whole Worker remote. To permit
+independent Hono routes to ship to the device, set an `execution` array in the
+build plugin, for example `execution: [{ method: "GET", path: "/" }]` when that
+registration and its dependencies may be distributed. The following analysis
+applies to that explicit selection. See [execution configuration](cloudflare-bindings.md#choosing-execution).
+
 For statically analyzable Hono applications, the compiler follows local module
 imports and re-exports, helpers, mounted routers, chained registrations and
 middleware. It generates a selector with the same Hono matching rules. If any

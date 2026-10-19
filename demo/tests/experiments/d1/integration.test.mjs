@@ -20,7 +20,7 @@ import { workersCapacitorPlugin as esbuildPlugin } from "../../../../dist/toolin
 
 const repo = fileURLToPath(new URL("../../../../", import.meta.url));
 for (const tool of ["vite", "esbuild"])
-  for (const boundary of ["authentication", "data", "manual", "network"])
+  for (const boundary of ["authentication", "data", "selected", "network"])
     test(`${tool}: ${boundary} policy excludes private contents from every shipped asset`, async () => {
       const artifacts = join(repo, "demo/artifacts");
       await mkdir(artifacts, { recursive: true });
@@ -44,14 +44,8 @@ for (const tool of ["vite", "esbuild"])
         const options = {
           worker: join(root, "worker.js"),
           workerConfig: "wrangler.json",
-          ...(boundary === "manual"
-            ? {
-                execution: "manual",
-                localRoutes: [{ method: "GET", path: "/" }],
-              }
-            : boundary === "network"
-              ? { execution: "network" }
-              : {}),
+          execution:
+            boundary === "network" ? "network" : [{ method: "GET", path: "/" }],
         };
         const outdir = join(root, "out");
         if (tool === "vite")
