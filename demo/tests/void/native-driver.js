@@ -24,6 +24,32 @@
     }
   };
   try {
+    if (location.pathname === "/about") {
+      await wait(
+        () =>
+          document.querySelector("h1")?.textContent === "A public Void page",
+      );
+      // Keep clicking until React has installed the event handler.
+      const end = Date.now() + 20000;
+      while (document.querySelector("button")?.textContent === "Count: 0") {
+        if (Date.now() > end) throw Error("Public page did not hydrate");
+        document.querySelector("button").click();
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const api = await (await fetch("/api/hello")).json();
+      const authenticated = await fetch("/about?authenticated=1", {
+        headers: { authorization: "Bearer native-test" },
+      });
+      if (authenticated.status !== 200)
+        throw Error("Authenticated page failed");
+      await report({
+        stage: "local",
+        message: api.message,
+        count: document.querySelector("button").textContent,
+      });
+      location.href = "/";
+      return;
+    }
     await wait(() => document.querySelector("li strong")?.textContent);
     if (location.pathname === "/") {
       // React installs the controlled input accessor during hydration.

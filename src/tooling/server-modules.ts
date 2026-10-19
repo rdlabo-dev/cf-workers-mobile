@@ -1,6 +1,7 @@
 import { resolve, dirname } from "node:path";
 import { existsSync } from "node:fs";
 import { compileOpenNext } from "./opennext/index.js";
+import { compileVoid } from "./void/index.js";
 import {
   compileServerWorker,
   serverBindings,
@@ -43,7 +44,8 @@ export function serverModules(
       (!bindings.forceRemoteReason ||
         bindings.forceRemoteReason ===
           "Asset-first routing executes on the deployed Worker")
-        ? await compileOpenNext(entry, options.execution, bindings.names)
+        ? ((await compileOpenNext(entry, options.execution, bindings.names)) ??
+          (await compileVoid(entry, options.execution, bindings.names)))
         : undefined;
     const compilation =
       framework ??

@@ -63,6 +63,7 @@ jobs:
               npm install --prefix void
               npm run build --prefix void
               npm run test:void
+              npm run test:void:routes
           - suite: upstream-minvoice
             commands: |
               npm install --prefix authentication

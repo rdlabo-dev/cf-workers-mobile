@@ -27,6 +27,8 @@ export async function runNativeAcceptance({
   publicDir = false,
   kvExecution,
   remoteBindings,
+  execution = "network",
+  expectedMode = "worker",
   render = "/",
   validate,
   platform = process.env.UPSTREAM_PLATFORM,
@@ -87,7 +89,7 @@ export async function runNativeAcceptance({
       publicDir,
       plugins: [
         workersCapacitorPlugin({
-          execution: "network",
+          execution,
           worker,
           workerConfig,
           kvExecution,
@@ -100,7 +102,7 @@ export async function runNativeAcceptance({
     const report = JSON.parse(
       await readFile(join(shell, "www/workers-capacitor-server.json"), "utf8"),
     );
-    assert.equal(report.mode, "worker");
+    assert.equal(report.mode, expectedMode, report.reason);
     try {
       await access(join(shell, platform));
     } catch {

@@ -1,6 +1,6 @@
 # Void React Pages
 
-[Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. The integration below targets **Void / @void/react 1.1.12, React Pages and D1**, using bundled client assets and the existing remote Worker. Local Void runtime compatibility is not established.
+[Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. The integration below targets **Void / @void/react 1.1.12, React Pages and D1**, using bundled client assets and the existing remote Worker. Explicit route permissions can also distribute eligible public GET handlers to the device.
 
 ## Build and connect
 
@@ -42,6 +42,21 @@ await runtime.ready;
 
 The existing Worker handles page requests, loaders and actions. D1 access stays there. `publicDir` copies the generated client assets into the native app; the document host serves those exact paths locally, so hydration and client interactions use bundled JavaScript and CSS. `assetsExecution: "remote"` keeps the Worker ASSETS binding remote; it does not prevent serving bundled files. The report’s `mode: "worker"` describes server execution, not asset delivery. The library's document host displays the response as a document; see the [integration guide](integration.md) for Capacitor installation, authentication and document rendering. The native test uses this same configuration.
 
+## Public GET route execution
+
+The build plugins recognize the generated output of exactly Void 1.1.12 when `execution` contains explicit GET route permissions. It can isolate static public HTTP handlers and React Pages without server dependencies. D1-backed routes, mutations, requests with Cookie or Authorization headers, dynamic paths and framework-internal paths remain remote. Custom middleware, layouts and head configuration prevent this optimization. Unknown route registrations are rejected instead of dropping their middleware.
+
+Add permissions to the Capacitor build plugin, for example `execution: [{ method: "GET", path: "/about" }, { method: "GET", path: "/api/hello" }]`. Check `workers-capacitor-server.json`: `mode: "routes"` and each route's `remote` flag explain the result. A permission authorizes distributing the selected handler and its retained fixed data; it does not establish that the data is public. Keep the remote origin configured for all other requests.
+
+The browser acceptance test checks Vite and esbuild in Chromium and WebKit, including public SSR/API execution, remote selection and exclusion of database code from JavaScript and source maps. After building the library, reproduce it with `npm --prefix demo run test:void:routes`. Native acceptance uses Vite on an iOS 26.1 simulator and Android API 36.1 emulator. It checks local public SSR, a hydrated React state update, local API access, authenticated remote selection, D1 form insertion with a database assertion, and navigation to a client-only page. Run the platforms serially:
+
+```sh
+VOID_ROUTES=1 UPSTREAM_PLATFORM=ios UPSTREAM_DEVICE=<simulator-UUID> node --test demo/tests/void/native.test.mjs
+VOID_ROUTES=1 UPSTREAM_PLATFORM=android UPSTREAM_DEVICE=<emulator-serial> node --test demo/tests/void/native.test.mjs
+```
+
+This is a generated-route profile, not general local Void runtime compatibility. Unrecognized generators and unsupported routing configurations retain the remote Worker boundary.
+
 ## SSR and client-only pages
 
 `export const ssr = false` suppresses the page component's server-rendered HTML. It does **not** make a D1-backed loader safe to execute on the device. Keep that request remote: Void obtains loader data on the Worker and the browser renders the component. Ordinary SSR pages receive initial HTML and hydrate with Void's client assets. Neither case requires converting the existing application to an SPA or replacing its forms with custom API calls.
@@ -54,7 +69,7 @@ The browser test substitutes network delivery with local workerd. The native tes
 
 Use **1.1.12 or newer** for Capacitor iOS navigation. [Void 1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12) includes our [upstream Capacitor navigation fix](https://github.com/voidzero-dev/void/pull/485). The tests use the published 1.1.12 packages without patching the router or changing Capacitor’s default `capacitor://localhost` origin. Versions before 1.1.12 reject that scheme; an initial HTML response alone does not establish working navigation.
 
-Void-specific physical-device acceptance, deployed Cloudflare integration, production authentication, native plugin events, Vue, Svelte, Solid, other Void bindings and local execution are unverified.
+Void-specific physical-device acceptance, deployed Cloudflare integration, production authentication, native plugin events, Vue, Svelte, Solid, other Void bindings and whole-Worker local execution are unverified.
 
 Build the Worker and Capacitor assets from the same application build. Deploying different client/server versions independently can break hydration or actions; an older installed app must remain compatible with your deployed Worker. Paths absent from the bundle still go to the Worker.
 
