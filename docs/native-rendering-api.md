@@ -75,6 +75,16 @@ Run `npx cap sync ios` after changing this setting. This default applies to the
 native Worker document view; the ordinary Fetch-only WebView retains Capacitor's
 normal behavior. No new `workersCapacitor` option is required.
 
+## Native plugins
+
+Choose a feature that helps your users, such as taking a photo, opening the share sheet or feeling feedback after an action. Browse the [official Capacitor plugins](https://capacitorjs.com/docs/apis) and follow the selected plugin's installation and permission setup.
+
+1. Install a plugin version compatible with Capacitor 8 in your application, configure its required iOS/Android permissions, rebuild the web assets and run `npx cap sync`.
+2. Call the plugin from the page's client-side JavaScript in response to a user action. Keep these calls out of SSR and Worker handlers: the native feature belongs to the device. For a remotely rendered page, include the plugin's JavaScript in that page's client build and its native package in the Capacitor application.
+3. Check the feature on each target platform, including permission denial, navigation away and back, and app resume. Register page listeners when the page mounts and remove them when it unmounts; a new document needs new listeners. If the same page runs on the web, provide the plugin's supported web behavior or an alternative UI.
+
+See [Using Plugins](https://capacitorjs.com/docs/basics/using-plugins) for the Capacitor workflow and [plugin lifecycle boundaries](integration.md#treat-packaged-code-and-data-as-extractable) for this library's document host.
+
 ## Build configuration
 
 The existing Vite or esbuild plugin automatically prepares document assets:

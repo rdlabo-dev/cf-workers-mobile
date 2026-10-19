@@ -34,6 +34,14 @@ Supported code can run on the device. Requests that need D1 or other cloud servi
 
 Already have a separate frontend calling Worker APIs? Use the [Fetch-only integration](docs/runtime.md#fetch-only-integration).
 
+## Next steps
+
+Once your app is running, make it feel at home on a phone:
+
+- Keep buttons and content clear of the notch and home indicator. Start with the default insets, then adjust [iOS Safe Area](docs/native-rendering-api.md#ios-safe-area) for your layout.
+- Add a native touch, such as the camera, sharing or haptic feedback. Follow the [Capacitor plugin integration guide](docs/native-rendering-api.md#native-plugins).
+- Automate releases with [Capawesome Cloud](https://capawesome.io/docs/cloud/app-store-publishing/submit-automatically/): connect your repository, configure signing and store destinations, then trigger builds and store submissions from release tags.
+
 ## Before publishing
 
 Keep secrets on the server and authenticate requests from the app. Follow the [security guidance](docs/integration.md#5-security-the-device-is-not-a-trusted-server), review the [known limitations](docs/compatibility.md), and test your app on its target platforms.
