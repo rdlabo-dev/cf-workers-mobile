@@ -4,7 +4,7 @@ Bring Cloudflare Workers apps to iOS and Android.
 
 Let new users discover your app in the App Store and on Google Play. workers-capacitor helps you bring your existing Cloudflare Workers app to iOS and Android with minimal changes, while keeping your web app running.
 
-Void support is here with [Void 1.1.12, released on October 19, 2026](https://github.com/voidzero-dev/void/releases/tag/v1.1.12)! [Bring your Void app to mobile](docs/void.md).
+Void support is here with [Void 1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12)! [Bring your Void app to mobile](docs/void.md).
 
 ## Get started
 
