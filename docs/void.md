@@ -6,7 +6,7 @@
 
 Build the existing Void application normally first, using Node **24.21.0 or newer**. Keep its `voidPlugin()` and `voidReact()` configuration unchanged. Void emits `dist/ssr/index.js`, `dist/ssr/wrangler.json` and `dist/client/`.
 
-In the separate Capacitor Vite configuration, use those generated files:
+In the separate Capacitor Vite 7 configuration, use those generated files. Keep Void's own Vite configuration and version unchanged:
 
 ```ts
 workersCapacitorPlugin({

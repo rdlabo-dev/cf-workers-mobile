@@ -2,98 +2,47 @@
 
 **Bring Cloudflare Workers apps to iOS and Android.**
 
-Reuse your existing Worker's routes, HTML rendering and business logic in a Capacitor app, with minimal application changes. Configure the Worker entry in your Vite or esbuild build and initialize `workersCapacitor` in the app.
+You built a web app. Now put it on your phone.
 
-**Built an app with Void? Bring it to iOS and Android.** Keep your React Pages and D1 logic on your Worker, and connect the app with workers-capacitor. [Get started with Void →](docs/void.md)
+workers-capacitor brings your existing Workers application into an iOS or Android app with minimal application changes. Keep the pages you designed, the routes you wrote, and the forms and data that make it yours. Continue serving the web version from Cloudflare Workers, and add a mobile app alongside it.
 
-Requests run locally in JavaScript where supported, without starting an HTTP server. Requests that need Cloudflare services can run on your existing deployed Worker. The package includes native WebView integration; it does not compile JavaScript to native code or recreate the Cloudflare runtime on the device.
+**Built with Void? Your app can make the same move.** Void React Pages + D1 works with the released Void 1.1.12 packages, including page rendering, interactive forms and navigation.
 
-**0.1.0 Preview** is intended for integration and evaluation. APIs and compatibility boundaries may change before a stable release. Check the [application integration limits](docs/compatibility.md#application-integration-limits) before adopting it. Native scenarios have been tested in iOS simulators, Android emulators and on a Pixel 8a running Android 17. Selected packaged Hono/Express and remote OpenNext scenarios also run on an iPhone 15 Pro Max with iOS 27.0.1; this does not establish every application scenario on physical iOS.
+<p align="center">
+  <img src="docs/assets/void-ios.png" width="260" alt="Void's React Pages starter running in an iOS simulator, displaying a message submitted through its form and saved in D1." />
+</p>
 
-## Contents
+_The Void starter running in an iOS simulator after submitting a message to D1. The same flow passes on Android. [Try the sample](demo/void) · [Connect your Void app](docs/void.md)_
 
-- [Quick start](#quick-start)
-- [Native HTML rendering](#native-html-rendering)
-- [Build setup](#build-setup)
-- [Runtime behavior](#runtime-behavior)
-- [Workers Express](#workers-express)
-- [Local KV](#local-kv)
-- [D1 and remote APIs](#d1-and-remote-apis)
-- [Development and testing](#development-and-testing)
-- [Compatibility and limitations](#compatibility-and-limitations)
-- [Extending the library](#extending-the-library)
-- [Execution environment and async context](#execution-environment-and-async-context)
-- [Additional Cloudflare bindings](#additional-cloudflare-bindings)
+## Start with your app
 
-## Quick start
+[Capacitor](https://capacitorjs.com/) packages your web interface as an installable mobile app and connects it to native features through plugins. workers-capacitor connects your existing Workers pages and APIs to that app.
 
-For existing applications and AI coding assistants, start with the [AI integration guide](docs/integration.md): a ready-to-use prompt, Capacitor installation, connection of the existing Worker with minimal code changes, security and native verification.
+| Your application        | Start here                                                                                           |
+| ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| Void React Pages + D1   | [Connect your generated Void Worker](docs/void.md)                                                   |
+| Hono or Workers Express | [Connect your existing Worker](docs/build-setup.md#frameworks) · [Rendering example](demo/rendering) |
+| Next.js / OpenNext      | [OpenNext integration](docs/opennext.md)                                                             |
 
-### Install
+**0.1.0 Preview** — for trying integrations and giving feedback. Start with the [installation and integration guide](docs/integration.md) to add Capacitor, connect your Worker and run your app. It covers both existing Capacitor projects and your first mobile app. iOS development needs Xcode on macOS; Android development needs Android Studio and its SDK.
 
-The 0.1.0 Preview release is being prepared. Until it is published to npm, build and install a tarball from this repository:
+### Working with an AI coding assistant?
 
-```sh
-# In this repository
-npm install
-npm run build
-npm pack
+Open your existing application repository and give your assistant this prompt:
 
-# In your Capacitor application
-npm install /path/to/workers-capacitor-0.1.0.tgz
+```text
+Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
+to bring this app to iOS and Android with workers-capacitor.
+Preserve its pages, routes and authentication; verify it on the target platforms.
 ```
 
-Once published, the equivalent installation is `npm install workers-capacitor@0.1.0`. For a new Capacitor application, follow the [installation steps](docs/integration.md) before continuing. Native integration targets Capacitor 8, with Swift Package Manager on iOS and Gradle on Android.
+The same [step-by-step guide](docs/integration.md) works for manual setup.
 
-### Connect your Worker
+## What changes in your application?
 
-Configure your existing Worker entry with one of the [supported build setups](#build-setup), then initialize the runtime in your application:
+Add a Capacitor build alongside your existing Cloudflare build, point it at your Worker entry, and initialize workers-capacitor. Your application continues to own its pages and routes.
 
-```ts
-import { workersCapacitor } from "workers-capacitor";
-
-const runtime = workersCapacitor({
-  prefer: "worker", // Default. Use "direct" to prefer the UI environment.
-  baseURL: "https://api.example.com/api/",
-});
-
-// Finish initialization before UI requests (direct modules load lazily).
-await runtime.ready;
-
-// Existing UI calls stay unchanged.
-const response = await fetch("/api/hello");
-```
-
-## Native HTML rendering
-
-The public API also supports `workersCapacitor({ baseURL: "https://worker.invalid", render: "/" })`.
-The existing Worker returns complete HTML and owns page/API routing. The build
-plugin automatically emits the internal assets; no additional build option is needed.
-
-Native integration is included in the package for Capacitor 8: iOS uses Swift
-Package Manager and Android uses Gradle. Build the web assets and run `npx cap sync`
-to register it automatically. CocoaPods integration is not included. See the [API guide](docs/native-rendering-api.md) and
-[Hono/Express rendering demo](demo/rendering). Omitting `render` keeps the
-Fetch-only behavior described above.
-
-Worker-generated pages are trusted application code and run with the app's
-Capacitor plugin access. Native rendering does not sandbox untrusted HTML.
-
-## Build setup
-
-### Supported builds
-
-| Build              | Setup                                      | Input                                             |
-| ------------------ | ------------------------------------------ | ------------------------------------------------- |
-| Vite 7             | `workers-capacitor/tooling/vite` plugin    | TypeScript / JavaScript, Workers Hono and Express |
-| esbuild 0.28       | `workers-capacitor/tooling/esbuild` plugin | TypeScript / JavaScript, Workers Hono and Express |
-| Browser ES Modules | Explicit Worker source below               | Browser-compatible JavaScript only                |
-
-Other bundlers are not currently supported. Add these plugins only to the Capacitor/browser build, never the Cloudflare build.
-
-### Vite
-
-Add the plugin to the Capacitor/browser Vite configuration:
+For example, a Hono Worker exporting `app` can be connected through the Capacitor build's Vite configuration:
 
 ```ts
 import { defineConfig } from "vite";
@@ -104,353 +53,44 @@ export default defineConfig({
 });
 ```
 
-`src/worker.ts` is your existing application entry exporting a Fetch Handler (for example, Hono’s `export default app`), not a library transport module. The plugin's `worker` path is relative to the Vite root (absolute paths also work). The plugin connects that entry to the normal package import; no special import or generated source file is needed in application code.
-
-### esbuild
-
-For esbuild, use the same application code with this build configuration:
-
-```js
-import { build } from "esbuild";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/esbuild";
-
-await build({
-  entryPoints: ["src/main.ts"],
-  outdir: "www",
-  bundle: true,
-  format: "esm",
-  platform: "browser",
-  plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
-});
-```
-
-The entry path is relative to `absWorkingDir` (or the current directory). Serve the entire output directory, including emitted Worker assets and lazy direct modules. Worker compilation uses the plugin's compatibility transforms; additional application plugins are not applied to the Worker bundle. Browser ESM output with `outdir` or `outfile` is required. Worker entries must bundle into a single JavaScript file; separate CSS/file assets are not supported.
-
-### Browser ES Modules (no bundler)
-
-Without a bundler, copy the package's `dist` directory to your public `lib` directory and use ordinary relative ES Module imports:
-
-```js
-// main.js (loaded with <script type="module">)
-import { workersCapacitor } from "./lib/index.js";
-
-const runtime = workersCapacitor({
-  baseURL: "https://api.example.com/api/",
-  worker: {
-    createWorker: () =>
-      new Worker(new URL("./worker-entry.js", import.meta.url), {
-        type: "module",
-      }),
-    loadDirect: async () => (await import("./worker.js")).default,
-  },
-});
-await runtime.ready;
-```
-
-```js
-// worker-entry.js
-import { serve } from "./lib/browser/isolated/transport.js";
-import worker from "./worker.js";
-serve(worker);
-```
-
-`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `workers-capacitor/browser/isolated`.
-
-## Runtime behavior
-
-### Execution preference
-
-The default `prefer: "worker"` starts a Dedicated Web Worker when available and the initial `env` contains only plain data. If Worker is absent, its constructor reports SecurityError/NotSupportedError, or `env` contains methods/custom prototypes/accessors (such as local KV bindings), it selects direct execution before handling any request. `prefer: "direct"` loads the direct module without creating a Worker. Direct execution is always the available baseline; a module or application error does not mean it is unavailable.
-
-Await `runtime.ready` and inspect `runtime.execution` (`"worker"` or `"direct"`) to observe the selection. Direct code is dynamically imported only when selected. Selection happens once: startup script failures and request errors are reported, never replayed in the other environment. This is not automatic detection of every unsupported Workers API. Changes to `env` after selection do not trigger reselection. Worker selection conservatively accepts primitives, ordinary objects and arrays (including cycles), without non-enumerable custom properties or null prototypes; other structured-clone-capable types currently select direct too.
-
-### Initialization and cleanup
-
-Installation synchronously intercepts fetch. Worker-mode requests wait for startup; matching requests during direct-module loading reject explicitly to prevent top-level-await deadlocks. Await `runtime.ready` before starting UI requests. The runtime cannot distinguish module-initialization calls from concurrent UI calls, so both reject while direct loading is in progress. `await runtime.ready` observes startup success/failure before rendering the UI. `await workersCapacitor(...)` does **not** await Worker startup.
-
-Only one installation is supported; `await runtime.dispose()` restores fetch, terminates the Dedicated Worker and waits for asynchronous cleanup when needed. Termination rejects unfinished local calls/body reads and releases background tracking.
-
-### Explicit Worker sources
-
-Explicit direct-handler imports and standard `new Worker(new URL(...), { type: "module" })` factories are supported. `prefer` requires the plugin configuration or an explicit source with both `createWorker` and `loadDirect`; it cannot manufacture a second candidate from a handler or factory alone.
-
-Direct imports remain supported: `import worker from "./worker"` supplies an object with `fetch` and runs in the UI global scope. Hono needs no build plugin in that mode; Workers Express still needs the compatibility plugin. Worker subrequests stay outside UI interception only when `runtime.execution` is `"worker"`; direct fallback shares the UI global environment.
-
-If the Worker or any dependency uses Workers extensions (for example
-`Headers.getAll("set-cookie")` or `Request.cf`) during module evaluation, configure
-`worker` in the Vite/esbuild plugin as shown above. The runtime installs its Web
-APIs before loading that entry and its dependencies, in both execution modes.
-With a direct static import, module evaluation happens before `workersCapacitor()`
-can initialize those APIs; only calls made after initialization use the installed
-implementations. For plain JavaScript, use the `loadDirect` source shown above
-when initialization must precede module evaluation.
-
-### URL contract
-
-#### How local requests are selected
-
-The adapter resolves the request URL, then checks both its address and path:
-
-1. The URL must match either the running app's **protocol and host** (including the port), or the origin configured in `baseURL`.
-2. Its path must equal the `baseURL` path boundary or be below it. For `/api/`, `/api` and `/api/hello` match; `/apiary` does not.
-
-Matching requests normally run in the local Worker. With D1 build integration, the generated selector can send them to the existing deployed Worker before local execution. The adapter replaces the origin with the `baseURL` origin while preserving the path and query. The protocol alone does not select local execution: `capacitor://other-host/api/hello` does not match an app running at `capacitor://localhost`.
-
-With default Capacitor settings, `fetch("/api/hello")` follows these paths (assuming no `<base>` override and `baseURL: "https://api.example.com/api/"`):
-
-| Platform | Resolved app request URL          | URL received by the local Worker    |
-| -------- | --------------------------------- | ----------------------------------- |
-| iOS      | `capacitor://localhost/api/hello` | `https://api.example.com/api/hello` |
-| Android  | `https://localhost/api/hello`     | `https://api.example.com/api/hello` |
-
-The adapter uses the running app's URL, so custom scheme/hostname settings are handled by the same comparison. Without a generated remote boundary these are local JavaScript calls; neither row sends an HTTP request to `api.example.com`. D1-backed requests instead use the configured `remote.origin`.
-
-#### Endpoint examples
-
-For `baseURL: "https://api.example.com/api/"` and an app served at `https://localhost/` (without a `<base>` override):
-
-| URL passed to `fetch()`             | Request endpoint                           | Handled by     |
-| ----------------------------------- | ------------------------------------------ | -------------- |
-| `/api/hello?name=A`                 | `https://api.example.com/api/hello?name=A` | Local Worker   |
-| `https://api.example.com/api/hello` | `https://api.example.com/api/hello`        | Local Worker   |
-| `/api`                              | `https://api.example.com/api`              | Local Worker   |
-| `/apiary`                           | `https://localhost/apiary`                 | Original fetch |
-| `/outside.txt`                      | `https://localhost/outside.txt`            | Original fetch |
-| `https://other.example/api/hello`   | `https://other.example/api/hello`          | Original fetch |
-
-For local execution, the endpoint is the URL received by the Worker's Fetch Handler; no HTTP request is sent to that server.
-
-The path in `baseURL` selects a boundary; it is **not appended** to request paths. Relative paths resolve against `document.baseURI` (including `<base href>`) first, falling back to location when no document exists. Same-app URLs (including iOS `capacitor://localhost`) in the boundary are remapped to the base origin. Set a root base URL only if you intend to intercept every same-app fetch. A local 404/500 or exception never retries against the network. UI navigation, XHR, images and other WebViews are not intercepted.
-
-## Workers Express
-
-The sample uses the real `express` package and the Workers entry style:
+Then open its first page from the Capacitor entry:
 
 ```ts
-import express from "express";
-import { httpServerHandler } from "cloudflare:node";
+import { workersCapacitor } from "workers-capacitor";
 
-const app = express();
-app.use(express.json());
-app.get("/api/hello", (_req, res) => res.json({ hello: "world" }));
-app.listen(3000);
-export default httpServerHandler({ port: 3000 });
+const app = workersCapacitor({
+  baseURL: "https://worker.invalid",
+  render: "/",
+});
+await app.ready;
 ```
 
-Use the plugin shown above only in the Capacitor/browser build, never the Cloudflare build. It supplies Workers-compatible `node:http` and `node:net` adapters alongside browser polyfills; the [compatibility inventory](docs/compatibility.md) records the verified baseline and modules. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
+This is the local Worker example; `baseURL` is the logical origin the handler receives. For Void, OpenNext or cloud bindings such as D1, follow the linked framework guide to configure your existing deployed Worker as the remote endpoint. The [complete setup](docs/integration.md) includes installation, the bootstrap page, build scripts and native projects.
 
-### TypeScript types
+Already have a frontend calling Worker APIs? Keep it, omit `render`, and use the [Fetch-only integration](docs/runtime.md#fetch-only-integration).
 
-The package provides the `cloudflare:node` type for its supported `httpServerHandler` adapter. For a browser build without existing Workers type declarations, add it to `compilerOptions.types` in `tsconfig.json`:
+## Your app, on the device and in the cloud
 
-```json
-{ "compilerOptions": { "types": ["workers-capacitor/cloudflare/apis/types"] } }
-```
+Supported handlers can run on the device without an HTTP server. Requests that need cloud services run on your existing deployed Worker. D1 stays on Cloudflare; pages and forms can continue using it through that Worker.
 
-Keep any other types your project already uses. This is a type-only entry; do not import it at runtime. Projects with generated Workers types should keep those declarations instead. No application-owned `cloudflare.d.ts` or `client.d.ts` is needed.
+Worker-generated HTML becomes the app's page, including its client scripts and navigation. Keep your existing rendering model: adopting workers-capacitor does not require rewriting the application as an SPA. With Capacitor plugins, your app can also access native device features.
 
-## Local KV
+The build reports which requests execute locally or remotely. See [execution policies](docs/cloudflare-bindings.md) and [runtime behavior](docs/runtime.md) when you need those details.
 
-Use `LocalStorageKV` from `workers-capacitor/cloudflare/bindings/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
+## Before you ship
 
-## D1 and remote APIs
+Keep secrets on the server and authenticate requests from the app. Packaged code is readable by users, and rendered pages can access the app's Capacitor plugins. The [integration guide's security checks](docs/integration.md#5-security-the-device-is-not-a-trusted-server) cover these boundaries.
 
-R2, Service Bindings and Queue producers use the same build-generated HTTP
-dispatch. KV-only routes follow the required per-binding `kvExecution` (`local`/`remote`)
-setting; requests selected for remote execution use
-the deployed Worker's cloud KV. See the [service binding guide](docs/remote-service-bindings.md)
-for configuration, upload limits and verification status.
+Support depends on your application's APIs and authentication flow. Review the [known limitations](docs/compatibility.md) and test your own app on its target platforms. Preview APIs may change before a stable release.
 
-Hyperdrive-backed Workers use the same generated HTTP dispatch. The plugins detect Wrangler `hyperdrive` bindings, keeping database drivers, SQL and connection credentials on the existing Worker. See [transparent Hyperdrive migration](docs/hyperdrive-transparent-migration.md) for setup, security boundaries and verification.
+Tests cover browser, simulator/emulator and selected physical-device scenarios. Void 1.1.12 passes iOS simulator and Android emulator acceptance; physical iPhone checks also cover packaged Hono/Express and public-HTTPS OpenNext, D1, Images and a synthetic OAuth flow. See [verification scope and reproduction](demo/tests/README.md) for the exact boundaries.
 
-Reuse an existing Worker in Capacitor without rewriting its D1 operations as HTTP calls. The Vite and esbuild plugins read Wrangler's D1 binding names and remove server route implementations, including SQL, from the client build. Requests are selected before local execution and sent to the existing deployed Worker. Other routes run locally; when the build cannot safely split the application, the entire Worker runs remotely and the build reports that decision.
+## Explore and contribute
 
-Configure the existing Worker entry in the plugin, then set `remote: { origin: "https://your-worker.example", getToken: () => existingSession.accessToken }` when calling `workersCapacitor`. The optional token callback connects existing bearer credentials. Native Capacitor also reuses server-managed Cookie sessions and same-origin redirects through the existing login UI; this package does not issue sessions or provide a login system. See [transparent D1 migration](docs/d1-transparent-migration.md) for setup, build reports, supported boundaries, and verification.
-
-## Development and testing
-
-Requires Node 22.18+ (22.x) or 24.11+, npm, and the native SDKs for native tests. Package publication, PR creation and cloud deployment are not part of these commands.
-
-### Library and package tests
-
-```sh
-npm install
-npm run build
-npm run typecheck
-npm test
-npx playwright install chromium
-npm run test:package
-```
-
-### Demo and integration tests
-
-Follow the [demo setup guide](demo/README.md) to see which files to configure and how to run the app.
-
-The demo is an independent npm project under `demo/`, with its own package manifest. Dependency lockfiles are generated locally and are not committed. Capacitor, Hono, Express, native projects and integration tests belong to that project. It consumes the built library through `file:..`; it is not an npm workspace.
-
-The demo layout separates application sources from tooling:
-
-```text
-demo/
-  src/
-    main.ts         Runtime initialization and Worker HTML display
-    workers/        Hono and Express application code
-  tests/
-    validation/     Validation page, runners, contracts and Worker entries
-    fixtures/
-      apps/         Runtime and build-tool test apps
-      workers/      Test-only Worker handlers
-    scripts/        Node.js helpers that build test apps
-    ...             Automated tests and Playwright/Vitest configurations
-  ios/, android/    Native projects
-```
-
-`demo/src/main.ts` initializes the runtime and displays the HTML returned by the Worker’s `/` route. Hono is selected by default; the commented Express entry in `demo/vite.config.ts` shows how to switch. Browser tests build and render the same demo with each Worker. The separate `demo/tests/validation/` page runs compatibility checks; it has its own build and is served separately by the browser tests. Application sources never import validation code. Its shared HTTP checks live in `demo/tests/validation/contracts/http.ts` and are reused by the build-tool and runtime tests.
-
-Application Workers are organized as `demo/src/workers/<framework>/<scenario>.ts`. The Hono and Express examples each render HTML at `/` and expose `/api/hello` as JSON. This Fetch-only example inserts the returned HTML into the existing page; it is not the native document rendering path and does not provide navigation, returned-script execution, or form handling. For Worker-owned documents on iOS/Android, `demo/rendering` uses `workersCapacitor({ baseURL, render: "/" })` with the packaged native integration. Broader routing and error-handling cases live in `demo/tests/fixtures/workers/{hono,express}/standard.ts`; runtime and binding fixtures also live under `demo/tests/fixtures/workers/`.
-
-```sh
-cd demo
-npm install
-npm run typecheck
-npm run build
-npx playwright install chromium webkit
-npm run test:browser
-npm run test:workers
-npm run test:runtime
-npm run test:runtime:dev
-npm run test:build-tools
-```
-
-`npm run test:build-tools` in `demo` checks Vite and esbuild with Hono and Express, plus unbundled browser ESM, in both execution modes on Chromium and WebKit.
-
-`test:workers` runs Vitest tests in `demo/tests/workers/` against **local workerd**, using Wrangler's `createTestHarness`. Hono and Express each have two checks for the demo Worker and ten contract-fixture checks covering the API behavior checked in the WebView. It is not a live Cloudflare deployment. To filter tests, use e.g. `npm run test:workers -- -t hono`. `test:package` installs an actual npm tarball into a fresh temporary consumer and checks package types plus both direct and isolated framework execution without handwritten aliases/polyfills.
-
-### Local Cloudflare development
-
-Cloudflare CLI configuration lives in `demo/cloudflare.config.ts`. From `demo/`, run `npx cf build --mode hono` or `npx cf build --mode express` to build the corresponding Worker; use `npx cf dev --mode hono` (or `express`) for local development. The installed `cf` version is currently beta. Wrangler remains a development dependency for the CLI's bundler and the test harness; tests use the same compatibility settings, checking the example Workers as well as separate contract fixtures.
-
-### Void React Pages + D1
-
-[Void React Pages + D1](docs/void.md) is supported on iOS and Android through remote Worker execution with Void / @void/react **1.1.12**. The released packages pass SSR, hydration, form submission, D1 persistence and client-only page tests in an iOS simulator and Android emulator, with no router patches. See the guide for setup and verification scope.
-
-### OpenNext + D1
-
-[`demo/opennext`](demo/opennext/README.md) is a standalone Next.js application with D1-backed sessions, ordinary forms and static assets. Its normal Capacitor build sends requests to the existing Worker. Separate tests exercise public pages locally, so remote success is not counted as local OpenNext support. See [OpenNext configuration and limits](docs/opennext.md).
-
-### Native demo
-
-The native build requires Xcode 26 / Swift 6.2 or newer and Java 21.
-HTTP/1.1 request framing and response parsing run in JavaScript/WebAssembly.
-The native plugin provides TCP/TLS byte I/O and WebView integration; iOS uses
-Network.framework without AsyncHTTPClient or Swift NIO. Android uses Netty for
-TCP/TLS, without its HTTP codec.
-HTTPS response bodies require Content-Length or chunked framing; EOF-delimited
-HTTPS bodies fail explicitly because the native byte bridge cannot distinguish
-authenticated closure from truncation. See [the native boundary](docs/compatibility.md).
-For Android, add the following resource rules inside `android {}` in the application's
-`android/app/build.gradle` (already present in the demo):
-
-```groovy
-packaging.resources {
-    excludes += 'META-INF/INDEX.LIST'
-    merges += 'META-INF/io.netty.versions.properties'
-}
-```
-
-These combine Netty's dependency metadata; the library does not modify the application's Gradle configuration.
-
-Run the following from `demo/`, after building its web assets:
-
-```sh
-npm run sync
-npm run ios
-npm run android
-```
-
-Android requires Java 21+. The demo opens the minimal Hono example. For the separate 26-check validation app, run `npm run test:native:prepare -- validation`, then the same sync/ios/android commands. This replaces generated `dist/` assets; run `npm run build` and `npm run sync` to restore the example app. No `server.url` or development server is configured in Capacitor. Results appear in the UI and as `POC_RESULT` in the native console. Browser tests additionally re-run 18 API checks with networking disabled.
-
-### Continuous integration
-
-CI runs library/type checks, local workerd contracts, Chromium/WebKit integration, a fresh npm-tarball consumer and nine Android application scenarios in parallel jobs. iOS simulator checks run separately. See [CI and merge protection](CONTRIBUTING.md#ci-and-regression-protection) for the required `CI` check and verification boundaries.
-
-## Compatibility and limitations
-
-### Verified API behavior
-
-- Covered: Hono and Workers Express GET/POST/HEAD, query and route params, JSON bodies, middleware, 404/500, concurrent requests, Request input, logical URLs.
-- Optional `env` injects caller-provided values into the fetch handler's second argument. In isolated mode it is cloned per call: functions/native plugin objects cannot be passed and object identity is not preserved. No Wrangler secret values or cloud binding objects are imported; the build plugins read binding configuration to choose local or remote execution. `cloudflare:workers` named `env` is a partial adapter: the isolated transport updates a realm-wide proxy before dispatch, but direct execution does not populate it and module initialization happens before the first dispatch. Use the handler’s `env` argument for portable access; the proxy does not provide request-local isolation.
-- `ctx.waitUntil()` tracks promises without delaying the response; `runtime.drain()` waits for them. Errors go to optional `onBackgroundError` (default: console). OS suspension/termination can stop pending work.
-- Fetch abort rejects the caller and propagates a signal. It cannot forcibly stop arbitrary application work. Cookies, redirect following, `Response.url` population, credentials/cache policies and CORS enforcement are not emulated for local calls.
-
-See [compatibility and limitations](docs/compatibility.md) for incomplete Node
-modules, Workers APIs, cloud services and native transport restrictions.
-The [application integration limits](docs/compatibility.md#application-integration-limits)
-also cover Better Auth on iOS, passkeys, external-browser OAuth, Void routing,
-live analytics and the boundary between simulator checks and physical devices.
-
-### Framework and platform limits
-
-- Workers HTTP request/response streaming and native TCP are covered by shared contracts. File serving, WebSockets, other Node modules and async context propagation require their own compatibility work; the inventory records their status. The compatibility layer is not a general Node runtime.
-- `passThroughOnException`, WorkerEntrypoint/RPC and Service Worker format are unsupported. Workers-specific Request fields are covered only where stated in the compatibility inventory; `Request.cf` is preserved locally and is not populated with Cloudflare network metadata. Worker evaluation must not fetch its own local endpoints before installation.
-- CapacitorHttp's fetch patch is not tested; leave it disabled for this Preview. The package includes native TCP/TLS transport and document integration sources (iOS SPM / Android Gradle). A plain browser uses browser Fetch; native document rendering requires Capacitor.
-
-### Security and network boundaries
-
-- Treat everything packaged in the app as readable by users. Do not embed database credentials, service tokens or other server secrets.
-- For detected remote execution boundaries, the build removes server implementations, including their SQL, from the client bundle. This is not a general secret scanner: inspect the generated build report and bundled assets before shipping.
-- Authenticate and authorize requests on the deployed Worker. `remote.getToken` can supply existing bearer credentials, and native rendering supports server-managed Cookie sessions; the library does not provide an authentication system. A URL configured in `remote.origin` does not protect the endpoint.
-- Worker-generated HTML runs with the app's Capacitor plugin access. Only render trusted application content; do not use this integration to display arbitrary external pages.
-
-See the [integration security guidance](docs/integration.md) for the client/server boundary and migration checks.
-
-With a direct Worker import, matching Worker subrequests can re-enter the UI handler. In Capacitor, outbound HTTP(S) uses the packaged native transport, including when relayed from a Dedicated Worker. This transport handles headers, redirects and response bytes outside browser CORS enforcement. In a plain browser, outbound requests use browser Fetch and remain subject to its CORS and header restrictions. Neither execution mode is a workerd isolate.
-
-### Worker transport and resource lifetime
-
-The isolated transport streams uploads and responses as pull-driven MessagePort chunks (uploads are split at 64 KiB). Upload handlers can run before EOF; cancellation releases the upload reader. It preserves status/statusText/headers, body cancellation, abort after headers and background completion. Invalid/used/locked responses and status-0 opaque/error responses reject. Errors retain name/message, not identity/stack; custom abort/cancel reasons are not transported to the Worker. Unconsumed response bodies retain resources until consumed, cancelled or disposed. `drain()` tracks background work, not body consumption.
-
-## Extending the library
-
-We accept completed compatibility units only. Partial implementations remain development work and are not eligible for merge or release. See the [contribution and acceptance policy](CONTRIBUTING.md).
-
-The [contract API](docs/contracts.md) describes typed feature definitions,
-resource lifetime and FetchRuntime extension behavior. Implementation and test
-rules belong in [CONTRIBUTING](CONTRIBUTING.md).
-
-## Execution environment and async context
-
-The original Worker handler remains the Cloudflare entry. Install the Vite/esbuild
-plugin only in the Capacitor/browser build: its aliases select the local API
-implementations; the Cloudflare build retains native `node:*` and `cloudflare:*`.
-`getExecutionEnvironment()` (also available from `workers-capacitor/environment`)
-distinguishes Cloudflare Workers, native Capacitor hosts, browser workers, browsers,
-and unknown realms. A browser Dedicated Worker is not Cloudflare Workers.
-Installing the Capacitor runtime in Cloudflare Workers fails before changing globals.
-
-Capacitor builds lower async functions and generators, preserving module-level
-`await`, so AsyncLocalStorage scopes restore immediately and Promise continuations
-retain their own stores. Application handlers need no edits. Native async callbacks
-created outside this build pipeline (for example with `eval`) are rejected as ALS
-scope callbacks. Cloudflare continues to use its native async context implementation.
-
-Document responses are fetched incrementally on iOS and Android. Native document
-uploads still cross a buffered boundary and reject above 8 MiB before concatenation;
-use the Fetch-only runtime for streaming uploads. LocalStorage KV stream reads decode
-bounded chunks lazily, but the storage API itself necessarily returns a complete
-encoded record. Its synchronous storage/quota limits still apply.
-
-## Additional Cloudflare bindings
-
-Durable Objects, Workers AI, Vectorize, AI Search, Workflows and other cloud
-bindings are discovered for whole-request remote dispatch. `remoteBindings`
-adds server-only names (including secrets and future bindings); unrecognized
-binding-shaped configuration requires explicit acknowledgement. ASSETS uses an
-explicit `assetsExecution: "remote"` acknowledgement and retains its cloud routing
-behavior. Local ASSETS compatibility remains unimplemented. See
-[Cloudflare bindings and remote ASSETS](docs/cloudflare-bindings.md) for the
-configuration, supported scope and verification commands. WebSocket upgrades
-remain outside the remote HTTP transport.
+- [Examples](demo/README.md): see how applications connect to workers-capacitor.
+- [Build setup](docs/build-setup.md): Vite, esbuild and browser ES modules.
+- [Native rendering API](docs/native-rendering-api.md): pages, forms, assets and lifecycle.
+- [Development and testing](docs/development.md) · [Contributing](CONTRIBUTING.md).
 
 ## License
 

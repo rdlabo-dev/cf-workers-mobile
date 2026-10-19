@@ -76,7 +76,7 @@ npm run ios
 
 ## Compatibility tests
 
-`tests/validation/` and `tests/fixtures/` contain the validation app and test-only Workers. `npm run test:browser` builds the same demo once with Hono and once with Express, then checks both pages in Chromium and WebKit. The Express switch lives in [tests/vite.express.config.ts](tests/vite.express.config.ts), and assertions live in [tests/browser/demo.spec.ts](tests/browser/demo.spec.ts). The compatibility app is built and served separately. The normal `src/` application and its build do not depend on these files. See the [repository testing guide](../README.md#development-and-testing) for the full test commands.
+`tests/validation/` and `tests/fixtures/` contain the validation app and test-only Workers. `npm run test:browser` builds the same demo once with Hono and once with Express, then checks both pages in Chromium and WebKit. The Express switch lives in [tests/vite.express.config.ts](tests/vite.express.config.ts), and assertions live in [tests/browser/demo.spec.ts](tests/browser/demo.spec.ts). The compatibility app is built and served separately. The normal `src/` application and its build do not depend on these files. See the [repository testing guide](../docs/development.md) for the full test commands.
 
 ## Worker-rendered native documents
 

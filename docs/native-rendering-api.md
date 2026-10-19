@@ -2,24 +2,17 @@
 
 The package includes the native connection for Capacitor 8 (verified with 8.5.3).
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
-this Preview. No npm release is made by the packaging tests.
+this Preview.
 
 ## Installation
 
-Until a release is published, build and pack this repository:
+Install the package in your Capacitor application using the [Preview installation steps](integration.md#2-install-capacitor-and-this-package).
+
+Configure the Worker in the Vite/esbuild plugin and call
+`workersCapacitor({ baseURL, render: "/" })`. Build the web assets before
+synchronizing:
 
 ```sh
-npm install
-npm run build
-npm pack
-```
-
-In a Capacitor application, install the resulting tarball, configure the Worker
-in the Vite/esbuild plugin, and call `workersCapacitor({ baseURL, render: "/" })`.
-Build the web assets before synchronizing:
-
-```sh
-npm install /path/to/workers-capacitor-0.1.0.tgz
 npm run build
 npx cap sync
 npx cap run ios # or android
@@ -46,7 +39,10 @@ await app.ready;
 Fetch-only behavior. Document mode requires an HTTP(S) **origin** as `baseURL`,
 without an API path prefix. The Worker receives URLs under that logical origin;
 the visible page retains its Capacitor local URL (`capacitor://` on default iOS,
-`https://` on default Android). No remote fallback or local HTTP server is used.
+`https://` on default Android). The generated dispatch can select local execution
+or the configured remote Worker before invoking a handler; both paths return a
+document through the same native bridge. Local failures are not retried remotely,
+and no local HTTP server is started. See [remote execution setup](integration.md#3-configure-and-build-the-native-application).
 
 Hono and Workers Express use the same `worker.fetch(request, env, ctx)` boundary.
 Their application routers return complete HTML for pages and JSON for APIs. The
