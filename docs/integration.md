@@ -27,22 +27,16 @@ On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker
 ## Prompt to give your AI assistant
 
 ```text
-Follow docs/integration.md from rdlabo-dev/workers-capacitor to integrate this application with Capacitor using workers-capacitor.
-
-Inspect the existing code first, then install/configure the required dependencies, connect the existing Worker entry and verify the app on the target platforms.
-Preserve the cloud build and existing authentication. Keep changes minimal.
-
-First attempt integration without changing the Worker application code. For D1 and other cloud dependencies, configure the supported remote dispatch to the existing Worker and inspect its build report. Preserve SSR, routing and authentication, including when the whole request must execute remotely.
-Only change application code after identifying a specific incompatibility that configuration cannot resolve. Explain that incompatibility and make the smallest correction. Do not redesign the application as an App Shell or SPA, split SSR into APIs, or replace authentication merely to integrate Capacitor.
-
-Follow the security section.
-Report files changed, verification results and remaining limitations, distinguishing local execution from remote execution.
-Do not deploy cloud resources or publish the app without explicit authorization.
+Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
+to bring this app to iOS and Android with workers-capacitor.
+Preserve its pages, routes and authentication; verify it on the target platforms.
 ```
 
 Provide the target platforms, app ID/name, and an existing test Worker origin if available. The assistant should infer entries, framework and scripts from the repository, asking only for missing product choices or access it cannot infer.
 
 ## Workflow
+
+Follow the security and verification steps below. Cloud deployments and app publication require explicit user authorization.
 
 1. Inspect the application and select native HTML rendering or Fetch-only integration.
 2. Install Capacitor and this package in the application.

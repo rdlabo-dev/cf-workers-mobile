@@ -51,15 +51,27 @@ Choose the entry point that matches your application:
 | Next.js deployed through OpenNext                                     | [OpenNext integration](docs/opennext.md) — use the existing Worker; check the local/remote boundaries. |
 | An existing frontend calling a Workers API                            | [Fetch-only integration](#already-have-a-frontend) — initialize before mounting the UI.                |
 
-The integration guide includes a [prompt for your AI coding assistant](docs/integration.md#prompt-to-give-your-ai-assistant). Give it access to your existing repository and ask it to preserve the application architecture while connecting Capacitor.
-
 ## Quick start
+
+Choose [AI-assisted setup](#with-an-ai-coding-assistant) or [manual setup](#manual-setup).
+
+### With an AI coding assistant
+
+Open your existing application repository in your coding assistant and paste:
+
+```text
+Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
+to bring this app to iOS and Android with workers-capacitor.
+Preserve its pages, routes and authentication; verify it on the target platforms.
+```
+
+### Manual setup
 
 **New to Capacitor?** Start with the [installation and native project setup](docs/integration.md#2-install-capacitor-and-this-package). It adds iOS/Android projects alongside your existing application and connects the built web assets. You will need Xcode for iOS or Android Studio and its SDK for Android.
 
 The example below connects a Worker that returns HTML to an existing Capacitor 8 application using Vite. For Capacitor installation, the bootstrap HTML and a separate native build directory, follow the [complete setup](docs/integration.md). Void applications should use their [generated entry configuration](docs/void.md#build-and-connect).
 
-### Install
+#### Install
 
 Install the latest release in your Capacitor application:
 
@@ -69,7 +81,7 @@ npm install workers-capacitor
 
 Native integration uses Swift Package Manager on iOS and Gradle on Android. See the [native setup](docs/development.md#native-demo) for SDK requirements and Android resource rules.
 
-### Connect your existing Worker
+#### Connect your existing Worker
 
 Add the plugin to the **Capacitor build's** Vite configuration. Keep the Cloudflare build unchanged.
 
@@ -110,7 +122,7 @@ npx cap run ios # or android
 
 See the [Hono/Express rendering demo](demo/rendering) and [native rendering API](docs/native-rendering-api.md) for navigation, forms, assets and lifecycle details.
 
-### Already have a frontend?
+#### Already have a frontend?
 
 Omit `render` and use an API path boundary. Your existing UI keeps its ordinary Fetch calls:
 
