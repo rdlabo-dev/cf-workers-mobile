@@ -40,8 +40,8 @@ export interface WorkerSource<Env = Record<string, unknown>> {
 export type ExecutionPreference = "worker" | "direct";
 
 export interface RemoteWorkerOptions {
-  /** HTTPS origin of the existing deployed Worker. Paths are preserved. */
-  origin: string;
+  /** HTTPS origin of the deployed Worker; defaults to the baseURL origin. Paths are preserved. */
+  origin?: string;
   /** Maximum buffered upload bytes (default 8 MiB). Native manual/error requests stream. */
   maxBufferedBodyBytes?: number;
   /** Optional existing-session bridge, invoked in the host for each remote request. */

@@ -47,7 +47,7 @@ workersCapacitorPlugin({
 `remoteBindings` adds server-only names, including ordinary secrets that are not
 listed in Wrangler, and bindings configured by other tools. It does not replace
 discovery of known services. A name cannot also appear in `localBindings`.
-Supply `remote.origin` to `workersCapacitor` as for existing remote services.
+Set `baseURL` to the deployed HTTPS Worker URL; `remote.origin` is only needed to override its origin.
 Do not inject server secrets through the client runtime's `env` or bundler defines.
 
 Unknown configuration objects containing `binding`, or nested `bindings` entries
@@ -75,7 +75,7 @@ build plugin, not on the runtime's `workersCapacitor()` call.
 | `execution: [{ method: "GET", path: "/" }]` | Permit selected route implementations and retained dependencies to ship to the device. Server dependencies and uncertain boundaries still keep requests remote. |
 | `execution: "local"`                        | Permit distribution of the entire Worker and its dependencies. Intended for standalone applications; no route-splitting analysis or automatic remote fallback.  |
 
-Start with the existing Worker entry and the deployed Worker's `remote.origin`.
+Start with the existing Worker entry and its deployed HTTPS URL as `baseURL`.
 No route classification is required to bring the app to Capacitor. Public client
 assets can still be bundled locally while the Worker runs remotely. Once the app
 works, explicitly select routes that may be distributed if local execution is
@@ -125,7 +125,7 @@ URLs. The example permits these implementations and their retained dependencies:
 Permission does not guarantee local execution. Detected server dependencies,
 shared state and overlapping server handlers or middleware can keep a selected
 route remote. Unknown or unselected requests also stay remote, so array execution
-always requires `remote.origin`, even if every current registration is selected.
+always requires a remote destination (explicit `remote.origin` or the `baseURL` origin), even if every current registration is selected.
 An empty array permits no routes.
 
 Inspect `remote` and `reason` in the generated `workers-capacitor-server.json`

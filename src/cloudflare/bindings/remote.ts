@@ -17,7 +17,7 @@ import type { RemoteWorkerOptions } from "../workers/types.js";
 
 /** Host-owned: credentials never cross the Dedicated Worker message boundary. */
 export function createRemoteWorker(
-  options: RemoteWorkerOptions,
+  options: RemoteWorkerOptions & { origin: string },
   original: typeof fetch,
 ) {
   const origin = new URL(options.origin);

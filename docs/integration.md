@@ -140,20 +140,25 @@ Adjust paths to the actual application. For OpenNext the entry is the generated 
 // capacitor/main.ts — local document setup
 import { workersCapacitor } from "workers-capacitor";
 const runtime = workersCapacitor({
-  baseURL: "https://worker.invalid/",
+  baseURL: "https://your-worker.example.com/",
   render: "/",
 });
 await runtime.ready;
 ```
 
-If the build report selects remote routes or whole-Worker remote execution, add
-`remote: { origin: "https://your-worker.example.com" }` to these options and connect
-your existing authentication. Remote configuration is required for that generated
-boundary. For a local-only build, `remote` is optional: a build-generated source
-can retain the setting even when no request needs it. Explicit ESM wiring without
-a generated selector still rejects `remote`. See the [binding configuration guide](cloudflare-bindings.md).
+For remote routes or whole-Worker remote execution, the destination defaults to
+`new URL(baseURL).origin`. Set `remote.origin` only when the deployed destination
+differs from this logical origin. Authentication options such as
+`remote: { getToken: async () => getExistingSessionToken() }` do not require
+repeating the URL; session management remains application-owned.
 
-`baseURL` is the logical Worker origin, not a cloud connection by itself. `remote.origin` identifies the deployed HTTPS Worker. With the generated dispatch, relative API requests keep their path and selected requests reach that server. The local app origin is normally `capacitor://localhost` on iOS and `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
+The `baseURL` path remains the interception boundary, not a prefix appended to
+requests. Local-only builds remain local. Remote destinations must use HTTPS.
+Existing integrations using a placeholder logical `baseURL` must replace it with
+the deployed URL or retain an explicit `remote.origin`: omission now selects the
+`baseURL` origin instead of failing for missing configuration. An invalid explicit
+override is rejected, not replaced. The app origin remains `capacitor://localhost`
+on iOS and normally `https://localhost` on Android. See the [URL contract](runtime.md#url-contract).
 
 `render` selects native document rendering, including links and forms; it is not an option specifically for forms. For an existing separately built frontend, omit `render`, initialize the Fetch-only runtime before mounting the UI, and use an API-only `baseURL` boundary such as `https://your-worker.example.com/api/`. Keep that frontend outside the API boundary. The plugin entry must be the corresponding API Worker; inspect its remote-dispatch report too.
 
@@ -172,7 +177,7 @@ Build before every sync. Document rendering uses bundled assets, not the Vite de
 
 ## 4. Preserve behavior and fix only actual incompatibilities
 
-Build and run the existing entry before proposing an application refactor. Configure its bindings and connection to the existing Worker using the [remote binding guide](cloudflare-bindings.md). `remote.origin` supplies the destination; it does not itself classify routes. The build plugin generates dispatch from the application and its configuration.
+Build and run the existing entry before proposing an application refactor. Configure its bindings and connection to the existing Worker using the [remote binding guide](cloudflare-bindings.md). `remote.origin` (or the `baseURL` origin when omitted) supplies the destination; it does not itself classify routes. The build plugin generates dispatch from the application and its configuration.
 
 Check client initialization as well as SSR output. A client library that derives an HTTP(S) endpoint from `window.location.origin` can reject the iOS `capacitor://` scheme before hydration completes. The pinned [flare-stack-blog fixture](../demo/tests/upstream/flare-stack-blog/README.md) reproduces this with Better Auth. If the library supports an explicit HTTPS endpoint, validate that configuration together with authentication, cookies and routing; remote Worker execution alone does not change the visible page's origin. Do not spoof the origin or disable authentication checks to make initialization pass.
 
