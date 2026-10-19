@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, appendFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { build } from "esbuild";
@@ -8,8 +8,9 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { nativeBackend } from "../native/backend.mjs";
 import { runNativeAcceptance } from "../native/acceptance.mjs";
 const root = fileURLToPath(new URL("../../void/", import.meta.url));
+const routes = process.env.VOID_ROUTES === "1";
 test(
-  "Void native SSR, hydration, form action and client-only rendering",
+  `Void native ${routes ? "route execution, " : ""}SSR, hydration, form action and client-only rendering`,
   { timeout: 600000 },
   async () => {
     const compiled = await build({
@@ -49,14 +50,42 @@ test(
         "utf8",
       ),
       dispose: () => worker.dispose(),
+      instrument: () => !routes,
     });
     await runNativeAcceptance({
       backend,
       publicDir: join(root, "dist/client"),
       worker: join(root, "dist/ssr/index.js"),
       workerConfig: join(root, "dist/ssr/wrangler.json"),
+      execution: routes ? [{ method: "GET", path: "*" }] : "network",
+      expectedMode: routes ? "routes" : "worker",
+      render: routes ? "/about" : "/",
+      configureNative: routes
+        ? async ({ shell }) => {
+            // Instrument only the copied public entry chunk, so locally rendered
+            // documents run the same driver as remote documents.
+            const assets = join(shell, "www/assets");
+            const entries = (await readdir(assets)).filter((name) =>
+              /^pages-client-.*\.js$/.test(name),
+            );
+            assert.equal(entries.length, 1);
+            await appendFile(
+              join(assets, entries[0]),
+              "\n;" +
+                (await readFile(
+                  new URL("native-driver.js", import.meta.url),
+                  "utf8",
+                )),
+            );
+          }
+        : undefined,
       artifacts: fileURLToPath(
-        new URL("../../artifacts/void-native/", import.meta.url),
+        new URL(
+          routes
+            ? "../../artifacts/void-routes-native/"
+            : "../../artifacts/void-native/",
+          import.meta.url,
+        ),
       ),
       validate: async (backend, platform) => {
         assert.equal(
@@ -64,6 +93,23 @@ test(
           platform,
         );
         assert.ok(backend.reports.some((r) => r.stage === "action"));
+        if (routes) {
+          const local = backend.reports.find((r) => r.stage === "local");
+          assert.equal(local?.message, "Hello from Void");
+          assert.equal(local?.count, "Count: 1");
+          assert.deepEqual(
+            backend.requests.filter((r) =>
+              ["/about", "/api/hello"].includes(r.path),
+            ),
+            [],
+            "Public SSR and API must not reach the Worker",
+          );
+          assert.ok(
+            backend.requests.some(
+              (r) => r.path === "/about?authenticated=1" && r.status === 200,
+            ),
+          );
+        }
         const assets = JSON.parse(
           await readFile(
             new URL(
