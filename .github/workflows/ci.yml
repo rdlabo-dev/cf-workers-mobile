@@ -55,21 +55,26 @@ jobs:
               npm run test:documents
               node --test tests/native/links.test.mjs tests/native/acceptance.test.mjs
               npm run build:native-documents -- --mode express
-          - suite: build-tools
-            commands: npm run test:build-tools
-          - suite: void
+          # Share browser/dependency setup for short, independent suites.
+          # Keep commands sequential: each retains its original failure gate.
+          - suite: build-tools-and-upstream-browser
+            commands: |
+              npm run test:build-tools
+              npm install --prefix authentication
+              npm run typecheck --prefix authentication
+              node tests/upstream/minvoice/prepare.mjs
+              node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs tests/authentication/live/worker.test.mjs
+              npm run test:upstream:opennext:prepare
+              npm run test:upstream:opennext
+          - suite: void-and-pknotes
             node: 24.21.0
             commands: |
               npm install --prefix void
               npm run build --prefix void
               npm run test:void
               node --test tests/void/routes/acceptance.test.mjs
-          - suite: upstream-minvoice
-            commands: |
-              npm install --prefix authentication
-              npm run typecheck --prefix authentication
-              node tests/upstream/minvoice/prepare.mjs
-              node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs tests/authentication/live/worker.test.mjs
+              node tests/upstream/pknotes/prepare.mjs
+              node --test tests/upstream/pknotes/browser.test.mjs
           - suite: upstream-0bin
             native: 0bin
             node: 24.21.0
@@ -99,11 +104,6 @@ jobs:
             commands: |
               node tests/upstream/inkstone/prepare.mjs
               node --test tests/upstream/inkstone/browser.test.mjs
-          - suite: upstream-pknotes
-            node: 24.21.0
-            commands: |
-              node tests/upstream/pknotes/prepare.mjs
-              node --test tests/upstream/pknotes/browser.test.mjs
           - suite: upstream-counterscale-authentication
             native: counterscale
             node: 24.21.0
@@ -128,10 +128,6 @@ jobs:
             commands: |
               node tests/upstream/flare-stack-blog/prepare.mjs
               node --test tests/upstream/flare-stack-blog/browser.test.mjs
-          - suite: upstream-opennext
-            commands: |
-              npm run test:upstream:opennext:prepare
-              npm run test:upstream:opennext
           - suite: opennext
             timeout: 35
             commands: |

@@ -104,4 +104,6 @@ Android requires Java 21+. The demo opens the minimal Hono example. For the sepa
 
 ## Continuous integration
 
+See [test execution cost](test-execution-time.md) for the CI timing baseline, setup consolidation, and measurement limits.
+
 CI runs library/type checks, local workerd contracts, Chromium/WebKit integration, a fresh npm-tarball consumer and nine Android application scenarios in parallel jobs. iOS simulator checks run separately. See [CI and merge protection](../CONTRIBUTING.md#ci-and-regression-protection) for the required `CI` check and verification boundaries.
