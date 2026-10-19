@@ -24,6 +24,7 @@ export default {
             env.DB.prepare("DELETE FROM sessions"),
             env.DB.prepare("UPDATE notes SET value = 'First note', writes = 0"),
             env.DB.prepare("DELETE FROM acceptance_reports"),
+            env.DB.prepare("DELETE FROM acceptance_requests"),
           ]);
         }
         await env.DB.prepare(
@@ -40,6 +41,11 @@ export default {
       ).first();
       return Response.json({
         reports: rows.results.map((r) => JSON.parse(r.body)),
+        requests: (
+          await env.DB.prepare(
+            "SELECT body FROM acceptance_requests ORDER BY id",
+          ).all()
+        ).results.map((row) => JSON.parse(row.body)),
         sessionCount: sessions.count,
       });
     }
@@ -75,6 +81,17 @@ export default {
             : driver,
         { headers: { "content-type": "text/javascript" } },
       );
+    await env.DB.prepare("INSERT INTO acceptance_requests (body) VALUES (?)")
+      .bind(
+        JSON.stringify({
+          method: request.method,
+          path: url.pathname + url.search,
+          ...(request.headers.has("rsc")
+            ? { rsc: request.headers.get("rsc") }
+            : {}),
+        }),
+      )
+      .run();
     if (request.method === "GET" || request.method === "HEAD") {
       const asset = await env.ASSETS.fetch(request);
       if (asset.status !== 404) return asset;

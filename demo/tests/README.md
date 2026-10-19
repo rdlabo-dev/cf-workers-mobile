@@ -233,10 +233,19 @@ Native tests use `UPSTREAM_PLATFORM=ios|android` and `UPSTREAM_DEVICE` (the Andr
 
 `native/acceptance.mjs` owns only build/install/launch plumbing. It resets the test app’s data before each scenario (reinstall on iOS, `pm clear` on Android), so a previous login cannot bypass the scenario’s authentication flow. Each scenario owns its Worker, data and assertions. Artifacts are ignored by git. Its `elapsedFlowMs` is launch-to-scenario-completion time, not startup latency; simulator/emulator measurements are not physical-device performance results.
 
-The existing `opennext/native.test.mjs` also records a single Debug launch-to-hydration sample and host-process RSS (`*-performance.json`, raw `*-memory.txt`). The timing includes transport, launch tooling and host load; RSS excludes separate renderer/GPU processes. Physical iOS does not collect RSS. The artifact records the execution environment; Android distinguishes an emulator from a physical device. A single Debug run is not a release-build latency benchmark or a total application memory measurement.
+OpenNext native acceptance gates functional behavior only. Earlier single-sample Debug timing and host-process RSS measurements had no regression threshold and are no longer collected by this harness. Performance budgets require a separate repeatable release-build benchmark.
+
+The route-execution tests protect different failure boundaries:
+
+- Unit tests check compiler selection and rejection rules; real bundler tests check the distributed JavaScript and source maps for excluded server code.
+- Chromium/WebKit acceptance checks browser behavior with Vite/esbuild output, including unavailable-backend public requests and rebuild transitions.
+- OpenNext native acceptance checks WebView routing, cookies, app restart and Capacitor plugin communication. Same-build navigation and independent A/B builds cover soft navigation and full-document fallback respectively; they share one driver and assertion set.
+- CI runs OpenNext's Android same-build and A/B scenarios. iOS, public-HTTPS physical-device scenarios and Void native scenarios remain explicit manual checks. Their successful local runs are not automatic PR gates.
+
+New tests should identify a distinct failure boundary or replace a weaker assertion. Repeated setup, snapshots of implementation details and unbounded single-run measurements do not add a regression guarantee by themselves.
 
 ### Physical iOS devices
 
 The native runners also accept a paired iPhone UDID when `IOS_PHYSICAL_DEVICE=1` and `IOS_DEVELOPMENT_TEAM=<your-team-id>` are set. Enable Developer Mode and keep the phone unlocked. The runners sign a Debug build with your local Xcode account and use `devicectl` to install and launch it; they do not change library native source. The packaged Hono/Express scenarios need no test server.
 
-Physical-device remote acceptance uses a deployed HTTPS Worker with a publicly trusted certificate, not a CA installed on the phone. For OpenNext, use `NATIVE_TEST_ORIGIN`, `NATIVE_TEST_ADMIN_TOKEN` (host only) and `NATIVE_TEST_DEVICE_TOKEN` (a temporary credential scoped to the test deployment). See [live OpenNext acceptance](opennext/live/README.md) and [live OAuth acceptance](authentication/live/README.md). Never ship test credentials, test report endpoints or certificate bypasses in a consumer application. Physical iOS memory is not collected: the report uses `null` instead of querying the unrelated Mac process with the same PID.
+Physical-device remote acceptance uses a deployed HTTPS Worker with a publicly trusted certificate, not a CA installed on the phone. For OpenNext, use `NATIVE_TEST_ORIGIN`, `NATIVE_TEST_ADMIN_TOKEN` (host only) and `NATIVE_TEST_DEVICE_TOKEN` (a temporary credential scoped to the test deployment). See [live OpenNext acceptance](opennext/live/README.md) and [live OAuth acceptance](authentication/live/README.md). Never ship test credentials, test report endpoints or certificate bypasses in a consumer application.

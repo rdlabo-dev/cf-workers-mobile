@@ -16,6 +16,7 @@
         stage,
         path: location.pathname,
         cookieVisible: document.cookie.includes("demo_session"),
+        release: document.querySelector("main")?.dataset.release,
         ...extra,
       }),
     });
@@ -66,15 +67,37 @@
       await wait(() => document.querySelector("img")?.naturalWidth > 0);
       if (getComputedStyle(document.querySelector("main")).maxWidth !== "640px")
         throw new Error("CSS missing");
-      await report("hydrated");
+      const message =
+        config.execution === "routes"
+          ? (await (await fetch("/api/message")).json()).message
+          : undefined;
+      await report("hydrated", { message });
+      // A changed Next build can replace the document instead of completing a
+      // soft RSC navigation. Resume each phase in the new document as well.
+      sessionStorage.setItem("opennext-phase", "details");
       click('a[href="/details"]');
-      await wait(() => heading("Details"));
-      await report("plugin", {
-        mode: config.mode,
-        ...(await window.checkNativePlugin()),
-      });
-      await report("details");
-      history.back();
+      phase = "details";
+    }
+    if (phase === "details") {
+      await wait(
+        () =>
+          heading("Details") ||
+          sessionStorage.getItem("opennext-phase") !== "details",
+      );
+      // A bfcache-restored home document resumes this old pending wait after
+      // the replacement document has already completed the details phase.
+      if (sessionStorage.getItem("opennext-phase") === "details") {
+        await report("plugin", {
+          mode: config.mode,
+          ...(await window.checkNativePlugin()),
+        });
+        await report("details");
+        sessionStorage.setItem("opennext-phase", "back");
+        history.back();
+      }
+      phase = sessionStorage.getItem("opennext-phase");
+    }
+    if (phase === "back") {
       await wait(() => heading("OpenNext in Capacitor"));
       sessionStorage.setItem("opennext-phase", "login");
       click('a[href="/account"]');
@@ -91,6 +114,15 @@
       await wait(() => document.querySelector("#owner"));
       if (document.querySelector("#owner").textContent !== "alice")
         throw new Error("Wrong session");
+      const forged = await fetch("/api/notes", {
+        method: "POST",
+        body: new URLSearchParams({
+          value: "Forged native note",
+          csrf: "invalid",
+        }),
+      });
+      if (forged.status !== 403) throw new Error("Invalid CSRF was accepted");
+      await report("csrf-rejected", { status: forged.status });
       document.querySelector('input[name="value"]').value = "Native note";
       sessionStorage.setItem("opennext-phase", "done");
       click('form[action="/api/notes"] button');

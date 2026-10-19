@@ -7,7 +7,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export async function startBackend({ native = false, driver } = {}) {
+export async function startBackend({ native = false, driver, appRoot } = {}) {
   const pluginDriver =
     native && !driver
       ? (
@@ -25,7 +25,8 @@ export async function startBackend({ native = false, driver } = {}) {
   const reports = [];
   const requests = [];
   const config = { mode: "flow", id: crypto.randomUUID() };
-  const root = fileURLToPath(new URL("../../opennext/", import.meta.url));
+  const root =
+    appRoot ?? fileURLToPath(new URL("../../opennext/", import.meta.url));
   const compiled = await build({
     entryPoints: [join(root, ".open-next/worker.js")],
     bundle: true,
@@ -123,7 +124,11 @@ export async function startBackend({ native = false, driver } = {}) {
             );
             return;
           }
-          requests.push({ method: req.method, path: req.url });
+          requests.push({
+            method: req.method,
+            path: req.url,
+            ...(req.headers.rsc ? { rsc: req.headers.rsc } : {}),
+          });
           const headers = {
             ...req.headers,
             "x-forwarded-host": req.headers.host,
