@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  issue_comment:
+    types: [created]
   workflow_run:
     workflows: [Compatibility]
     types: [completed]
@@ -11,13 +13,9 @@ on:
 permissions:
   contents: read
 
-# Serialize publishing so concurrent runs cannot race a dist-tag update.
-concurrency:
-  group: npm-release
-  cancel-in-progress: false
-
 jobs:
   prepare:
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && github.event.comment.body == '/beta')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -40,6 +38,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.plan.outputs.result != 'null'
         with:
+          repository: ${{ fromJSON(steps.plan.outputs.result).repository || github.repository }}
           ref: ${{ fromJSON(steps.plan.outputs.result).sha }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -67,6 +66,10 @@ jobs:
           retention-days: 7
 
   publish:
+    # Only authorized candidates enter the publication queue.
+    concurrency:
+      group: npm-release
+      cancel-in-progress: false
     needs: prepare
     if: needs.prepare.outputs.plan != 'null'
     runs-on: ubuntu-24.04
@@ -74,8 +77,24 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: read
+      pull-requests: read
     steps:
-      - name: Skip a superseded beta
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@latest
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: npm-release
+          path: ${{ runner.temp }}/npm-release
+      - name: Revalidate authorization and candidate
         id: current
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
@@ -83,23 +102,8 @@ jobs:
         with:
           script: |
             const plan = JSON.parse(process.env.PLAN);
-            if (plan.channel !== 'beta') return true;
-            const { data } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
-            return data.commit.sha === plan.sha;
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        if: steps.current.outputs.result == 'true'
-        with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-      - name: Update npm for trusted publishing
-        if: steps.current.outputs.result == 'true'
-        run: npm install -g npm@latest
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
-        if: steps.current.outputs.result == 'true'
-        with:
-          name: npm-release
-          path: ${{ runner.temp }}/npm-release
+            const { isReleaseCurrent } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/npm-release.mjs`);
+            return await isReleaseCurrent(github, context, plan);
       - name: Publish the built tarball
         if: steps.current.outputs.result == 'true'
         env:

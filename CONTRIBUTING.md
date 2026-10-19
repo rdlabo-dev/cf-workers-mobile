@@ -130,12 +130,21 @@ or a namespace match to full behavioral support.
 
 | Trigger                                                                   | npm dist-tag | Version                                    |
 | ------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
+| Maintainer comments `/beta` on a CI-passing PR                            | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
 | PR merged into `main`, after Compatibility succeeds for that merge commit | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
 | Stable tag such as `v0.1.1`                                               | `latest`     | `0.1.1`                                    |
 | Prerelease/revision tag such as `v0.2.0-rc.1`                             | `next`       | `0.2.0-rc.1`                               |
 
-Direct pushes and PR branches do not publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
+Direct pushes and PR branches do not automatically publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
 
 For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility to pass on main. Then tag that commit and push the tag, for example `git tag v0.1.1` followed by `git push origin v0.1.1`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
 
 The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `workers-capacitor`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
+
+### PR beta requests
+
+After Compatibility succeeds for an open, non-draft PR targeting main, a repository admin or maintainer can post a comment containing exactly `/beta`. This also supports fork PRs. The request publishes that PR head to `beta` without merging it; it never updates `latest`.
+
+The workflow checks the requester's current permission, the PR head and its CI again in the publishing job. A PR updated after the comment requires successful CI and a fresh `/beta`; queued comments do not authorize newer changes. PRs modifying `.github/workflows/` or `.github/scripts/` must merge those changes before using this command. The candidate is built in the read-only job; its source and lifecycle scripts are never executed in the OIDC publishing job.
+
+The command becomes available after `release.yml` lands on main. A failed request can be inspected in the Release workflow's Actions log; it does not publish when CI is pending or failed.

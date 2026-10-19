@@ -18,6 +18,8 @@ export function releaseVersion(version, tag, pr, sha) {
 }
 
 export async function resolveRelease(github, context) {
+  if (context.eventName === "issue_comment")
+    return resolveCommentBeta(github, context);
   const repo = context.repo;
   const { data: main } = await github.rest.repos.getBranch({
     ...repo,
@@ -98,4 +100,94 @@ export async function resolveRelease(github, context) {
   if (pkg.name !== "workers-capacitor")
     throw new Error("Unexpected package name");
   return { sha, ...releaseVersion(pkg.version, tag, pr, sha) };
+}
+
+async function resolveCommentBeta(github, context) {
+  const { action, issue, comment } = context.payload;
+  if (action !== "created" || !issue.pull_request || comment.body !== "/beta")
+    return null;
+  const repo = context.repo;
+  const { data: permission } =
+    await github.rest.repos.getCollaboratorPermissionLevel({
+      ...repo,
+      username: comment.user.login,
+    });
+  if (
+    ![permission.permission, permission.role_name].some((role) =>
+      ["admin", "maintain"].includes(role),
+    )
+  )
+    return null;
+  const { data: pr } = await github.rest.pulls.get({
+    ...repo,
+    pull_number: issue.number,
+  });
+  if (
+    pr.state !== "open" ||
+    pr.draft ||
+    pr.base.ref !== "main" ||
+    !pr.head.repo
+  )
+    return null;
+  // A queued comment must not authorize code pushed after that comment.
+  if (Date.parse(pr.updated_at) > Date.parse(comment.created_at)) {
+    throw new Error(
+      "PR changed after /beta; post a fresh comment after CI passes",
+    );
+  }
+  const files = await github.paginate(github.rest.pulls.listFiles, {
+    ...repo,
+    pull_number: issue.number,
+    per_page: 100,
+  });
+  const protectedPath = (path = "") =>
+    path.startsWith(".github/workflows/") ||
+    path.startsWith(".github/scripts/");
+  if (
+    files.some(
+      (file) =>
+        protectedPath(file.filename) || protectedPath(file.previous_filename),
+    )
+  ) {
+    throw new Error(
+      "Merge release/CI workflow changes before requesting /beta",
+    );
+  }
+  const sha = pr.head.sha;
+  const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+    ...repo,
+    workflow_id: "ci.yml",
+    head_sha: sha,
+    event: "pull_request",
+    per_page: 100,
+  });
+  const latest = runs
+    .filter((run) => run.pull_requests.some((p) => p.number === pr.number))
+    .sort((a, b) => b.run_number - a.run_number)[0];
+  if (
+    !latest ||
+    latest.status !== "completed" ||
+    latest.conclusion !== "success"
+  ) {
+    throw new Error("The PR head must pass Compatibility before /beta");
+  }
+  const { data: file } = await github.rest.repos.getContent({
+    ...repo,
+    path: "package.json",
+    ref: "main",
+  });
+  const pkg = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
+  if (pkg.name !== "workers-capacitor")
+    throw new Error("Unexpected trusted package name");
+  return {
+    sha,
+    repository: pr.head.repo.full_name,
+    pr: pr.number,
+    ...releaseVersion(pkg.version, undefined, pr.number, sha),
+  };
+}
+
+export async function isReleaseCurrent(github, context, plan) {
+  const current = await resolveRelease(github, context);
+  return JSON.stringify(current) === JSON.stringify(plan);
 }

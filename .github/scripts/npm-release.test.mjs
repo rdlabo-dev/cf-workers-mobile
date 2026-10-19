@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { releaseVersion, resolveRelease } from "./npm-release.mjs";
+import {
+  releaseVersion,
+  resolveRelease,
+  isReleaseCurrent,
+} from "./npm-release.mjs";
 
 const sha = "a".repeat(40);
 function fixture() {
@@ -133,4 +137,115 @@ test("tag publication requires main ancestry, matching package version and exact
     resolveRelease(f.github, f.context),
     /must pass Compatibility/,
   );
+});
+
+function commentFixture() {
+  const f = fixture();
+  f.context.eventName = "issue_comment";
+  f.context.payload = {
+    action: "created",
+    issue: { number: 43, pull_request: {} },
+    comment: {
+      body: "/beta",
+      created_at: "2026-10-19T07:00:00Z",
+      user: { login: "maintainer" },
+    },
+  };
+  f.state.permission = "maintain";
+  f.state.pr = {
+    number: 43,
+    state: "open",
+    draft: false,
+    base: { ref: "main" },
+    head: { sha, repo: { full_name: "contributor/fork" } },
+    updated_at: "2026-10-19T07:00:00Z",
+  };
+  f.state.files = [];
+  f.state.runs[0].pull_requests = [{ number: 43 }];
+  f.github.rest.repos.getCollaboratorPermissionLevel = async () => ({
+    data: { permission: f.state.permission, role_name: f.state.role },
+  });
+  f.github.rest.pulls = {
+    get: async () => ({ data: f.state.pr }),
+    listFiles: "files",
+  };
+  f.github.paginate = async (method, params) => {
+    if (method === "runs") assert.equal(params.event, "pull_request");
+    return f.state[method];
+  };
+  return f;
+}
+
+test("/beta supports an authorized fork head without changing latest", async () => {
+  const f = commentFixture();
+  const plan = await resolveRelease(f.github, f.context);
+  assert.deepEqual(plan, {
+    sha,
+    repository: "contributor/fork",
+    pr: 43,
+    version: "0.1.1-beta.pr43.shaaaaaaaaaaaaa",
+    channel: "beta",
+  });
+  assert.equal(await isReleaseCurrent(f.github, f.context, plan), true);
+});
+
+test("/beta rejects unauthorized commenters, ordinary issues and closed/draft PRs", async () => {
+  for (const change of [
+    (f) => (f.state.permission = "write"),
+    (f) => (f.context.payload.issue.pull_request = undefined),
+    (f) => (f.context.payload.comment.body = "/beta please"),
+    (f) => (f.context.payload.action = "edited"),
+    (f) => (f.state.pr.state = "closed"),
+    (f) => (f.state.pr.draft = true),
+    (f) => (f.state.pr.base.ref = "other"),
+  ]) {
+    const f = commentFixture();
+    change(f);
+    assert.equal(await resolveRelease(f.github, f.context), null);
+  }
+});
+
+test("/beta refuses workflow changes, unmatched PR CI and updates after the comment", async () => {
+  for (const change of [
+    (f) => (f.state.files = [{ filename: ".github/workflows/ci.yml" }]),
+    (f) =>
+      (f.state.files = [
+        {
+          filename: "moved.yml",
+          previous_filename: ".github/workflows/ci.yml",
+        },
+      ]),
+    (f) => (f.state.files = [{ filename: ".github/scripts/npm-release.mjs" }]),
+    (f) => (f.state.runs[0].pull_requests = [{ number: 99 }]),
+    (f) => (f.state.runs[0].conclusion = "failure"),
+    (f) => (f.state.pr.updated_at = "2026-10-19T07:00:01Z"),
+  ]) {
+    const f = commentFixture();
+    change(f);
+    await assert.rejects(resolveRelease(f.github, f.context));
+  }
+});
+
+test("publication rechecks current permission, head and CI after building", async () => {
+  for (const change of [
+    (f) => (f.state.permission = "write"),
+    (f) => (f.state.pr.head.sha = "b".repeat(40)),
+    (f) => (f.state.pr.state = "closed"),
+  ]) {
+    const f = commentFixture();
+    const plan = await resolveRelease(f.github, f.context);
+    change(f);
+    assert.equal(await isReleaseCurrent(f.github, f.context, plan), false);
+  }
+  const f = commentFixture();
+  const plan = await resolveRelease(f.github, f.context);
+  f.state.runs[0].conclusion = "failure";
+  await assert.rejects(isReleaseCurrent(f.github, f.context, plan));
+});
+
+test("GitHub maintain role is accepted even when the legacy permission is write", async () => {
+  const f = commentFixture();
+  f.state.permission = "write";
+  f.state.role = "maintain";
+  assert.equal((await resolveRelease(f.github, f.context)).channel, "beta");
 });
