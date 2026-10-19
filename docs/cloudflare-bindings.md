@@ -90,53 +90,77 @@ server, including routes added later. There is no need to list all server routes
 | `manual`  | Permit selected routes and their retained dependencies to be distributed. Unselected routes stay remote; permission does not override detected server dependencies or overlapping server middleware. |
 | `local`   | Permit distribution of the entire Worker implementation and fixed data. There is no automatic server fallback or source-removal analysis.                                                            |
 
+#### Selecting local routes
+
+Set these options on the Vite or esbuild plugin in the Capacitor build, not on
+`workersCapacitor()` at runtime. For a Hono app with pages and device operations
+under `/app/`, the configuration can be:
+
 ```ts
 workersCapacitorPlugin({
   worker: "src/worker.ts",
   execution: "manual",
   localRoutes: [
     { method: "GET", path: "/" },
-    { method: "GET", path: "/about" },
+    { method: "*", path: "/app/*" },
   ],
 });
 ```
 
-`localRoutes` is available only with `manual`. Use uppercase HTTP methods (or
-`"*"` for all methods) and
-exact Hono registration paths, a trailing `/*`, or JavaScript regular expressions:
+This permits distribution of the selected route implementations and their retained
+dependencies. It does not guarantee local execution: detected server dependencies,
+shared state and overlapping server handlers or middleware can keep a selected
+route remote. Inspect `remote` and `reason` in the generated dispatch report.
+Requests that do not match a permitted registration stay remote. `manual` therefore
+requires the deployed Worker's `remote.origin`, even if every existing route was selected.
 
-```ts
-localRoutes: [
-  { method: "GET", path: "/" },
-  { method: "*", path: "/app/*" },
-  { method: "GET", path: /^\/pages\// },
-  { method: "*", path: /^\/notes\// },
-],
-```
+Selection happens against Hono registrations at build time, not against each
+incoming URL. With the example above:
 
-`"/app/*"` selects registrations starting with `/app/`, including nested paths
-such as `/app/news/:id`. It does not select `/app`, `/application`, or
-`/app-private`; add `/app` separately if needed. Only a trailing `/*` has wildcard
-meaning; other strings remain exact matches. This is not a general glob syntax.
+| Existing registration               | Permission from this configuration            |
+| ----------------------------------- | --------------------------------------------- |
+| `app.get("/", handler)`             | Selected by `GET /`                           |
+| `app.get("/app/home", handler)`     | Selected by `* /app/*`                        |
+| `app.post("/app/notes", handler)`   | Selected by `* /app/*`                        |
+| `app.get("/app/news/:id", handler)` | Selected; Hono matches the actual `:id` value |
+| `app.get("/app", handler)`          | Not selected; add `/app` separately if needed |
+| `app.get("/application", handler)`  | Not selected                                  |
+| `app.get("/api/news", handler)`     | Not selected                                  |
 
-A regular expression or wildcard tests the registered path at build time, not the incoming
-URL. For example, `/^\/pages\//` permits both `/pages/about` and
-`/pages/news/:id`; Hono still matches actual requests and route parameters.
-Use `^` and `$` when you need to anchor the match. Matching future registrations
-also receive permission, so keep patterns narrow. Each match starts at index zero,
-including expressions with `g` or `y`; the supplied expression is not mutated.
-These settings are not authorization rules. Currently, manual selection requires direct
-registrations on the exported Hono router; mounted routes, `basePath`, and `on()`
-registrations are not resolved for manual permission. For an analyzable Hono
-graph, an unresolved selection fails the build rather than broadening permission.
-An unsupported Worker graph stays entirely remote. An empty list permits no routes.
-`method: "*"` selects every supported direct HTTP-method registration and
-`app.all()` at the matching paths. It does not grant middleware permission or
-override server dependencies. It also permits matching methods added later;
-use a specific method when that broader distribution permission is not intended.
-The example assumes direct `app.get("/", ...)` and `app.get("/about", ...)`
-registrations. Copy your application's actual registration paths; this setting
-does not create new routes or require rewriting the existing Worker.
+The setting does not create routes. `/app/missing` remains remote unless an
+existing permitted Hono registration matches it. A selected Hono wildcard such as
+`app.get("/app/*", handler)` still matches requests according to Hono's own rules.
+
+#### Path and method syntax
+
+- A string such as `"/about"` selects that exact registration path.
+- A trailing `/*`, such as `"/app/*"`, selects registration paths starting with
+  `/app/`, including nested paths and parameters. It does not select `/app`,
+  `/application`, or `/app-private`. Other strings remain exact matches; this is
+  not a general glob syntax.
+- A JavaScript regular expression such as `{ method: "GET", path: /^\/pages\// }`
+  selects matching registration paths, for example `/pages/about` and
+  `/pages/news/:id`. Use `^` and `$` to anchor matches as needed. Each match starts
+  at index zero, including expressions with `g` or `y`; the supplied expression
+  is not mutated.
+- An uppercase HTTP method selects registrations for that method. `method: "*"`
+  selects all supported direct HTTP-method registrations and `app.all()`. It does
+  not grant middleware permission. Hono retains its request semantics, including
+  handling HEAD through a selected GET route when applicable.
+
+Patterns also permit matching registrations added in future builds. `method: "*"`
+includes future matching POST, DELETE and other operations, not just today's GET
+routes. Use narrow paths and specific methods when broader permission is not intended.
+
+`localRoutes` is available only with `manual`. Current selection supports direct
+registrations on the exported Hono router. Mounted routes (`app.route()`),
+`basePath`, and `on()` registrations are not resolved for manual permission.
+For an analyzable Hono graph, a selection matching no supported registration fails
+the build. An unsupported Worker graph stays entirely remote. An empty list
+permits no routes. Do not restructure authentication or remove server dependencies
+to force a match.
+
+#### Distribution and security
 
 Permission includes retained fixed data, not just response bodies. For example,
 permitting a handler that reads `settings.title` can distribute private siblings

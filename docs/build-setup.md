@@ -36,6 +36,13 @@ entry. Use `render: "/"` for Worker-owned pages, or omit `render` when integrati
 an existing frontend with the API. Follow the [application integration guide](integration.md)
 for Capacitor setup, cloud bindings and authentication.
 
+Start with the default `execution: "auto"`; no route list is required. To choose
+which route implementations may ship to the device, use the build plugin's
+`execution: "manual"` and `localRoutes`. Exact paths, `/app/*` prefixes and regular
+expressions are supported. This permission includes retained dependency data and
+does not override detected server dependencies. See [local route selection](cloudflare-bindings.md#selecting-local-routes)
+before enabling it.
+
 ### Workers Express
 
 The sample uses the real `express` package and the Workers entry style:
