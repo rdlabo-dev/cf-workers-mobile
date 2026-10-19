@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/esbuild";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/esbuild";
 import { fileURLToPath } from "node:url";
 import { writeFile } from "node:fs/promises";
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));

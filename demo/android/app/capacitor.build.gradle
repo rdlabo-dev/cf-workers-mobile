@@ -9,7 +9,7 @@ android {
 
 apply from: "../capacitor-cordova-android-plugins/cordova.variables.gradle"
 dependencies {
-    implementation project(':workers-capacitor')
+    implementation project(':rdlabo-workers-capacitor')
 
 }
 

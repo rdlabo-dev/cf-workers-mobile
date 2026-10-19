@@ -1,6 +1,6 @@
 import * as asyncHooks from "../../src/compat/async-hooks/index";
 import { expect, it } from "vitest";
-import { runContract } from "workers-capacitor/shared/contracts/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import {
   AsyncHooksImplementation,
   asyncHooksContract,

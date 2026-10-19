@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import * as fs from "./index.js";
 export const fsFeature = defineFeature<typeof fs>()("node.fs", [
   "readFileSync",
@@ -38,19 +38,15 @@ export const fsContract: ContractSuite<typeof fsFeature> = {
     },
     async readFileCallback(api) {
       await new Promise<void>((resolve, reject) => {
-        api.readFile(
-          "/app/dist/a.txt",
-          "utf8",
-          (err: unknown, data: unknown) => {
-            try {
-              equal(err, null);
-              equal(data, "alpha");
-              resolve();
-            } catch (e) {
-              reject(e);
-            }
-          },
-        );
+        api.readFile("/app/dist/a.txt", "utf8", (err: unknown, data: unknown) => {
+          try {
+            equal(err, null);
+            equal(data, "alpha");
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        });
       });
     },
     async promises(api) {
@@ -95,7 +91,9 @@ export const fsContract: ContractSuite<typeof fsFeature> = {
     },
   },
 };
-export class FsImplementation extends FeatureImplementation<typeof fsFeature> {
+export class FsImplementation extends FeatureImplementation<
+  typeof fsFeature
+> {
   constructor(private readonly api = fs) {
     super(fsFeature, {
       readFileSync: { status: "supported" },

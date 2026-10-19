@@ -2,8 +2,8 @@ import punycode, * as namespace from "node:punycode";
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import { testPunycode } from "./upstream.spec";
 const groups = [
   "exports",

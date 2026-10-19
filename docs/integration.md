@@ -27,7 +27,7 @@ On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker
 ## Prompt to give your AI assistant
 
 ```text
-Follow docs/integration.md from rdlabo-dev/workers-capacitor to integrate this application with Capacitor using workers-capacitor.
+Follow docs/integration.md from rdlabo-dev/workers-capacitor to integrate this application with Capacitor using @rdlabo/workers-capacitor.
 
 Inspect the existing code first, then install/configure the required dependencies, connect the existing Worker entry and verify the app on the target platforms.
 Preserve the cloud build and existing authentication. Keep changes minimal.
@@ -84,7 +84,7 @@ For the Vite example below, install `vite@7` as a dev dependency if it is not al
 Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Until a package release is available, build and pack this repository with `npm ci`, `npm run build`, `npm pack`, then install the resulting `.tgz` in the application. Do not assume an npm release exists. In the application, install the actual file:
 
 ```sh
-npm install /absolute/path/to/workers-capacitor-0.0.0-poc.1.tgz
+npm install /absolute/path/to/rdlabo-workers-capacitor-0.0.0-poc.1.tgz
 ```
 
 Keep Capacitor/native projects in the application package, not in the library's source tree. Reuse existing dependencies and scripts rather than scaffolding a second application unnecessarily.
@@ -119,7 +119,7 @@ capacitor.config.ts      webDir: "www"
 // capacitor/vite.config.ts
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   root: here("."),
@@ -140,7 +140,7 @@ Adjust paths to the actual application. For OpenNext the entry is the generated 
 
 ```ts
 // capacitor/main.ts — cookie-session example; no app startup side effects
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
   remote: { origin: "https://your-worker.example.com" },

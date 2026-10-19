@@ -1,4 +1,4 @@
-import { runContract } from "workers-capacitor/shared/contracts/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import { Request as LocalRequest } from "../../../../../src/browser/request";
 import { Response as LocalResponse } from "../../../../../src/browser/response";
 import {

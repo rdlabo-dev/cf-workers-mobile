@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 const OriginalURL = globalThis.URL;
 const OriginalBlob = globalThis.Blob;
-const nativeBlob = Symbol.for("workers-capacitor/native-blob");
+const nativeBlob = Symbol.for("@rdlabo/workers-capacitor/native-blob");
 afterEach(() => {
   globalThis.URL = OriginalURL;
   globalThis.Blob = OriginalBlob;
@@ -16,8 +16,7 @@ it("formats URLs created before installation and by a separate bundle", async ()
   const prior = new first.URL(before.href);
   vi.resetModules();
   const second = await import("./index.js");
-  const { structuredClone } =
-    await import("../../browser/structured-clone/index.js");
+  const { structuredClone } = await import("../../browser/structured-clone/index.js");
   for (const value of [before, prior]) {
     expect(() => structuredClone(value)).toThrow();
     expect(

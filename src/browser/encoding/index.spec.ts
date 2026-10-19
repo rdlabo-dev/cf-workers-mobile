@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import * as api from "./index.js";
 const equal = (value: unknown, expected: unknown) => {
   if (JSON.stringify(value) !== JSON.stringify(expected))

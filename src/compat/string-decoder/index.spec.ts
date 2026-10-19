@@ -2,8 +2,8 @@ import * as stringDecoder from "node:string_decoder";
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 /** node:string_decoder module contract, matching the Workers baseline. */
 export interface NodeStringDecoderApi {

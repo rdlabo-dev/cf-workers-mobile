@@ -1,5 +1,5 @@
 import "./form-body";
-import { FetchRuntime } from "workers-capacitor";
+import { FetchRuntime } from "@rdlabo/workers-capacitor";
 
 // Experiment only: keep native document navigation, but carry fetch bytes and
 // redirect policy through a script-message bridge before WebKit serializes them.

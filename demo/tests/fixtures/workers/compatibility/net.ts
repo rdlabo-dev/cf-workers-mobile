@@ -1,4 +1,4 @@
-import { runContract } from "workers-capacitor/shared/contracts/testing";
+import { runContract } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 import {
   NetImplementation,
   netContract,

@@ -1,4 +1,4 @@
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import { Capacitor } from "@capacitor/core";
 import server from "./server.json";
 const origin = `https://${Capacitor.getPlatform() === "android" || globalThis.WorkersCapacitorHost ? "10.0.2.2" : "127.0.0.1"}:${server.port}`;

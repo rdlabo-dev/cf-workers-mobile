@@ -1,4 +1,4 @@
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
   ...(import.meta.env.VITE_REPORT_ORIGIN ? { render: "/" } : {}),

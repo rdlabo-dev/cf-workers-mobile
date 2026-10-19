@@ -27,6 +27,6 @@ See [binding declarations and limits](../../../docs/cloudflare-bindings.md),
 Remote dispatch sends whole HTTP requests, not generic binding method calls.
 Cloud credentials and lifecycle stay on Workers. WebSocket upgrades are rejected.
 
-Public `workers-capacitor/cloudflare/bindings/kv` is the KV entry point; package
+Public `@rdlabo/workers-capacitor/cloudflare/bindings/kv` is the KV entry point; package
 exports now point at this folder's compiled output. No placeholder per-service
 implementation directories are created for services executed remotely.

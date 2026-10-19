@@ -21,7 +21,7 @@ These paths assume the Capacitor build root is an application subdirectory such 
 The Capacitor entry uses the ordinary public API:
 
 ```ts
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",

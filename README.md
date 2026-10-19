@@ -1,4 +1,4 @@
-# workers-capacitor
+# @rdlabo/workers-capacitor
 
 Experimental compatibility library: run a Cloudflare Workers fetch handler in a Capacitor WebView. Local requests execute without an API server or socket listener. D1- and Hyperdrive-backed requests can reuse the existing deployed Worker through the build integration below. This executes JavaScript in the WebView; it does not compile Workers code to native code.
 
@@ -25,7 +25,7 @@ For existing applications and AI coding assistants, start with the [AI integrati
 Configure your existing Worker entry with one of the [supported build setups](#build-setup), then initialize the runtime in your application:
 
 ```ts
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 
 const runtime = workersCapacitor({
   prefer: "worker", // Default. Use "direct" to prefer the UI environment.
@@ -60,8 +60,8 @@ Capacitor plugin access. Native rendering does not sandbox untrusted HTML.
 
 | Build              | Setup                                      | Input                                             |
 | ------------------ | ------------------------------------------ | ------------------------------------------------- |
-| Vite 7             | `workers-capacitor/tooling/vite` plugin    | TypeScript / JavaScript, Workers Hono and Express |
-| esbuild 0.28       | `workers-capacitor/tooling/esbuild` plugin | TypeScript / JavaScript, Workers Hono and Express |
+| Vite 7             | `@rdlabo/workers-capacitor/tooling/vite` plugin    | TypeScript / JavaScript, Workers Hono and Express |
+| esbuild 0.28       | `@rdlabo/workers-capacitor/tooling/esbuild` plugin | TypeScript / JavaScript, Workers Hono and Express |
 | Browser ES Modules | Explicit Worker source below               | Browser-compatible JavaScript only                |
 
 Other bundlers are not currently supported. Add these plugins only to the Capacitor/browser build, never the Cloudflare build.
@@ -72,7 +72,7 @@ Add the plugin to the Capacitor/browser Vite configuration:
 
 ```ts
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 
 export default defineConfig({
   plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
@@ -87,7 +87,7 @@ For esbuild, use the same application code with this build configuration:
 
 ```js
 import { build } from "esbuild";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/esbuild";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/esbuild";
 
 await build({
   entryPoints: ["src/main.ts"],
@@ -129,7 +129,7 @@ import worker from "./worker.js";
 serve(worker);
 ```
 
-`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `workers-capacitor/browser/isolated`.
+`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `@rdlabo/workers-capacitor/browser/isolated`.
 
 ## Runtime behavior
 
@@ -219,14 +219,14 @@ Use the plugin shown above only in the Capacitor/browser build, never the Cloudf
 The package provides the `cloudflare:node` type for its supported `httpServerHandler` adapter. For a browser build without existing Workers type declarations, add it to `compilerOptions.types` in `tsconfig.json`:
 
 ```json
-{ "compilerOptions": { "types": ["workers-capacitor/cloudflare/apis/types"] } }
+{ "compilerOptions": { "types": ["@rdlabo/workers-capacitor/cloudflare/apis/types"] } }
 ```
 
 Keep any other types your project already uses. This is a type-only entry; do not import it at runtime. Projects with generated Workers types should keep those declarations instead. No application-owned `cloudflare.d.ts` or `client.d.ts` is needed.
 
 ## Local KV
 
-Use `LocalStorageKV` from `workers-capacitor/cloudflare/bindings/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
+Use `LocalStorageKV` from `@rdlabo/workers-capacitor/cloudflare/bindings/kv` to supply a persistent KV binding through `env` in direct execution, including read modes, bulk reads, metadata, expiration and paginated listing. See [setup, supported operations and limits](docs/kv.md). The named contract is tested against local workerd; cloud replication and isolated binding RPC remain outside its scope.
 
 ## D1 and remote APIs
 
@@ -401,7 +401,7 @@ The Hono + Express compatibility test app currently includes broad Node polyfill
 The original Worker handler remains the Cloudflare entry. Install the Vite/esbuild
 plugin only in the Capacitor/browser build: its aliases select the local API
 implementations; the Cloudflare build retains native `node:*` and `cloudflare:*`.
-`getExecutionEnvironment()` (also available from `workers-capacitor/environment`)
+`getExecutionEnvironment()` (also available from `@rdlabo/workers-capacitor/environment`)
 distinguishes Cloudflare Workers, native Capacitor hosts, browser workers, browsers,
 and unknown realms. A browser Dedicated Worker is not Cloudflare Workers.
 Installing the Capacitor runtime in Cloudflare Workers fails before changing globals.

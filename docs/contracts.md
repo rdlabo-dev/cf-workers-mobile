@@ -20,12 +20,12 @@ import {
   FeatureImplementation,
   openFeature,
   type FeatureScope,
-} from "workers-capacitor/shared/contracts";
+} from "@rdlabo/workers-capacitor/shared/contracts";
 import {
   runContract,
   assertContract,
   type ContractSuite,
-} from "workers-capacitor/shared/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts/testing";
 
 interface TextAPI {
   read(key: string): Promise<string | null>;

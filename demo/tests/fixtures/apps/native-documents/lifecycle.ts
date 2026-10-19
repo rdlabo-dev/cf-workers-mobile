@@ -1,4 +1,4 @@
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "@rdlabo/workers-capacitor";
 import {
   enableDocumentWorker,
   registerDocumentWorker,

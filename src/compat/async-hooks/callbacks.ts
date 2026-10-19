@@ -2,14 +2,16 @@
 // Both must capture from the same async context, without replacing timer globals.
 type Callback = (...args: any[]) => any;
 type Binding = (callback: Callback) => Callback;
-const key = Symbol.for("workers-capacitor/callback-binding");
+const key = Symbol.for("@rdlabo/workers-capacitor/callback-binding");
 const realm = globalThis as unknown as Record<
   symbol,
   { bindings: Set<Binding> }
 >;
 const state = realm[key] ?? { bindings: new Set<Binding>() };
 if (!realm[key]) Object.defineProperty(realm, key, { value: state });
-export const contextAware = Symbol.for("workers-capacitor/context-aware");
+export const contextAware = Symbol.for(
+  "@rdlabo/workers-capacitor/context-aware",
+);
 export function addCallbackBinding(binding: Binding) {
   state.bindings.add(binding);
 }

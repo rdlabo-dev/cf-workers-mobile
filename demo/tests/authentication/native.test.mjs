@@ -30,7 +30,7 @@ test(
       worker: join(here, "worker.ts"),
       workerConfig: join(here, "wrangler.jsonc"),
       bootstrapCode: `
-import { workersCapacitor } from 'workers-capacitor';
+import { workersCapacitor } from '@rdlabo/workers-capacitor';
 import { Capacitor, CapacitorHttp } from ${JSON.stringify(join(shell, "node_modules/@capacitor/core/dist/index.js"))};
 import { login } from ${JSON.stringify(join(shell, "login.ts"))};
 try {

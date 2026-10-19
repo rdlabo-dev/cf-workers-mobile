@@ -3,8 +3,8 @@ import * as http from "node:http";
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "@rdlabo/workers-capacitor/shared/contracts";
+import type { ContractSuite } from "@rdlabo/workers-capacitor/shared/contracts/testing";
 const api = https as unknown as typeof import("./index.js");
 function same(a: unknown, b: unknown) {
   if (a !== b) throw Error(`${String(a)} != ${String(b)}`);

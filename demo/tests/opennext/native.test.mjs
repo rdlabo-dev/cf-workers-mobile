@@ -84,7 +84,7 @@ test(
           configPath,
           originalConfig.replace(
             'webDir: "www",',
-            'webDir: "www", includePlugins: ["workers-capacitor", "@workers-capacitor-test/bridge-probe"],',
+            'webDir: "www", includePlugins: ["@rdlabo/workers-capacitor", "@workers-capacitor-test/bridge-probe"],',
           ),
         );
       }

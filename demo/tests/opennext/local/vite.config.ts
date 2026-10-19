@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "@rdlabo/workers-capacitor/tooling/vite";
 import { fileURLToPath } from "node:url";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
