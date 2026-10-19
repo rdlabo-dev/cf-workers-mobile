@@ -156,7 +156,11 @@ export function workersCapacitorPlugin(
       });
       await serverPlugin.setup(build);
       const virtualFiles = () =>
-        readWorkerFiles(entry, root, options.workerFiles);
+        readWorkerFiles(
+          options.execution === "local" ? originalEntry : entry,
+          root,
+          options.workerFiles,
+        );
       await compatibilityPlugin().setup(build);
       build.onLoad({ filter: /configured\.js$/ }, ({ path }) => {
         if (path !== configuredPath) return;

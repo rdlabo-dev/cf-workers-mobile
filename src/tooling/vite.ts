@@ -237,7 +237,8 @@ export function workersCapacitorPlugin(
   const entries = new Map<string, string>();
   const virtualFiles = async () =>
     readWorkerFiles(
-      options.worker && !(await server?.get())
+      options.worker &&
+        (options.execution === "local" || !(await server?.get()))
         ? resolve(root, options.worker)
         : undefined,
       root,

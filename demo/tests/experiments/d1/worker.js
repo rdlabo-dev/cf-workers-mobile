@@ -7,7 +7,8 @@ async function readCounter(db, owner) {
   return db.prepare(readSQL).bind(owner).first();
 }
 
-app.use("*", async (c, next) => {
+// Header mutation belongs to the remote API; public rendering stays independent.
+app.use("/api/*", async (c, next) => {
   await next();
   c.header("x-worker-middleware", "once");
 });
