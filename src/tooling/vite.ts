@@ -3,6 +3,8 @@ export type {
   WorkerExecutionMode,
   LocalRoute,
 } from "./server.js";
+import { guardHtmlAssets } from "./server-only-html.js";
+import { serverOnlyFiles } from "./server-only.js";
 import { readWorkerFiles } from "./files.js";
 import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
@@ -240,9 +242,12 @@ export function workersCapacitorPlugin(
   options: WorkersCapacitorPluginOptions = {},
 ): PluginOption[] {
   const entries = new Map<string, string>();
-  const virtualFiles = () => readWorkerFiles(root, options.workerFiles);
+  const virtualFiles = () =>
+    readWorkerFiles(root, options.workerFiles, options.serverOnly);
   let root: string;
   let publicDir: string;
+  let htmlEnv: Record<string, string>;
+  let denied: ReturnType<typeof serverOnlyFiles>;
   let server: ReturnType<typeof serverModules> | undefined;
   const serverPlugin = (): Plugin => ({
     name: "workers-capacitor-server",
@@ -250,15 +255,27 @@ export function workersCapacitorPlugin(
     resolveId(id) {
       return virtualId(id, root, (path) => server?.owns(path) ?? false);
     },
+    transform(_code, id) {
+      denied.assertPublic(id);
+    },
     async load(id) {
+      denied.assertPublic(id);
       if (!server) return;
       const path = id.split("?")[0];
       const generated = await server.load(path);
       if (generated) {
-        for (const input of generated.inputs) this.addWatchFile(input);
+        // Declared file contents are replaced before analysis and cannot affect
+        // the mobile output. Keep them out of client-asset provenance below.
+        for (const input of generated.inputs)
+          if (!denied.matches(input)) this.addWatchFile(input);
         return { code: generated.code, map: null };
       }
       await server.guard(path);
+    },
+    generateBundle() {
+      // Vite's CSS and new URL assets can be inlined without loading a module.
+      // Their tracked source files still identify what entered the client build.
+      for (const path of this.getWatchFiles()) denied.assertPublic(path);
     },
     async handleHotUpdate(ctx) {
       const previous = await server?.get();
@@ -270,8 +287,60 @@ export function workersCapacitorPlugin(
       }
     },
   });
+  const assetGuard = (): Plugin => ({
+    name: "workers-capacitor-server-only-urls",
+    async transform(code, id) {
+      if (
+        !options.serverOnly?.length ||
+        !code.includes("import.meta.url") ||
+        !code.includes("URL")
+      )
+        return;
+      const paths: string[] = [];
+      const visit = (node: import("estree").Node) => {
+        if (
+          node.type === "NewExpression" &&
+          node.callee.type === "Identifier" &&
+          node.callee.name === "URL"
+        ) {
+          const [value, base] = node.arguments;
+          if (
+            base?.type === "MemberExpression" &&
+            base.object.type === "MetaProperty" &&
+            base.object.meta.name === "import" &&
+            base.property.type === "Identifier" &&
+            base.property.name === "url"
+          ) {
+            const path =
+              value?.type === "Literal" && typeof value.value === "string"
+                ? value.value
+                : value?.type === "TemplateLiteral" && !value.expressions.length
+                  ? value.quasis[0].value.cooked
+                  : undefined;
+            if (path) paths.push(path);
+          }
+        }
+        for (const value of Object.values(node))
+          for (const child of Array.isArray(value) ? value : [value])
+            if (
+              child &&
+              typeof child === "object" &&
+              typeof child.type === "string"
+            )
+              visit(child);
+      };
+      visit(this.parse(code));
+      for (const path of paths) {
+        // Vite does not track new URL files with query suffixes as watch inputs.
+        // Resolve aliases as well as relative paths before built-in inlining.
+        const resolved = await this.resolve(path, id, { skipSelf: true });
+        denied.assertPublic(resolved?.id ?? resolve(dirname(id), path));
+      }
+    },
+  });
   return [
     serverPlugin(),
+    assetGuard(),
     {
       name: "workers-capacitor-source",
       enforce: "pre",
@@ -279,15 +348,56 @@ export function workersCapacitorPlugin(
         optimizeDeps: { exclude: ["workers-capacitor"] },
         worker: { format: "es" },
       }),
+      transformIndexHtml: {
+        order: "pre",
+        handler(html, context) {
+          if (options.serverOnly?.length)
+            guardHtmlAssets(
+              html.replace(/%(\S+?)%/g, (match, key) => htmlEnv[key] ?? match),
+              context.filename,
+              root,
+              denied.assertPublic,
+            );
+        },
+      },
       configResolved(config) {
         root = config.root;
+        htmlEnv = { ...config.env };
+        // Match Vite HTML substitution, including define overrides of env.
+        for (const [key, value] of Object.entries(config.define ?? {})) {
+          if (!key.startsWith("import.meta.env.")) continue;
+          let replacement =
+            typeof value === "string" ? value : JSON.stringify(value);
+          if (typeof value === "string") {
+            try {
+              const parsed: unknown = JSON.parse(value);
+              if (typeof parsed === "string") replacement = parsed;
+            } catch {
+              /* Vite retains non-JSON strings. */
+            }
+          }
+          htmlEnv[key.slice(16)] = replacement;
+        }
+        denied = serverOnlyFiles(root, options.serverOnly);
         publicDir = config.publicDir;
         if (options.worker)
           server = serverModules(resolve(root, options.worker), root, options);
       },
+      async buildStart() {
+        denied = serverOnlyFiles(root, options.serverOnly);
+        if (publicDir && existsSync(publicDir))
+          denied.assertDirectory(publicDir);
+        for (const file of options.workerFiles ?? [])
+          denied.assertPublic(resolve(root, file));
+      },
       generateBundle: {
         order: "post",
         async handler(_options, bundle) {
+          for (const asset of Object.values(bundle)) {
+            if (asset.type === "asset")
+              for (const path of asset.originalFileNames)
+                denied.assertPublic(resolve(root, path));
+          }
           const files = [
             ...Object.keys(bundle),
             ...(publicDir ? await listAssets(publicDir) : []),
@@ -365,6 +475,7 @@ export default { createWorker: () => new Constructor(), ${compilation ? "needsRe
             plugins: () => [
               ...(previous?.() ?? []),
               serverPlugin(),
+              assetGuard(),
               workerEntryPlugin(entries, () => root, virtualFiles),
               ...compatibilityPlugins("worker"),
             ],

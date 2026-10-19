@@ -233,6 +233,57 @@ Only pursue this when the application requires local startup or a measured impro
 
 If that renderer waits for remote data, separating a locally rendered App Shell from authenticated data requests is a possible application refactor. It is not automatic and is outside the default integration work. Preserve templates, navigation and authorization, and measure useful content and usable controls before claiming a speed improvement. For Next.js, hydration alone does not remove server dependencies; see [OpenNext limitations](opennext.md). Do not switch the cloud application to static export or add new APIs solely to complete this guide.
 
+### Declared server-only files
+
+Use `serverOnly` in the Capacitor Vite or esbuild plugin to prohibit distributing
+specific source modules or files:
+
+```ts
+workersCapacitorPlugin({
+  worker: "./src/worker.ts",
+  execution: [{ method: "GET", path: "/public" }],
+  serverOnly: ["./src/server/signing.ts", "./secrets/test-key.pem"],
+  remoteBindings: ["SIGNING_KEY"],
+});
+```
+
+Declarations are exact existing file paths relative to Vite's root or esbuild's
+`absWorkingDir` (cwd by default); absolute paths work too. Directories and globs
+are not declarations. Symlink aliases resolve to the same protected file.
+`remoteBindings` declares server binding names; `serverOnly` protects files that
+need not access a binding. Neither declaration contains secret values or fetches
+production credentials.
+
+`network` continues to exclude Worker code. `local` fails if its bundled imports
+include a declared file. With route permissions, a declared dependency keeps the
+Worker remote: the current implementation conservatively retains the whole
+Worker rather than attempting to separate code across that file boundary. When
+`serverOnly` is supplied, generated-framework optimization uses the conservative
+generic analysis. Route permission never overrides a file prohibition.
+
+Separate direct/transitive client imports, `workerFiles`, Vite public-directory
+copies (including symlinks), and normal Vite/esbuild asset imports cannot include
+a declared file. Vite also checks the tracked inputs of inlined CSS/HTML assets
+and static `new URL(..., import.meta.url)` references, including aliases. A forbidden inclusion fails the build with the source path,
+not its contents. The rule also applies inside the generated Dedicated Worker.
+
+This is a production-build distribution boundary, not a general secret scanner.
+It covers files consumed by these plugins and built-in bundler import/asset
+handling. Custom plugins or external scripts that inject/copy data without source
+file provenance, precompiled artifacts that already contain a file's transformed
+contents, and files added after the build require separate artifact review.
+Bundler defines and client `env` are not scanned for undeclared secret values.
+Public verification keys/configuration remain allowed unless explicitly declared;
+a variable named `KEY` alone is not rejected.
+
+The runnable synthetic fixture in `demo/tests/build/server-only.test.ts` builds a
+Worker importing a private module, proves its marker is absent from permitted
+mobile JS/maps/files, and checks rejected client imports/copies in both adapters.
+After `npm run build`, run it with
+`cd demo && npx vitest run --config tests/vitest.build.config.ts tests/build/server-only.test.ts`.
+Keep real server credentials in server-side storage/bindings and obtain user
+credentials at runtime through the existing authentication flow described below.
+
 ## 5. Security: the device is not a trusted server
 
 ### What the build removes
