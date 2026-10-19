@@ -134,6 +134,55 @@ it("manual does not bypass authentication middleware", async () => {
     `import {Hono} from 'hono'; const app=new Hono(); app.use('/private',async(c,next)=>{if(c.req.header('authorization')!==c.env.SECRET)return c.text('denied',401);await next();});app.get('/private',c=>c.text('PROTECTED_CONTENT'));export default app;`,
   );
 });
+it.each(["auto", "manual"] as const)(
+  "%s keeps a separate REST API and unselected private pages on the server",
+  async (execution) => {
+    await fixture(
+      execution === "manual"
+        ? { execution, localRoutes: [{ method: "GET", path: "/" }] }
+        : {},
+      async (graph) => {
+        const result = (await graph.get())!;
+        expect(result.local + result.selector).not.toContain(
+          "PRIVATE_PAGE_DATA",
+        );
+        expect(result.local + result.selector).not.toContain(
+          "SELECT secret FROM accounts",
+        );
+        const { needsRemote } = await load(result.selector);
+        expect(await needsRemote(new Request("https://local.invalid/"))).toBe(
+          false,
+        );
+        for (const [path, method] of [
+          ["/api/accounts", "GET"],
+          ["/api/accounts", "POST"],
+          ["/account", "GET"],
+        ]) {
+          expect(
+            await needsRemote(
+              new Request(`https://local.invalid${path}`, { method }),
+            ),
+          ).toBe(true);
+        }
+        expect(
+          await (
+            await (
+              await load(result.local)
+            ).default.fetch(new Request("https://local.invalid/"))
+          ).text(),
+        ).toBe("<h1>News</h1>");
+      },
+      `import {Hono} from 'hono';
+      const app=new Hono();
+      app.get('/',c=>c.html('<h1>News</h1>'));
+      app.get('/api/accounts',async c=>c.json(await c.env.DB.prepare('SELECT secret FROM accounts').all()));
+      app.post('/api/accounts',async c=>c.json(await c.env.DB.prepare('INSERT INTO accounts DEFAULT VALUES').run()));
+      app.get('/account',c=>c.req.header('authorization')===c.env.SECRET ? c.text('PRIVATE_PAGE_DATA') : c.text('denied',401));
+      export default app;`,
+      { d1_databases: [{ binding: "DB" }] },
+    );
+  },
+);
 it("local explicitly distributes the whole Worker and supports standalone POST", async () => {
   await fixture({ execution: "local" }, async (graph) => {
     const result = (await graph.get())!;

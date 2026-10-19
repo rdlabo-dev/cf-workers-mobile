@@ -187,6 +187,8 @@ Check client initialization as well as SSR output. A client library that derives
 
 For statically analyzable Hono applications, the build may keep independent routes local. If it cannot safely separate requests, it selects whole-Worker remote execution, including for general Fetch handlers and Workers Express. Inspect `workers-capacitor-d1.json` or `workers-capacitor-server.json` in the output. Do not remove bindings, bypass authentication or create another router to force local execution.
 
+Start with the default `execution: "auto"`; do not ask the user to enumerate server routes as a prerequisite for migration. A REST API prefix such as `/api/` does not establish that all other routes can be distributed. If the user wants explicit control, use `execution: "manual"` and `localRoutes` only for reviewed routes whose implementation and retained dependencies may ship to the device. Unselected routes stay remote. Do not infer this permission from GET, HTML output, or the absence of a known binding. See [execution policies](cloudflare-bindings.md#choosing-execution).
+
 For example, a page that authenticates the user, queries D1 and returns SSR HTML can retain that entire sequence on the deployed Worker. The device renders the response and uses the application's existing interaction model. This requires connectivity; it does not make D1 available locally. See [D1 dispatch](d1-transparent-migration.md) and the [OpenNext sample](../demo/opennext/README.md). Remote execution is a supported way to preserve the application, not an incomplete migration requiring a subsequent redesign.
 
 ### Next.js: distinguish rendering from data execution

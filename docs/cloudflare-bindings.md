@@ -71,6 +71,18 @@ The Vite and esbuild plugins accept the same `execution` policy. Start with
 `manual` when you want to explicitly permit selected routes. `local` is for
 applications deliberately designed to run entirely on the device.
 
+You do not need to classify every route before trying the app. Start with your
+existing Worker entry and configure the deployed Worker's `remote.origin` in
+the runtime. Leave `execution` unset to use `auto`, then check the generated
+dispatch report and verify the app's pages and API calls.
+
+Separating REST APIs under `/api/` does not make every other route suitable for
+distribution: `/account`, for example, may contain session checks or private data.
+No path prefix is treated as proof of publication permission. If you need to
+choose the boundary yourself, use `manual` to list the routes whose code and
+dependencies may be shipped to the device. Everything unselected stays on the
+server, including routes added later. There is no need to list all server routes.
+
 | Policy    | Distribution permission and execution                                                                                                                                                                |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auto`    | Analyze every Worker, including applications without Cloudflare bindings. Only supported Hono responses with a provable distribution boundary become local; unresolved cases remain on the server.   |
@@ -84,7 +96,7 @@ workersCapacitorPlugin({
   execution: "manual",
   localRoutes: [
     { method: "GET", path: "/" },
-    { method: "POST", path: "/notes" },
+    { method: "GET", path: "/about" },
   ],
 });
 ```
@@ -96,6 +108,9 @@ registrations on the exported Hono router; mounted routes, `basePath`, and `on()
 registrations are not resolved for manual permission. For an analyzable Hono
 graph, an unresolved selection fails the build rather than broadening permission.
 An unsupported Worker graph stays entirely remote. An empty list permits no routes.
+The example assumes direct `app.get("/", ...)` and `app.get("/about", ...)`
+registrations. Copy your application's actual registration paths; this setting
+does not create new routes or require rewriting the existing Worker.
 
 Permission includes retained fixed data, not just response bodies. For example,
 permitting a handler that reads `settings.title` can distribute private siblings
