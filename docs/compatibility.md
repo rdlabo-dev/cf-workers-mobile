@@ -5,6 +5,8 @@ profile uses workerd `1.20261012.1`, compatibility date `2026-10-17`, without
 additional flags. Other dates and flags are not covered by this profile.
 The WebView does not contain workerd or V8; iOS uses its own JavaScript engine.
 
+0.1.0 Preview includes existing compatibility implementations with the limits below under a [version-specific release exception](../CONTRIBUTING.md#010-preview-exception). Inclusion is not a claim of complete Workers or Node.js compatibility.
+
 ## Node.js
 
 Whole-Node compatibility is incomplete. Importing a module successfully does not
@@ -67,8 +69,9 @@ connection with `Connection: close`; there is no implicit retry after sending.
   across informational/final headers and trailers. Reads follow consumer demand.
 - Browser execution retains browser CORS/header/cookie restrictions. Native
   transport does not promise browser-equivalent SameSite or CSRF protection.
-- OS termination can stop background work. Physical devices, WebView crash
-  recovery and memory pressure require separate validation.
+- OS termination can stop background work. Selected scenarios cover physical
+  devices; your application's device behavior, WebView crash recovery and memory
+  pressure require separate validation.
 
 ## Document rendering
 

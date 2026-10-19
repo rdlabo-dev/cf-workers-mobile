@@ -147,9 +147,10 @@ Observed Origin and Fetch Metadata headers are preserved. When iOS omits a form 
 The native host/child lifecycle, pending-request timeouts and explicit disposal
 are implemented. App process termination/relaunch, background/foreground,
 asset-update reinstalls without data deletion, and shutdown followed by
-reinitialization are covered by the packaged native fixture. Physical
-devices, WebView crash recovery, memory pressure and arbitrary third-party
-plugin lifecycle behavior require separate validation.
+reinitialization are covered by the packaged native fixture, including selected
+physical-device scenarios. Validate your application on its target devices;
+WebView crash recovery, memory pressure and arbitrary third-party plugin lifecycle
+behavior remain outside this coverage.
 
 ## Demo and validation
 

@@ -60,11 +60,13 @@ OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=<emulator-id> node --test tests/openne
 The native remote scenario also checks calls, native events and rejected calls from a test-only Capacitor plugin before and after navigation and process restart. The plugin and driver live under `../tests/`; they are not application dependencies.
 
 The browser integration uses workerd, a disposable D1 database and a local HTTPS
-endpoint. No Cloudflare account or deployed service is required. Native tests
+endpoint. No Cloudflare account or deployed service is required. The default native tests
 install the example app and trust a temporary test CA (Android trusts it only in
 the debug build). Native artifacts are written under `demo/artifacts/`. Reports include the web
 bundle size and elapsed time from launching the app to a hydrated counter; these
-are simulator/emulator observations, not physical-device benchmarks.
+are single Debug observations, not release-build benchmarks.
+
+For physical iOS devices, use the [public HTTPS scenario](../tests/opennext/live/README.md), which connects to a dedicated deployed Worker and D1 without installing a test CA. It covers hydration, navigation, native plugin calls/events/errors, sessions and a D1 write. Physical iOS memory is not measured.
 
 The separate local profile runs only public pages without cloud bindings. It is
 not a production configuration for this D1 application. Set `OPENNEXT_LOCAL=1`
@@ -74,7 +76,7 @@ on a native test command to exercise that profile's rendering and navigation.
 
 - Observed Origin headers are preserved. iOS recovers a missing form Origin only from a verified local main-frame initiator. Other requests may omit it; this sample retains CSRF tokens on both Web and Capacitor.
 
-- `/images` uses `next/image` with the `IMAGES` binding. The image tests verify WebP conversion and resizing through `/_next/image`; production Cloudflare Images deployment and custom image loaders are not covered.
+- `/images` uses `next/image` with the `IMAGES` binding. The image tests verify WebP conversion and resizing through `/_next/image`, including the deployed Cloudflare binding on a physical iPhone. Custom image loaders remain unverified.
 - Incremental cache, tag cache and queue use OpenNext's dummy adapters.
 - Server Actions, streaming Suspense and arbitrary third-party Next.js plugins
   are outside this sample's coverage.
