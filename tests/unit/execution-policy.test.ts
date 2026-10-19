@@ -1,4 +1,5 @@
 import { expect, it } from "vitest";
+import { Hono } from "hono";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
@@ -141,6 +142,7 @@ it("manual selects descendants with a trailing path wildcard, without widening t
       const result = (await graph.get())!;
       const { needsRemote } = await load(result.selector);
       for (const [path, method] of [
+        ["/app", "GET"],
         ["/app/home", "GET"],
         ["/app/news/123", "GET"],
         ["/app/notes", "POST"],
@@ -152,9 +154,6 @@ it("manual selects descendants with a trailing path wildcard, without widening t
         ).toBe(false);
       }
       for (const path of [
-        "/app",
-        // The existing overlap guard conservatively keeps /app/ remote too.
-        "/app/",
         "/application",
         "/app-private",
         "/app/cloud",
@@ -174,15 +173,89 @@ it("manual selects descendants with a trailing path wildcard, without widening t
       ).toBe("123");
     },
     `import {Hono} from 'hono'; const app=new Hono();
-    app.get('/app/',c=>c.text('home'));
     app.get('/app/home',c=>c.text('home'));
     app.get('/app/news/:id',c=>c.text(c.req.param('id')));
     app.post('/app/notes',async c=>c.text(await c.req.text()));
     app.get('/app/cloud',c=>c.text(c.env.SECRET));
-    app.get('/app',c=>c.text('UNSELECTED_DATA'));
+    app.get('/app',c=>c.text('home'));
     app.get('/application',c=>c.text('UNSELECTED_DATA'));
     app.get('/app-private',c=>c.text('UNSELECTED_DATA'));
     export default app;`,
+  );
+});
+it.each(["/app/*", "/*", "*"])(
+  "manual wildcard %s agrees with Hono for literal registrations",
+  async (path) => {
+    const hono = new Hono();
+    hono.get(path, (c) => c.text("matched"));
+    for (const registration of [
+      "/",
+      "/app",
+      "/app/",
+      "/app/news/123",
+      "/application",
+      "/app-private",
+    ]) {
+      const expectedLocal = (await hono.request(registration)).status === 200;
+      await fixture(
+        { execution: "manual", localRoutes: [{ method: "GET", path }] },
+        async (graph) => {
+          const result = (await graph.get())!;
+          const { needsRemote } = await load(result.selector);
+          expect(
+            await needsRemote(
+              new Request(`https://local.invalid${registration}`),
+            ),
+          ).toBe(!expectedLocal);
+          expect(result.local.includes("ROUTE_IMPLEMENTATION")).toBe(
+            expectedLocal,
+          );
+        },
+        `import {Hono} from 'hono'; const app=new Hono();
+        app.get('/app/anchor',c=>c.text('anchor'));
+        app.get(${JSON.stringify(registration)},c=>c.text('ROUTE_IMPLEMENTATION'));
+        export default app;`,
+      );
+    }
+  },
+);
+it("manual preserves Hono's parameter constraints for an explicitly selected registration", async () => {
+  const path = "/posts/:id{[0-9]+}";
+  const hono = new Hono();
+  hono.get(path, (c) => c.text(c.req.param("id")));
+  await fixture(
+    { execution: "manual", localRoutes: [{ method: "GET", path }] },
+    async (graph) => {
+      const result = (await graph.get())!;
+      const { needsRemote } = await load(result.selector);
+      for (const url of ["/posts/123", "/posts/abc", "/posts/123/edit"]) {
+        expect(
+          await needsRemote(new Request(`https://local.invalid${url}`)),
+        ).toBe((await hono.request(url)).status !== 200);
+      }
+      expect(
+        await (
+          await (
+            await load(result.local)
+          ).default.fetch(new Request("https://local.invalid/posts/123"))
+        ).text(),
+      ).toBe("123");
+    },
+    `import {Hono} from 'hono'; const app=new Hono();
+    app.get(${JSON.stringify(path)},c=>c.text(c.req.param('id'))); export default app;`,
+  );
+});
+it("does not infer permission by treating a dynamic registration as a literal URL", async () => {
+  await fixture(
+    {
+      execution: "manual",
+      localRoutes: [{ method: "GET", path: "/app/:id/*" }],
+    },
+    async (graph) => {
+      await expect(graph.get()).rejects.toThrow("cannot resolve");
+    },
+    `import {Hono} from 'hono'; const app=new Hono();
+    app.get('/app/:id/admin',c=>c.text('private')); export default app;`,
   );
 });
 it.each(["/notes", /^\/notes$/])(

@@ -8,7 +8,7 @@ export interface ServerBuildOptions {
   /** auto analyzes distribution; network ships no Worker implementation;
    * manual permits selected routes; local permits the entire Worker source. */
   execution?: "auto" | "network" | "manual" | "local";
-  /** Distribution permission for Hono registration paths (exact strings, trailing /*, or RegExp).
+  /** Distribution permission for Hono registration paths (exact patterns, literal-prefix wildcards, or RegExp).
    * Only used with execution: "manual". Includes retained dependency data. */
   localRoutes?: {
     method:

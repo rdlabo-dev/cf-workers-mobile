@@ -111,7 +111,7 @@ export async function compileServerWorker(
           !route ||
           !/^(\*|GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS)$/.test(route.method) ||
           !(typeof route.path === "string"
-            ? route.path.startsWith("/")
+            ? route.path === "*" || route.path.startsWith("/")
             : route.path instanceof RegExp),
       ))
   )
@@ -1288,9 +1288,15 @@ async function partition(
       const matchesPath = (path: string | undefined) => {
         if (path === undefined) return false;
         if (typeof route.path === "string") {
-          return route.path.endsWith("/*")
-            ? path.startsWith(route.path.slice(0, -1))
-            : path === route.path;
+          if (path === route.path || route.path === "*" || route.path === "/*")
+            return true;
+          // Hono's trailing wildcard includes the base path. Only a literal
+          // prefix proves containment of another registration's entire pattern.
+          if (/^\/[A-Za-z0-9_/-]+\/\*$/.test(route.path)) {
+            const base = route.path.slice(0, -2);
+            return path === base || path.startsWith(`${base}/`);
+          }
+          return false;
         }
         if (!pattern) return false;
         pattern.lastIndex = 0;

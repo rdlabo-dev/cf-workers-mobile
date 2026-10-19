@@ -123,7 +123,7 @@ incoming URL. With the example above:
 | `app.get("/app/home", handler)`     | Selected by `* /app/*`                        |
 | `app.post("/app/notes", handler)`   | Selected by `* /app/*`                        |
 | `app.get("/app/news/:id", handler)` | Selected; Hono matches the actual `:id` value |
-| `app.get("/app", handler)`          | Not selected; add `/app` separately if needed |
+| `app.get("/app", handler)`          | Selected by `* /app/*`, as in Hono            |
 | `app.get("/application", handler)`  | Not selected                                  |
 | `app.get("/api/news", handler)`     | Not selected                                  |
 
@@ -133,11 +133,14 @@ existing permitted Hono registration matches it. A selected Hono wildcard such a
 
 #### Path and method syntax
 
-- A string such as `"/about"` selects that exact registration path.
-- A trailing `/*`, such as `"/app/*"`, selects registration paths starting with
-  `/app/`, including nested paths and parameters. It does not select `/app`,
-  `/application`, or `/app-private`. Other strings remain exact matches; this is
-  not a general glob syntax.
+- A string such as `"/about"` selects that exact registration path. You can also
+  copy an existing Hono pattern such as `"/posts/:id"` or `"/posts/:id{[0-9]+}"`
+  to permit that registration; Hono handles its request matching.
+- A trailing wildcard on a literal prefix, such as `"/app/*"`, selects `/app`
+  itself and registrations under `/app/`, matching Hono’s wildcard scope. It
+  does not select `/application` or `/app-private`. `"*"` and `"/*"` select all
+  supported registration paths. This grants distribution permission, not an
+  exemption from server-dependency checks.
 - A JavaScript regular expression such as `{ method: "GET", path: /^\/pages\// }`
   selects matching registration paths, for example `/pages/about` and
   `/pages/news/:id`. Use `^` and `$` to anchor matches as needed. Each match starts
@@ -151,6 +154,12 @@ existing permitted Hono registration matches it. A selected Hono wildcard such a
 Patterns also permit matching registrations added in future builds. `method: "*"`
 includes future matching POST, DELETE and other operations, not just today's GET
 routes. Use narrow paths and specific methods when broader permission is not intended.
+
+The build does not infer containment between arbitrary Hono patterns. For example,
+`"/posts/:id"` selects that registration, not a separate `"/posts/:slug"` or
+`"/posts/123"` registration. Copy the registered pattern or use a literal-prefix
+wildcard to select the group. JavaScript `RegExp` remains an explicit test of
+registration text, not a Hono URL matcher.
 
 `localRoutes` is available only with `manual`. Current selection supports direct
 registrations on the exported Hono router. Mounted routes (`app.route()`),
