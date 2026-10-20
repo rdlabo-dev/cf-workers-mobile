@@ -41,8 +41,19 @@ adb("logcat", "-c");
 adb("shell", "am", "start", "-n", "probe.workersembed/probe.Launcher");
 
 async function screen() {
-  adb("shell", "uiautomator", "dump", "/sdcard/workers-embedding.xml");
-  return adb("exec-out", "cat", "/sdcard/workers-embedding.xml");
+  const dumpFile = "/sdcard/workers-embedding.xml";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // A killed dumper may leave a completed file; never read a previous attempt.
+    adb("shell", "rm", "-f", dumpFile);
+    try {
+      adb("shell", "uiautomator", "dump", dumpFile);
+    } catch (error) {
+      if (error.status !== 137 || attempt === 2) throw error;
+      await delay(300 * (attempt + 1));
+      continue;
+    }
+    return adb("exec-out", "cat", dumpFile);
+  }
 }
 async function waitFor(text, timeout = 30_000) {
   const deadline = Date.now() + timeout;
