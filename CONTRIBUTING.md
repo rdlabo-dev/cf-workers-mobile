@@ -6,7 +6,7 @@ Run `npm run format` from the repository root before submitting changes. `npm ru
 
 ## Complete compatibility units only
 
-New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The only release exception is the existing implementation included in [0.1.0 Preview](#010-preview-exception).
+New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1 follow-up](#010-preview-exception).
 
 For Node.js compatibility, the acceptance unit is a module, including its Workers
 exports, subpaths and observable behavior. For a binding or Web API, define the
@@ -73,7 +73,11 @@ unfinished production behavior.
 
 0.1.0 Preview may include existing compatibility implementations with the limitations documented in the [compatibility inventory](docs/compatibility.md). Their inclusion does not establish complete module compatibility or certify untested behavior. Keep missing exports, unsupported operations and verification boundaries visible; a passing application scenario does not make its dependencies complete.
 
-This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
+This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1 follow-up below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
+
+### 0.1.1 Preview follow-up
+
+0.1.1 is explicitly authorized to retain the existing compatibility limitations documented in the inventory, provided its changes pass regression checks and required CI. This is a version-specific continuation of the Preview scope, not a claim that incomplete modules are complete. Keep known failures and unverified behavior visible in release notes. It does not authorize new incomplete compatibility units or extend the exception to later versions.
 
 ## Layout and tests
 
