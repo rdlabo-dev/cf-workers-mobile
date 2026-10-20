@@ -50,6 +50,8 @@ import WebKit
 @objc(SceneDelegate) class SceneDelegate: UIResponder, UIWindowSceneDelegate {
  var window: UIWindow?
  func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+  print("SDK_SCENE_STARTED")
+  fflush(stdout)
   let window = UIWindow(windowScene: scene as! UIWindowScene)
   let host = UIViewController()
   let child = try! makeEmbeddedController()
