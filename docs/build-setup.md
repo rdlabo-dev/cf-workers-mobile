@@ -5,6 +5,21 @@ its Capacitor integration. The framework guide identifies the Worker entry and
 execution boundary; the tool plugin connects that entry to the mobile app.
 Keep the existing Cloudflare build separate.
 
+Use a separate configuration and output directory for the Capacitor build. The
+plugin reads the server entry and deployment configuration; it generates a mobile
+copy without rewriting those inputs. Vite rejects SSR/server environments and
+configurations containing the Cloudflare Vite plugin. Both builders reject output
+directories containing known server inputs, and existing links inside the output
+directory are rejected to prevent writes through them. Do not reuse an arbitrary
+Cloudflare deployment directory as mobile output: the plugin cannot identify every
+custom build directory. OpenNext route compilation uses a disposable directory in
+`node_modules/.cache/workers-capacitor/opennext`, outside `.next` and `.open-next`.
+
+These build boundaries preserve the existing Cloudflare deployment. Explicit
+client choices such as local execution, remote origin and `getToken` still control
+which requests reach it and how the client authenticates; they do not modify the
+server's routes, authorization logic or bindings.
+
 ## Frameworks
 
 The following integrations have examples and verification evidence. Support is

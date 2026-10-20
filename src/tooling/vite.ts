@@ -4,13 +4,17 @@ export type {
   LocalRoute,
 } from "./server.js";
 import { guardHtmlAssets } from "./server-only-html.js";
+import {
+  assertSeparateOutput,
+  assertNoOutputLinks,
+} from "./build-isolation.js";
 import { serverOnlyFiles } from "./server-only.js";
 import { readWorkerFiles } from "./files.js";
 import { lowerAsync, asyncContextPlugin } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
 import { serverModules } from "./server-modules.js";
 import type { ServerBuildOptions } from "./server.js";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, isAbsolute } from "node:path";
 import { existsSync } from "node:fs";
 import {
   configuredPath,
@@ -249,10 +253,13 @@ export function workersCapacitorPlugin(
   let htmlEnv: Record<string, string>;
   let denied: ReturnType<typeof serverOnlyFiles>;
   let server: ReturnType<typeof serverModules> | undefined;
+  let outputDirectory: string | undefined;
   const serverPlugin = (): Plugin => ({
     name: "workers-capacitor-server",
     enforce: "pre",
     resolveId(id) {
+      if (this.environment.config.consumer === "server")
+        this.error("workersCapacitorPlugin cannot build a server environment");
       return virtualId(id, root, (path) => server?.owns(path) ?? false);
     },
     transform(_code, id) {
@@ -260,6 +267,8 @@ export function workersCapacitorPlugin(
     },
     async load(id) {
       denied.assertPublic(id);
+      if (outputDirectory && isAbsolute(id))
+        assertSeparateOutput(outputDirectory, [id.split("?")[0]]);
       if (!server) return;
       const path = id.split("?")[0];
       const generated = await server.load(path);
@@ -276,6 +285,10 @@ export function workersCapacitorPlugin(
       // Vite's CSS and new URL assets can be inlined without loading a module.
       // Their tracked source files still identify what entered the client build.
       for (const path of this.getWatchFiles()) denied.assertPublic(path);
+    },
+    buildEnd() {
+      if (outputDirectory)
+        assertSeparateOutput(outputDirectory, this.getWatchFiles());
     },
     async handleHotUpdate(ctx) {
       const previous = await server?.get();
@@ -361,7 +374,31 @@ export function workersCapacitorPlugin(
         },
       },
       configResolved(config) {
+        if (
+          config.build.ssr ||
+          Object.entries(config.environments).some(
+            ([name, environment]) =>
+              environment.consumer === "server" &&
+              // Vite adds an unused default SSR environment to every dev server.
+              // Its actual use is rejected by the server-environment hooks.
+              (config.command === "build" || name !== "ssr"),
+          ) ||
+          config.plugins.some((plugin) =>
+            /^vite-plugin-cloudflare(?::|$)/.test(plugin.name),
+          )
+        )
+          throw new Error(
+            "workersCapacitorPlugin is only for a separate Capacitor/browser build; do not add it to the Cloudflare or SSR build.",
+          );
         root = config.root;
+        outputDirectory = config.build.write
+          ? resolve(root, config.build.outDir)
+          : undefined;
+        if (outputDirectory && options.worker)
+          assertSeparateOutput(outputDirectory, [
+            resolve(root, options.worker),
+          ]);
+        if (outputDirectory) assertNoOutputLinks(outputDirectory);
         htmlEnv = { ...config.env };
         // Match Vite HTML substitution, including define overrides of env.
         for (const [key, value] of Object.entries(config.define ?? {})) {
@@ -384,6 +421,13 @@ export function workersCapacitorPlugin(
           server = serverModules(resolve(root, options.worker), root, options);
       },
       async buildStart() {
+        if (outputDirectory) assertNoOutputLinks(outputDirectory);
+        if (this.environment.config.consumer === "server")
+          this.error(
+            "workersCapacitorPlugin cannot build a server environment",
+          );
+        if (outputDirectory && server)
+          assertSeparateOutput(outputDirectory, (await server.get()).inputs);
         denied = serverOnlyFiles(root, options.serverOnly);
         if (publicDir && existsSync(publicDir))
           denied.assertDirectory(publicDir);

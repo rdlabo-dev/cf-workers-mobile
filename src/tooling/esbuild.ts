@@ -4,6 +4,10 @@ export type {
   LocalRoute,
 } from "./server.js";
 import { serverOnlyFiles } from "./server-only.js";
+import {
+  assertSeparateOutput,
+  assertNoOutputLinks,
+} from "./build-isolation.js";
 import { readWorkerFiles } from "./files.js";
 import { asyncContextPlugin, lowerAsync } from "./async.js";
 import { documentAssets, listAssets } from "./documents.js";
@@ -90,6 +94,13 @@ export function workersCapacitorPlugin(
           "workersCapacitorPlugin requires worker, bundle: true, format: 'esm', browser platform and outdir or outfile.",
         );
       const root = config.absWorkingDir ?? process.cwd();
+      const outputDirectory =
+        config.write !== false
+          ? resolve(root, config.outdir ?? dirname(config.outfile!))
+          : undefined;
+      if (outputDirectory)
+        assertSeparateOutput(outputDirectory, [resolve(root, options.worker)]);
+      if (outputDirectory) assertNoOutputLinks(outputDirectory);
       let denied = serverOnlyFiles(root, options.serverOnly);
       // Written builds include document assets automatically. In-memory builds
       // remain available for tooling and Fetch-only consumers.
@@ -126,6 +137,7 @@ export function workersCapacitorPlugin(
         name: "workers-capacitor-server",
         setup(build) {
           build.onLoad({ filter: /.*/, namespace: "file" }, ({ path }) => {
+            if (outputDirectory) assertSeparateOutput(outputDirectory, [path]);
             denied.assertPublic(path);
             return undefined;
           });
@@ -147,11 +159,14 @@ export function workersCapacitorPlugin(
         },
       };
       build.onStart(async () => {
+        if (outputDirectory) assertNoOutputLinks(outputDirectory);
         denied = serverOnlyFiles(root, options.serverOnly);
         for (const file of options.workerFiles ?? [])
           denied.assertPublic(resolve(root, file));
         server.reset();
         const compilation = await server.get();
+        if (outputDirectory)
+          assertSeparateOutput(outputDirectory, compilation.inputs);
         entry = compilation ? server.localEntry : originalEntry;
         selector = compilation ? server.selectorEntry : undefined;
         if (compilation) return { warnings: [{ text: compilation.message }] };

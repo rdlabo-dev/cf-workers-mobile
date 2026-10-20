@@ -98,8 +98,17 @@ for (const tool of ["vite", "esbuild"])
                 name,
               );
             }
-          const cache = join(root, ".open-next/.capacitor");
-          assert.deepEqual(await readdir(cache).catch(() => []), []);
+          const cache = join(
+            root,
+            "node_modules/.cache/workers-capacitor/opennext",
+          );
+          assert.deepEqual(
+            await readdir(cache).catch((error) => {
+              if (error.code === "ENOENT") return [];
+              throw error;
+            }),
+            [],
+          );
         } finally {
           await rm(root, { recursive: true, force: true });
         }

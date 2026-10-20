@@ -115,7 +115,7 @@ export async function compileOpenNext(
     return reject(
       "No permitted OpenNext routes can be separated from server middleware",
     );
-  const cache = join(directory, ".capacitor");
+  const cache = join(app, "node_modules/.cache/workers-capacitor/opennext");
   await mkdir(cache, { recursive: true });
   const temporary = await mkdtemp(join(cache, "routes-"));
   const output = join(temporary, ".open-next");
