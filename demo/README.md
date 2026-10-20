@@ -1,6 +1,19 @@
-# Workers Capacitor demo
+# cf-workers-mobile examples
 
-This demo shows the setup needed to run an existing Workers Fetch Handler inside Capacitor. Start with the application files below; compatibility tests have their own sources and build.
+Choose the example closest to the experience you want to build:
+
+| Experience                                          | Example                                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------ |
+| A Workers screen in an existing iOS app             | [UIKit and SwiftUI consumer](tests/native-embedding/ios/README.md)       |
+| A Workers screen in an existing Android app         | [Independent Android consumer](tests/native-embedding/android/README.md) |
+| Worker-rendered pages, links and forms in Capacitor | [Hono and Express document rendering](rendering/README.md)               |
+| React pages with D1-backed forms                    | [Void sample](void/README.md)                                            |
+| Next.js pages through OpenNext                      | [OpenNext sample](opennext/README.md)                                    |
+| An existing frontend calling a Worker               | The Fetch-only demo below                                                |
+
+The native consumers are executable acceptance fixtures; use the [embedding guide](../docs/native-embedding.md) for application integration. Framework samples describe their own execution and verification boundaries.
+
+The rest of this page runs a minimal Workers Fetch Handler inside Capacitor. It illustrates Fetch-only integration; use the rendering example above for full document navigation.
 
 ## 1. Choose your existing Worker
 

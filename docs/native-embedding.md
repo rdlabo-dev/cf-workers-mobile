@@ -1,18 +1,20 @@
 # Embed Workers UI in an existing native application
 
-**Release status:** these hosts are included in 0.1.2 Preview. Install
-`cf-workers-mobile@0.1.2` once the npm release is published and use matching
-native dependencies as described under [dependency setup](#dependency-setup).
-The earlier `workers-capacitor@0.1.1` release does not include these hosts.
-No public Android Maven release is provided yet.
+Add your Workers pages to a screen in an existing UIKit, SwiftUI or Android app.
+Keep the native app's entry point, navigation and root screen while reusing your
+Workers routes and rendering inside the SDK's WebView.
 
-Use these hosts in an existing UIKit, SwiftUI, or Android application without
-creating a Capacitor application. The SDK uses Capacitor internally and resolves
-it as a native dependency. Your existing application entry point, navigation,
-and root screen remain in place.
+Choose [iOS](#ios) or [Android](#android) for native setup. Both use the
+[shared web build](#shared-web-build) below and the same runtime options. For a
+new mobile app or general native plugins, use the [Capacitor integration](integration.md).
 
-Choose [iOS](#ios) or [Android](#android) below. For a new Capacitor application or
-general native plugins, use the [Capacitor integration](integration.md).
+You will build the web assets in your web project, add the native SDK to your
+app, then open and close a Workers screen through its native API. The SDK resolves
+Capacitor internally; your native app does not need Capacitor configuration or CLI commands.
+
+**0.1.2 Preview:** install `cf-workers-mobile@0.1.2` with matching
+[native dependencies](#dependency-setup). Android requires WebView `MULTI_PROFILE`
+support and a locally built SDK artifact; no public Maven release is provided yet.
 
 ## Shared web build
 
@@ -85,7 +87,7 @@ There is one npm package, `cf-workers-mobile`. Its `/ios`, `/android` and `/capa
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
 `jp.rdlabo:workers-native-android` is an Android Maven artifact.
 
-Once 0.1.2 Preview is published, install it in the web project:
+Install 0.1.2 Preview in the web project:
 
 ```sh
 npm install cf-workers-mobile@0.1.2
