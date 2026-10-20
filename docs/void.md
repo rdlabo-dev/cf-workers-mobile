@@ -2,6 +2,14 @@
 
 [Void](https://void.cloud/) builds full-stack applications into a Cloudflare Worker and client assets. The integration below targets **Void / @void/react 1.1.12, React Pages and D1**, using bundled client assets and the existing remote Worker. Explicit route permissions can also distribute eligible public GET handlers to the device.
 
+## Take your Void app to mobile
+
+Keep building your application with Void, and add an iOS and Android version for your users. This guide connects the Worker and client assets Void already generates to the mobile build.
+
+If this is your first mobile app, start with the [Capacitor setup](integration.md#2-install-capacitor-and-this-package), then use the Void build configuration below in its separate mobile build. Already have a native app? Follow the [iOS or Android embedding guide](native-embedding.md) and select that host's runtime entry with the same build configuration.
+
+The acceptance evidence below covers the Capacitor integration; embedding Void in an existing native app still requires verification of your application's flows.
+
 ## Build and connect
 
 Build the existing Void application normally first, using Node **24.21.0 or newer**. Keep its `voidPlugin()` and `voidReact()` configuration unchanged. Void emits `dist/ssr/index.js`, `dist/ssr/wrangler.json` and `dist/client/`.

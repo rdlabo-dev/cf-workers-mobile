@@ -4,7 +4,9 @@ For an existing [iOS](native-embedding.md#ios) or [Android](native-embedding.md#
 application, use the embedding guide. This guide is for a Capacitor app, including
 creating one when starting a mobile application or using general Capacitor plugins.
 
-Give this guide to an AI coding assistant with access to your application repository. The goal is to run the existing Workers application in Capacitor with the fewest application-code changes. Start by adding Capacitor and connecting the existing Worker entry; preserve the cloud build, rendering, routes, business logic and authentication.
+Bring your existing Workers pages to an iOS and Android app with Capacitor. Add a mobile build, connect the Worker entry and use Capacitor for the native shell and plugins. Keep your cloud build, rendering, routes, business logic and authentication.
+
+Follow the [workflow](#workflow) below yourself, or give the [integration prompt](#prompt-to-give-your-ai-assistant) to an assistant with access to your application repository.
 
 The primary success criterion is a working native application with minimal integration effort, not a new application architecture. Keep ordinary HTML documents, links and forms where the application uses them. SPA conversion, a new client router, App Shell redesign, SSR/API separation and adding hydration are not prerequisites.
 
@@ -81,7 +83,7 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. For 0.1.2 Preview, install the npm package once the release is published:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. For 0.1.2 Preview, install the npm package from npm:
 
 ```sh
 npm install cf-workers-mobile@0.1.2
@@ -104,7 +106,7 @@ The installed package is named `cf-workers-mobile`; the checkout directory can r
 
 ### Migrating from the old npm package
 
-If your application already depends on `workers-capacitor`, remove it before installing the renamed package. Keeping both dependencies can make Capacitor discover and register the same native plugin twice. In the application package, after the 0.1.2 release is published:
+If your application already depends on `workers-capacitor`, remove it before installing the renamed package. Keeping both dependencies can make Capacitor discover and register the same native plugin twice. In the application package, using 0.1.2 Preview:
 
 ```sh
 npm uninstall workers-capacitor
