@@ -3,7 +3,7 @@ import type { WorkersCapacitorOptions } from "./cloudflare/workers/types.js";
 
 type NativeHost = typeof globalThis & {
   __workersNativeDispose?: () => Promise<void>;
-  WorkersNativeHost?: { failed(message: string): void };
+  WorkersNativeHost?: { ready?(): void; failed(message: string): void };
 };
 
 /** Shared entry for SDK-owned hosts; the handle belongs to this runtime realm. */
@@ -41,19 +41,30 @@ export function workersNative<Env = Record<string, unknown>>(
     return closing;
   };
   host.__workersNativeDispose = dispose;
-  const ready = app.ready.catch(async (error: unknown) => {
-    try {
-      await dispose();
-    } catch (cleanupError) {
-      throw new AggregateError(
-        [error, cleanupError],
-        "Native startup and cleanup failed",
-      );
-    } finally {
-      failed(error);
-    }
-    throw error;
-  });
+  const ready = app.ready.then(
+    () => {
+      if (closing || host.__workersNativeDispose !== dispose) return;
+      try {
+        host.WorkersNativeHost?.ready?.();
+      } catch {
+        // The native host owns its startup deadline if notification fails.
+      }
+    },
+    async (error: unknown) => {
+      const reportFailure = !closing;
+      try {
+        await dispose();
+      } catch (cleanupError) {
+        throw new AggregateError(
+          [error, cleanupError],
+          "Native startup and cleanup failed",
+        );
+      } finally {
+        if (reportFailure) failed(error);
+      }
+      throw error;
+    },
+  );
   return {
     ready,
     get execution() {

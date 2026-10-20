@@ -43,6 +43,32 @@ import WebKit
   host.addChild(child); child.view.frame = CGRect(x:20,y:100,width:350,height:600)
   host.view.addSubview(child.view); child.didMove(toParent: host)
   window.rootViewController = host; window.makeKeyAndVisible(); self.window = window
+  if CommandLine.arguments.contains("broken-entry") {
+   let shownAt = Date()
+   var closedNotifications = 0
+   var hiddenNotifications = 0
+   let manuallyClosed = try! makeEmbeddedController()
+   manuallyClosed.onStartupError = { _ in closedNotifications += 1 }
+   host.addChild(manuallyClosed); host.view.addSubview(manuallyClosed.view); manuallyClosed.didMove(toParent: host)
+   let hidden = try! makeEmbeddedController()
+   hidden.onStartupError = { _ in hiddenNotifications += 1 }
+   _ = hidden.view
+   let closed = Task { @MainActor in try! await manuallyClosed.close() }
+   child.onStartupError = { message in
+    Task { @MainActor in
+     await closed.value
+     assert(message.contains("30 seconds") && Date().timeIntervalSince(shownAt) >= 29)
+     assert(child.startupError != nil && child.children.isEmpty && window.rootViewController === host)
+     assert(closedNotifications == 0 && manuallyClosed.children.isEmpty && manuallyClosed.startupError == nil)
+     assert(hiddenNotifications == 0 && !hidden.children.isEmpty && hidden.startupError == nil)
+     try! await hidden.close()
+     print("SDK_MANUAL_CLOSE_NO_LATE_ERROR", closedNotifications)
+     print("SDK_HIDDEN_NO_DEADLINE", hiddenNotifications)
+     print("SDK_BROKEN_ENTRY_CLEANED", child.children.count)
+    }
+   }
+   return
+  }
   if CommandLine.arguments.contains("startup-failure") {
    child.onStartupError = { message in
     assert(!message.isEmpty && child.startupError != nil)
@@ -57,6 +83,11 @@ import WebKit
      let hook = try! await runtime.webView!.evaluateJavaScript("typeof globalThis.__workersNativeDispose")
      assert(hook as? String == "function")
      print("SDK_HOOK function")
+     // Deliberately outlive the startup deadline: ready must cancel it.
+     try! await Task.sleep(nanoseconds: 35_000_000_000)
+     assert(child.startupError == nil && !child.children.isEmpty && !runtime.children.isEmpty)
+     assert(window.rootViewController === host)
+     print("SDK_READY_SURVIVED_DEADLINE")
      _ = try! await page.evaluateJavaScript("document.querySelector('a').click()")
      try! await waitForText("Worker Next", in: page)
      print("SDK_NAVIGATION Worker Next")

@@ -24,6 +24,9 @@ public class WorkersCapacitorPlugin extends Plugin {
     private Runnable closeTimeout;
     private Object closeGeneration;
     private Object sdkHost;
+    private androidx.webkit.Profile sdkProfile;
+    void setNativeProfile(androidx.webkit.Profile profile) { sdkProfile = profile; }
+    private CookieManager cookies() { return sdkProfile == null ? CookieManager.getInstance() : sdkProfile.getCookieManager(); }
     private boolean awaitingNativeCleanup;
     private boolean rendererLost;
     private Runnable nativeFailure;
@@ -62,6 +65,7 @@ public class WorkersCapacitorPlugin extends Plugin {
             documentLinks = androidx.webkit.WebViewCompat.addDocumentStartJavaScript(bridge.getWebView(), script, java.util.Collections.singleton(bridge.getLocalUrl().replaceAll("/$", "")));
             starting = call;
             runtime = new WebView(getContext());
+            if (sdkProfile != null) androidx.webkit.WebViewCompat.setProfile(runtime, sdkProfile.getName());
             runtime.getSettings().setJavaScriptEnabled(true);
             runtime.getSettings().setDomStorageEnabled(true);
             hostBridge = new HostBridge(runtime);
@@ -128,7 +132,7 @@ public class WorkersCapacitorPlugin extends Plugin {
     private void cookiesGet(String url, WorkerSockets.Result result) {
         if (!cookieURL(url)) { result.reject("Cookies require an HTTPS URL without credentials"); return; }
         main.post(() -> {
-            String cookie = CookieManager.getInstance().getCookie(url);
+            String cookie = cookies().getCookie(url);
             JSObject value = new JSObject(); value.put("cookie", cookie == null ? "" : cookie); result.resolve(value);
         });
     }
@@ -140,7 +144,7 @@ public class WorkersCapacitorPlugin extends Plugin {
         } catch (Exception error) { result.reject("Invalid remote cookies"); }
     }
     private void saveCookie(String url, JSONArray cookies, int index, WorkerSockets.Result result) {
-        CookieManager store = CookieManager.getInstance();
+        CookieManager store = cookies();
         if (index == cookies.length()) { store.flush(); result.resolve(null); return; }
         store.setCookie(url, cookies.optString(index), accepted -> saveCookie(url, cookies, index + 1, result));
     }

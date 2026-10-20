@@ -24,7 +24,7 @@ const run = (command, args, options = {}) =>
   });
 const adb = (...args) =>
   run("adb", ["-s", device, ...args], { timeout: 60_000 });
-for (const scenario of ["normal", "startup-failure"])
+for (const scenario of ["normal", "startup-failure", "broken-entry"])
   run(process.execPath, ["../build-web.mjs", "android", scenario]);
 run(gradle, [
   "-p",
@@ -44,8 +44,8 @@ async function screen() {
   adb("shell", "uiautomator", "dump", "/sdcard/workers-embedding.xml");
   return adb("exec-out", "cat", "/sdcard/workers-embedding.xml");
 }
-async function waitFor(text) {
-  const deadline = Date.now() + 30_000;
+async function waitFor(text, timeout = 30_000) {
+  const deadline = Date.now() + timeout;
   let xml = "";
   while (Date.now() < deadline) {
     xml = await screen();
@@ -137,8 +137,18 @@ const rotation = adb(
 ).trim();
 try {
   await waitFor("Native host visits 0");
+  await waitFor("Host service worker host-sw-retained");
   await tap("Open Worker");
   await waitFor("Worker Home");
+  // Healthy ready must cancel the native 30-second startup deadline.
+  await delay(35_000);
+  await waitFor("Worker Home");
+  if (
+    !adb("logcat", "-d", "-s", "HostIsolation:I", "*:S").includes(
+      "Host SW result during SDK open: host-sw-retained",
+    )
+  )
+    throw new Error("Host service-worker routing failed while SDK was open");
   await tap("Next");
   await waitFor("Worker Next");
   await tap("Submit");
@@ -149,6 +159,23 @@ try {
   await waitFor("Posted verified");
   adb("shell", "input", "keyevent", "4");
   await waitFor("Native host visits 1");
+  await tap("Verify host isolation");
+  const isolationScreen = await screen();
+  await writeFile(path.join(artifacts, "host-isolation.xml"), isolationScreen);
+  await writeFile(
+    path.join(artifacts, "host-isolation.log"),
+    adb("logcat", "-d", "-s", "HostIsolation:I", "*:S"),
+  );
+  if (
+    !isolationScreen.includes(
+      'text="Host isolation session=true persistent=true handler=true"',
+    )
+  )
+    throw new Error(
+      "SDK open/close changed host cookies or process CookieHandler; see host-isolation.log",
+    );
+  await tap("Verify host service worker");
+  await waitFor("Host service worker host-sw-retained");
   await tap("Open Worker");
   await waitFor("Worker Home");
   adb("shell", "input", "keyevent", "4");
@@ -173,9 +200,64 @@ try {
   await waitFor("Worker Home");
   adb("shell", "input", "keyevent", "4");
   await waitFor("Native host visits 5");
+  const lifecycleLog = () =>
+    adb("logcat", "-d", "-s", "HostIsolation:I", "*:S");
+  const createdBefore = (lifecycleLog().match(/SDK Activity created /g) ?? [])
+    .length;
+  await tap("Recreate Worker");
+  const recreateDeadline = Date.now() + 30_000;
+  while (
+    !adb("logcat", "-d", "-s", "HostIsolation:I", "*:S").includes(
+      "Recreating SDK Activity",
+    )
+  ) {
+    if (Date.now() > recreateDeadline)
+      throw new Error("SDK Activity recreation not triggered");
+    await delay(300);
+  }
+  while (
+    (lifecycleLog().match(/SDK Activity created /g) ?? []).length <
+    createdBefore + 2
+  ) {
+    if (Date.now() > recreateDeadline)
+      throw new Error("SDK Activity was not recreated");
+    await delay(300);
+  }
+  await waitFor("Worker Home");
+  await tap("Next");
+  await waitFor("Worker Next");
+  await tap("Submit");
+  await waitFor("Posted verified");
+  adb("shell", "input", "keyevent", "4");
+  await waitFor("Native host visits 6");
+  await tap("Open broken Worker");
+  await waitFor("Native host visits 7", 60_000);
+  if (
+    !adb("logcat", "-d", "-s", "WorkersNative:E").includes(
+      "Runtime startup timed out before ready",
+    )
+  )
+    throw new Error(
+      "Missing JavaScript entry did not report the native startup deadline",
+    );
+  // A deadline failure must also release the runtime so a normal open works.
+  await tap("Open Worker");
+  await waitFor("Worker Home");
+  adb("shell", "input", "keyevent", "4");
+  await waitFor("Native host visits 8");
+  await tap("Verify host isolation");
+  await waitFor("Host isolation session=true persistent=true handler=true");
+  await tap("Verify host service worker");
+  await waitFor("Host service worker host-sw-retained");
   await writeFile(path.join(artifacts, "passed.xml"), await screen());
+  await writeFile(
+    path.join(artifacts, "passed.png"),
+    run("adb", ["-s", device, "exec-out", "screencap", "-p"], {
+      encoding: null,
+    }),
+  );
   console.log(
-    "PASS Maven consumer: navigation, POST, rotation, close/reopen, startup failure, renderer loss and host state",
+    "PASS Maven consumer: navigation, POST, rotation, close/reopen, startup failure, renderer loss, Activity recreation, broken entry, cookies, CookieHandler and host service-worker routing",
   );
 } finally {
   for (const [name, value] of [
@@ -186,4 +268,8 @@ try {
     else adb("shell", "settings", "put", "system", name, value);
   }
   await writeFile(path.join(artifacts, "runtime.log"), adb("logcat", "-d"));
+  await writeFile(
+    path.join(artifacts, "host-isolation.log"),
+    adb("logcat", "-d", "-s", "HostIsolation:I", "*:S"),
+  );
 }

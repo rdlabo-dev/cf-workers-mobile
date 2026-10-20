@@ -7,13 +7,13 @@ const platform = process.argv[2];
 const scenario = process.argv[3] ?? "normal";
 if (!["ios", "android"].includes(platform))
   throw new Error("Usage: node build-web.mjs ios|android");
-if (!["normal", "startup-failure"].includes(scenario))
-  throw new Error("Scenario must be normal or startup-failure");
+if (!["normal", "startup-failure", "broken-entry"].includes(scenario))
+  throw new Error("Scenario must be normal, startup-failure or broken-entry");
 const root = new URL("./", import.meta.url);
 const output = new URL(
   platform === "ios"
     ? "ios/Sources/Consumer/PrivateWeb/"
-    : `android/app/src/main/assets/sdk-web${scenario === "normal" ? "" : "-failure"}/`,
+    : `android/app/src/main/assets/sdk-web${scenario === "normal" ? "" : scenario === "startup-failure" ? "-failure" : "-broken"}/`,
   root,
 );
 const entry = new URL(`../../../dist/${platform}.js`, import.meta.url);
@@ -41,5 +41,5 @@ app.ready.catch(error => { console.error("EMBED_START_FAILED", error); });`,
 });
 await writeFile(
   new URL("index.html", output),
-  '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><script type="module" src="/main.js"></script>',
+  `<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><script type="module" src="/${scenario === "broken-entry" ? "missing-entry.js" : "main.js"}"></script>`,
 );

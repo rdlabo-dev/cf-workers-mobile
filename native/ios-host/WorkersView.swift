@@ -9,8 +9,12 @@ import WorkersCapacitor
 @MainActor public final class WorkersViewController: UIViewController {
     private var runtime: EmbeddedRuntimeController?
     private var closing: Task<Void, Error>?
+    private enum StartupState { case idle, waiting, ready, failed, closed }
+    private var startupState = StartupState.idle
+    private var startupDeadline: Task<Void, Never>?
     public private(set) var startupError: String?
-    /// Called after failed startup has released the embedded runtime.
+    /// Called after failed startup has released the embedded runtime. A displayed
+    /// controller must receive the JavaScript ready handshake within 30 seconds.
     public var onStartupError: ((String) -> Void)?
 
     public init(assets: URL) throws {
@@ -20,13 +24,14 @@ import WorkersCapacitor
         }
         runtime = EmbeddedRuntimeController(assets: assets)
         super.init(nibName: nil, bundle: nil)
+        runtime?.onStartupReady = { [weak self] in
+            guard let self, self.startupState == .idle || self.startupState == .waiting else { return }
+            self.startupState = .ready
+            self.startupDeadline?.cancel()
+            self.startupDeadline = nil
+        }
         runtime?.onStartupFailure = { [weak self] message in
-            guard let self, self.startupError == nil else { return }
-            self.startupError = message
-            Task { @MainActor in
-                try? await self.close()
-                self.onStartupError?(message)
-            }
+            self?.failStartup(message)
         }
     }
 
@@ -43,10 +48,41 @@ import WorkersCapacitor
         runtime.didMove(toParent: self)
     }
 
+    public override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        guard startupState == .idle else { return }
+        startupState = .waiting
+        startupDeadline = Task { @MainActor [weak self] in
+            do { try await Task.sleep(nanoseconds: 30_000_000_000) }
+            catch { return }
+            self?.failStartup("Workers application did not become ready within 30 seconds")
+        }
+    }
+
+    private func failStartup(_ message: String) {
+        guard startupState == .idle || startupState == .waiting else { return }
+        startupState = .failed
+        startupDeadline?.cancel()
+        startupDeadline = nil
+        startupError = message
+        Task { @MainActor in
+            try? await self.closeRuntime()
+            guard self.startupState == .failed else { return }
+            self.onStartupError?(message)
+        }
+    }
+
     /// Await before removing the controller. Disposes JavaScript in its owning
     /// runtime realm, then releases document views, sockets, and native bridges.
     /// A closed controller is terminal; create a new controller to open again.
     public func close() async throws {
+        startupState = .closed
+        startupDeadline?.cancel()
+        startupDeadline = nil
+        try await closeRuntime()
+    }
+
+    private func closeRuntime() async throws {
         if let closing { return try await closing.value }
         guard let runtime else { return }
         let task = Task { @MainActor in
@@ -103,6 +139,7 @@ private final class EmbeddedRuntimeController: CAPBridgeViewController {
     let workers = WorkersCapacitorPlugin()
     private let assets: URL
     var onStartupFailure: ((String) -> Void)?
+    var onStartupReady: (() -> Void)?
     private var failureHandler: StartupFailureHandler?
     init(assets: URL) { self.assets = assets; super.init(nibName: nil, bundle: nil) }
     @available(*, unavailable)
@@ -123,11 +160,11 @@ private final class EmbeddedRuntimeController: CAPBridgeViewController {
         }
         bridge?.registerPluginInstance(workers)
         guard let content = webView?.configuration.userContentController else { return }
-        let handler = StartupFailureHandler { [weak self] message in self?.onStartupFailure?(message) }
+        let handler = StartupFailureHandler(ready: { [weak self] in self?.onStartupReady?() }, failed: { [weak self] message in self?.onStartupFailure?(message) })
         failureHandler = handler
         content.add(handler, name: "WorkersNativeStartupFailure")
         content.addUserScript(WKUserScript(
-            source: "globalThis.WorkersNativeHost = { failed: message => window.webkit.messageHandlers.WorkersNativeStartupFailure.postMessage(String(message)) };",
+            source: "globalThis.WorkersNativeHost = { ready: () => window.webkit.messageHandlers.WorkersNativeStartupFailure.postMessage({type: 'ready'}), failed: message => window.webkit.messageHandlers.WorkersNativeStartupFailure.postMessage({type: 'failed', message: String(message)}) };",
             injectionTime: .atDocumentStart, forMainFrameOnly: true))
     }
     override func setStatusBarDefaults() {}
@@ -135,11 +172,13 @@ private final class EmbeddedRuntimeController: CAPBridgeViewController {
 }
 
 private final class StartupFailureHandler: NSObject, WKScriptMessageHandler {
+    private let ready: () -> Void
     private let failed: (String) -> Void
-    init(_ failed: @escaping (String) -> Void) { self.failed = failed }
+    init(ready: @escaping () -> Void, failed: @escaping (String) -> Void) { self.ready = ready; self.failed = failed }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.frameInfo.isMainFrame, let value = message.body as? String else { return }
-        failed(value)
+        guard message.frameInfo.isMainFrame, let value = message.body as? [String: Any] else { return }
+        if value["type"] as? String == "ready" { ready() }
+        if value["type"] as? String == "failed", let message = value["message"] as? String { failed(message) }
     }
 }
 

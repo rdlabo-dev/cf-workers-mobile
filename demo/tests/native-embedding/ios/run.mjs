@@ -17,9 +17,11 @@ const scratch =
 const device = process.argv[2];
 const scenario = process.argv[3] || "normal";
 const finalMarker =
-  scenario === "startup-failure"
-    ? "SDK_STARTUP_FAILURE_CLEANED 0"
-    : "SDK_SWIFTUI_DISMANTLED 0";
+  scenario === "broken-entry"
+    ? "SDK_BROKEN_ENTRY_CLEANED 0"
+    : scenario === "startup-failure"
+      ? "SDK_STARTUP_FAILURE_CLEANED 0"
+      : "SDK_SWIFTUI_DISMANTLED 0";
 if (!device) throw new Error("Usage: node run.mjs <booted-simulator-UUID>");
 function run(command, args, cwd = here) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });
@@ -162,9 +164,12 @@ const output = await new Promise((resolve, reject) => {
     if (error) reject(error);
     else resolve(log);
   };
-  const timer = setTimeout(() => {
-    finish(new Error(`Probe timed out\n${log}`));
-  }, 90000);
+  const timer = setTimeout(
+    () => {
+      finish(new Error(`Probe timed out\n${log}`));
+    },
+    scenario === "normal" ? 120000 : 90000,
+  );
   const receive = (chunk) => {
     log += chunk.toString();
     if (log.includes(finalMarker)) {
@@ -180,9 +185,10 @@ const output = await new Promise((resolve, reject) => {
     }
   });
 });
-if (scenario !== "startup-failure")
+if (scenario === "normal")
   for (const marker of [
     "SDK_HOOK function",
+    "SDK_READY_SURVIVED_DEADLINE",
     "SDK_DOCUMENT Worker Home",
     "SDK_NAVIGATION Worker Next",
     "SDK_POST Posted verified",
@@ -191,5 +197,13 @@ if (scenario !== "startup-failure")
   ])
     if (!output.includes(marker))
       throw new Error(`Missing ${marker}\n${output}`);
+if (scenario === "broken-entry") {
+  for (const marker of [
+    "SDK_MANUAL_CLOSE_NO_LATE_ERROR 0",
+    "SDK_HIDDEN_NO_DEADLINE 0",
+  ])
+    if (!output.includes(marker))
+      throw new Error(`Missing ${marker}\n${output}`);
+}
 await writeFile(`${scratch}/${scenario}.log`, output);
 console.log(`PASS ${scenario}. Log: ${scratch}/${scenario}.log`);

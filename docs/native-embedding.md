@@ -66,6 +66,9 @@ application delegate.
 
 Failed Worker startup releases the embedded runtime and reports `startupError`
 and `onStartupError`. The SDK does not pop or replace your native navigation.
+When the controller first appears, startup must complete within 30 seconds.
+This also detects missing or broken entry scripts that cannot report an error
+from JavaScript. Explicit closure cancels the pending startup notification.
 
 ## Android
 
@@ -89,10 +92,21 @@ The existing Activity can remain a ComponentActivity. The SDK owns its
 AppCompatActivity and WebView; the application does not change its superclass,
 initialize a Capacitor bridge, or register the Workers plugin.
 
-Only one SDK screen can be active per process. This host uses Android's
-process-global Service Worker client, so applications that install their own
-custom Service Worker client are not supported. Do not replace that client while
-the SDK is active. Cookie storage is preserved when the SDK closes.
+The installed Android WebView must support AndroidX WebKit `MULTI_PROFILE`.
+Check `WorkersNative.isSupported()` before offering the screen on devices where
+WebView availability is uncertain. `open()` throws `UnsupportedOperationException`
+when this feature is unavailable; updating the device's WebView may enable it.
+
+The SDK uses a dedicated persistent WebView profile for its cookies, storage,
+and Service Worker routing. Existing host session cookies, the Java
+`CookieHandler`, and the host's Service Worker client remain unchanged. SDK
+cookies are separate from host cookies and persist across SDK screen openings.
+Capacitor's application-wide core plugins are not registered in this host.
+
+Only one SDK screen can be active at a time. Activity recreation waits for the
+previous runtime to release ownership before starting its replacement.
+Startup must complete within 30 seconds; failed or incomplete startup closes
+the SDK screen and returns to the existing Activity.
 
 ## Compatibility
 
