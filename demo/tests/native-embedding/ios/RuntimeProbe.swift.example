@@ -1,0 +1,66 @@
+import UIKit
+import SwiftUI
+import Capacitor
+import WorkersIOS
+import Consumer
+import WebKit
+
+@MainActor func waitForText(_ expected: String, in page: WKWebView) async throws {
+ for _ in 0..<100 {
+  let value = try? await page.evaluateJavaScript("document.body.innerText")
+  if (value as? String)?.contains(expected) == true { return }
+  try await Task.sleep(nanoseconds: 100_000_000)
+ }
+ throw URLError(.timedOut)
+}
+@objc class AppDelegate: UIResponder, UIApplicationDelegate {}
+@objc(SceneDelegate) class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+ var window: UIWindow?
+ func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+  let window = UIWindow(windowScene: scene as! UIWindowScene)
+  let host = UIViewController()
+  let child = try! makeEmbeddedController()
+  host.addChild(child); child.view.frame = CGRect(x:20,y:100,width:350,height:600)
+  host.view.addSubview(child.view); child.didMove(toParent: host)
+  window.rootViewController = host; window.makeKeyAndVisible(); self.window = window
+  if CommandLine.arguments.contains("startup-failure") {
+   child.onStartupError = { message in
+    assert(!message.isEmpty && child.startupError != nil)
+    assert(child.children.isEmpty && window.rootViewController === host)
+    print("SDK_STARTUP_FAILURE_CLEANED", child.children.count)
+   }
+   return
+  }
+  DispatchQueue.main.asyncAfter(deadline:.now()+5) {
+   let runtime = child.children.first as! CAPBridgeViewController
+   let document = runtime.children.first as! CAPBridgeViewController
+   Task { @MainActor in
+     let page = document.webView!
+     try! await waitForText("Worker Home", in: page)
+     print("SDK_DOCUMENT Worker Home")
+     let hook = try! await runtime.webView!.evaluateJavaScript("typeof globalThis.__workersNativeDispose")
+     assert(hook as? String == "function")
+     print("SDK_HOOK function")
+     _ = try! await page.evaluateJavaScript("document.querySelector('a').click()")
+     try! await waitForText("Worker Next", in: page)
+     print("SDK_NAVIGATION Worker Next")
+     _ = try! await page.evaluateJavaScript("document.querySelector('form').requestSubmit()")
+     try! await waitForText("Posted verified", in: page)
+     print("SDK_POST Posted verified")
+     assert(window.rootViewController === host)
+     try! await child.close()
+     try! await child.close()
+     print("SDK_CLOSED CHILDREN",child.children.count,"RUNTIME_CHILDREN",runtime.children.count)
+     assert(child.children.isEmpty && runtime.children.isEmpty)
+     let reopened = try! makeEmbeddedController()
+     let swiftUI = UIHostingController(rootView: WorkersView(controller: reopened)); window.rootViewController = swiftUI
+     DispatchQueue.main.asyncAfter(deadline:.now()+4) {
+      let runtime = reopened.children.first as! CAPBridgeViewController
+      let document = runtime.children.first as! CAPBridgeViewController
+      document.webView?.evaluateJavaScript("document.body.innerText") { value,error in assert((value as? String)?.contains("Worker Home") == true); print("SDK_REOPENED_SWIFTUI",value ?? "nil",error ?? "ok"); window.rootViewController = UIViewController(); DispatchQueue.main.asyncAfter(deadline: .now()+2) { assert(reopened.children.isEmpty); print("SDK_SWIFTUI_DISMANTLED",reopened.children.count) } }
+     }
+   }
+  }
+ }
+}
+UIApplicationMain(CommandLine.argc, CommandLine.unsafeArgv,nil,NSStringFromClass(AppDelegate.self))

@@ -1,0 +1,12 @@
+apply plugin: 'com.android.application'
+android {
+    namespace 'probe'
+    compileSdk 36
+    defaultConfig { applicationId 'probe.workersembed'; minSdk 24; targetSdk 36 }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_21; targetCompatibility JavaVersion.VERSION_21 }
+    packaging.resources { excludes += 'META-INF/INDEX.LIST'; merges += 'META-INF/io.netty.versions.properties' }
+}
+dependencies {
+    implementation 'jp.rdlabo:workers-native-android:0.1.1'
+    implementation 'androidx.activity:activity:1.10.1'
+}

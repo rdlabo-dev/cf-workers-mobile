@@ -20,3 +20,11 @@ demo/*/.open-next/
 demo/*/.void/
 demo/*/next-env.d.ts
 demo/*/.void-wrangler.jsonc
+
+# Generated native embedding consumer resources and build products.
+demo/tests/native-embedding/ios/Sources/Consumer/PrivateWeb/
+demo/tests/native-embedding/ios/.build/
+demo/tests/native-embedding/android/app/src/main/assets/
+demo/tests/native-embedding/android/build/
+demo/tests/native-embedding/android/app/build/
+demo/tests/native-embedding/android/.gradle/

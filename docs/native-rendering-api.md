@@ -4,9 +4,8 @@ The package includes the native connection for Capacitor 8 (verified with 8.5.3)
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
 this Preview.
 
-For the proposed SDKs for existing native applications, see the
-[minimal native embedding plan](native-embedding-plan.md). Those SDKs are not yet
-released; the installation below describes the current Capacitor integration.
+For an existing native application without Capacitor setup, see
+[native application embedding](native-embedding.md).
 
 ## Installation
 

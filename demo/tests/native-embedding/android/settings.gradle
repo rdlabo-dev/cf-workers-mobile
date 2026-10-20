@@ -1,0 +1,7 @@
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+rootProject.name = 'WorkersOrdinaryAndroidHost'
+include ':app'
+if (providers.gradleProperty('includeSdk').isPresent()) {
+    include ':workers'
+    project(':workers').projectDir = file('../../../../native/android')
+}

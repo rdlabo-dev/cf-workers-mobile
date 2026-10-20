@@ -29,6 +29,19 @@ const pack = JSON.parse(
     encoding: "utf8",
   }),
 )[0];
+for (const required of [
+  "dist/ios.js",
+  "dist/android.js",
+  "native/ios-host/WorkersView.swift",
+  "native/android/consumer-rules.pro",
+  "native/android/src/main/java/jp/rdlabo/workerscapacitor/WorkersNative.java",
+  "native/android/src/main/java/jp/rdlabo/workerscapacitor/WorkersNativeActivity.java",
+]) {
+  assert.ok(
+    pack.files.some((file) => file.path === required),
+    `Native embedding consumer requires packed file ${required}`,
+  );
+}
 for (const module of [
   "path",
   "querystring",

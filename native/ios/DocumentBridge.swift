@@ -3,10 +3,12 @@ import Capacitor
 
 // Internal document view. Consumers retain their ordinary Capacitor controller.
 final class DocumentBridgeController: CAPBridgeViewController {
+    var embeddedDescriptorFactory: (() -> InstanceDescriptor)?
     weak var runtimeHost: WKWebView?
     var settings: [String: Any] = [:]
     var localURL: URL!
     override func instanceDescriptor() -> InstanceDescriptor {
+        if let factory = embeddedDescriptorFactory { return factory() }
         let descriptor = super.instanceDescriptor()
         // Capacitor's resolved value cannot distinguish an explicit "never"
         // from its default. Check presence in the same bundled configuration.

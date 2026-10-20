@@ -30,7 +30,9 @@
     "dist",
     "Package.swift",
     "native/ios/*.swift",
+    "native/ios-host/*.swift",
     "native/android/build.gradle",
+    "native/android/consumer-rules.pro",
     "native/android/src/main/"
   ],
   "exports": {
@@ -80,6 +82,14 @@
     "./environment": {
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"
+    },
+    "./ios": {
+      "types": "./dist/ios.d.ts",
+      "import": "./dist/ios.js"
+    },
+    "./android": {
+      "types": "./dist/android.d.ts",
+      "import": "./dist/android.js"
     }
   },
   "scripts": {

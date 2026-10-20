@@ -1,0 +1,2 @@
+-keep @com.getcapacitor.annotation.CapacitorPlugin class jp.rdlabo.workerscapacitor.** { *; }
+-keepclassmembers class jp.rdlabo.workerscapacitor.** { @android.webkit.JavascriptInterface <methods>; }

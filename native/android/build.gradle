@@ -1,9 +1,15 @@
 apply plugin: 'com.android.library'
+apply plugin: 'maven-publish'
+
+group = 'jp.rdlabo'
+version = '0.1.1'
+
 
 android {
     namespace 'jp.rdlabo.workerscapacitor'
     compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
     defaultConfig {
+        consumerProguardFiles 'consumer-rules.pro'
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24
         targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
     }
@@ -14,7 +20,28 @@ android {
 }
 
 dependencies {
-    implementation project(':capacitor-android')
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+    if (findProject(':capacitor-android') != null) {
+        implementation project(':capacitor-android')
+    } else {
+        implementation 'com.capacitorjs:core:8.5.3'
+    }
     implementation "androidx.webkit:webkit:${rootProject.ext.has('androidxWebkitVersion') ? rootProject.ext.androidxWebkitVersion : '1.14.0'}"
     implementation 'io.netty:netty-handler:4.1.139.Final'
+}
+
+android { publishing { singleVariant('release') { withSourcesJar() } } }
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                artifactId = 'workers-native-android'
+                pom {
+                    name = 'Workers Native Android'
+                    description = 'Android host and Capacitor transport for Workers Native'
+                }
+            }
+        }
+    }
 }

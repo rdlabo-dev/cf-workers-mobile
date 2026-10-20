@@ -1,0 +1,14 @@
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.13.0' }
+}
+allprojects {
+    repositories { maven { url rootProject.file('build/maven') }; google(); mavenCentral() }
+}
+if (findProject(':workers') != null) {
+    project(':workers') {
+        afterEvaluate {
+            publishing.repositories { maven { name = 'Probe'; url = rootProject.file('build/maven') } }
+        }
+    }
+}
