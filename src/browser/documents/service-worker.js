@@ -87,6 +87,31 @@ self.addEventListener("fetch", (event) => {
     })(),
   );
 });
+// A destroyed Android WebView can remain in clients.matchAll briefly. Probe
+// before sending a navigation request; never replay an application request.
+function hostReady(host, signal) {
+  return new Promise((resolve, reject) => {
+    const channel = new MessageChannel();
+    const finish = (ready, error) => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", abort);
+      channel.port1.close();
+      channel.port2.close();
+      error ? reject(error) : resolve(ready);
+    };
+    const abort = () => finish(false, signal.reason);
+    const timer = setTimeout(() => finish(false), 2000);
+    channel.port1.onmessage = (event) =>
+      finish(event.data === "workers-capacitor:host-ready");
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) return abort();
+    try {
+      host.postMessage("workers-capacitor:host-ready", [channel.port2]);
+    } catch {
+      finish(false);
+    }
+  });
+}
 async function dispatch(request) {
   const deadline = Date.now() + 10000;
   let host = (
@@ -96,10 +121,14 @@ async function dispatch(request) {
   );
   // An installed SW survives process restarts. Let the bundled entry restart the
   // native host before intercepting its first document, without a network server.
-  if (!host && request.mode === "navigate" && request.method === "GET")
-    return fetch(new URL("/index.html", self.location.origin).href, {
-      cache: "no-store",
-    });
+  if (request.mode === "navigate" && request.method === "GET") {
+    request.signal.throwIfAborted();
+    if (!host || !(await hostReady(host, request.signal)))
+      return fetch(new URL("/index.html", self.location.origin).href, {
+        cache: "no-store",
+        signal: request.signal,
+      });
+  }
   while (!host) {
     host = (
       await self.clients.matchAll({ type: "window", includeUncontrolled: true })

@@ -8,6 +8,7 @@ const script = readFileSync(
 function setup(cache = new Map<string, Response>()) {
   let assets = ["/index.html"];
   let hostAvailable = true;
+  let hostResponsive = true;
   const listeners = new Map<string, (event: any) => void>();
   const dispatch = vi.fn(async (request: any) => ({
     url: "https://worker.example" + new URL(request.url).pathname,
@@ -56,7 +57,9 @@ function setup(cache = new Map<string, Response>()) {
                 {
                   url: "https://localhost/index.html?__workers_capacitor_host=1",
                   postMessage: async (request: any, ports: MessagePort[]) => {
-                    ports[0].postMessage(await dispatch(request));
+                    if (request === "workers-capacitor:host-ready") {
+                      if (hostResponsive) ports[0].postMessage(request);
+                    } else ports[0].postMessage(await dispatch(request));
                     ports[0].close();
                   },
                 },
@@ -66,6 +69,9 @@ function setup(cache = new Map<string, Response>()) {
     },
   });
   return {
+    setHostResponsive: (value: boolean) => {
+      hostResponsive = value;
+    },
     setHostAvailable: (value: boolean) => {
       hostAvailable = value;
     },
@@ -180,7 +186,7 @@ it("loads the bundled bootstrap when a persisted SW has no native host", async (
   expect(sw.dispatch).not.toHaveBeenCalled();
   expect(sw.nativeFetch).toHaveBeenLastCalledWith(
     "https://localhost/index.html",
-    { cache: "no-store" },
+    { cache: "no-store", signal: request.signal },
   );
 });
 
@@ -351,3 +357,136 @@ it("bounds pending headers without blocking stream reads or queued cancellation"
     (await Promise.all(more)).map((response) => response.body!.cancel()),
   );
 });
+
+it("bootstraps a navigation without dispatching to an unresponsive listed host", async () => {
+  vi.useFakeTimers();
+  try {
+    const sw = setup();
+    sw.setHostResponsive(false);
+    const request = new Request("https://localhost/page");
+    Object.defineProperty(request, "mode", { value: "navigate" });
+    const pending = sw.fetch(request)!;
+    await vi.advanceTimersByTimeAsync(2001);
+    expect(await (await pending).text()).toBe("asset");
+    expect(sw.dispatch).not.toHaveBeenCalled();
+    expect(sw.nativeFetch).toHaveBeenLastCalledWith(
+      "https://localhost/index.html",
+      { cache: "no-store", signal: request.signal },
+    );
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("dispatches a live navigation once and never bootstraps after a sent request times out", async () => {
+  vi.useFakeTimers();
+  const sw = setup();
+  const request = new Request("https://localhost/page");
+  Object.defineProperty(request, "mode", { value: "navigate" });
+  expect(await (await sw.fetch(request))!.text()).toBe("worker");
+  expect(sw.dispatch).toHaveBeenCalledOnce();
+  sw.dispatch.mockClear();
+  let release!: (value: any) => void;
+  try {
+    sw.dispatch.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+    sw.dispatch.mockResolvedValue({ done: true } as any);
+    const pending = sw.fetch(request)!;
+    const rejected = expect(pending).rejects.toThrow("Worker response timeout");
+    // Deliver the readiness MessagePort reply before advancing the RPC deadline.
+    await vi.waitFor(() => expect(sw.dispatch).toHaveBeenCalledOnce());
+    await vi.advanceTimersByTimeAsync(30001);
+    await rejected;
+    expect(
+      sw.nativeFetch.mock.calls.some(([url]) =>
+        String(url).endsWith("/index.html"),
+      ),
+    ).toBe(false);
+    expect(
+      sw.dispatch.mock.calls.filter(([value]) => !(value as any).action),
+    ).toHaveLength(1);
+    release({ done: true });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("aborts a navigation readiness check without dispatch or bootstrap", async () => {
+  vi.useFakeTimers();
+  try {
+    const sw = setup();
+    sw.setHostResponsive(false);
+    const controller = new AbortController();
+    const request = new Request("https://localhost/page", {
+      signal: controller.signal,
+    });
+    Object.defineProperty(request, "mode", { value: "navigate" });
+    const pending = sw.fetch(request)!;
+    const rejected = expect(pending).rejects.toThrow("cancel readiness");
+    await vi.advanceTimersByTimeAsync(1);
+    controller.abort(new Error("cancel readiness"));
+    await rejected;
+    await vi.advanceTimersByTimeAsync(2001);
+    expect(sw.dispatch).not.toHaveBeenCalled();
+    expect(
+      sw.nativeFetch.mock.calls.some(([url]) =>
+        String(url).endsWith("/index.html"),
+      ),
+    ).toBe(false);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it.each([false, true])(
+  "a live host may start slowly or report startup failure without bootstrap (failure=%s)",
+  async (failure) => {
+    vi.useFakeTimers();
+    let release!: (value: any) => void;
+    try {
+      const sw = setup();
+      sw.dispatch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      const request = new Request("https://localhost/page");
+      Object.defineProperty(request, "mode", { value: "navigate" });
+      const pending = sw.fetch(request)!;
+      const result = failure
+        ? expect(pending).rejects.toThrow("original startup failed")
+        : pending;
+      await vi.waitFor(() => expect(sw.dispatch).toHaveBeenCalledOnce());
+      await vi.advanceTimersByTimeAsync(2500);
+      expect(
+        sw.nativeFetch.mock.calls.some(([url]) =>
+          String(url).endsWith("/index.html"),
+        ),
+      ).toBe(false);
+      release(
+        failure
+          ? { error: "original startup failed" }
+          : {
+              status: 200,
+              headers: {},
+              body: new TextEncoder().encode("started").buffer,
+            },
+      );
+      if (failure) await result;
+      else expect(await (await pending).text()).toBe("started");
+      expect(sw.dispatch).toHaveBeenCalledOnce();
+      expect(
+        sw.nativeFetch.mock.calls.some(([url]) =>
+          String(url).endsWith("/index.html"),
+        ),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  },
+);
