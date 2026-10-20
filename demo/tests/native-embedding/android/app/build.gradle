@@ -7,6 +7,6 @@ android {
     packaging.resources { excludes += 'META-INF/INDEX.LIST'; merges += 'META-INF/io.netty.versions.properties' }
 }
 dependencies {
-    implementation 'jp.rdlabo:workers-native-android:0.1.1'
+    implementation 'jp.rdlabo:workers-native-android:0.1.2'
     implementation 'androidx.activity:activity:1.10.1'
 }

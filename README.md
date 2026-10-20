@@ -20,7 +20,7 @@ All three JavaScript entries belong to the single npm package `cf-workers-mobile
 
 The iOS and Android hosts use Capacitor internally. Your existing native app does not need Capacitor configuration, CLI commands or plugin registration. They share the same Worker source, runtime options and [build tooling](docs/build-setup.md). Use the Capacitor integration when you need general native plugins.
 
-**Release status:** `cf-workers-mobile` is not published to npm yet. The existing `workers-capacitor@0.1.1` Preview provides the earlier Capacitor integration and does not include the new embedding hosts or the renamed imports. Build matching source revisions as described in the [embedding guide](docs/native-embedding.md#dependency-setup). APIs may change before a stable release.
+**Release status:** 0.1.2 Preview introduces the `cf-workers-mobile` npm name and the iOS, Android and Capacitor entries. Once the release is published, install `cf-workers-mobile@0.1.2`. The earlier `workers-capacitor@0.1.1` Preview does not include the embedding hosts or renamed imports. See [dependency setup](docs/native-embedding.md#dependency-setup) and the [compatibility limits](docs/compatibility.md); APIs may change before a stable release.
 
 If you use an AI coding assistant, open your application repository and give it the guide for your chosen host. For an existing native app:
 

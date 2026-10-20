@@ -1,9 +1,10 @@
 # Embed Workers UI in an existing native application
 
-**Release status:** `cf-workers-mobile` is not published to npm yet. The earlier
-`workers-capacitor@0.1.1` release does not include these hosts. Use matching
-source revisions for the JavaScript package and native SDK as described under
-[dependency setup](#dependency-setup). No public Android Maven release is provided yet.
+**Release status:** these hosts are included in 0.1.2 Preview. Install
+`cf-workers-mobile@0.1.2` once the npm release is published and use matching
+native dependencies as described under [dependency setup](#dependency-setup).
+The earlier `workers-capacitor@0.1.1` release does not include these hosts.
+No public Android Maven release is provided yet.
 
 Use these hosts in an existing UIKit, SwiftUI, or Android application without
 creating a Capacitor application. The SDK uses Capacitor internally and resolves
@@ -84,7 +85,13 @@ There is one npm package, `cf-workers-mobile`. Its `/ios`, `/android` and `/capa
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
 `jp.rdlabo:workers-native-android` is an Android Maven artifact.
 
-Create a JavaScript package tarball from a checkout containing these hosts:
+Once 0.1.2 Preview is published, install it in the web project:
+
+```sh
+npm install cf-workers-mobile@0.1.2
+```
+
+For a source build instead, create a JavaScript package tarball from the matching checkout:
 
 ```sh
 # In the SDK checkout:
@@ -92,7 +99,7 @@ npm install
 npm pack
 
 # In the web project:
-npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.1.tgz
+npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.2.tgz
 ```
 
 `npm pack` runs the build through `prepack`; the filename above uses the current
@@ -109,7 +116,7 @@ The source checkout's npm and build tools belong in the web build or CI.
 ## iOS
 
 Add `https://github.com/rdlabo-dev/cf-workers-mobile` as a Swift package pinned to
-the matching source revision and select the `WorkersIOS` product. Use Xcode 26 /
+tag `v0.1.2` for the 0.1.2 Preview npm package (or the matching revision for a source build), and select the `WorkersIOS` product. Use Xcode 26 /
 Swift 6.2 or newer, as required by the native dependency toolchain.
 Add your generated assets as a folder resource, for example `WorkerWeb`, then
 create the controller from that directory on the main actor:
@@ -167,12 +174,12 @@ demo/android/gradlew -p demo/tests/native-embedding/android -PincludeSdk \
 Use Java 21 and Android SDK 36, with `ANDROID_HOME` pointing to the installed SDK. Add the resulting
 `demo/tests/native-embedding/android/build/maven` directory as a Maven repository
 in your app's dependency repositories, alongside Google and Maven Central.
-The current local publication uses version `0.1.1`; it is a source-build version,
+The current local publication uses version `0.1.2`; it is a source-build version,
 not evidence of a public Maven release. In your app's Groovy `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'jp.rdlabo:workers-native-android:0.1.1'
+    implementation 'jp.rdlabo:workers-native-android:0.1.2'
 }
 android {
     compileOptions {
