@@ -10,6 +10,7 @@ import {
 import { appendFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { createProbeDeadline } from "./deadline.mjs";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const scratch =
@@ -158,20 +159,23 @@ const output = await new Promise((resolve, reject) => {
   const finish = (error) => {
     if (settled) return;
     settled = true;
-    clearTimeout(timer);
+    deadline.stop();
+    if (error) log += `\nSDK_PROBE_FAILURE ${error.message.split("\n")[0]}\n`;
     writeFileSync(`${scratch}/${scenario}.log`, log);
     child.kill();
     if (error) reject(error);
     else resolve(log);
   };
-  const timer = setTimeout(
-    () => {
-      finish(new Error(`Probe timed out\n${log}`));
+  const deadline = createProbeDeadline({
+    scenario,
+    onTimeout: (message) => finish(new Error(`${message}\n${log}`)),
+    onStage: (message) => {
+      log += `\n${message}\n`;
     },
-    scenario === "normal" ? 120000 : 90000,
-  );
+  });
   const receive = (chunk) => {
     log += chunk.toString();
+    if (log.includes("SDK_SCENE_STARTED")) deadline.sceneStarted();
     if (log.includes(finalMarker)) {
       finish();
     }

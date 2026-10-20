@@ -31,6 +31,8 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm run build
+      - name: Verify probe deadlines
+        run: node --test demo/tests/native-embedding/ios/deadline.test.mjs
       - name: Boot an available iPhone simulator
         run: |
           device=$(xcrun simctl list devices available --json | node -e 'let data="";process.stdin.on("data",c=>data+=c);process.stdin.on("end",()=>{const d=Object.values(JSON.parse(data).devices).flat().find(d=>d.name.startsWith("iPhone"));if(!d)process.exit(1);console.log(d.udid)})')
