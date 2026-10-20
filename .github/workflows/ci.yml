@@ -2,7 +2,7 @@ name: Compatibility
 permissions:
   contents: read
 concurrency:
-  group: issue52-full-${{ github.ref }}
+  group: issue52-target-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   compatibility:
