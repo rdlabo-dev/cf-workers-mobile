@@ -97,7 +97,7 @@ export async function resolveRelease(github, context) {
     ref: sha,
   });
   const pkg = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
-  if (pkg.name !== "workers-capacitor")
+  if (pkg.name !== "cf-workers-mobile")
     throw new Error("Unexpected package name");
   return { sha, ...releaseVersion(pkg.version, tag, pr, sha) };
 }
@@ -177,7 +177,7 @@ async function resolveCommentBeta(github, context) {
     ref: "main",
   });
   const pkg = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
-  if (pkg.name !== "workers-capacitor")
+  if (pkg.name !== "cf-workers-mobile")
     throw new Error("Unexpected trusted package name");
   return {
     sha,

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { context, type BuildResult } from "esbuild";
 import { expect, it } from "vitest";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/esbuild";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/esbuild";
 
 it("watches Worker dependencies and emits a new asset without writing output", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "workers-capacitor-watch-"));
@@ -16,7 +16,7 @@ it("watches Worker dependencies and emits a new asset without writing output", a
   );
   await writeFile(
     resolve(dir, "main.js"),
-    `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("workers-capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:"https://worker.invalid/api"});`,
+    `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("cf-workers-mobile/capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:"https://worker.invalid/api"});`,
   );
   const build = await context({
     absWorkingDir: dir,

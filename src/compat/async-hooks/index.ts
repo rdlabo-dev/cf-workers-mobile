@@ -39,7 +39,7 @@ function scope<T, A extends unknown[]>(
 ): T {
   if (Object.prototype.toString.call(callback) === "[object AsyncFunction]")
     throw new Error(
-      "AsyncLocalStorage requires async/await lowering by the workers-capacitor build plugin; native async callbacks are unsupported.",
+      "AsyncLocalStorage requires async/await lowering by the cf-workers-mobile build plugin; native async callbacks are unsupported.",
     );
   return withContext(context, callback, args);
 }

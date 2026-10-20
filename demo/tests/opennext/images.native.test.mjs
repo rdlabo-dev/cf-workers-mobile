@@ -26,7 +26,7 @@ test(
       backend,
       ...(live
         ? {
-            bootstrapCode: `import { workersCapacitor } from "workers-capacitor"; await workersCapacitor({ baseURL: "https://worker.invalid/", remote: { origin: ${JSON.stringify(backend.url.origin)}, getToken: () => ${JSON.stringify(process.env.NATIVE_TEST_DEVICE_TOKEN)} }, render: "/images" }).ready;`,
+            bootstrapCode: `import { workersCapacitor } from "cf-workers-mobile/capacitor"; await workersCapacitor({ baseURL: "https://worker.invalid/", remote: { origin: ${JSON.stringify(backend.url.origin)}, getToken: () => ${JSON.stringify(process.env.NATIVE_TEST_DEVICE_TOKEN)} }, render: "/images" }).ready;`,
           }
         : {}),
       worker: join(root, ".open-next/worker.js"),

@@ -1,4 +1,4 @@
-import type { ContractResult } from "workers-capacitor/shared/contracts/testing";
+import type { ContractResult } from "cf-workers-mobile/shared/contracts/testing";
 import { runWebApiContracts } from "./web-api-contracts";
 
 export async function runWebApis() {

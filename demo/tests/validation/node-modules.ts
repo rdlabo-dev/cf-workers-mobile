@@ -124,13 +124,13 @@ import {
   TimersImplementation,
   timersContract,
 } from "../../../src/compat/timers/index.spec";
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "cf-workers-mobile/capacitor";
 // Environment runners share module-owned contracts. The node:* imports in
 // their implementations resolve to workerd builtins or the bundler aliases.
 import {
   runContract,
   type ContractResult,
-} from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts/testing";
 import {
   nodePathContract,
   BundledPath,

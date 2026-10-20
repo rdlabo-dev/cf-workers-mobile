@@ -178,7 +178,7 @@ error; it grants permission to distribute the entire application implementation.
 Both tooling entry points export the same types:
 
 ```ts
-import type { WorkerExecution } from "workers-capacitor/tooling/vite";
+import type { WorkerExecution } from "cf-workers-mobile/tooling/vite";
 
 const execution = [
   { method: "GET", path: "/" },

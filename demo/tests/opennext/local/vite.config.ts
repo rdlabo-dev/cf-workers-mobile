@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));

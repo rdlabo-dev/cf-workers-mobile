@@ -67,7 +67,7 @@ test(
       );
       await writeFile(
         join(temp, "main.js"),
-        `import { workersCapacitor } from "workers-capacitor";
+        `import { workersCapacitor } from "cf-workers-mobile/capacitor";
 window.runtime = workersCapacitor({ baseURL: "https://worker.invalid/", remote: { origin: "https://void.invalid" } });`,
       );
       await build({

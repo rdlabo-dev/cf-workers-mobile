@@ -4,8 +4,8 @@ import { EventEmitter } from "node:events";
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts";
+import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
 import type local from "./index.js";
 type Api = typeof local;
 function equal(a: unknown, b: unknown) {

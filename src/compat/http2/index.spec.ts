@@ -3,8 +3,8 @@ import { Buffer } from "node:buffer";
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts";
+import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
 import { expectedValues } from "./values.spec";
 export const http2Feature = defineFeature<typeof http2>()("node.http2", [
   "exports",

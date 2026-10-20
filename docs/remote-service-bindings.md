@@ -69,8 +69,8 @@ local bindings; KV uses `kvExecution` instead. Declaring a remote KV name in
 does not override another server dependency or whole-Worker fallback.
 
 ```ts
-import { openFeature } from "workers-capacitor/shared/contracts";
-import { LocalStorageKV } from "workers-capacitor/cloudflare/bindings/kv";
+import { openFeature } from "cf-workers-mobile/shared/contracts";
+import { LocalStorageKV } from "cf-workers-mobile/cloudflare/bindings/kv";
 const kv = await openFeature(new LocalStorageKV("my-app-settings"));
 // Pass env: { SETTINGS: kv.api } to workersCapacitor; SETTINGS must match Wrangler's name.
 // At shutdown: await runtime.dispose(); await kv.dispose();

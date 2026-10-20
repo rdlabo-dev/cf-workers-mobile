@@ -1,26 +1,39 @@
-# workers-capacitor
+# cf-workers-mobile
 
 Bring Cloudflare Workers apps to iOS and Android.
 
-workers-capacitor connects existing Cloudflare Workers applications to Capacitor, so you can reuse your pages, routes and application logic in an iOS or Android app with minimal changes. Your web application stays on Workers, with a mobile version you can prepare for distribution through the App Store and Google Play.
+cf-workers-mobile brings existing Cloudflare Workers applications into iOS, Android and Capacitor applications, so you can reuse your pages, routes and application logic with minimal changes. Your web application stays on Workers, with a mobile version you can prepare for distribution through the App Store and Google Play.
 
-[Void 1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12) adds Capacitor iOS navigation support! With this update, you can bring your Void app to iOS and Android using workers-capacitor. [Get started with Void](docs/void.md).
+[Void 1.1.12](https://github.com/voidzero-dev/void/releases/tag/v1.1.12) adds Capacitor iOS navigation support! With this update, you can bring your Void app to iOS and Android using cf-workers-mobile. [Get started with Void](docs/void.md).
 
 ## Get your app onto your phone
 
-Start with the app you already have. The [integration guide](docs/integration.md) takes you from your existing Workers project to opening it on iOS or Android, including Capacitor setup if this is your first mobile app.
+Choose the host that matches your application:
 
-0.1.1 is a Preview release. Follow the installation steps in the guide; APIs may change before a stable release.
+| Host                                                           | Start here                                                | Application entry                                     |
+| -------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------- |
+| iOS: existing UIKit or SwiftUI app                             | [Embed a Workers screen](docs/native-embedding.md#ios)    | `workersIOS` from `cf-workers-mobile/ios`             |
+| Android: existing native app                                   | [Open a Workers screen](docs/native-embedding.md#android) | `workersAndroid` from `cf-workers-mobile/android`     |
+| Capacitor: a new mobile app, or an app using Capacitor plugins | [Integrate your Workers app](docs/integration.md)         | `workersCapacitor` from `cf-workers-mobile/capacitor` |
 
-If you use an AI coding assistant, open your application repository and give it this prompt:
+All three JavaScript entries belong to the single npm package `cf-workers-mobile`; `/ios`, `/android` and `/capacitor` are subpath imports; there is no bare package-root runtime entry.
+
+The iOS and Android hosts use Capacitor internally. Your existing native app does not need Capacitor configuration, CLI commands or plugin registration. They share the same Worker source, runtime options and [build tooling](docs/build-setup.md). Use the Capacitor integration when you need general native plugins.
+
+**Release status:** `cf-workers-mobile` is not published to npm yet. The existing `workers-capacitor@0.1.1` Preview provides the earlier Capacitor integration and does not include the new embedding hosts or the renamed imports. Build matching source revisions as described in the [embedding guide](docs/native-embedding.md#dependency-setup). APIs may change before a stable release.
+
+If you use an AI coding assistant, open your application repository and give it the guide for your chosen host. For an existing native app:
 
 ```text
-Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
-to bring this app to iOS and Android with workers-capacitor.
-Preserve its pages, routes and authentication; verify it on the target platforms.
+Follow docs/native-embedding.md from the cf-workers-mobile revision being used
+to embed this Workers app in our existing iOS or Android application.
+Preserve the native entry point, navigation and existing host state.
+Reuse the Workers pages, routes and authentication; verify on the target platform.
 ```
 
-Take the path that matches your app:
+For Capacitor, use the [integration prompt](docs/integration.md#prompt-to-give-your-ai-assistant).
+
+Then select the framework guide for the Workers application:
 
 - [Void React Pages + D1](docs/void.md)
 - [Hono and Workers Express](docs/build-setup.md#frameworks)
@@ -28,7 +41,7 @@ Take the path that matches your app:
 
 ## Keep building the app you know
 
-Keep working with your existing pages, forms and routes. [Capacitor](https://capacitorjs.com/) makes your web interface an installable mobile app; workers-capacitor connects your existing Worker to it.
+Keep working with your existing pages, forms and routes. The iOS and Android hosts display them inside your existing native app. [Capacitor](https://capacitorjs.com/) provides the app shell when you are starting a mobile app or need its plugin ecosystem.
 
 Your database can stay where it is. Requests that need D1 or other cloud services run on your existing deployed Worker, while supported code can run on the device. See [build setup](docs/build-setup.md) and [execution policies](docs/cloudflare-bindings.md) when you need the details.
 
@@ -36,7 +49,9 @@ If you already have a separate frontend, keep its existing API calls with the [F
 
 ## Next steps
 
-Your app is on screen! Now make it your own, one step at a time:
+For an existing iOS or Android app, keep its icons, navigation and release workflow. Follow the [embedding lifecycle and verification guidance](docs/native-embedding.md#verification) before shipping.
+
+For a Capacitor app, make it your own one step at a time:
 
 1. Make your app easy to recognize on the home screen and when it opens. Add your own icon and splash screen with [Capacitor's asset guide](https://capacitorjs.com/docs/guides/splash-screens-and-icons), then rebuild and run the app again to see your changes.
 2. Make the screen comfortable to use. Check that buttons stay clear of the notch and home indicator; adjust [iOS Safe Area](docs/native-rendering-api.md#ios-safe-area) if needed.
@@ -50,6 +65,7 @@ Keep secrets on the server and authenticate requests from the app. Follow the [s
 ## Explore and contribute
 
 - [See how other apps connect](demo/README.md)
+- [iOS and Android embedding](docs/native-embedding.md) · [Capacitor integration](docs/integration.md)
 - [Runtime behavior](docs/runtime.md) · [Native rendering API](docs/native-rendering-api.md)
 - [Development and testing](docs/development.md) · [Verification scope](demo/tests/README.md)
 - [Contributing](CONTRIBUTING.md)

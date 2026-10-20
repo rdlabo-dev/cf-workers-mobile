@@ -61,7 +61,7 @@ speedup requires comparable repeated observations; it is not a prerequisite for
 accepting verified removal of redundant work. If conditions prevent that claim,
 report it as unproven and stop measurements that do not inform the decision.
 
-[Issue #52 and its measurement evidence](https://github.com/rdlabo-dev/workers-capacitor/issues/52#issuecomment-6283412842)
+[Issue #52 and its measurement evidence](https://github.com/rdlabo-dev/cf-workers-mobile/issues/52#issuecomment-6283412842)
 record the baseline, commands, observations, and acceptance decision. The original
 same-image repeated-comparison condition was not fully met. Its replacement accepts
 the verified removal of three setup sequences and preserved coverage without

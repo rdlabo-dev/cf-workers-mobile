@@ -1,4 +1,4 @@
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "cf-workers-mobile/capacitor";
 await workersCapacitor({
   baseURL: "https://worker.invalid/",
   remote: {

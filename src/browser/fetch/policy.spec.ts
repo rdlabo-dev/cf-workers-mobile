@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts";
+import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
 import type { createFetch } from "./index.js";
 import type { Request } from "../request/index.js";
 

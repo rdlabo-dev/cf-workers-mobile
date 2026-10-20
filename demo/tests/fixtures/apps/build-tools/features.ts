@@ -1,5 +1,5 @@
-import { FetchImplementation } from "workers-capacitor/cloudflare/workers";
-import { openFeature } from "workers-capacitor/shared/contracts";
+import { FetchImplementation } from "cf-workers-mobile/cloudflare/workers";
+import { openFeature } from "cf-workers-mobile/shared/contracts";
 import { runContract } from "../../../validation/contracts/http";
 
 // Deliberately no root package import: exercise subpath-only dependency scanning.

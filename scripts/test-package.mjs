@@ -141,13 +141,13 @@ for (const entry of [
 // Never copy library implementation sources from the checkout.
 for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
   await cp(
-    join(temp, "node_modules/workers-capacitor/dist", domain),
+    join(temp, "node_modules/cf-workers-mobile/dist", domain),
     join(temp, "src", domain),
     { recursive: true },
   );
 }
 await cp(
-  join(temp, "node_modules/workers-capacitor/dist/environment.js"),
+  join(temp, "node_modules/cf-workers-mobile/dist/environment.js"),
   join(temp, "src/environment.js"),
 );
 // Discover module-owned specs by convention. Only test sources come from the
@@ -164,7 +164,7 @@ for (const domain of ["compat", "browser", "cloudflare", "shared"]) {
 await writeFile(
   join(temp, "vite.config.mjs"),
   `import { readFile } from 'node:fs/promises';
-import { workersCapacitorPlugin } from 'workers-capacitor/tooling/vite';
+import { workersCapacitorPlugin } from 'cf-workers-mobile/tooling/vite';
 export default {root:'demo/tests/validation',plugins:[{name:'brotli-wasm-binary',async load(id){if(!id.includes('brotli_dec_wasm_bg.wasm'))return;const data=(await readFile(id.split('?')[0])).toString('base64');return \`export default Uint8Array.from(atob(\${JSON.stringify(data)}), c => c.charCodeAt(0));\`;}},workersCapacitorPlugin()],build:{outDir:'../../../build',target:'es2022'}};`,
 );
 execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
@@ -173,26 +173,34 @@ execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {
 });
 await writeFile(
   join(temp, "consumer.ts"),
-  `/// <reference types="workers-capacitor/cloudflare/apis/types" />
+  `/// <reference types="cf-workers-mobile/cloudflare/apis/types" />
 import worker from "./demo/src/workers/hono/standard";
 import { httpServerHandler } from "cloudflare:node";
 const handler = httpServerHandler({ port: 3000 });
 const response: Promise<Response> = handler.fetch(new Request("https://worker.invalid/api"));
 // @ts-expect-error Logical ports must be numeric.
 httpServerHandler({ port: "3000" });
-import { workersCapacitor, FetchRuntime, type WorkerContext } from "workers-capacitor";
+import { workersCapacitor, FetchRuntime, type WorkerContext } from "cf-workers-mobile/capacitor";
+import { workersIOS } from "cf-workers-mobile/ios";
+import { workersAndroid } from "cf-workers-mobile/android";
+const nativeEntries: Array<typeof workersIOS> = [workersIOS, workersAndroid];
+for (const entry of nativeEntries) {
+  const runtime = entry({ baseURL: "https://worker.invalid", render: "/" });
+  const ready: Promise<void> = runtime.ready;
+  void runtime.dispose();
+}
 class ExampleRuntime extends FetchRuntime<{ label: string }> {
   protected dispatch(request: Request, env: { label: string }, ctx: WorkerContext) {
     ctx.waitUntil(Promise.resolve());
     return new Response(env.label + request.method);
   }
 }
-import { defineFeature, FeatureImplementation, openFeature } from "workers-capacitor/shared/contracts";
-import { runContract, type ContractSuite } from "workers-capacitor/shared/contracts/testing";
-import { kvContract } from "workers-capacitor/cloudflare/bindings/kv/testing";
-import { fetchContract, fetchContractWorker } from "workers-capacitor/cloudflare/workers/testing";
-import { LocalStorageKV } from "workers-capacitor/cloudflare/bindings/kv";
-import { workersCapacitorPlugin as buildPlugin } from "workers-capacitor/tooling/vite";
+import { defineFeature, FeatureImplementation, openFeature } from "cf-workers-mobile/shared/contracts";
+import { runContract, type ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+import { kvContract } from "cf-workers-mobile/cloudflare/bindings/kv/testing";
+import { fetchContract, fetchContractWorker } from "cf-workers-mobile/cloudflare/workers/testing";
+import { LocalStorageKV } from "cf-workers-mobile/cloudflare/bindings/kv";
+import { workersCapacitorPlugin as buildPlugin } from "cf-workers-mobile/tooling/vite";
 buildPlugin({ worker: "worker.ts", execution: "local" });
 buildPlugin({ worker: "worker.ts", execution: [{ method: "*", path: "/app/*" }] });
 // @ts-expect-error Automatic distribution is not part of the execution contract.
@@ -200,7 +208,7 @@ buildPlugin({ worker: "worker.ts", execution: "auto" });
 buildPlugin({ worker: "worker.ts", remoteBindings: ["SECRET"], assetsExecution: "remote" });
 // @ts-expect-error Local ASSETS is not a completed compatibility unit.
 buildPlugin({ worker: "worker.ts", assetsExecution: "local" });
-import { FetchImplementation } from "workers-capacitor/cloudflare/workers";
+import { FetchImplementation } from "cf-workers-mobile/cloudflare/workers";
 void runContract(new LocalStorageKV("consumer-test"), kvContract);
 const kv = new LocalStorageKV("consumer-test").create();
 const bytes: Promise<ArrayBuffer | null> = kv.get("key", "arrayBuffer");
@@ -306,7 +314,7 @@ try {
   // Rebuild the same installed tarball consumer using the public isolated import.
   await writeFile(
     join(temp, "vite.config.mjs"),
-    `import { workersCapacitorPlugin } from 'workers-capacitor/tooling/vite';
+    `import { workersCapacitorPlugin } from 'cf-workers-mobile/tooling/vite';
 export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacitorPlugin({execution:'local',worker:'../../workers/runtime/isolation.ts'})],build:{outDir:'../../../../../build',emptyOutDir:true,target:'es2022'}};`,
   );
   execFileSync(process.execPath, ["node_modules/vite/bin/vite.js", "build"], {

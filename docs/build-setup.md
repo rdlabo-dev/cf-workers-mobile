@@ -1,11 +1,11 @@
 # Build setup
 
 Choose your application's framework first, then configure the build tool used for
-its Capacitor integration. The framework guide identifies the Worker entry and
+its iOS, Android or Capacitor integration. The framework guide identifies the Worker entry and
 execution boundary; the tool plugin connects that entry to the mobile app.
 Keep the existing Cloudflare build separate.
 
-Use a separate configuration and output directory for the Capacitor build. The
+Use a separate configuration and output directory for the mobile build. The
 plugin reads the server entry and deployment configuration; it generates a mobile
 copy without rewriting those inputs. Vite rejects SSR/server environments and
 configurations containing the Cloudflare Vite plugin. Both builders reject output
@@ -19,6 +19,23 @@ These build boundaries preserve the existing Cloudflare deployment. Explicit
 client choices such as local execution, remote origin and `getToken` still control
 which requests reach it and how the client authenticates; they do not modify the
 server's routes, authorization logic or bindings.
+
+## Choose the runtime entry
+
+The bundler plugin stays `workersCapacitorPlugin` for every host. Only the
+application's runtime import changes; Worker source and execution options are shared.
+
+| Host      | Runtime import                                        | Native setup                                        |
+| --------- | ----------------------------------------------------- | --------------------------------------------------- |
+| iOS       | `workersIOS` from `cf-workers-mobile/ios`             | [UIKit / SwiftUI](native-embedding.md#ios)          |
+| Android   | `workersAndroid` from `cf-workers-mobile/android`     | [Existing Android app](native-embedding.md#android) |
+| Capacitor | `workersCapacitor` from `cf-workers-mobile/capacitor` | [Capacitor app](integration.md)                     |
+
+The `cf-workers-mobile` package is unpublished and requires matching source
+revisions; see [dependency setup](native-embedding.md#dependency-setup).
+Build the corresponding entry for each target, then package the entire output
+directory. Existing Capacitor examples below use `workersCapacitor`; the same
+options apply to `workersIOS` and `workersAndroid` in their SDK hosts.
 
 ## Frameworks
 
@@ -73,7 +90,7 @@ app.listen(3000);
 export default httpServerHandler({ port: 3000 });
 ```
 
-Use the [Vite](#vite) or [esbuild](#esbuild) plugin only in the Capacitor/browser build, never the Cloudflare build. It supplies Workers-compatible `node:http` and `node:net` adapters alongside browser polyfills; the [compatibility inventory](compatibility.md) records the verified baseline and modules. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
+Use the [Vite](#vite) or [esbuild](#esbuild) plugin only in the mobile/browser build, never the Cloudflare build. It supplies Workers-compatible `node:http` and `node:net` adapters alongside browser polyfills; the [compatibility inventory](compatibility.md) records the verified baseline and modules. `listen(3000)` registers an in-memory handler, not a listening TCP port. The plugin supports both Hono and Workers Express; framework code stays unchanged.
 
 The default `execution: "network"` keeps the Worker entirely remote. Set `baseURL`
 in `workersCapacitor()` to the deployed Worker's HTTPS URL; set `remote.origin`
@@ -89,7 +106,7 @@ Configured server bindings make `local` fail the build. See
 The package provides the `cloudflare:node` type for its supported `httpServerHandler` adapter. For a browser build without existing Workers type declarations, add it to `compilerOptions.types` in `tsconfig.json`:
 
 ```json
-{ "compilerOptions": { "types": ["workers-capacitor/cloudflare/apis/types"] } }
+{ "compilerOptions": { "types": ["cf-workers-mobile/cloudflare/apis/types"] } }
 ```
 
 Keep any other types your project already uses. This is a type-only entry; do not import it at runtime. Projects with generated Workers types should keep those declarations instead. No application-owned `cloudflare.d.ts` or `client.d.ts` is needed.
@@ -106,25 +123,25 @@ Fetch-only integration of a separate frontend is a different use case.
 
 ## Tools
 
-These versions describe the separate Capacitor build. A framework's existing
+These versions describe the separate mobile build. A framework's existing
 cloud build may use a different tool or version; keep it unchanged and connect
 its generated Worker as described in the framework guide.
 
 | Build              | Setup                                      | Input                                                                              |
 | ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| Vite 7             | `workers-capacitor/tooling/vite` plugin    | TypeScript / JavaScript Worker entries, including framework output described above |
-| esbuild 0.28       | `workers-capacitor/tooling/esbuild` plugin | TypeScript / JavaScript Worker entries, including framework output described above |
+| Vite 7             | `cf-workers-mobile/tooling/vite` plugin    | TypeScript / JavaScript Worker entries, including framework output described above |
+| esbuild 0.28       | `cf-workers-mobile/tooling/esbuild` plugin | TypeScript / JavaScript Worker entries, including framework output described above |
 | Browser ES Modules | Explicit Worker source below               | Browser-compatible JavaScript only                                                 |
 
-Other bundlers are not currently supported. Add these plugins only to the Capacitor/browser build, never the Cloudflare build.
+Other bundlers are not currently supported. Add these plugins only to the mobile/browser build, never the Cloudflare build.
 
 ### Vite
 
-Add the plugin to the Capacitor/browser Vite configuration:
+Add the plugin to the mobile/browser Vite configuration:
 
 ```ts
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
 
 export default defineConfig({
   plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
@@ -139,7 +156,7 @@ For esbuild, use the same application code with this build configuration:
 
 ```js
 import { build } from "esbuild";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/esbuild";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/esbuild";
 
 await build({
   entryPoints: ["src/main.ts"],
@@ -181,4 +198,4 @@ import worker from "./worker.js";
 serve(worker);
 ```
 
-`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `workers-capacitor/browser/isolated`.
+`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `cf-workers-mobile/browser/isolated`.
