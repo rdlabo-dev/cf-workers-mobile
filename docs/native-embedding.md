@@ -84,10 +84,21 @@ There is one npm package, `cf-workers-mobile`. Its `/ios`, `/android` and `/capa
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
 `jp.rdlabo:workers-native-android` is an Android Maven artifact.
 
-Build the JavaScript package from a checkout containing these hosts (`npm install`
-and `npm run build` at its root), then install that checkout in the web project,
-for example `npm install /path/to/cf-workers-mobile`. Use the same Git revision
-for the iOS Swift package and Android publication. Installing the published
+Create a JavaScript package tarball from a checkout containing these hosts:
+
+```sh
+# In the SDK checkout:
+npm install
+npm pack
+
+# In the web project:
+npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.1.tgz
+```
+
+`npm pack` runs the build through `prepack`; the filename above uses the current
+source version. Install the tarball rather than the checkout directory to avoid
+a symlink back into the SDK tree, which can create recursive paths for apps inside
+that checkout. Use the same Git revision for the iOS Swift package and Android publication. Installing the published
 `workers-capacitor@0.1.1` does not provide these entry points.
 
 When migrating from the old npm package, remove the `workers-capacitor` dependency before installing `cf-workers-mobile`; see the [migration steps](integration.md#migrating-from-the-old-npm-package). Keep only the renamed package in the web project.

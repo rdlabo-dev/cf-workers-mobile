@@ -152,3 +152,35 @@ After Compatibility succeeds for an open, non-draft PR targeting main, a reposit
 The workflow checks the requester's current permission, the PR head and its CI again in the publishing job. A PR updated after the comment requires successful CI and a fresh `/beta`; queued comments do not authorize newer changes. PRs modifying `.github/workflows/` or `.github/scripts/` must merge those changes before using this command. The candidate is built in the read-only job; its source and lifecycle scripts are never executed in the OIDC publishing job.
 
 The command becomes available after `release.yml` lands on main. A failed request can be inspected in the Release workflow's Actions log; it does not publish when CI is pending or failed.
+
+### Local CI bootstrap release
+
+A maintainer can prepare a `beta` package from any committed branch when CI needs
+an npm artifact before merge or Trusted Publishing setup. This local path does
+not require main or successful remote CI; it does not alter the GitHub release gates.
+Review the local build/test results before publishing the candidate.
+
+```sh
+npm run release:prepare
+```
+
+The command requires a clean checkout, builds with the ordinary `prepack` hook,
+and stages a tarball under `artifacts/npm/<full-commit-SHA>/`. Its version is
+`<base>-beta.local.sha<12-character-SHA>` and its dist-tag is `beta`. The source
+`package.json` and Git tags are unchanged. `release.json` records the source
+branch/commit and tarball SHA-256. Preparation does not publish or use npm credentials.
+
+The command prints the exact `npm publish <tarball> --ignore-scripts --access public
+--tag beta --registry https://registry.npmjs.org` invocation. After reviewing the
+artifact, use your local npm account (`npm login` if needed) with permission to
+publish `cf-workers-mobile`, and run that printed command. Append `--dry-run` to
+inspect it without publishing. Complete npm's authentication/2FA prompts when
+requested; keep credentials outside the repository. Local publication does not
+use the workflow's OIDC identity or its `--provenance` option.
+
+This publishes only the npm package. It does not deploy a Worker, push a Git tag,
+merge a PR, or publish Android Maven artifacts. The new npm name must be available
+to your account; preparation and dry-run do not prove publication permission.
+Use the exact printed version in CI installs rather than a moving `beta` tag.
+Already published versions cannot be replaced; commit changes and prepare a new
+candidate. This does not update `latest`.

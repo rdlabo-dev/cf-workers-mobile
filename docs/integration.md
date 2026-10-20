@@ -81,21 +81,28 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. `cf-workers-mobile` is not published to npm yet. Build a checkout of this repository (`npm install` and `npm run build` at its root), then install it in the application:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. `cf-workers-mobile` is not published to npm yet. Create a package tarball from a checkout of this repository:
 
 ```sh
-npm install /path/to/cf-workers-mobile
+# In the SDK checkout:
+npm install
+npm pack
+
+# In the application package:
+npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.1.tgz
 ```
+
+`npm pack` runs the SDK build through `prepack`. Install the generated tarball rather than the checkout directory: directory installs can create a symlink back to the SDK tree, including a recursive path when the app lives inside that checkout. The tarball filename above uses the current source version.
 
 The installed package is named `cf-workers-mobile`; the checkout directory can retain the repository name. The earlier published `workers-capacitor@0.1.1` Preview uses the old package name and does not provide the imports shown here. Keep JavaScript and native dependencies on the same source revision.
 
 ### Migrating from the old npm package
 
-If your application already depends on `workers-capacitor`, remove it before installing the renamed package. Keeping both dependencies can make Capacitor discover and register the same native plugin twice. In the application package, using the built checkout described above:
+If your application already depends on `workers-capacitor`, remove it before installing the renamed package. Keeping both dependencies can make Capacitor discover and register the same native plugin twice. In the application package, using the tarball created above:
 
 ```sh
 npm uninstall workers-capacitor
-npm install /path/to/cf-workers-mobile
+npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.1.tgz
 ```
 
 Change runtime imports from `workers-capacitor` to `cf-workers-mobile/capacitor`, and change other package subpaths to the `cf-workers-mobile` prefix. Rebuild the application's mobile web assets with its existing build command, then run `npx cap sync` to regenerate native plugin dependencies. New applications use the installation steps above directly.
