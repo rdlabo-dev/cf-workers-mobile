@@ -5,7 +5,7 @@ profile uses workerd `1.20261012.1`, compatibility date `2026-10-17`, without
 additional flags. Other dates and flags are not covered by this profile.
 The WebView does not contain workerd or V8; iOS uses its own JavaScript engine.
 
-0.1.0 Preview includes existing compatibility implementations with the limits below under a [version-specific release exception](../CONTRIBUTING.md#010-preview-exception). Inclusion is not a claim of complete Workers or Node.js compatibility.
+0.1.0 Preview and the explicitly authorized 0.1.1 Preview follow-up include existing compatibility implementations with the limits below under a [version-specific release exception](../CONTRIBUTING.md#010-preview-exception). Inclusion is not a claim of complete Workers or Node.js compatibility.
 
 ## Node.js
 

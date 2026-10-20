@@ -258,11 +258,17 @@ export function installDocumentHost(runtime: DocumentRuntime, baseURL: string) {
       if (!streams.has(id)) requests.delete(id);
     }
   }
-  const message = async (event: MessageEvent<DocumentRequest>) => {
+  const message = async (
+    event: MessageEvent<DocumentRequest | "workers-capacitor:host-ready">,
+  ) => {
     const port = event.ports[0];
     if (!port) return;
     try {
-      port.postMessage(await nativeDispatch(event.data));
+      if (event.data === "workers-capacitor:host-ready") {
+        // Liveness only: application startup/errors belong to normal dispatch.
+        if (host.__workersCapacitorDispatch === nativeDispatch)
+          port.postMessage("workers-capacitor:host-ready");
+      } else port.postMessage(await nativeDispatch(event.data));
     } catch (error) {
       port.postMessage({ error: String(error) });
     } finally {

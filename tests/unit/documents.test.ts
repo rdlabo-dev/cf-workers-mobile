@@ -1,3 +1,4 @@
+import { installDocumentHost } from "../../src/browser/documents/host";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { workersCapacitor } from "../../src/index";
 let runtime: ReturnType<typeof workersCapacitor> | undefined;
@@ -435,3 +436,79 @@ it.each(["capacitor://localhost", "https://foreign.example", "null"])(
     });
   },
 );
+
+it.each([false, true])(
+  "host liveness does not wait for startup or dispatch application work (retired=%s)",
+  async (retired) => {
+    let ready!: () => void;
+    const application = {
+      ready: new Promise<void>((resolve) => {
+        ready = resolve;
+      }),
+      fetch: vi.fn(),
+    };
+    const messages = {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal("navigator", { serviceWorker: messages });
+    const uninstall = installDocumentHost(
+      application,
+      "https://worker.example",
+    );
+    try {
+      const listener = messages.addEventListener.mock.calls[0][1];
+      const port = { postMessage: vi.fn(), close: vi.fn() };
+      if (retired) uninstall();
+      const pending = listener({
+        data: "workers-capacitor:host-ready",
+        ports: [port],
+      });
+      await pending;
+      if (retired) expect(port.postMessage).not.toHaveBeenCalled();
+      else
+        expect(port.postMessage).toHaveBeenCalledWith(
+          "workers-capacitor:host-ready",
+        );
+      expect(port.close).toHaveBeenCalledOnce();
+      expect(application.fetch).not.toHaveBeenCalled();
+      ready();
+    } finally {
+      uninstall();
+    }
+  },
+);
+
+it("a live host preserves startup rejection for normal dispatch", async () => {
+  let fail!: (error: Error) => void;
+  const application = {
+    ready: new Promise<void>((_, reject) => {
+      fail = reject;
+    }),
+    fetch: vi.fn(),
+  };
+  const messages = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+  vi.stubGlobal("navigator", { serviceWorker: messages });
+  const uninstall = installDocumentHost(application, "https://worker.example");
+  try {
+    const listener = messages.addEventListener.mock.calls[0][1];
+    const ping = { postMessage: vi.fn(), close: vi.fn() };
+    await listener({ data: "workers-capacitor:host-ready", ports: [ping] });
+    expect(ping.postMessage).toHaveBeenCalledWith(
+      "workers-capacitor:host-ready",
+    );
+    const reply = { postMessage: vi.fn(), close: vi.fn() };
+    const pending = listener({
+      data: { url: "capacitor://localhost/page", method: "GET", headers: {} },
+      ports: [reply],
+    });
+    fail(new Error("original startup failed"));
+    await pending;
+    expect(reply.postMessage).toHaveBeenCalledWith({
+      error: "Error: original startup failed",
+    });
+    expect(application.fetch).not.toHaveBeenCalled();
+  } finally {
+    uninstall();
+  }
+});
