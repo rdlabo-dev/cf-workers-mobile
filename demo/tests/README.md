@@ -68,9 +68,10 @@ The preparation command builds the selected test app and replaces only the gener
 ## Document browser checks
 
 `npm run test:documents` exercises the document Service Worker and injected iOS
-page script in Chromium/WebKit. Six WebKit Service Worker comparisons have
-expected failures for POST redirect replay and response metadata. Native iOS
-uses a scheme bridge, so these browser checks do not replace native validation.
+page script in Chromium/WebKit. WebKit Service Worker comparisons explicitly
+expect empty replayed POST bodies and `redirected: false` for synthetic redirects;
+URL, method, history and all other assertions remain required. Native iOS uses a
+scheme bridge, so these browser checks do not replace native validation.
 
 ## Packaged native rendering API
 

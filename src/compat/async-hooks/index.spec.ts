@@ -292,22 +292,28 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
     },
     async throwRestore(api) {
       const als = new api.AsyncLocalStorage<unknown>();
+      const reason = new Error("boom");
+      let observed: unknown;
       try {
         als.run("store", () => {
-          throw new Error("boom");
+          throw reason;
         });
-      } catch {
-        // expected
+      } catch (error) {
+        observed = error;
       }
+      equal(observed === reason, true);
       equal(als.getStore(), undefined);
+      observed = undefined;
       try {
         await als.run("store", async () => {
           equal(als.getStore(), "store");
-          throw new Error("async boom");
+          throw reason;
         });
-      } catch {
-        // expected
+      } catch (error) {
+        observed = error;
       }
+      equal(observed === reason, true);
+      equal(als.getStore(), undefined);
     },
     async awaitPropagation(api) {
       const als = new api.AsyncLocalStorage<unknown>();
@@ -345,13 +351,16 @@ export const asyncHooksContract: ContractSuite<typeof asyncHooksFeature> = {
         equal(als.getStore(), "store");
       });
       equal(als.getStore(), undefined);
+      const reason = new Error("boom");
+      let observed: unknown;
       try {
         await als.run("store", async () => {
-          throw new Error("boom");
+          throw reason;
         });
-      } catch {
-        // expected
+      } catch (error) {
+        observed = error;
       }
+      equal(observed === reason, true);
       equal(als.getStore(), undefined);
     },
     async nestedAsyncRestore(api) {

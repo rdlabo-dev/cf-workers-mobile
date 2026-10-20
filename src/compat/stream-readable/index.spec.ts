@@ -37,7 +37,7 @@ export const streamReadableContract: ContractSuite<
         throw Error("Alias namespace mismatch");
     },
     async behavior(value) {
-      const r = s.Readable.from([1, 2]);
+      const r = value.from(value.Readable, [1, 2], undefined);
       const values = [];
       for await (const value of r) values.push(value);
       if (values.join() !== "1,2") throw Error("Readable alias failed");

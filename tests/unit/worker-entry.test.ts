@@ -7,6 +7,10 @@ it("installs globals before evaluating a Worker entry without shared bootstrap e
   const installImport = `await import(${JSON.stringify(globalsInstallPath)});`;
   const workerImport = `const { default: worker } = await import(${JSON.stringify(entry)});`;
 
+  expect(source).toContain("await initializeWorkerNetwork();");
+  expect(source).toContain(installImport);
+  expect(source).toContain(workerImport);
+
   expect(source.indexOf(installImport)).toBeGreaterThan(
     source.indexOf("await initializeWorkerNetwork();"),
   );

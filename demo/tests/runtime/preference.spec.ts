@@ -65,7 +65,7 @@ test("early direct requests reject and aborted requests never replay after start
     () => typeof window.startDelayedDirect === "function",
   );
   const results = await page.evaluate(async () => {
-    const { runtime, release } = window.startDelayedDirect();
+    const { runtime, release, dispatched } = window.startDelayedDirect();
     try {
       const early = await fetch("/api/echo", {
         method: "POST",
@@ -87,7 +87,7 @@ test("early direct requests reject and aborted requests never replay after start
       const text = await (
         await fetch("/api/echo", { method: "POST", body: "ready" })
       ).text();
-      return { early, aborted, text };
+      return { early, aborted, text, dispatched: dispatched() };
     } finally {
       release();
       runtime.dispose();
@@ -98,4 +98,5 @@ test("early direct requests reject and aborted requests never replay after start
   );
   expect(results.aborted).toBe("AbortError");
   expect(results.text).toBe("ready");
+  expect(results.dispatched).toBe(1);
 });

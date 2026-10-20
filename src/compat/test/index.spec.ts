@@ -89,14 +89,14 @@ export const testContract: ContractSuite<typeof testFeature> = {
     },
     overloads(api) {
       const t = tracker(api);
-      for (const f of [
-        t.fn(),
-        t.fn({ times: 2 }),
-        t.fn(() => 7, { times: 2 }),
-      ]) {
+      for (const [f, expected] of [
+        [t.fn(), undefined],
+        [t.fn({ times: 2 }), undefined],
+        [t.fn(() => 7, { times: 2 }), 7],
+      ] as const) {
         const result = f();
         same(f.mock.callCount(), 1);
-        same(result === 7 || result === undefined, true);
+        same(result, expected);
       }
       const original = () => 1;
       const mock = t.fn(original, () => 2);

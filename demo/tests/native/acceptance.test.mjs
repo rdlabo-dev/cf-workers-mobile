@@ -4,6 +4,36 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runNativeAcceptance } from "./acceptance.mjs";
+import { waitForAcceptance } from "./reports.mjs";
+
+for (const refreshed of [false, true]) {
+  test(`failure wins over completion in ${refreshed ? "refreshed" : "existing"} reports`, async () => {
+    const reports = [
+      { stage: "failure", error: "page crashed" },
+      { stage: "complete" },
+    ];
+    const backend = {
+      reports: refreshed ? [] : reports,
+      refresh: refreshed
+        ? async () => {
+            backend.reports = reports;
+          }
+        : undefined,
+    };
+    await assert.rejects(waitForAcceptance(backend, 1000), /page crashed/);
+  });
+}
+
+test("acceptance requires completion and refreshes pending reports", async () => {
+  const backend = {
+    reports: [],
+    refresh: async () => {
+      backend.reports.push({ stage: "complete" });
+    },
+  };
+  assert.equal((await waitForAcceptance(backend, 1000)).stage, "complete");
+  await assert.rejects(waitForAcceptance({ reports: [] }, 0));
+});
 
 test("invalid native configuration closes the already-started backend", async () => {
   const artifacts = await mkdtemp(join(tmpdir(), "native-acceptance-"));

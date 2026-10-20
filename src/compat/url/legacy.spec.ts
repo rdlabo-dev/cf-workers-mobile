@@ -2228,8 +2228,9 @@ export function legacyCases(url) {
           const out = [];
           for (let i = 0x80; i < 0x110000; i++) {
             const cp = String.fromCodePoint(i);
+            const normalized = cp.normalize("NFKD");
             for (const badChar of BAD_CHARS) {
-              if (cp.normalize("NFKD").includes(badChar)) {
+              if (normalized.includes(badChar)) {
                 out.push(cp);
               }
             }

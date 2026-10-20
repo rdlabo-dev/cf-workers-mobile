@@ -46,8 +46,3 @@ it("embeds only explicitly selected public files, never adjacent server metadata
   ).toBe("runtime template");
   expect(await readWorkerFiles(root)).toBeUndefined();
 });
-it("does not add a filesystem to ordinary Workers", async () => {
-  const root = await mkdtemp(join(tmpdir(), "worker-files-"));
-  directories.push(root);
-  expect(await readWorkerFiles(root)).toBeUndefined();
-});

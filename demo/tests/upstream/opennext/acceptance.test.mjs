@@ -1,3 +1,4 @@
+import { waitForAcceptance } from "../../native/reports.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chromium, webkit } from "@playwright/test";
@@ -15,16 +16,7 @@ test(
         try {
           const page = await browser.newPage({ ignoreHTTPSErrors: true });
           await page.goto(new URL("/server-actions", backend.url).href);
-          const deadline = Date.now() + 60000;
-          while (!backend.reports.some((r) => r.stage === "complete")) {
-            assert.equal(
-              backend.reports.find((r) => r.stage === "failure"),
-              undefined,
-              JSON.stringify(backend.reports),
-            );
-            assert.ok(Date.now() < deadline, JSON.stringify(backend.reports));
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          }
+          await waitForAcceptance(backend, 60000);
           assert.ok(backend.reports.some((r) => r.stage === "action"));
           assert.ok(backend.reports.some((r) => r.stage === "form"));
           assert.equal(

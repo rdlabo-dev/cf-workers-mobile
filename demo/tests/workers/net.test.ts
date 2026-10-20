@@ -1,3 +1,4 @@
+import expectedCases from "../validation/expected-cases.json" with { type: "json" };
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createTestHarness } from "wrangler";
 import {
@@ -20,6 +21,10 @@ afterAll(() => harness.close());
 it("runs net contracts in pinned workerd", async () => {
   const report = (await (await harness.fetch("/")).json()) as ContractResult;
   assertContract(report);
+  expect(report.cases.map((test) => test.id)).toEqual(
+    expectedCases["node.net"],
+  );
+  expect(report.cases.every((test) => test.status === "passed")).toBe(true);
 });
 
 it("accepts TCP through the public Workers bridge", async () => {

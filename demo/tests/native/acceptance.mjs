@@ -1,3 +1,4 @@
+import { waitForAcceptance } from "./reports.mjs";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -254,23 +255,7 @@ export async function runNativeAcceptance({
         "-n",
         `${appId}/.MainActivity`,
       ]);
-    const deadline = Date.now() + timeout;
-    while (!backend.reports.some((r) => r.stage === "complete")) {
-      await backend.refresh?.();
-      assert.equal(
-        backend.reports.find((r) => r.stage === "failure"),
-        undefined,
-        JSON.stringify(backend.reports),
-      );
-      assert.ok(
-        Date.now() < deadline,
-        JSON.stringify({
-          reports: backend.reports,
-          requests: backend.requests?.slice(-15),
-        }),
-      );
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    await waitForAcceptance(backend, timeout);
     await validate(backend, platform);
     await writeFile(
       join(artifacts, `${platform}-summary.json`),

@@ -1,6 +1,5 @@
 import { workersCapacitor, type ExecutionPreference } from "workers-capacitor";
 import { runContract } from "../../../validation/contracts/http";
-import { runLocalNodeContracts } from "../../../validation/node-modules";
 // Bare, node:-prefixed, subpath, named and default import forms must all
 // resolve to the same compat profiles under both bundlers.
 import nodePath from "node:path";
@@ -49,7 +48,7 @@ async function run(prefer: ExecutionPreference) {
   } finally {
     await runtime.dispose();
   }
-  return { ...result, node: { direct: await runLocalNodeContracts() } };
+  return result;
 }
 declare global {
   interface Window {

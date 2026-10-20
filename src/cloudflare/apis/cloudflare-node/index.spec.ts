@@ -555,8 +555,9 @@ it("resets the shared ClientRequest idle timeout for each response chunk", async
     await reader.next();
     await vi.advanceTimersByTimeAsync(40);
     expect(timedOut).not.toHaveBeenCalled();
-    body.close();
-    await reader.next();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(timedOut).toHaveBeenCalledOnce();
+    expect(response.destroyed).toBe(true);
   } finally {
     vi.useRealTimers();
     vi.unstubAllGlobals();

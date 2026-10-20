@@ -160,7 +160,8 @@ export const nodeHttpContract: ContractSuite<typeof nodeHttpFeature> = {
         const first = a.address() as { port: number };
         const second = b.address() as { port: number };
         equal(first.port !== second.port, true);
-        equal(first.port >= 49152 && second.port <= 65535, true);
+        for (const { port } of [first, second])
+          equal(Number.isInteger(port) && port >= 49152 && port <= 65535, true);
         await rejects(() => a.listen(), "ERR_SERVER_ALREADY_LISTEN");
       } finally {
         a.close();

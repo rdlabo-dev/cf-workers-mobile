@@ -96,6 +96,7 @@ export function startStartupProbe() {
   });
 }
 export function startDelayedDirect() {
+  let dispatched = 0;
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -109,11 +110,18 @@ export function startDelayedDirect() {
       },
       loadDirect: async () => {
         await gate;
-        return (await import("../../workers/runtime/isolation")).default;
+        const worker = (await import("../../workers/runtime/isolation"))
+          .default;
+        return {
+          fetch(...args: Parameters<typeof worker.fetch>) {
+            dispatched++;
+            return worker.fetch(...args);
+          },
+        };
       },
     },
   });
-  return { runtime, release };
+  return { runtime, release, dispatched: () => dispatched };
 }
 declare global {
   interface Window {

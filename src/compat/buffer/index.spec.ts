@@ -10,7 +10,14 @@ type Api = typeof import("./index.js");
 function equal(actual: unknown, expected: unknown, label = "") {
   const json = (value: unknown) =>
     JSON.stringify(value, (_, v) => (typeof v === "bigint" ? `${v}n` : v));
-  if (json(actual) !== json(expected))
+  const primitive = (value: unknown) =>
+    value === null ||
+    (typeof value !== "object" && typeof value !== "function");
+  const matches =
+    primitive(actual) || primitive(expected)
+      ? Object.is(actual, expected)
+      : json(actual) === json(expected);
+  if (!matches)
     throw new Error(`${label}: ${json(actual)} != ${json(expected)}`);
 }
 function check(value: unknown, label: string) {
