@@ -5,11 +5,17 @@ Status: proposed implementation, with local feasibility probes completed on
 
 ## Decision: thin wrappers over Capacitor and workers-capacitor
 
+The primary consumer is an existing native iOS or Android application that has
+never installed or configured Capacitor. Installing this SDK must not require
+converting that application into a Capacitor application.
+
 Build workers-ios and workers-android as thin integration layers over Capacitor
 itself and the existing workers-capacitor implementation. Direct dependencies on
 `@capacitor/ios`, `@capacitor/android`, or their SwiftPM/Maven distributions are
 part of the design. Capacitor can appear in dependency graphs, setup documentation,
-and native types where useful; hiding the dependency is not a product requirement.
+and implementation types where useful; hiding the dependency is not a product
+requirement. Consumer integration must use the Workers wrapper's entry points
+without requiring manual Capacitor bridge initialization or plugin registration.
 
 Capacitor is [MIT licensed](https://github.com/ionic-team/capacitor/blob/8.5.3/LICENSE).
 Use its existing host, bridge, WebView configuration, and asset server directly,
@@ -40,8 +46,9 @@ into platform forks. Exact public export paths remain an implementation choice.
 1. Build the existing Worker application with the existing tooling and options.
    Select `workersIOS(options)` or `workersAndroid(options)` in the application
    entry instead of `workersCapacitor(options)`.
-2. Add the native wrapper and its Capacitor dependencies through SwiftPM or Gradle,
-   and include the generated web assets in the native application.
+2. Add the native wrapper through SwiftPM or Gradle. Its package metadata resolves
+   the required Capacitor dependencies. Include the generated web assets in the
+   native application.
 3. Embed or open the provided host from the application's existing UI.
 
 The wrapper supplies the required Capacitor configuration and Workers plugin
@@ -49,6 +56,15 @@ registration. Consumers do not need a separate Capacitor application project,
 Capacitor CLI synchronization, or duplicate Worker configuration in Swift/Kotlin.
 Normal native dependency and resource setup is expected; eliminating visible
 Capacitor dependencies must not introduce extra abstraction or custom packaging.
+The native project does not need npm, `node_modules`, `capacitor.config.*`, or a
+Capacitor-generated project structure. Node-based tooling remains part of building
+the Worker web assets, which can happen in a separate project or CI.
+
+Retain the application's existing entry point, root view/controller, navigation,
+Activity superclass, and application delegate. SDK-specific configuration belongs
+to the SDK-owned host. On Android, opening the SDK Activity from ComponentActivity
+is the baseline integration; it does not require changing the consumer's Activity
+to AppCompatActivity. Inline embedding has the narrower host support below.
 
 Ionic Portals illustrates this embedding model, but is not required. Its
 [installation guide](https://ionic.io/docs/portals/for-android/guide) requires an
@@ -134,6 +150,25 @@ No physical-device or finished SDK distribution acceptance is claimed.
 
 ## Implementation sequence and acceptance
 
+Use independent applications that start with no Capacitor dependency or setup as
+the release acceptance consumers. Do not use the existing Capacitor demo as a
+substitute for this acceptance.
+
+| Consumer                                       | Required acceptance                                                                                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Existing UIKit application                     | Add the package and assets, embed/open the Workers controller, then return to the original navigation with its state preserved                  |
+| Existing SwiftUI application                   | Exercise the representable at runtime, including dismissal and reopening; compilation alone is insufficient                                     |
+| Existing Android ComponentActivity application | Add the Maven dependency and assets, open the SDK-owned Activity, then return with the original screen/state preserved and no superclass change |
+| Existing Android AppCompatActivity application | Exercise the optional inline Fragment path without replacing the host Activity                                                                  |
+
+Each consumer must resolve the packaged SDK and transitive dependencies using
+ordinary native build tools, without Capacitor CLI commands, manual plugin
+registration, or copied runtime sources. Verify normal host UI operation before
+opening, after closing, and after a failed SDK startup. Check that host resources,
+navigation and unrelated WebViews remain functional within the documented
+Service Worker support limits. SDK installation must not mutate the existing
+application's global configuration to make the demo work.
+
 1. **Thin entries and lifecycle connection.** Add the platform entries and private
    handle registration. Add the two iOS descriptor-passing seams while preserving
    the existing Capacitor fallback. Verify options/return compatibility and
@@ -146,7 +181,9 @@ No physical-device or finished SDK distribution acceptance is claimed.
 3. **Distribution and independent consumers.** Package SwiftPM and Maven products,
    including resources, normal Capacitor dependencies, license notices, manifest
    and shrinker requirements. Build separate native consumer applications using
-   native dependency/resource setup and no Capacitor CLI steps. Exercise the same Worker UI and verify existing Capacitor behavior and
+   native dependency/resource setup and no Capacitor CLI steps. Complete the
+   non-Capacitor consumer acceptance above, exercise the same Worker UI, and verify
+   existing Capacitor behavior and
    Cloudflare build isolation.
 
 Reuse existing contract fixtures and assertions across hosts. Add tests only for
