@@ -7,7 +7,7 @@
     "strict": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node", "workers-capacitor/cloudflare/apis/types"],
+    "types": ["node", "cf-workers-mobile/cloudflare/apis/types"],
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
     "resolveJsonModule": true

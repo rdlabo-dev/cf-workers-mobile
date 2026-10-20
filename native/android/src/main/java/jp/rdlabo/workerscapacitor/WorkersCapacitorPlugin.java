@@ -19,6 +19,20 @@ public class WorkersCapacitorPlugin extends Plugin {
     private HostBridge hostBridge;
     private PluginCall starting;
     private Runnable timeout;
+    private final java.util.List<Runnable> closeCallbacks = new java.util.ArrayList<>();
+    private boolean closingRuntime;
+    private Runnable closeTimeout;
+    private Object closeGeneration;
+    private Object sdkHost;
+    private androidx.webkit.Profile sdkProfile;
+    void setNativeProfile(androidx.webkit.Profile profile) { sdkProfile = profile; }
+    private CookieManager cookies() { return sdkProfile == null ? CookieManager.getInstance() : sdkProfile.getCookieManager(); }
+    private boolean awaitingNativeCleanup;
+    private boolean rendererLost;
+    private Runnable nativeFailure;
+    void setNativeFailure(Runnable failure) { nativeFailure = failure; }
+    void rendererGone() { rendererLost = true; if (nativeFailure != null) nativeFailure.run(); }
+    void setNativeHost(Object host) { sdkHost = host; }
 
     private final WebViewListener networkLifecycle = new WebViewListener() {
         @Override public void onPageStarted(WebView webView) {
@@ -37,7 +51,7 @@ public class WorkersCapacitorPlugin extends Plugin {
 
     @PluginMethod public void start(PluginCall call) {
         main.post(() -> {
-            if (runtime != null) { call.reject("Document rendering already started"); return; }
+            if (closingRuntime || runtime != null) { call.reject("Document rendering already started"); return; }
             String bootstrap = call.getString("bootstrapURL");
             try {
                 URI url = new URI(bootstrap);
@@ -51,11 +65,18 @@ public class WorkersCapacitorPlugin extends Plugin {
             documentLinks = androidx.webkit.WebViewCompat.addDocumentStartJavaScript(bridge.getWebView(), script, java.util.Collections.singleton(bridge.getLocalUrl().replaceAll("/$", "")));
             starting = call;
             runtime = new WebView(getContext());
+            if (sdkProfile != null) androidx.webkit.WebViewCompat.setProfile(runtime, sdkProfile.getName());
             runtime.getSettings().setJavaScriptEnabled(true);
             runtime.getSettings().setDomStorageEnabled(true);
             hostBridge = new HostBridge(runtime);
             runtime.addJavascriptInterface(hostBridge, "WorkersCapacitorHost");
+            if (sdkHost != null) runtime.addJavascriptInterface(sdkHost, "WorkersNativeHost");
             runtime.setWebViewClient(new WebViewClient() {
+                @Override public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                    if (sdkHost == null) return false;
+                    main.post(WorkersCapacitorPlugin.this::rendererGone);
+                    return true;
+                }
                 @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
                     return bridge.getLocalServer().shouldInterceptRequest(request);
                 }
@@ -68,7 +89,7 @@ public class WorkersCapacitorPlugin extends Plugin {
             runtime.loadUrl(bootstrap);
         });
     }
-    @PluginMethod public void stop(PluginCall call) { main.post(() -> { close(); call.resolve(); }); }
+    @PluginMethod public void stop(PluginCall call) { main.post(() -> { if (closingRuntime) call.resolve(); else { close(); call.resolve(); } }); }
 
     // ---- Outbound network transport (see src/browser/fetch/transport.ts) ----
 
@@ -111,7 +132,7 @@ public class WorkersCapacitorPlugin extends Plugin {
     private void cookiesGet(String url, WorkerSockets.Result result) {
         if (!cookieURL(url)) { result.reject("Cookies require an HTTPS URL without credentials"); return; }
         main.post(() -> {
-            String cookie = CookieManager.getInstance().getCookie(url);
+            String cookie = cookies().getCookie(url);
             JSObject value = new JSObject(); value.put("cookie", cookie == null ? "" : cookie); result.resolve(value);
         });
     }
@@ -123,21 +144,67 @@ public class WorkersCapacitorPlugin extends Plugin {
         } catch (Exception error) { result.reject("Invalid remote cookies"); }
     }
     private void saveCookie(String url, JSONArray cookies, int index, WorkerSockets.Result result) {
-        CookieManager store = CookieManager.getInstance();
+        CookieManager store = cookies();
         if (index == cookies.length()) { store.flush(); result.resolve(null); return; }
         store.setCookie(url, cookies.optString(index), accepted -> saveCookie(url, cookies, index + 1, result));
     }
 
-    private void close() {
+    private void close() { closingRuntime = true; finishClose(); }
+    void closeRuntime(Runnable completion) {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post(() -> closeRuntime(completion)); return; }
+        closeCallbacks.add(completion);
+        if (closingRuntime) return;
+        closingRuntime = true;
+        if (rendererLost) { finishClose(); return; }
+        WebView closingView = runtime != null ? runtime : bridge.getWebView();
+        Object generation = new Object();
+        closeGeneration = generation;
+        closeTimeout = () -> { if (closeGeneration == generation) finishClose(); };
+        main.postDelayed(closeTimeout, 5000);
+        if (runtime != null) {
+            closingView.evaluateJavascript("Promise.resolve().then(() => globalThis.__workersNativeDispose?.()).then(() => WorkersCapacitorHost.disposed(), () => WorkersCapacitorHost.disposed())", null);
+        } else {
+            String token = "__workersClosing" + System.nanoTime();
+            closingView.evaluateJavascript("globalThis." + token + "=false;Promise.resolve().then(() => globalThis.__workersNativeDispose?.()).finally(() => globalThis." + token + "=true)", null);
+            pollDisposal(closingView, token, generation);
+        }
+    }
+    private void pollDisposal(WebView owner, String token, Object generation) {
+        if (!closingRuntime || closeGeneration != generation) return;
+        owner.evaluateJavascript("globalThis." + token + "===true", value -> {
+            if (!closingRuntime || closeGeneration != generation) return;
+            if ("true".equals(value)) finishClose();
+            else main.postDelayed(() -> pollDisposal(owner, token, generation), 25);
+        });
+    }
+
+    private void finishClose() {
+        if (!closingRuntime || awaitingNativeCleanup) return;
+        if (closeTimeout != null) main.removeCallbacks(closeTimeout);
         if (documentLinks != null) { documentLinks.remove(); documentLinks = null; }
-        if (hostBridge != null) { hostBridge.network.shutdown(); hostBridge = null; }
+        java.util.concurrent.CompletableFuture<Void> hiddenShutdown = hostBridge == null
+            ? java.util.concurrent.CompletableFuture.completedFuture(null) : hostBridge.network.shutdown().toCompletableFuture();
+        hostBridge = null;
         if (timeout != null) main.removeCallbacks(timeout);
         if (starting != null) { starting.reject("Document runtime disposed"); starting = null; }
         if (runtime != null) {
             runtime.stopLoading(); runtime.removeJavascriptInterface("WorkersCapacitorHost"); runtime.destroy(); runtime = null;
         }
+        if (!closeCallbacks.isEmpty()) {
+            awaitingNativeCleanup = true;
+            java.util.concurrent.CompletableFuture.allOf(hiddenShutdown, network.shutdown().toCompletableFuture())
+                .whenComplete((unused, error) -> main.post(this::completeClose));
+        } else completeClose();
     }
-    @Override protected void handleOnDestroy() { bridge.removeWebViewListener(networkLifecycle); main.post(this::close); network.shutdown(); }
+    private void completeClose() {
+        awaitingNativeCleanup = false;
+        closeGeneration = null;
+        closingRuntime = false;
+        java.util.List<Runnable> callbacks = new java.util.ArrayList<>(closeCallbacks);
+        closeCallbacks.clear();
+        for (Runnable callback : callbacks) callback.run();
+    }
+    @Override protected void handleOnDestroy() { bridge.removeWebViewListener(networkLifecycle); close(); network.shutdown(); }
 
     /**
      * JavaScript interface exposed to the hidden document runtime. The bridge
@@ -171,6 +238,7 @@ public class WorkersCapacitorPlugin extends Plugin {
         private final WebView owner;
         private final WorkerSockets network = new WorkerSockets();
         HostBridge(WebView owner) { this.owner = owner; }
+        @JavascriptInterface public void disposed() { main.post(() -> { if (runtime == owner) finishClose(); }); }
         @JavascriptInterface public void ready() {
             main.post(() -> {
                 if (runtime == owner && starting != null) { main.removeCallbacks(timeout); starting.resolve(); starting = null; }

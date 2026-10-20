@@ -4,6 +4,9 @@ The package includes the native connection for Capacitor 8 (verified with 8.5.3)
 iOS uses Swift Package Manager; Android uses Gradle. CocoaPods is not included in
 this Preview.
 
+For an existing native application without Capacitor setup, see
+[native application embedding](native-embedding.md).
+
 ## Installation
 
 Install the package in your Capacitor application using the [Preview installation steps](integration.md#2-install-capacitor-and-this-package).
@@ -26,7 +29,7 @@ installing Capacitor.
 ## Application entry
 
 ```ts
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "cf-workers-mobile/capacitor";
 
 const app = workersCapacitor({
   baseURL: "https://worker.invalid",

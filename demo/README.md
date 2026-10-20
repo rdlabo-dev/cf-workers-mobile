@@ -29,7 +29,7 @@ The path is relative to the configured Vite root, `src/`. The example uses [the 
 [src/main.ts](src/main.ts) initializes the runtime and displays the HTML returned by `/`:
 
 ```ts
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "cf-workers-mobile/capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",

@@ -1,4 +1,4 @@
-import { runContract } from "workers-capacitor/shared/contracts/testing";
+import { runContract } from "cf-workers-mobile/shared/contracts/testing";
 import {
   localStructuredCloneApi,
   StructuredCloneImplementation,

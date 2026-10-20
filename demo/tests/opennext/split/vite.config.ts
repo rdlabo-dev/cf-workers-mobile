@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));

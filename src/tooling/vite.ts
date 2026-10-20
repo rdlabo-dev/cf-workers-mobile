@@ -358,7 +358,7 @@ export function workersCapacitorPlugin(
       name: "workers-capacitor-source",
       enforce: "pre",
       config: () => ({
-        optimizeDeps: { exclude: ["workers-capacitor"] },
+        optimizeDeps: { exclude: ["cf-workers-mobile"] },
         worker: { format: "es" },
       }),
       transformIndexHtml: {

@@ -1,15 +1,15 @@
 {
-  "name": "workers-capacitor",
-  "version": "0.1.1",
+  "name": "cf-workers-mobile",
+  "version": "0.1.2",
   "license": "MIT",
   "description": "Bring Cloudflare Workers apps to iOS and Android.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rdlabo-dev/workers-capacitor.git"
+    "url": "git+https://github.com/rdlabo-dev/cf-workers-mobile.git"
   },
-  "homepage": "https://github.com/rdlabo-dev/workers-capacitor#readme",
+  "homepage": "https://github.com/rdlabo-dev/cf-workers-mobile#readme",
   "bugs": {
-    "url": "https://github.com/rdlabo-dev/workers-capacitor/issues"
+    "url": "https://github.com/rdlabo-dev/cf-workers-mobile/issues"
   },
   "keywords": [
     "cloudflare",
@@ -30,11 +30,21 @@
     "dist",
     "Package.swift",
     "native/ios/*.swift",
+    "native/ios-host/*.swift",
     "native/android/build.gradle",
+    "native/android/consumer-rules.pro",
     "native/android/src/main/"
   ],
   "exports": {
-    ".": {
+    "./ios": {
+      "types": "./dist/ios.d.ts",
+      "import": "./dist/ios.js"
+    },
+    "./android": {
+      "types": "./dist/android.d.ts",
+      "import": "./dist/android.js"
+    },
+    "./capacitor": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
@@ -89,7 +99,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "release:prepare": "node scripts/prepare-local-release.mjs"
   },
   "dependencies": {
     "@babel/core": "^8.0.7",

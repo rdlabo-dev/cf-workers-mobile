@@ -6,7 +6,7 @@ Run `npm run format` from the repository root before submitting changes. `npm ru
 
 ## Complete compatibility units only
 
-New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1 follow-up](#010-preview-exception).
+New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1 and 0.1.2 follow-ups](#010-preview-exception).
 
 For Node.js compatibility, the acceptance unit is a module, including its Workers
 exports, subpaths and observable behavior. For a binding or Web API, define the
@@ -51,7 +51,7 @@ A compatibility implementation is ready to merge only when all of these are true
 - The relevant contracts pass on iOS and Android WebViews. Logs or screenshots
   identify the tested revision, platform and results. Passing an early subset of
   a native run is not a completed run.
-- Required CI passes. Manager and independent acceptance reviews have no
+- CI must pass before release; pending CI does not block merging. Manager and independent acceptance reviews have no
   outstanding required changes. Reviewers check coverage completeness as well as
   test results; CI cannot prove a missing contract exists.
 - Documentation describes current API behavior, the pinned baseline, limitations
@@ -73,11 +73,15 @@ unfinished production behavior.
 
 0.1.0 Preview may include existing compatibility implementations with the limitations documented in the [compatibility inventory](docs/compatibility.md). Their inclusion does not establish complete module compatibility or certify untested behavior. Keep missing exports, unsupported operations and verification boundaries visible; a passing application scenario does not make its dependencies complete.
 
-This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1 follow-up below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
+This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1 and 0.1.2 follow-ups below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
 
 ### 0.1.1 Preview follow-up
 
 0.1.1 is explicitly authorized to retain the existing compatibility limitations documented in the inventory, provided its changes pass regression checks and required CI. This is a version-specific continuation of the Preview scope, not a claim that incomplete modules are complete. Keep known failures and unverified behavior visible in release notes. It does not authorize new incomplete compatibility units or extend the exception to later versions.
+
+### 0.1.2 Preview follow-up
+
+`cf-workers-mobile@0.1.2` Preview is explicitly authorized with the current limitations documented in the [compatibility inventory](docs/compatibility.md). This version-specific exception retains existing incomplete compatibility implementations; it does not certify complete Workers or Node.js compatibility, authorize new incomplete units, bypass required regression checks or CI, or extend to later releases. Keep unsupported behavior and verification boundaries visible.
 
 ## Layout and tests
 
@@ -104,12 +108,21 @@ test; a single passing “globals” result must not stand in for individual API
 
 ## CI and regression protection
 
-The required `CI` check aggregates library, the compatibility matrix, bindings,
-streams-fallback, package and upstream jobs. Workers/browser, runtime/documents
-and build-tool checks run on separate runners; only the bindings job starts MySQL. Every job must succeed; skipped or cancelled jobs
-cannot satisfy the gate. Main requires a pull request, an up-to-date branch and
-this check, and blocks force pushes and deletion. Workflow configuration is in
-[ci.yml](.github/workflows/ci.yml); CodeQL is configured separately.
+The `CI` check aggregates library, the compatibility matrix, bindings,
+streams-fallback, package and upstream jobs. Main requires a pull request and
+blocks force pushes and deletion; CI is not a required merge status check.
+Publishing still requires successful Compatibility for the release commit.
+Workflow configuration is in [ci.yml](.github/workflows/ci.yml); CodeQL is separate.
+
+For a main push, the workflow compares its Git tree with the source actually
+checked out by the latest applicable PR Compatibility run. Matching successful
+results are reused without executing the full suites again. If that PR run is
+still running, main waits for its result; an applicable failed run fails the gate.
+Missing or unverifiable evidence, different source contents, or no applicable PR
+requires the ordinary full CI run. The source record is tied to the run and
+attempt, so an earlier successful attempt cannot replace a newer result.
+Ordinary full runs require every job to succeed; skipped or cancelled suites are
+accepted only when the main gate has explicitly validated successful reuse.
 
 Library checks include types, adjacent contracts and reproducible URL generation.
 Integration checks use pinned local workerd, Chromium/WebKit, both build tools,
@@ -136,14 +149,14 @@ or a namespace match to full behavioral support.
 | ------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
 | Maintainer comments `/beta` on a CI-passing PR                            | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
 | PR merged into `main`, after Compatibility succeeds for that merge commit | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
-| Stable tag such as `v0.1.1`                                               | `latest`     | `0.1.1`                                    |
+| Stable tag such as `v0.1.2`                                               | `latest`     | `0.1.2`                                    |
 | Prerelease/revision tag such as `v0.2.0-rc.1`                             | `next`       | `0.2.0-rc.1`                               |
 
 Direct pushes and PR branches do not automatically publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
 
-For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility to pass on main. Then tag that commit and push the tag, for example `git tag v0.1.1` followed by `git push origin v0.1.1`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
+For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility on main to validate reuse or finish the necessary full run. Then tag that commit and push the tag, for example `git tag v0.1.2` followed by `git push origin v0.1.2`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
 
-The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `workers-capacitor`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
+The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `cf-workers-mobile`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
 
 ### PR beta requests
 
@@ -152,3 +165,35 @@ After Compatibility succeeds for an open, non-draft PR targeting main, a reposit
 The workflow checks the requester's current permission, the PR head and its CI again in the publishing job. A PR updated after the comment requires successful CI and a fresh `/beta`; queued comments do not authorize newer changes. PRs modifying `.github/workflows/` or `.github/scripts/` must merge those changes before using this command. The candidate is built in the read-only job; its source and lifecycle scripts are never executed in the OIDC publishing job.
 
 The command becomes available after `release.yml` lands on main. A failed request can be inspected in the Release workflow's Actions log; it does not publish when CI is pending or failed.
+
+### Local CI bootstrap release
+
+A maintainer can prepare a `beta` package from any committed branch when CI needs
+an npm artifact before merge or Trusted Publishing setup. This local path does
+not require main or successful remote CI; it does not alter the GitHub release gates.
+Review the local build/test results before publishing the candidate.
+
+```sh
+npm run release:prepare
+```
+
+The command requires a clean checkout, builds with the ordinary `prepack` hook,
+and stages a tarball under `artifacts/npm/<full-commit-SHA>/`. Its version is
+`<base>-beta.local.sha<12-character-SHA>` and its dist-tag is `beta`. The source
+`package.json` and Git tags are unchanged. `release.json` records the source
+branch/commit and tarball SHA-256. Preparation does not publish or use npm credentials.
+
+The command prints the exact `npm publish <tarball> --ignore-scripts --access public
+--tag beta --registry https://registry.npmjs.org` invocation. After reviewing the
+artifact, use your local npm account (`npm login` if needed) with permission to
+publish `cf-workers-mobile`, and run that printed command. Append `--dry-run` to
+inspect it without publishing. Complete npm's authentication/2FA prompts when
+requested; keep credentials outside the repository. Local publication does not
+use the workflow's OIDC identity or its `--provenance` option.
+
+This publishes only the npm package. It does not deploy a Worker, push a Git tag,
+merge a PR, or publish Android Maven artifacts. The new npm name must be available
+to your account; preparation and dry-run do not prove publication permission.
+Use the exact printed version in CI installs rather than a moving `beta` tag.
+Already published versions cannot be replaced; commit changes and prepare a new
+candidate. This does not update `latest`.

@@ -13,8 +13,11 @@ const artifacts = new URL(
 );
 test("capture every builtin export from the pinned Workers profile", async () => {
   const require = createRequire(import.meta.url);
+  const miniflareRequire = createRequire(
+    require.resolve("miniflare/package.json"),
+  );
   const workerdPackage = JSON.parse(
-    await readFile(require.resolve("workerd/package.json"), "utf8"),
+    await readFile(miniflareRequire.resolve("workerd/package.json"), "utf8"),
   );
   assert.equal(workerdPackage.version, profile.workerd);
   const runtime = new Miniflare(

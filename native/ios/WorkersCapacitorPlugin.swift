@@ -3,6 +3,8 @@ import WebKit
 
 @objc(WorkersCapacitorPlugin)
 public final class WorkersCapacitorPlugin: CAPPlugin, CAPBridgedPlugin {
+    /// Optional embedding configuration; ordinary Capacitor applications keep their existing configuration.
+    public var documentDescriptorFactory: (() -> InstanceDescriptor)?
     public let identifier = "WorkersCapacitorPlugin"
     public let jsName = "WorkersCapacitor"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -46,6 +48,7 @@ public final class WorkersCapacitorPlugin: CAPPlugin, CAPBridgedPlugin {
             guard let entry = call.getString("entry"), entry.hasPrefix("/"), !entry.hasPrefix("//"), !entry.contains("\\"),
                   let baseURL = call.getString("baseURL"), let assets = call.getArray("assets", String.self), let script = call.getString("pageScript"), !script.isEmpty else { call.reject("Invalid document configuration"); return }
             let child = DocumentBridgeController()
+            child.embeddedDescriptorFactory = self.documentDescriptorFactory
             child.runtimeHost = host
             child.localURL = bridge.config.localURL
             child.settings = ["entry": entry, "baseURL": baseURL, "assets": assets, "pageScript": script]
@@ -122,6 +125,13 @@ public final class WorkersCapacitorPlugin: CAPPlugin, CAPBridgedPlugin {
         guard let child = documentController else { return }
         child.close(); child.willMove(toParent: nil); child.view.removeFromSuperview(); child.removeFromParent()
         documentController = nil
+    }
+    /// Releases the native resources after the owning JavaScript runtime has disposed.
+    @MainActor public func shutdown() async {
+        close()
+        await network.shutdown()
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "WorkersCapacitorNetworkReset")
+        networkLifecycle = nil
     }
     deinit {
         documentController?.close()

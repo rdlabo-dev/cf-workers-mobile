@@ -27,6 +27,7 @@ final class WorkerSockets {
     private EventLoopGroup group;
     private SSLContext tlsContext;
     private boolean stopped;
+    private final java.util.concurrent.CompletableFuture<Void> terminated = new java.util.concurrent.CompletableFuture<>();
     private final class Connection extends SimpleChannelInboundHandler<ByteBuf> {
         final String id;
         final Result opening;
@@ -187,9 +188,15 @@ final class WorkerSockets {
         if(connection==null) { result.resolve(null); return; }
         connection.channel.eventLoop().execute(() -> { connection.fail("Socket closed"); connection.channel.close().addListener(future -> result.resolve(null)); });
     }
-    synchronized void shutdown() {
-        if(stopped) return; stopped=true;
+    synchronized java.util.concurrent.CompletionStage<Void> shutdown() {
+        if(stopped) return terminated; stopped=true;
         for(Connection connection:connections.values()) connection.channel.eventLoop().execute(() -> connection.fail("Socket runtime closed"));
-        connections.clear(); if(group!=null) group.shutdownGracefully(0,2,TimeUnit.SECONDS);
+        connections.clear();
+        if(group==null) terminated.complete(null);
+        else group.shutdownGracefully(0,2,TimeUnit.SECONDS).addListener(future -> {
+            if(future.isSuccess()) terminated.complete(null);
+            else terminated.completeExceptionally(future.cause());
+        });
+        return terminated;
     }
 }

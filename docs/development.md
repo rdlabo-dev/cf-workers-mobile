@@ -70,7 +70,21 @@ The sample pins Void / @void/react 1.1.12. Its iOS and Android tests require suc
 
 [`demo/opennext`](../demo/opennext/README.md) is a standalone Next.js application with D1-backed sessions, ordinary forms and static assets. Its normal Capacitor build sends requests to the existing Worker. Separate tests exercise public pages locally, so remote success is not counted as local OpenNext support. See [OpenNext configuration and limits](opennext.md).
 
-## Native demo
+## Native embedding consumers
+
+These independent consumers verify that an existing native app can use the SDK
+without Capacitor application setup. Build the library first, then follow:
+
+1. [iOS: UIKit and SwiftUI consumer](../demo/tests/native-embedding/ios/README.md).
+2. [Android: Maven-only ComponentActivity consumer](../demo/tests/native-embedding/android/README.md).
+
+They exercise navigation, POST, close/reopen and startup failure. They also guard
+the ready deadline, Android Activity recreation, and preservation of Android host
+cookies and Service Worker behavior. Generated assets and local publications are
+fixture outputs, not release artifacts. The `Native embedding` workflow runs both
+platforms separately from the existing compatibility workflow.
+
+## Capacitor native demo
 
 The native build requires Xcode 26 / Swift 6.2 or newer and Java 21.
 HTTP/1.1 request framing and response parsing run in JavaScript/WebAssembly.
@@ -106,4 +120,4 @@ Android requires Java 21+. The demo opens the minimal Hono example. For the sepa
 
 See [test execution cost](test-execution-time.md) for the CI timing baseline, setup consolidation, and measurement limits.
 
-CI runs library/type checks, local workerd contracts, Chromium/WebKit integration, a fresh npm-tarball consumer and nine Android application scenarios in parallel jobs. iOS simulator checks run separately. See [CI and merge protection](../CONTRIBUTING.md#ci-and-regression-protection) for the required `CI` check and verification boundaries.
+CI runs library/type checks, local workerd contracts, Chromium/WebKit integration, a fresh npm-tarball consumer and nine Android application scenarios in parallel jobs. iOS simulator checks run separately. See [CI and merge protection](../CONTRIBUTING.md#ci-and-regression-protection) for the release `CI` gate, reuse of verified PR results on main, and verification boundaries. CI does not block merging.

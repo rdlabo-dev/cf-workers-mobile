@@ -51,7 +51,17 @@ npm run test:upstream -- hono-jsx-ssr ios <simulator-UUID>
 
 `test:runtime` builds the runtime test app before running Playwright. `test:build-tools` runs the build checks, prepares the build-tool test apps using `scripts/build-tools.mjs`, then runs Playwright. Their generated files go to `../artifacts/`.
 
-## Native checks
+## Native embedding checks
+
+- [iOS](native-embedding/ios/README.md): independent SwiftPM consumer, UIKit/SwiftUI lifecycle and startup cleanup.
+- [Android](native-embedding/android/README.md): independent Maven consumer, host-state isolation, Activity recreation and startup cleanup.
+
+These fixtures use the public SDK products without Capacitor application setup.
+See their READMEs for commands, prerequisites and evidence limits.
+
+<a id="native-checks"></a>
+
+## Capacitor native checks
 
 Prepare a test app in Capacitor's ordinary `dist/` directory, then sync and run:
 

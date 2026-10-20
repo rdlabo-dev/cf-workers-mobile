@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
 import { resolve } from "node:path";
 export default defineConfig(({ mode }) => ({
   resolve: {

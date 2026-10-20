@@ -3,8 +3,8 @@ import { Buffer } from "node:buffer";
 import {
   defineFeature,
   FeatureImplementation,
-} from "workers-capacitor/shared/contracts";
-import type { ContractSuite } from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts";
+import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
 const api = consumers as unknown as typeof import("./index.js");
 function same(a: unknown, b: unknown) {
   if (a !== b) throw Error(`${String(a)} != ${String(b)}`);

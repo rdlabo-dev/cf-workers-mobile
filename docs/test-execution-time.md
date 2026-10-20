@@ -3,6 +3,15 @@
 Reduce repeated work while preserving regression guarantees. A smaller test count
 or a faster single CI run is not sufficient evidence of an improvement.
 
+## Reuse after merge
+
+Main can reuse the latest successful PR Compatibility result when its Git tree
+matches the source actually tested by that run. The workflow verifies a source
+record tied to the run and attempt. A still-running applicable PR run is awaited;
+a failed result blocks release. Missing evidence or changed contents falls back
+to full CI. This avoids a second identical test run without caching test outputs
+or removing coverage. CI is a release condition, not a required merge check.
+
 ## Required coverage and isolation
 
 Short suites with matching Node versions share setup and run sequentially:
@@ -28,7 +37,7 @@ databases, and native emulators must retain isolation.
 
 The npm download cache does not replace installation, compilation, or execution.
 Source and configuration changes are rebuilt on every run; dependency installation
-resolves the current manifests even when downloaded packages are reused.
+resolves the current manifests even when downloaded packages are reused. This applies to full runs; validated result reuse after merge does not reinstall or rebuild.
 
 ## Verification
 
@@ -61,7 +70,7 @@ speedup requires comparable repeated observations; it is not a prerequisite for
 accepting verified removal of redundant work. If conditions prevent that claim,
 report it as unproven and stop measurements that do not inform the decision.
 
-[Issue #52 and its measurement evidence](https://github.com/rdlabo-dev/workers-capacitor/issues/52#issuecomment-6283412842)
+[Issue #52 and its measurement evidence](https://github.com/rdlabo-dev/cf-workers-mobile/issues/52#issuecomment-6283412842)
 record the baseline, commands, observations, and acceptance decision. The original
 same-image repeated-comparison condition was not fully met. Its replacement accepts
 the verified removal of three setup sequences and preserved coverage without

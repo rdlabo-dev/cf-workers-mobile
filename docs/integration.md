@@ -1,5 +1,9 @@
 # Integrate an existing Workers application with Capacitor
 
+For an existing [iOS](native-embedding.md#ios) or [Android](native-embedding.md#android)
+application, use the embedding guide. This guide is for a Capacitor app, including
+creating one when starting a mobile application or using general Capacitor plugins.
+
 Give this guide to an AI coding assistant with access to your application repository. The goal is to run the existing Workers application in Capacitor with the fewest application-code changes. Start by adding Capacitor and connecting the existing Worker entry; preserve the cloud build, rendering, routes, business logic and authentication.
 
 The primary success criterion is a working native application with minimal integration effort, not a new application architecture. Keep ordinary HTML documents, links and forms where the application uses them. SPA conversion, a new client router, App Shell redesign, SSR/API separation and adding hydration are not prerequisites.
@@ -27,8 +31,8 @@ On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker
 ## Prompt to give your AI assistant
 
 ```text
-Follow https://github.com/rdlabo-dev/workers-capacitor/blob/main/docs/integration.md
-to bring this app to iOS and Android with workers-capacitor.
+Follow https://github.com/rdlabo-dev/cf-workers-mobile/blob/main/docs/integration.md
+to bring this app to iOS and Android with cf-workers-mobile.
 Preserve its pages, routes and authentication; verify it on the target platforms.
 ```
 
@@ -77,13 +81,39 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Install the 0.1.0 Preview release from npm:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. For 0.1.2 Preview, install the npm package once the release is published:
 
 ```sh
-npm install workers-capacitor
+npm install cf-workers-mobile@0.1.2
 ```
 
-Before building a native target, check the [native SDK requirements and Android Gradle resource rules](development.md#native-demo). The Android resource rules belong in the application's `android/app/build.gradle`.
+For a source build instead, create a package tarball from a checkout of this repository:
+
+```sh
+# In the SDK checkout:
+npm install
+npm pack
+
+# In the application package:
+npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.2.tgz
+```
+
+`npm pack` runs the SDK build through `prepack`. Install the generated tarball rather than the checkout directory: directory installs can create a symlink back to the SDK tree, including a recursive path when the app lives inside that checkout. The tarball filename above uses the current source version.
+
+The installed package is named `cf-workers-mobile`; the checkout directory can retain the repository name. The earlier published `workers-capacitor@0.1.1` Preview uses the old package name and does not provide the imports shown here. Keep JavaScript and native dependencies on the same source revision.
+
+### Migrating from the old npm package
+
+If your application already depends on `workers-capacitor`, remove it before installing the renamed package. Keeping both dependencies can make Capacitor discover and register the same native plugin twice. In the application package, after the 0.1.2 release is published:
+
+```sh
+npm uninstall workers-capacitor
+npm install cf-workers-mobile@0.1.2
+```
+
+Change runtime imports from `workers-capacitor` to `cf-workers-mobile/capacitor`, and change other package subpaths to the `cf-workers-mobile` prefix. Rebuild the application's mobile web assets with its existing build command, then run `npx cap sync` to regenerate native plugin dependencies. New applications use the installation steps above directly.
+
+Before building a native target, check the [native SDK requirements and Android Gradle resource rules](development.md#capacitor-native-demo). The Android resource rules belong in the application's `android/app/build.gradle`.
 
 Keep Capacitor/native projects in the application package, not in the library's source tree. Reuse existing dependencies and scripts rather than scaffolding a second application unnecessarily.
 
@@ -117,7 +147,7 @@ capacitor.config.ts      webDir: "www"
 // capacitor/vite.config.ts
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   root: here("."),
@@ -138,7 +168,7 @@ Adjust paths to the actual application. For OpenNext the entry is the generated 
 
 ```ts
 // capacitor/main.ts — local document setup
-import { workersCapacitor } from "workers-capacitor";
+import { workersCapacitor } from "cf-workers-mobile/capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://your-worker.example.com/",
   render: "/",

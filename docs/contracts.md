@@ -20,12 +20,12 @@ import {
   FeatureImplementation,
   openFeature,
   type FeatureScope,
-} from "workers-capacitor/shared/contracts";
+} from "cf-workers-mobile/shared/contracts";
 import {
   runContract,
   assertContract,
   type ContractSuite,
-} from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts/testing";
 
 interface TextAPI {
   read(key: string): Promise<string | null>;
@@ -89,7 +89,7 @@ Requirements are executable checks in `create`, not strings in an unverified cap
 
 ## FetchRuntime
 
-`FetchRuntime` is exported from the package root for custom execution adapters.
+`FetchRuntime` is exported from `cf-workers-mobile/capacitor` for custom execution adapters.
 Subclasses implement `dispatch(request, env, ctx)` and may override `ready` and
 `close(): void | Promise<void>` for startup and owned-resource cleanup.
 Construction does not patch global fetch; call the bound `fetch` method directly.

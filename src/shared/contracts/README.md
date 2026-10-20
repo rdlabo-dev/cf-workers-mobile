@@ -11,6 +11,6 @@ adapters and contracts live with their owning implementation:
 - Local KV: `src/cloudflare/bindings/kv/`, including `contract.ts`.
 - API modules: adjacent module-owned contracts under `compat` and `browser`.
 
-Public `workers-capacitor/shared/contracts` and `workers-capacitor/shared/contracts/testing`
+Public `cf-workers-mobile/shared/contracts` and `cf-workers-mobile/shared/contracts/testing`
 resolve here. Imports use these role-based paths; old `features` and `testing`
 entry points are removed before release. See [the contract standard](../../../docs/contracts.md).

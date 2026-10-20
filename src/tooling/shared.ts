@@ -143,10 +143,12 @@ export function compatibilityDependencies(): string[] {
 export function workerEntry(entry: string, virtualFiles?: string) {
   // WebKit can evaluate a Worker entry twice when a dynamic child imports its
   // exports. Keep the bootstrap free of exports and all shared code in children.
+  // Older WebKit does not deliver rejected module evaluation to Worker.onerror;
+  // explicitly report startup failure before the parent waits indefinitely.
   const files = virtualFiles
     ? `const { registerVirtualFiles } = await import(${JSON.stringify(nodeCompatPath("fs"))});\nregisterVirtualFiles(${virtualFiles});\n`
     : "";
-  return `const { initializeWorkerNetwork } = await import(${JSON.stringify(networkRelayPath)});\nawait initializeWorkerNetwork();\nawait import(${JSON.stringify(globalsInstallPath)});\n${files}const { default: worker } = await import(${JSON.stringify(entry)});\nconst { serve } = await import(${JSON.stringify(transportPath)});\nserve(worker);`;
+  return `try {\nconst { initializeWorkerNetwork } = await import(${JSON.stringify(networkRelayPath)});\nawait initializeWorkerNetwork();\nawait import(${JSON.stringify(globalsInstallPath)});\n${files}const { default: worker } = await import(${JSON.stringify(entry)});\nconst { serve } = await import(${JSON.stringify(transportPath)});\nserve(worker);\n} catch (error) {\nself.postMessage({ type: "startup-error", name: error instanceof Error ? error.name : "Error", message: error instanceof Error ? error.message : String(error) });\n}`;
 }
 export function workerSource(
   entry: string,

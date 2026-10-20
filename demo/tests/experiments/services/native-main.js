@@ -1,5 +1,5 @@
-import { workersCapacitor } from "workers-capacitor";
-import { LocalStorageKV } from "workers-capacitor/cloudflare/bindings/kv";
+import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { LocalStorageKV } from "cf-workers-mobile/cloudflare/bindings/kv";
 import { Capacitor } from "@capacitor/core";
 import settings from "./server.json";
 const platform = Capacitor.getPlatform();

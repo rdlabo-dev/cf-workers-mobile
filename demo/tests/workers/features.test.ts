@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createTestHarness } from "wrangler";
-import { FeatureImplementation } from "workers-capacitor/shared/contracts";
-import { fetchFeature } from "workers-capacitor/cloudflare/workers";
+import { FeatureImplementation } from "cf-workers-mobile/shared/contracts";
+import { fetchFeature } from "cf-workers-mobile/cloudflare/workers";
 import {
   assertContract,
   runContract,
   type ContractResult,
-} from "workers-capacitor/shared/contracts/testing";
-import { fetchContract } from "workers-capacitor/cloudflare/workers/testing";
+} from "cf-workers-mobile/shared/contracts/testing";
+import { fetchContract } from "cf-workers-mobile/cloudflare/workers/testing";
 const http = createTestHarness({
   workers: [
     {

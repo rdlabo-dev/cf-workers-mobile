@@ -6,7 +6,7 @@ import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import {
   assertContract,
   type ContractResult,
-} from "workers-capacitor/shared/contracts/testing";
+} from "cf-workers-mobile/shared/contracts/testing";
 
 let harness: Miniflare;
 beforeAll(async () => {

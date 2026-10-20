@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import { build as vite } from "vite";
-import { workersCapacitorPlugin as esbuildPlugin } from "workers-capacitor/tooling/esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "workers-capacitor/tooling/vite";
+import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-mobile/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "cf-workers-mobile/tooling/vite";
 
 for (const tool of ["vite", "esbuild"] as const)
   for (const execution of ["local", "network"] as const)
@@ -30,7 +30,7 @@ for (const tool of ["vite", "esbuild"] as const)
         const entry = resolve(root, "main.js");
         await writeFile(
           entry,
-          `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("workers-capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:'https://local.invalid/'});`,
+          `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("cf-workers-mobile/capacitor")))}; globalThis.runtime = workersCapacitor({baseURL:'https://local.invalid/'});`,
         );
         const options = {
           worker: resolve(generated, "worker.js"),
