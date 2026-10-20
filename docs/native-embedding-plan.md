@@ -26,6 +26,26 @@ place or open its screen. They do not configure Capacitor, register its plugins,
 run the Capacitor CLI, or repeat Worker configuration in Swift/Kotlin. Internal
 Capacitor dependencies remain pinned and managed by the SDK.
 
+## Use Capacitor itself as the embedded host
+
+Direct internal use of `@capacitor/ios` and `@capacitor/android`, or their native
+SwiftPM/Maven distributions, is explicitly intended. A consumer-facing
+Capacitor-free setup does not mean a Capacitor-free implementation. Reuse its
+bridge, WebView host, configuration, and asset server rather than rebuilding
+those facilities. Add only the glue required to host the existing Workers
+plugin, select packaged assets, and connect lifecycle ownership.
+
+Ionic Portals provides the same general embedding model: its
+[iOS views](https://ionic.io/docs/portals/for-ios/getting-started) host web content
+inside UIKit or SwiftUI. It was considered as an existing host dependency.
+However, its [installation guide](https://ionic.io/docs/portals/for-android/guide)
+requires an active commercial agreement, and Ionic
+[announced the end of new commercial sales, including Portals](https://ionic.io/blog/important-announcement-the-future-of-ionics-commercial-products).
+For a generally distributable SDK, use Capacitor directly rather than requiring
+Portals. This is a distribution decision, not a requirement to avoid existing
+embedding libraries. Portals integration with this Workers plugin has not been
+runtime-tested and must not be assumed to resolve its lifecycle constraints.
+
 ## Native hosts
 
 ### iOS
