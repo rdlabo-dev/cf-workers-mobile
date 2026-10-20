@@ -26,6 +26,13 @@ export function createIsolatedWorker<Env>(worker: Worker) {
     network.receive(event);
     const { data } = event;
     if (data.type === "ready") started();
+    // Module top-level-await rejection does not reliably dispatch Worker.onerror
+    // in older WebKit. The generated bootstrap explicitly reports startup errors.
+    if (data.type === "startup-error") {
+      const error = new Error(data.message);
+      error.name = data.name;
+      void stop(error)?.catch(console.error);
+    }
   };
   worker.onerror = (event) => {
     event.preventDefault();

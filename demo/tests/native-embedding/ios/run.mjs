@@ -7,7 +7,7 @@ import {
   readdir,
   access,
 } from "node:fs/promises";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -32,6 +32,7 @@ function run(command, args, cwd = here) {
   return result.stdout.trim();
 }
 await mkdir(scratch, { recursive: true });
+writeFileSync(`${scratch}/${scenario}.log`, "");
 run(process.execPath, ["../build-web.mjs", "ios", scenario]);
 const sdk = run("xcrun", ["--sdk", "iphonesimulator", "--show-sdk-path"]);
 const arch = process.arch === "arm64" ? "arm64" : "x86_64";
@@ -151,25 +152,31 @@ const output = await new Promise((resolve, reject) => {
     scenario,
   ]);
   let log = "";
-  const timer = setTimeout(() => {
+  let settled = false;
+  const finish = (error) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    writeFileSync(`${scratch}/${scenario}.log`, log);
     child.kill();
-    reject(new Error(`Probe timed out\n${log}`));
+    if (error) reject(error);
+    else resolve(log);
+  };
+  const timer = setTimeout(() => {
+    finish(new Error(`Probe timed out\n${log}`));
   }, 90000);
   const receive = (chunk) => {
     log += chunk.toString();
     if (log.includes(finalMarker)) {
-      clearTimeout(timer);
-      child.kill();
-      resolve(log);
+      finish();
     }
   };
   child.stdout.on("data", receive);
   child.stderr.on("data", receive);
-  child.on("error", reject);
+  child.on("error", finish);
   child.on("exit", (code) => {
     if (!log.includes(finalMarker)) {
-      clearTimeout(timer);
-      reject(new Error(`Probe exited ${code}\n${log}`));
+      finish(new Error(`Probe exited ${code}\n${log}`));
     }
   });
 });
