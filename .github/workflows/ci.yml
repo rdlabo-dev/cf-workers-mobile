@@ -1,32 +1,26 @@
 name: Compatibility
-
-on:
-  pull_request:
-  push:
-    branches: [main]
-  merge_group:
-  workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: compatibility-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
+  group: issue52-full-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   library:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Isolate comparison download cache
+        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-library' > .ci-measurement-cache-scope
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package.json
+          cache-dependency-path: |-
+            package.json
+            .ci-measurement-cache-scope
       - run: npm install
       - run: npm run format:check
       - run: node --test .github/scripts/npm-release.test.mjs
@@ -34,7 +28,6 @@ jobs:
       - run: node scripts/url-idna/bundle-url.mjs --check
       - run: npm run build
       - run: npm test -- --allowOnly=false
-
   compatibility:
     name: compatibility (${{ matrix.suite }})
     runs-on: ubuntu-24.04
@@ -55,8 +48,6 @@ jobs:
               npm run test:documents
               node --test tests/native/links.test.mjs tests/native/acceptance.test.mjs
               npm run build:native-documents -- --mode express
-          # Share browser/dependency setup for short, independent suites.
-          # Keep commands sequential: each retains its original failure gate.
           - suite: build-tools-and-upstream-browser
             commands: |
               npm run test:build-tools
@@ -140,16 +131,20 @@ jobs:
               node --test tests/opennext/live/worker.test.mjs
               node tests/opennext/releases/prepare.mjs
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Isolate comparison download cache
+        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-compatibility-${{ matrix.suite }}' > .ci-measurement-cache-scope
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: ${{ matrix.node || '22' }}
           cache: npm
-          cache-dependency-path: |
+          cache-dependency-path: |-
             package.json
             demo/package.json
+
+            .ci-measurement-cache-scope
       - run: npm install
       - run: npm run build
       - run: npm install
@@ -161,7 +156,6 @@ jobs:
       - name: Run ${{ matrix.suite }} contracts
         run: ${{ matrix.commands }}
         working-directory: demo
-
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
         if: matrix.native || matrix.suite == 'opennext'
         with:
@@ -208,7 +202,6 @@ jobs:
             demo/artifacts/opennext-releases/native/android-*.json
             demo/artifacts/opennext-releases/native/android-error.log
           retention-days: 7
-
   bindings:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -220,22 +213,22 @@ jobs:
           MYSQL_DATABASE: hyperdrive_test
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -phyperdrive-test-only"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=12
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1 -phyperdrive-test-only" --health-interval=10s --health-timeout=5s --health-retries=12
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Isolate comparison download cache
+        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-bindings' > .ci-measurement-cache-scope
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
+          cache-dependency-path: |-
             package.json
             demo/package.json
+
+            .ci-measurement-cache-scope
       - run: npm install
       - run: npm run build
       - run: npm install
@@ -254,21 +247,24 @@ jobs:
         working-directory: demo
         env:
           HYPERDRIVE_TEST_MYSQL_URL: mysql://root:hyperdrive-test-only@127.0.0.1:3306/hyperdrive_test
-
   streams-fallback:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Isolate comparison download cache
+        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-streams-fallback' > .ci-measurement-cache-scope
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
+          cache-dependency-path: |-
             package.json
             demo/package.json
+
+            .ci-measurement-cache-scope
       - run: npm install
       - run: npm run build
       - run: npm install
@@ -281,40 +277,46 @@ jobs:
         working-directory: demo
       - run: npm run test:runtime:fallback:dev
         working-directory: demo
-
   package:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Isolate comparison download cache
+        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-package' > .ci-measurement-cache-scope
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: package.json
+          cache-dependency-path: |-
+            package.json
+            .ci-measurement-cache-scope
       - run: npm install
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:package
       - name: Verify packed native plugin discovery
         run: node demo/tests/scripts/prepare-native-package.mjs
-
   upstream:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Isolate comparison download cache
+        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-upstream' > .ci-measurement-cache-scope
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: |
+          cache-dependency-path: |-
             package.json
             demo/package.json
+
+            .ci-measurement-cache-scope
       - run: npm install
       - run: npm run build
       - run: npm install
@@ -332,7 +334,7 @@ jobs:
         working-directory: demo
       - name: Save upstream test evidence
         if: ${{ always() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: upstream-hono-jsx-ssr
           path: |
@@ -340,12 +342,16 @@ jobs:
             demo/artifacts/upstream/*-results.json
             demo/artifacts/upstream/playwright/
           retention-days: 7
-
   required:
     name: CI
     if: ${{ always() }}
     needs:
-      [library, compatibility, bindings, streams-fallback, package, upstream]
+      - library
+      - compatibility
+      - bindings
+      - streams-fallback
+      - package
+      - upstream
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     steps:
@@ -364,3 +370,14 @@ jobs:
           test "$STREAMS" = success
           test "$PACKAGE" = success
           test "$UPSTREAM" = success
+"on":
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Cold first, then warm on this identical ref
+        type: choice
+        options:
+          - cold
+          - warm
+        required: true
+run-name: Issue 52 after (${{ inputs.phase }})
