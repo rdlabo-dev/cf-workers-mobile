@@ -13,6 +13,26 @@ import WebKit
  }
  throw URLError(.timedOut)
 }
+@MainActor func waitForWorkerHome(in controller: WorkersViewController) async throws -> (CAPBridgeViewController, WKWebView) {
+ for _ in 0..<200 {
+  if let runtime = controller.children.first as? CAPBridgeViewController,
+     let document = runtime.children.first as? CAPBridgeViewController,
+     let page = document.webView {
+   let value = try? await page.evaluateJavaScript("document.body.innerText")
+   if (value as? String)?.contains("Worker Home") == true { return (runtime, page) }
+  }
+  try await Task.sleep(nanoseconds: 100_000_000)
+ }
+ throw URLError(.timedOut)
+}
+
+@MainActor func waitForDismantle(_ controller: WorkersViewController) async throws {
+ for _ in 0..<100 {
+  if controller.children.isEmpty { return }
+  try await Task.sleep(nanoseconds: 100_000_000)
+ }
+ throw URLError(.timedOut)
+}
 @objc class AppDelegate: UIResponder, UIApplicationDelegate {}
 @objc(SceneDelegate) class SceneDelegate: UIResponder, UIWindowSceneDelegate {
  var window: UIWindow?
@@ -31,12 +51,8 @@ import WebKit
    }
    return
   }
-  DispatchQueue.main.asyncAfter(deadline:.now()+5) {
-   let runtime = child.children.first as! CAPBridgeViewController
-   let document = runtime.children.first as! CAPBridgeViewController
-   Task { @MainActor in
-     let page = document.webView!
-     try! await waitForText("Worker Home", in: page)
+  Task { @MainActor in
+     let (runtime, page) = try! await waitForWorkerHome(in: child)
      print("SDK_DOCUMENT Worker Home")
      let hook = try! await runtime.webView!.evaluateJavaScript("typeof globalThis.__workersNativeDispose")
      assert(hook as? String == "function")
@@ -53,13 +69,13 @@ import WebKit
      print("SDK_CLOSED CHILDREN",child.children.count,"RUNTIME_CHILDREN",runtime.children.count)
      assert(child.children.isEmpty && runtime.children.isEmpty)
      let reopened = try! makeEmbeddedController()
-     let swiftUI = UIHostingController(rootView: WorkersView(controller: reopened)); window.rootViewController = swiftUI
-     DispatchQueue.main.asyncAfter(deadline:.now()+4) {
-      let runtime = reopened.children.first as! CAPBridgeViewController
-      let document = runtime.children.first as! CAPBridgeViewController
-      document.webView?.evaluateJavaScript("document.body.innerText") { value,error in assert((value as? String)?.contains("Worker Home") == true); print("SDK_REOPENED_SWIFTUI",value ?? "nil",error ?? "ok"); window.rootViewController = UIViewController(); DispatchQueue.main.asyncAfter(deadline: .now()+2) { assert(reopened.children.isEmpty); print("SDK_SWIFTUI_DISMANTLED",reopened.children.count) } }
-     }
-   }
+     window.rootViewController = UIHostingController(rootView: WorkersView(controller: reopened))
+     _ = try! await waitForWorkerHome(in: reopened)
+     print("SDK_REOPENED_SWIFTUI Worker Home")
+     window.rootViewController = UIViewController()
+     try! await waitForDismantle(reopened)
+     assert(reopened.children.isEmpty)
+     print("SDK_SWIFTUI_DISMANTLED", reopened.children.count)
   }
  }
 }

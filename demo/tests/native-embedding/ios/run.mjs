@@ -1,5 +1,13 @@
 import { spawn, spawnSync } from "node:child_process";
-import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  readFile,
+  writeFile,
+  readdir,
+  access,
+} from "node:fs/promises";
+import { appendFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -15,6 +23,10 @@ const finalMarker =
 if (!device) throw new Error("Usage: node run.mjs <booted-simulator-UUID>");
 function run(command, args, cwd = here) {
   const result = spawnSync(command, args, { cwd, encoding: "utf8" });
+  appendFileSync(
+    `${scratch}/build.log`,
+    `$ ${command} ${args.join(" ")}\n${result.stdout || ""}${result.stderr || ""}\n`,
+  );
   if (result.status !== 0)
     throw new Error(`${command} failed\n${result.stdout}\n${result.stderr}`);
   return result.stdout.trim();
@@ -23,8 +35,11 @@ await mkdir(scratch, { recursive: true });
 run(process.execPath, ["../build-web.mjs", "ios", scenario]);
 const sdk = run("xcrun", ["--sdk", "iphonesimulator", "--show-sdk-path"]);
 const arch = process.arch === "arm64" ? "arm64" : "x86_64";
-run("swift", [
+const buildArgs = [
   "build",
+  ...(process.env.WORKERS_IOS_BUILD_SYSTEM
+    ? ["--build-system", process.env.WORKERS_IOS_BUILD_SYSTEM]
+    : []),
   "--triple",
   `${arch}-apple-ios15.0-simulator`,
   "--sdk",
@@ -32,12 +47,56 @@ run("swift", [
   "--scratch-path",
   `${scratch}/build`,
   "--disable-sandbox",
-]);
-const products = `${scratch}/build/out/Products/Debug-iphonesimulator`;
+];
+run("swift", ["--version"]);
+run("swift", buildArgs);
+const products = run("swift", [...buildArgs, "--show-bin-path"])
+  .split("\n")
+  .at(-1);
+console.log(`SwiftPM products: ${products}`);
+async function exists(file) {
+  try {
+    await access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function framework(name) {
+  if (await exists(`${products}/${name}`)) return `${products}/${name}`;
+  async function search(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const candidate = path.join(directory, entry.name);
+      if (entry.name === name && directory.endsWith("-simulator"))
+        return candidate;
+      const found = await search(candidate);
+      if (found) return found;
+    }
+  }
+  const found = await search(`${scratch}/build/artifacts`);
+  if (!found)
+    throw new Error(
+      `Missing simulator framework ${name}; see ${scratch}/build.log`,
+    );
+  return found;
+}
+const frameworks = await Promise.all(
+  ["Capacitor.framework", "Cordova.framework"].map(framework),
+);
+const objects = [];
+for (const module of ["Consumer", "WorkersIOS", "WorkersCapacitor"]) {
+  if (await exists(`${products}/${module}.o`))
+    objects.push(`${products}/${module}.o`);
+  else
+    for (const file of await readdir(`${products}/${module}.build`))
+      if (file.endsWith(".o"))
+        objects.push(`${products}/${module}.build/${file}`);
+}
 const app = `${scratch}/Probe.app`;
 await mkdir(`${app}/Frameworks`, { recursive: true });
-for (const name of ["Capacitor.framework", "Cordova.framework"])
-  await cp(`${products}/${name}`, `${app}/Frameworks/${name}`, {
+for (const source of frameworks)
+  await cp(source, `${app}/Frameworks/${path.basename(source)}`, {
     recursive: true,
   });
 await cp(
@@ -60,18 +119,18 @@ run("xcrun", [
   "-sdk",
   sdk,
   "-F",
-  products,
+  `${app}/Frameworks`,
   "-I",
   products,
+  "-I",
+  `${products}/Modules`,
   "-module-cache-path",
   `${scratch}/cache`,
   "-framework",
   "Capacitor",
   "-framework",
   "Cordova",
-  `${products}/Consumer.o`,
-  `${products}/WorkersIOS.o`,
-  `${products}/WorkersCapacitor.o`,
+  ...objects,
   "-Xlinker",
   "-rpath",
   "-Xlinker",
@@ -95,7 +154,7 @@ const output = await new Promise((resolve, reject) => {
   const timer = setTimeout(() => {
     child.kill();
     reject(new Error(`Probe timed out\n${log}`));
-  }, 60000);
+  }, 90000);
   const receive = (chunk) => {
     log += chunk.toString();
     if (log.includes(finalMarker)) {
