@@ -31,7 +31,7 @@ dependencies {
     implementation 'io.netty:netty-handler:4.1.139.Final'
 }
 
-android { publishing { singleVariant('release') { withSourcesJar() } } }
+android { publishing { singleVariant('release') { withSourcesJar(); withJavadocJar() } } }
 afterEvaluate {
     publishing {
         publications {
@@ -40,7 +40,27 @@ afterEvaluate {
                 artifactId = 'workers-native-android'
                 pom {
                     name = 'Workers Native Android'
-                    description = 'Android host and Capacitor transport for Workers Native'
+                    description = 'Embed Cloudflare Workers applications in existing Android apps'
+                    url = 'https://github.com/rdlabo-dev/cf-workers-mobile'
+                    licenses {
+                        license {
+                            name = 'MIT License'
+                            url = 'https://opensource.org/license/mit'
+                            distribution = 'repo'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'rdlabo'
+                            name = 'rdlabo'
+                            url = 'https://github.com/rdlabo'
+                        }
+                    }
+                    scm {
+                        connection = 'scm:git:https://github.com/rdlabo-dev/cf-workers-mobile.git'
+                        developerConnection = 'scm:git:ssh://git@github.com/rdlabo-dev/cf-workers-mobile.git'
+                        url = 'https://github.com/rdlabo-dev/cf-workers-mobile'
+                    }
                 }
             }
         }

@@ -1,0 +1,4 @@
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+rootProject.name = 'WorkersAndroidRelease'
+include ':workers'
+project(':workers').projectDir = file('../../native/android')
