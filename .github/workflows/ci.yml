@@ -5,29 +5,6 @@ concurrency:
   group: issue52-full-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  library:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Isolate comparison download cache
-        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-library' > .ci-measurement-cache-scope
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |-
-            package.json
-            .ci-measurement-cache-scope
-      - run: npm install
-      - run: npm run format:check
-      - run: node --test .github/scripts/npm-release.test.mjs
-      - run: npm run typecheck
-      - run: node scripts/url-idna/bundle-url.mjs --check
-      - run: npm run build
-      - run: npm test -- --allowOnly=false
   compatibility:
     name: compatibility (${{ matrix.suite }})
     runs-on: ubuntu-24.04
@@ -36,348 +13,145 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suite: workers
-            commands: |
-              npm run test:node-inventory
-              npm run test:workers -- --allowOnly=false
-              npm run test:browser
-          - suite: runtime
-            commands: |
-              npm run test:runtime
-              npm run test:runtime:dev
-              npm run test:documents
-              node --test tests/native/links.test.mjs tests/native/acceptance.test.mjs
-              npm run build:native-documents -- --mode express
-          - suite: build-tools-and-upstream-browser
-            commands: |
-              npm run test:build-tools
-              npm install --prefix authentication
-              npm run typecheck --prefix authentication
-              node tests/upstream/minvoice/prepare.mjs
-              node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs tests/authentication/live/worker.test.mjs
-              npm run test:upstream:opennext:prepare
-              npm run test:upstream:opennext
-          - suite: void-and-pknotes
-            node: 24.21.0
-            commands: |
-              npm install --prefix void
-              npm run build --prefix void
-              npm run test:void
-              node --test tests/void/routes/acceptance.test.mjs
-              node tests/upstream/pknotes/prepare.mjs
-              node --test tests/upstream/pknotes/browser.test.mjs
-          - suite: upstream-0bin
-            native: 0bin
-            node: 24.21.0
-            commands: |
-              node tests/upstream/0bin/prepare.mjs
-              node --test tests/upstream/0bin/browser.test.mjs
-          - suite: upstream-flaredrive
-            native: flaredrive
-            node: 24.21.0
-            commands: |
-              node tests/upstream/flaredrive/prepare.mjs
-              node --test tests/upstream/flaredrive/browser.test.mjs
-          - suite: upstream-sink
-            native: sink
-            node: 24.21.0
-            commands: |
-              node tests/upstream/sink/prepare.mjs
-              node --test tests/upstream/sink/browser.test.mjs
-          - suite: upstream-tsrss
-            native: tsrss
-            commands: |
-              node tests/upstream/tsrss/prepare.mjs
-              node --test tests/upstream/tsrss/browser.test.mjs
-          - suite: upstream-inkstone
-            native: inkstone
-            node: 24.21.0
-            commands: |
-              node tests/upstream/inkstone/prepare.mjs
-              node --test tests/upstream/inkstone/browser.test.mjs
-          - suite: upstream-counterscale-authentication
-            native: counterscale
-            node: 24.21.0
-            commands: |
-              node tests/upstream/counterscale/prepare.mjs
-              node --test tests/upstream/counterscale/browser.test.mjs
-          - suite: upstream-microfeed
-            native: microfeed
-            node: 24.21.0
-            commands: |
-              node tests/upstream/microfeed/prepare.mjs
-              node --test tests/upstream/microfeed/browser.test.mjs
-          - suite: upstream-uptimeflare
-            native: uptimeflare
-            node: 24.21.0
-            commands: |
-              node tests/upstream/uptimeflare/prepare.mjs
-              node --test tests/upstream/uptimeflare/browser.test.mjs
-          - suite: upstream-flare-stack-blog
-            native: flare-stack-blog
-            node: 24.21.0
-            commands: |
-              node tests/upstream/flare-stack-blog/prepare.mjs
-              node --test tests/upstream/flare-stack-blog/browser.test.mjs
-          - suite: opennext
-            timeout: 35
-            commands: |
-              npm install --prefix opennext
-              npm run build:worker --prefix opennext
-              npm run test:opennext
-              npm run test:opennext:split
-              node --test tests/opennext/images.test.mjs
-              NATIVE_TEST_D1_ID=00000000-0000-0000-0000-000000000001 node tests/opennext/live/prepare.mjs
-              node --test tests/opennext/live/worker.test.mjs
-              node tests/opennext/releases/prepare.mjs
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Isolate comparison download cache
-        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-compatibility-${{ matrix.suite }}' > .ci-measurement-cache-scope
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: ${{ matrix.node || '22' }}
-          cache: npm
-          cache-dependency-path: |-
-            package.json
-            demo/package.json
+        - suite: build-tools-and-upstream-browser
+          commands: 'npm run test:build-tools
 
-            .ci-measurement-cache-scope
-      - run: npm install
-      - run: npm run build
-      - run: npm install
-        working-directory: demo
-      - run: npm run typecheck
-        working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
-        working-directory: demo
-      - name: Run ${{ matrix.suite }} contracts
-        run: ${{ matrix.commands }}
-        working-directory: demo
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
-        if: matrix.native || matrix.suite == 'opennext'
-        with:
-          distribution: temurin
-          java-version: "21"
-      - run: npm install --prefix demo/opennext
-        if: matrix.native
-      - name: Enable emulator acceleration
-        if: matrix.native || matrix.suite == 'opennext'
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Test the public API in Android WebView
-        if: matrix.native
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
-        with:
-          api-level: 36
-          target: google_apis
-          arch: x86_64
-          disable-animations: true
-          script: UPSTREAM_PLATFORM=android UPSTREAM_DEVICE=emulator-5554 node --test demo/tests/upstream/${{ matrix.native }}/native.test.mjs
-      - name: Test OpenNext routes and release skew in Android WebView
-        if: matrix.suite == 'opennext'
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
-        with:
-          api-level: 36
-          target: google_apis
-          arch: x86_64
-          disable-animations: true
-          script: |
-            OPENNEXT_SPLIT=1 OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=emulator-5554 node --test demo/tests/opennext/native.test.mjs
-            OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=emulator-5554 node demo/tests/opennext/releases/native.mjs
-      - name: Save native acceptance evidence
-        if: always() && (matrix.native || matrix.suite == 'opennext')
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: native-${{ matrix.native || matrix.suite }}
-          path: |
-            demo/artifacts/upstream/${{ matrix.native }}/native/android-*.json
-            demo/artifacts/upstream/${{ matrix.native }}/native/android-error.log
-            demo/artifacts/opennext-native/android-*.json
-            demo/artifacts/opennext-native/android-error.log
-            demo/artifacts/opennext-releases/native/android-*.json
-            demo/artifacts/opennext-releases/native/android-error.log
-          retention-days: 7
-  bindings:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: hyperdrive-test-only
-          MYSQL_DATABASE: hyperdrive_test
-        ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping -h 127.0.0.1 -phyperdrive-test-only" --health-interval=10s --health-timeout=5s --health-retries=12
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Isolate comparison download cache
-        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-bindings' > .ci-measurement-cache-scope
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |-
-            package.json
-            demo/package.json
+            npm install --prefix authentication
 
-            .ci-measurement-cache-scope
-      - run: npm install
-      - run: npm run build
-      - run: npm install
-        working-directory: demo
-      - run: npm run typecheck
-        working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
-        working-directory: demo
-      - run: npm run test:d1-migration
-        working-directory: demo
-      - run: npm run test:service-bindings
-        working-directory: demo
-      - run: npm run test:cloudflare-bindings
-        working-directory: demo
-      - run: npm run test:hyperdrive-migration
-        working-directory: demo
-        env:
-          HYPERDRIVE_TEST_MYSQL_URL: mysql://root:hyperdrive-test-only@127.0.0.1:3306/hyperdrive_test
-  streams-fallback:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Isolate comparison download cache
-        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-streams-fallback' > .ci-measurement-cache-scope
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |-
-            package.json
-            demo/package.json
+            npm run typecheck --prefix authentication
 
-            .ci-measurement-cache-scope
-      - run: npm install
-      - run: npm run build
-      - run: npm install
-        working-directory: demo
-      - run: npm run typecheck
-        working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
-        working-directory: demo
-      - run: npm run test:runtime:fallback
-        working-directory: demo
-      - run: npm run test:runtime:fallback:dev
-        working-directory: demo
-  package:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Isolate comparison download cache
-        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-package' > .ci-measurement-cache-scope
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |-
-            package.json
-            .ci-measurement-cache-scope
-      - run: npm install
-      - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:package
-      - name: Verify packed native plugin discovery
-        run: node demo/tests/scripts/prepare-native-package.mjs
-  upstream:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Isolate comparison download cache
-        run: printf '%s\n' 'issue52-full-20261020-v1' 'after-upstream' > .ci-measurement-cache-scope
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |-
-            package.json
-            demo/package.json
+            node tests/upstream/minvoice/prepare.mjs
 
-            .ci-measurement-cache-scope
-      - run: npm install
-      - run: npm run build
-      - run: npm install
-        working-directory: demo
-      - name: Fetch the pinned official Hono sample
-        run: npm run test:upstream:prepare -- hono-jsx-ssr --clone-only
-        working-directory: demo
-      - name: Check the original Worker in workerd
-        run: npm run test:upstream:workerd -- --reporter=default --reporter=json --outputFile=artifacts/upstream/workerd-results.json
-        working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
-        working-directory: demo
-      - name: Build and test the browser adapter against the same expectations
-        run: npm run test:upstream:browser
-        working-directory: demo
-      - name: Save upstream test evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
-        with:
-          name: upstream-hono-jsx-ssr
-          path: |
-            demo/tests/upstream/hono-jsx-ssr/upstream.json
-            demo/artifacts/upstream/*-results.json
-            demo/artifacts/upstream/playwright/
-          retention-days: 7
+            node --test tests/upstream/minvoice/browser.test.mjs tests/authentication/backend.test.mjs tests/authentication/live/worker.test.mjs
+
+            npm run test:upstream:opennext:prepare
+
+            npm run test:upstream:opennext
+
+            '
+          native: false
+          timeout: 25
+        - suite: void-and-pknotes
+          node: 24.21.0
+          commands: 'npm install --prefix void
+
+            npm run build --prefix void
+
+            npm run test:void
+
+            node --test tests/void/routes/acceptance.test.mjs
+
+            node tests/upstream/pknotes/prepare.mjs
+
+            node --test tests/upstream/pknotes/browser.test.mjs
+
+            '
+          native: false
+          timeout: 25
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Isolate comparison download cache
+      run: printf '%s\n' 'issue52-full-20261020-v1' 'after-compatibility-${{ matrix.suite }}' > .ci-measurement-cache-scope
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: ${{ matrix.node || '22' }}
+        cache: npm
+        cache-dependency-path: 'package.json
+
+          demo/package.json
+
+
+          .ci-measurement-cache-scope'
+    - run: npm install
+    - run: npm run build
+    - run: npm install
+      working-directory: demo
+    - run: npm run typecheck
+      working-directory: demo
+    - run: npx playwright install --with-deps chromium webkit
+      working-directory: demo
+    - name: Run ${{ matrix.suite }} contracts
+      run: ${{ matrix.commands }}
+      working-directory: demo
+    - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+      if: matrix.native || matrix.suite == 'opennext'
+      with:
+        distribution: temurin
+        java-version: '21'
+    - run: npm install --prefix demo/opennext
+      if: matrix.native
+    - name: Enable emulator acceleration
+      if: matrix.native || matrix.suite == 'opennext'
+      run: 'echo ''KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"'' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+
+        sudo udevadm control --reload-rules
+
+        sudo udevadm trigger --name-match=kvm
+
+        '
+    - name: Test the public API in Android WebView
+      if: matrix.native
+      uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+      with:
+        api-level: 36
+        target: google_apis
+        arch: x86_64
+        disable-animations: true
+        script: UPSTREAM_PLATFORM=android UPSTREAM_DEVICE=emulator-5554 node --test demo/tests/upstream/${{ matrix.native }}/native.test.mjs
+    - name: Test OpenNext routes and release skew in Android WebView
+      if: matrix.suite == 'opennext'
+      uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+      with:
+        api-level: 36
+        target: google_apis
+        arch: x86_64
+        disable-animations: true
+        script: 'OPENNEXT_SPLIT=1 OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=emulator-5554 node --test demo/tests/opennext/native.test.mjs
+
+          OPENNEXT_PLATFORM=android OPENNEXT_DEVICE=emulator-5554 node demo/tests/opennext/releases/native.mjs
+
+          '
+    - name: Save native acceptance evidence
+      if: always() && (matrix.native || matrix.suite == 'opennext')
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: native-${{ matrix.native || matrix.suite }}
+        path: 'demo/artifacts/upstream/${{ matrix.native }}/native/android-*.json
+
+          demo/artifacts/upstream/${{ matrix.native }}/native/android-error.log
+
+          demo/artifacts/opennext-native/android-*.json
+
+          demo/artifacts/opennext-native/android-error.log
+
+          demo/artifacts/opennext-releases/native/android-*.json
+
+          demo/artifacts/opennext-releases/native/android-error.log
+
+          '
+        retention-days: 7
   required:
-    name: CI
+    name: Measured suites
     if: ${{ always() }}
     needs:
-      - library
-      - compatibility
-      - bindings
-      - streams-fallback
-      - package
-      - upstream
+    - compatibility
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     steps:
-      - name: Require every job to succeed
-        env:
-          LIBRARY: ${{ needs.library.result }}
-          COMPATIBILITY: ${{ needs.compatibility.result }}
-          BINDINGS: ${{ needs.bindings.result }}
-          STREAMS: ${{ needs['streams-fallback'].result }}
-          PACKAGE: ${{ needs.package.result }}
-          UPSTREAM: ${{ needs.upstream.result }}
-        run: |
-          test "$LIBRARY" = success
-          test "$COMPATIBILITY" = success
-          test "$BINDINGS" = success
-          test "$STREAMS" = success
-          test "$PACKAGE" = success
-          test "$UPSTREAM" = success
-"on":
+    - name: Require every measured suite to succeed
+      env:
+        COMPATIBILITY: ${{ needs.compatibility.result }}
+      run: test "$COMPATIBILITY" = success
+'on':
   workflow_dispatch:
     inputs:
       phase:
         description: Cold first, then warm on this identical ref
         type: choice
         options:
-          - cold
-          - warm
+        - cold
+        - warm
         required: true
-run-name: Issue 52 after (${{ inputs.phase }})
+run-name: Issue 52 after affected suites (${{ inputs.phase }})
