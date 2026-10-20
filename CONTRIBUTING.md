@@ -51,7 +51,7 @@ A compatibility implementation is ready to merge only when all of these are true
 - The relevant contracts pass on iOS and Android WebViews. Logs or screenshots
   identify the tested revision, platform and results. Passing an early subset of
   a native run is not a completed run.
-- Required CI passes. Manager and independent acceptance reviews have no
+- CI must pass before release; pending CI does not block merging. Manager and independent acceptance reviews have no
   outstanding required changes. Reviewers check coverage completeness as well as
   test results; CI cannot prove a missing contract exists.
 - Documentation describes current API behavior, the pinned baseline, limitations
@@ -108,12 +108,21 @@ test; a single passing “globals” result must not stand in for individual API
 
 ## CI and regression protection
 
-The required `CI` check aggregates library, the compatibility matrix, bindings,
-streams-fallback, package and upstream jobs. Workers/browser, runtime/documents
-and build-tool checks run on separate runners; only the bindings job starts MySQL. Every job must succeed; skipped or cancelled jobs
-cannot satisfy the gate. Main requires a pull request, an up-to-date branch and
-this check, and blocks force pushes and deletion. Workflow configuration is in
-[ci.yml](.github/workflows/ci.yml); CodeQL is configured separately.
+The `CI` check aggregates library, the compatibility matrix, bindings,
+streams-fallback, package and upstream jobs. Main requires a pull request and
+blocks force pushes and deletion; CI is not a required merge status check.
+Publishing still requires successful Compatibility for the release commit.
+Workflow configuration is in [ci.yml](.github/workflows/ci.yml); CodeQL is separate.
+
+For a main push, the workflow compares its Git tree with the source actually
+checked out by the latest applicable PR Compatibility run. Matching successful
+results are reused without executing the full suites again. If that PR run is
+still running, main waits for its result; an applicable failed run fails the gate.
+Missing or unverifiable evidence, different source contents, or no applicable PR
+requires the ordinary full CI run. The source record is tied to the run and
+attempt, so an earlier successful attempt cannot replace a newer result.
+Ordinary full runs require every job to succeed; skipped or cancelled suites are
+accepted only when the main gate has explicitly validated successful reuse.
 
 Library checks include types, adjacent contracts and reproducible URL generation.
 Integration checks use pinned local workerd, Chromium/WebKit, both build tools,
@@ -145,7 +154,7 @@ or a namespace match to full behavioral support.
 
 Direct pushes and PR branches do not automatically publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
 
-For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility to pass on main. Then tag that commit and push the tag, for example `git tag v0.1.2` followed by `git push origin v0.1.2`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
+For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility on main to validate reuse or finish the necessary full run. Then tag that commit and push the tag, for example `git tag v0.1.2` followed by `git push origin v0.1.2`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
 
 The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `cf-workers-mobile`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
 

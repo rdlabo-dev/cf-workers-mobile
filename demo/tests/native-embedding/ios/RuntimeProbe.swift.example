@@ -33,6 +33,19 @@ import WebKit
  }
  throw URLError(.timedOut)
 }
+
+// Only a not-yet-ready host may time out while evaluating JavaScript disposal.
+// close() still must finish native cleanup before reporting that error.
+@MainActor func closeUnreadyHost(_ controller: WorkersViewController, label: String) async {
+ do { try await controller.close() }
+ catch {
+  let failure = error as NSError
+  assert(failure.domain == NSURLErrorDomain && failure.code == URLError.timedOut.rawValue,
+         "Unexpected unready disposal error: \(failure)")
+  print("SDK_UNREADY_DISPOSAL_TIMEOUT", label, failure.domain, failure.code)
+ }
+ assert(controller.children.isEmpty, "Native cleanup must finish even when JavaScript disposal times out")
+}
 @objc class AppDelegate: UIResponder, UIApplicationDelegate {}
 @objc(SceneDelegate) class SceneDelegate: UIResponder, UIWindowSceneDelegate {
  var window: UIWindow?
@@ -53,7 +66,7 @@ import WebKit
    let hidden = try! makeEmbeddedController()
    hidden.onStartupError = { _ in hiddenNotifications += 1 }
    _ = hidden.view
-   let closed = Task { @MainActor in try! await manuallyClosed.close() }
+   let closed = Task { @MainActor in await closeUnreadyHost(manuallyClosed, label: "manual") }
    child.onStartupError = { message in
     Task { @MainActor in
      await closed.value
@@ -61,7 +74,7 @@ import WebKit
      assert(child.startupError != nil && child.children.isEmpty && window.rootViewController === host)
      assert(closedNotifications == 0 && manuallyClosed.children.isEmpty && manuallyClosed.startupError == nil)
      assert(hiddenNotifications == 0 && !hidden.children.isEmpty && hidden.startupError == nil)
-     try! await hidden.close()
+     await closeUnreadyHost(hidden, label: "hidden")
      print("SDK_MANUAL_CLOSE_NO_LATE_ERROR", closedNotifications)
      print("SDK_HIDDEN_NO_DEADLINE", hiddenNotifications)
      print("SDK_BROKEN_ENTRY_CLEANED", child.children.count)
