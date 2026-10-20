@@ -1,41 +1,70 @@
 # Test execution cost
 
-Issue #52 tracks execution cost without changing required coverage.
+Reduce repeated work while preserving regression guarantees. A smaller test count
+or a faster single CI run is not sufficient evidence of an improvement.
 
-## Baseline
+## Required coverage and isolation
 
-[Successful Compatibility run 39276706316](https://github.com/rdlabo-dev/workers-capacitor/actions/runs/39276706316) on Ubuntu 24.04 provides the baseline. GitHub job/step timestamps (one-second resolution) give:
-
-| Measure                                   | Baseline |
-| ----------------------------------------- | -------: |
-| Trigger to required CI completion         |    729 s |
-| First job start to required CI completion |    725 s |
-| Sum of 23 job execution durations         |  6,811 s |
-| Browser setup across 20 two-engine jobs   |    929 s |
-| Library builds across 22 jobs             |     32 s |
-| Type checks across 20 jobs                |     20 s |
-
-The first jobs started 4 seconds after the trigger. Several jobs waited longer: upstream 144 s, pknotes 167 s, inkstone 116 s, flare-stack-blog 54 s, OpenNext 48 s. These start delays are scheduling/queue observations, not test execution. The final CI aggregation job starts after its dependencies and must not be counted as runner queue time. Job-duration sums exclude queue time; workflow `updated_at` is not the CI completion time.
-
-The longest jobs were sink (620 s), inkstone (604 s), flare-stack-blog (500 s), and OpenNext (488 s). Native emulator/test steps cost roughly 207–340 s each. Those checks protect distinct applications and are retained. Cache-hit state was not collected for this historical baseline, so it is not a controlled cold/warm comparison.
-
-## Change
-
-Short suites with matching Node versions share setup, then run sequentially:
+Short suites with matching Node versions share setup and run sequentially:
 
 - Node 22: build-tools, minvoice/authentication, upstream OpenNext.
 - Node 24.21.0: Void, pknotes.
 
-Every original test/preparation command is retained, in its original order within each suite. Each shell step fails on the first failing command. No test assertion, browser engine, package consumer, workerd, native scenario, or required-check dependency is removed. Matrix `fail-fast: false` and the final all-jobs-success gate remain unchanged. A failed command may prevent later suites in its group from running, but cannot yield a passing CI result.
+Grouping these five suites into two jobs removes three setup sequences. Every
+original test/preparation command remains in its original order within its suite.
+Each shell step fails on the first failing command. A failure may prevent later
+suites in its group from running, but cannot produce a passing CI result.
 
-The three eliminated jobs previously spent 132 s preparing browsers and about 102 s on other setup/cleanup. The initial target is to remove those three setup sequences (approximately 234 runner-seconds, about 3% of the baseline total), without extending the critical path. The grouped Node 22 job is projected at roughly 300 s and the Node 24 job at roughly 180 s, below the existing longest jobs. These are estimates from historical timings, not measured improvements or promises about queue time.
+Browser engines, packed consumers, workerd, native scenarios, matrix
+`fail-fast: false`, and the final all-jobs-success gate remain required. Unit,
+final-bundle, browser, and native checks protect different failure boundaries;
+remove equivalent assertions only when the remaining check preserves the same
+guarantee.
 
-No fixture artifact or compiled output is cached or shared between jobs. Each job still checks out its own source, installs dependencies, and builds the library. Upstream preparations recreate their own application outputs. Mutable main OpenNext builds and native emulators retain their existing isolated jobs. The existing npm download cache does not replace installation, compilation, or execution; changes to source/configuration are always rebuilt.
+No fixture artifact or compiled output is cached or shared between jobs. Each job
+checks out its own source, installs dependencies, and builds the library. Upstream
+preparations recreate their application outputs. Mutable OpenNext builds, test
+databases, and native emulators must retain isolation.
 
-## Verification and remaining measurement
+The npm download cache does not replace installation, compilation, or execution.
+Source and configuration changes are rebuilt on every run; dependency installation
+resolves the current manifests even when downloaded packages are reused.
 
-Local verification runs the grouped command sequences in order with their matching Node versions, plus `actionlint .github/workflows/ci.yml`. This validates shared-checkout isolation; it does not reproduce Linux browser setup or hosted-runner timing.
+## Verification
 
-Local results: build-tool unit tests (18), Chromium/WebKit build-tool checks (30), minvoice/authentication checks (4), upstream OpenNext acceptance, Void integration/routes, and pknotes acceptance passed. Both supervisory and independent acceptance reviews found no remaining changes to request.
+Run affected command sequences in order with their matching Node versions, plus
+`actionlint .github/workflows/ci.yml`, when changing grouping. Required CI must
+continue to execute every retained coverage boundary and reject test failures.
+Local validation establishes shared-checkout correctness, not hosted-runner timing.
 
-Before closing #52, run the complete required CI on this revision with a cold npm cache and again with the warm cache, and record trigger/first-start/CI-completion timestamps and summed job durations. Compare with an ungrouped run on the same revision and runner image/cache state. Use several runs if noise exceeds the expected 234-second reduction. Preserve failures and queue delays separately. No CI timing improvement is claimed until that comparison is available.
+## Measurement and acceptance
+
+Use existing job/step timestamps and lightweight measurements. Record product
+revision, workload, Node versions, runner image, actual cache hits/misses, failures,
+and cancelled runs. A run requested as warm is not a warm observation unless its
+cache restores are verified. Keep measurement workflows out of production CI.
+
+Report trigger-to-required-CI completion separately from summed job execution
+time. Record scheduling delays separately; the final aggregation job's dependency
+wait is not runner queue time. Compare affected work separately from unrelated
+long-running jobs, and retain all observations rather than selecting fast runs.
+
+Budget measurement effort. Cache isolation must fit the available storage; avoid
+creating a large cache copy for every unrelated job. Limit cleanup to caches created
+by the experiment. Do not add timing-only tests or a benchmarking service.
+
+Accept an execution-cost change when redundant work is demonstrably removed,
+regression guarantees and failure gates are preserved, and observations and their
+limits are documented. Establish a baseline-derived target before measurement,
+but distinguish a target from a measured or repeatable result. A stable global
+speedup requires comparable repeated observations; it is not a prerequisite for
+accepting verified removal of redundant work. If conditions prevent that claim,
+report it as unproven and stop measurements that do not inform the decision.
+
+[Issue #52 and its measurement evidence](https://github.com/rdlabo-dev/workers-capacitor/issues/52#issuecomment-6283412842)
+record the baseline, commands, observations, and acceptance decision. The original
+same-image repeated-comparison condition was not fully met. Its replacement accepts
+the verified removal of three setup sequences and preserved coverage without
+claiming stable achievement of the estimated 234 runner-second target or a global
+wall-clock improvement. This avoids making further costly CI repetition a condition
+of accepting an already verified reduction in work.
