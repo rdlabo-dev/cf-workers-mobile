@@ -3,56 +3,68 @@
 Status: proposed implementation, with local feasibility probes completed on
 2026-10-20. This document does not announce released SDKs or new public exports.
 
-## Goal and reuse boundary
+## Decision: thin wrappers over Capacitor and workers-capacitor
 
-Let existing iOS and Android applications display a Workers application's web UI
-using the runtime already provided by workers-capacitor. Applications needing
-general native plugins should use the existing Capacitor integration.
+Build workers-ios and workers-android as thin integration layers over Capacitor
+itself and the existing workers-capacitor implementation. Direct dependencies on
+`@capacitor/ios`, `@capacitor/android`, or their SwiftPM/Maven distributions are
+part of the design. Capacitor can appear in dependency graphs, setup documentation,
+and native types where useful; hiding the dependency is not a product requirement.
 
-Keep one implementation of Worker execution, compatibility APIs, network and
-socket bridges, document rendering, routing, and local/remote execution policy.
-Reuse the existing Vite/esbuild plugins and their generated assets. Do not create
-a second engine, a native Worker invocation API, or three runtime forks.
-Existing workers-capacitor behavior and Cloudflare builds must remain unchanged.
+Capacitor is [MIT licensed](https://github.com/ionic-team/capacitor/blob/8.5.3/LICENSE).
+Use its existing host, bridge, WebView configuration, and asset server directly,
+and preserve its copyright and license notices in distributions. No replacement
+WebView framework or generic embedding framework is needed.
 
-Provide thin `workersIOS(options)` and `workersAndroid(options)` entries with the
-same options and returned application handle as `workersCapacitor(options)`.
-Exact package/export paths will be chosen during implementation. These wrappers
-also register the handle with a private SDK lifecycle hook; a literal alias alone
-cannot support native-initiated disposal.
+The product is a Workers web UI that an existing native application can embed or
+open. Applications wanting the full Capacitor plugin workflow can continue using
+workers-capacitor. The new wrappers only connect that same Workers implementation
+to an existing native application.
 
-Native consumers add the SDK dependency, include the generated web assets, and
-place or open its screen. They do not configure Capacitor, register its plugins,
-run the Capacitor CLI, or repeat Worker configuration in Swift/Kotlin. Internal
-Capacitor dependencies remain pinned and managed by the SDK.
+## Reuse and additional code
 
-## Use Capacitor itself as the embedded host
+| Layer                | Reuse                                                                                                                         | Small addition                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Native web host      | Capacitor's existing iOS controller and Android bridge                                                                        | Host composition, generated asset location, and Workers plugin registration                   |
+| Workers behavior     | workers-capacitor execution, compatibility APIs, document rendering, network/socket bridges, routing, and local/remote policy | No separate runtime                                                                           |
+| JS application entry | Existing options and application handle                                                                                       | `workersIOS(options)` / `workersAndroid(options)` wrappers and private lifecycle registration |
+| Build                | Existing Vite/esbuild plugins and generated assets                                                                            | Native resource placement and dependency packaging                                            |
+| Shutdown             | Existing application disposal and native cleanup                                                                              | Connect native screen closure and failure rollback to the owning runtime                      |
 
-Direct internal use of `@capacitor/ios` and `@capacitor/android`, or their native
-SwiftPM/Maven distributions, is explicitly intended. A consumer-facing
-Capacitor-free setup does not mean a Capacitor-free implementation. Reuse its
-bridge, WebView host, configuration, and asset server rather than rebuilding
-those facilities. Add only the glue required to host the existing Workers
-plugin, select packaged assets, and connect lifecycle ownership.
+Keep the existing workers-capacitor API and Cloudflare builds unchanged. Use the
+same sources rather than extracting a new core package or copying the runtime
+into platform forks. Exact public export paths remain an implementation choice.
 
-Ionic Portals provides the same general embedding model: its
-[iOS views](https://ionic.io/docs/portals/for-ios/getting-started) host web content
-inside UIKit or SwiftUI. It was considered as an existing host dependency.
-However, its [installation guide](https://ionic.io/docs/portals/for-android/guide)
-requires an active commercial agreement, and Ionic
-[announced the end of new commercial sales, including Portals](https://ionic.io/blog/important-announcement-the-future-of-ionics-commercial-products).
-For a generally distributable SDK, use Capacitor directly rather than requiring
-Portals. This is a distribution decision, not a requirement to avoid existing
-embedding libraries. Portals integration with this Workers plugin has not been
-runtime-tested and must not be assumed to resolve its lifecycle constraints.
+## Consumer workflow
+
+1. Build the existing Worker application with the existing tooling and options.
+   Select `workersIOS(options)` or `workersAndroid(options)` in the application
+   entry instead of `workersCapacitor(options)`.
+2. Add the native wrapper and its Capacitor dependencies through SwiftPM or Gradle,
+   and include the generated web assets in the native application.
+3. Embed or open the provided host from the application's existing UI.
+
+The wrapper supplies the required Capacitor configuration and Workers plugin
+registration. Consumers do not need a separate Capacitor application project,
+Capacitor CLI synchronization, or duplicate Worker configuration in Swift/Kotlin.
+Normal native dependency and resource setup is expected; eliminating visible
+Capacitor dependencies must not introduce extra abstraction or custom packaging.
+
+Ionic Portals illustrates this embedding model, but is not required. Its
+[installation guide](https://ionic.io/docs/portals/for-android/guide) requires an
+active commercial agreement, and Ionic
+[ended new commercial sales including Portals](https://ionic.io/blog/important-announcement-the-future-of-ionics-commercial-products).
+Use the MIT-licensed Capacitor host directly. Portals integration with the Workers
+plugin has not been runtime-tested.
 
 ## Native hosts
 
 ### iOS
 
-Expose a Workers view controller that can be embedded in an existing UIKit
-controller, with a thin SwiftUI representable. Internally reuse
-`CAPBridgeViewController` and the current native plugin.
+Compose or minimally subclass `CAPBridgeViewController` with the current Workers
+plugin, and expose it for embedding in an existing UIKit controller. Add only a
+thin SwiftUI representable. Reuse Capacitor initialization and view handling;
+do not implement a separate iOS WebView host.
 
 Pass the private asset/configuration descriptor through the document-controller
 factory and plugin startup path. Preserve the current descriptor fallback for
@@ -65,7 +77,8 @@ SwiftPM distribution.
 
 ### Android
 
-The baseline is an SDK-owned AppCompatActivity that any existing Activity can
+Reuse Capacitor's `Bridge.Builder` inside a thin Fragment/Activity adapter.
+The baseline is a wrapper-owned AppCompatActivity that any existing Activity can
 open. Inline Fragment embedding is supported only in an AppCompatActivity host:
 Capacitor 8.5.3's Fragment bridge builder requires that concrete activity type.
 Arbitrary ComponentActivity inline embedding is outside the initial scope.
@@ -125,14 +138,15 @@ No physical-device or finished SDK distribution acceptance is claimed.
    handle registration. Add the two iOS descriptor-passing seams while preserving
    the existing Capacitor fallback. Verify options/return compatibility and
    disposal in the actual runtime realm.
-2. **Native hosts and ownership.** Implement the iOS controller and Android screen,
-   internal plugin setup, asset loading, orderly shutdown, and failure rollback.
+2. **Connect existing Capacitor hosts.** Add the thin iOS controller and Android
+   screen adapters, Workers plugin registration, asset selection, orderly
+   shutdown, and failure rollback. Reuse Capacitor host behavior directly.
    Verify navigation, POST, close/reopen, pending network cancellation, startup
    failure, renderer loss, overlap rejection, and release of retained resources.
 3. **Distribution and independent consumers.** Package SwiftPM and Maven products,
-   including resources, dependencies, manifest and shrinker requirements. Build
-   separate native consumer applications without Capacitor configuration or CLI
-   steps. Exercise the same Worker UI and verify existing Capacitor behavior and
+   including resources, normal Capacitor dependencies, license notices, manifest
+   and shrinker requirements. Build separate native consumer applications using
+   native dependency/resource setup and no Capacitor CLI steps. Exercise the same Worker UI and verify existing Capacitor behavior and
    Cloudflare build isolation.
 
 Reuse existing contract fixtures and assertions across hosts. Add tests only for
