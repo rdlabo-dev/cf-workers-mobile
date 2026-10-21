@@ -55,12 +55,19 @@ async function screen() {
     return adb("exec-out", "cat", dumpFile);
   }
 }
+function labelledNode(xml, text) {
+  return [...xml.matchAll(/<node\b[^>]*>/g)].find(([tag]) =>
+    ["text", "content-desc"].some((attribute) =>
+      tag.includes(`${attribute}="${text}"`),
+    ),
+  )?.[0];
+}
 async function waitFor(text, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   let xml = "";
   while (Date.now() < deadline) {
     xml = await screen();
-    if (xml.includes(`text="${text}"`)) return xml;
+    if (labelledNode(xml, text)) return xml;
     await delay(300);
   }
   await writeFile(path.join(artifacts, "failure.xml"), xml);
@@ -68,9 +75,7 @@ async function waitFor(text, timeout = 30_000) {
 }
 async function tap(text) {
   const xml = await waitFor(text);
-  const node = [...xml.matchAll(/<node\b[^>]*>/g)].find(([tag]) =>
-    tag.includes(`text="${text}"`),
-  )?.[0];
+  const node = labelledNode(xml, text);
   const bounds = node?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if (!bounds) throw new Error(`No bounds for ${text}`);
   adb(

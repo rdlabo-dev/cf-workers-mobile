@@ -32,4 +32,15 @@ export function createRequire(_filename: string | URL) {
     );
   };
 }
-export default { builtinModules, isBuiltin, createRequire };
+// Bundled frameworks may install hooks on Module.prototype.require. Keep the
+// constructor mutable, while dynamic executable loading still fails explicitly.
+export class Module {
+  static builtinModules = builtinModules;
+  static isBuiltin = isBuiltin;
+  static createRequire = createRequire;
+  static Module = Module;
+  require(id: string): unknown {
+    return createRequire("/")(id);
+  }
+}
+export default Module;

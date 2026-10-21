@@ -4,7 +4,7 @@
     "lib": ["dom", "esnext"],
     "module": "esnext",
     "moduleResolution": "bundler",
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "strict": true,
     "plugins": [
       {
@@ -25,7 +25,8 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "middleware.ts",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

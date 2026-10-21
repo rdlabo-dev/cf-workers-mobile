@@ -184,6 +184,13 @@ jobs:
             commands: |
               node tests/upstream/flare-stack-blog/prepare.mjs
               node --test tests/upstream/flare-stack-blog/browser.test.mjs
+          - suite: opennext-15
+            commands: |
+              npm install --prefix opennext --save-exact next@15.5.28
+              npm pkg set --prefix opennext 'scripts.build=next build' 'scripts.build:worker=opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion'
+              npm run build:worker --prefix opennext
+              npm run test:opennext
+              npm run test:opennext:split
           - suite: opennext
             timeout: 35
             commands: |

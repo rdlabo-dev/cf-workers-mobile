@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "build:worker": "opennextjs-cloudflare build",
     "build:capacitor": "vite build --config capacitor/vite.config.ts",
     "typecheck": "tsc --noEmit"
@@ -12,7 +12,7 @@
   "dependencies": {
     "@capacitor/core": "8.5.3",
     "cf-workers-mobile": "file:../..",
-    "next": "15.5.28",
+    "next": "16.4.2",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

@@ -3,7 +3,7 @@
 //     https://opensource.org/licenses/Apache-2.0
 // Copyright Joyent and Node contributors. All rights reserved. MIT license.
 
-import * as _promises from "./internal-promises.js";
+import _promises from "./promises.js";
 import {
   setTimeout,
   clearTimeout,

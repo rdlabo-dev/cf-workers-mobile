@@ -5,11 +5,19 @@ where the request executes; remote rendering does not establish local framework
 compatibility. The [standalone OpenNext sample](../demo/opennext/README.md) separates
 these paths and keeps its test drivers outside the application.
 
+The default sample uses Next.js 16.4.2. Route splitting also retains the exact
+Next.js 15.5.28 compatibility profile with OpenNext 1.20.12. This does not extend
+Next.js 15's upstream maintenance period. For that legacy version, build with
+`next build` and `opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion`;
+route isolation applies the same support-window exception only to 15.5.28.
+Use `next build --webpack` for 16.4.2; its support check remains enabled.
+Node middleware/proxy and unrecognized build formats remain entirely remote.
+
 ## Execution and configuration
 
 ### Route execution
 
-For OpenNext 1.20.12 with Next.js 15.5.28 App Router output, the Vite and esbuild plugins can separate explicitly selected static GET routes. Point `worker` at the ordinary generated Worker; no additional preparation script or Worker wrapper is required:
+For OpenNext 1.20.12 with Next.js 16.4.2 App Router output built using `next build --webpack`, the Vite and esbuild plugins can separate explicitly selected static GET routes. Point `worker` at the ordinary generated Worker; no additional preparation script or Worker wrapper is required:
 
 ```ts
 workersCapacitorPlugin({
