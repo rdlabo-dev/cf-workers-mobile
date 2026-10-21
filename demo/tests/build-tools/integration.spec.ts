@@ -62,6 +62,7 @@ for (const build of ["vite-node", "esbuild-node"]) {
       expect(report.mixedModule).toBe(true);
       expect(report.commonJsStreams).toEqual(Array(7).fill(true));
       expect(report.commonJsTimers).toEqual(Array(8).fill(true));
+      expect(report.commonJsModule).toEqual(Array(5).fill(true));
       expect(report.commonJsAssertions).toEqual({
         callable: true,
         sameDefault: true,

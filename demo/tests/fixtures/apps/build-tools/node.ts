@@ -21,6 +21,7 @@ async function run(prefer: ExecutionPreference) {
       commonJsAssertions: payload.commonJsAssertions,
       commonJsStreams: payload.commonJsStreams,
       commonJsTimers: payload.commonJsTimers,
+      commonJsModule: payload.commonJsModule,
       mixedModule: payload.mixedModule,
       globals: payload.globals,
       webGlobals: payload.webGlobals,

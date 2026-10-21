@@ -70,7 +70,7 @@ const builtins: readonly (readonly [string, string, string?])[] = [
   ["timers", "timers/index.js", "timers/index.cjs"],
   ["fs/promises", "fs/promises/index.js"],
   ["fs", "fs/index.js"],
-  ["module", "module/index.js"],
+  ["module", "module/index.js", "module/index.cjs"],
   ["_stream_readable", "stream-readable/index.js", "stream-readable/index.cjs"],
   ["_stream_writable", "stream-writable/index.js", "stream-writable/index.cjs"],
   ["_stream_duplex", "stream-duplex/index.js", "stream-duplex/index.cjs"],

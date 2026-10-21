@@ -5,11 +5,10 @@ where the request executes; remote rendering does not establish local framework
 compatibility. The [standalone OpenNext sample](../demo/opennext/README.md) separates
 these paths and keeps its test drivers outside the application.
 
-The current acceptance sample uses Next.js 16.4.2. The earlier exact 15.5.28
-version remains recognized, but route isolation invokes OpenNext's build step
-even for existing generated output. Its two-year support check now rejects that
-version, so route isolation falls back to remote execution. Update the application
-to a supported version instead of disabling that check. Next.js 16 Node
+The current acceptance sample and route splitting require Next.js 16.4.2.
+Next.js 15 is no longer supported; update the application instead of disabling
+OpenNext's support check. Older versions remain remote when route splitting is requested.
+Next.js 16 Node
 middleware/proxy and unrecognized build formats remain entirely remote.
 
 ## Execution and configuration

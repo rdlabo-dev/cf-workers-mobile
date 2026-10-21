@@ -25,6 +25,10 @@ export const moduleContract: ContractSuite<typeof moduleFeature> = {
       const require = api.createRequire("/worker.js");
       equal(typeof require, "function");
       equal((require("/app/data.json") as { ok: boolean }).ok, true);
+      equal(
+        (new api.Module().require("/app/data.json") as { ok: boolean }).ok,
+        true,
+      );
       try {
         require("./page.js");
         throw new Error("Expected throw");

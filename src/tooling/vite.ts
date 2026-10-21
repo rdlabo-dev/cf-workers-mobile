@@ -173,6 +173,9 @@ function compatibilityPlugins(
         global: [globalsRuntimePath, "global"],
         setImmediate: [globalsRuntimePath, "setImmediate"],
         clearImmediate: [globalsRuntimePath, "clearImmediate"],
+        // Static requires were bundled above; remaining resolve references
+        // must fail explicitly when called rather than during module setup.
+        "require.resolve": [aliases["module"], "resolveUnavailable"],
         exclude: [
           normalizePath(globalsPath),
           normalizePath(globalsInjectPath),
