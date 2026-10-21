@@ -121,3 +121,11 @@ Android requires Java 21+. The demo opens the minimal Hono example. For the sepa
 See [test execution cost](test-execution-time.md) for the CI timing baseline, setup consolidation, and measurement limits.
 
 CI runs library/type checks, local workerd contracts, Chromium/WebKit integration, a fresh npm-tarball consumer and nine Android application scenarios in parallel jobs. iOS simulator checks run separately. See [CI and merge protection](../CONTRIBUTING.md#ci-and-regression-protection) for the release `CI` gate, reuse of verified PR results on main, and verification boundaries. CI does not block merging.
+
+## Android Maven publication
+
+Use the [standalone publication build](../scripts/android-release/README.md) to
+prepare and verify the Android SDK independently of a Capacitor application.
+Native embedding CI checks a disposable-key signed bundle and builds an
+independent consumer from that Maven repository. Actual Central publication
+requires a verified namespace, release signing key and explicit publication.

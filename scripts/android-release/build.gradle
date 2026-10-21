@@ -1,0 +1,47 @@
+import groovy.json.JsonSlurper
+
+buildscript {
+    repositories { google(); mavenCentral() }
+    dependencies { classpath 'com.android.tools.build:gradle:8.13.0' }
+}
+allprojects {
+    repositories { google(); mavenCentral() }
+}
+
+def sdkVersion = new JsonSlurper().parse(file('../../package.json')).version
+project(':workers') {
+    afterEvaluate {
+        if (version.toString() != sdkVersion) {
+            throw new GradleException('Android and npm SDK versions must match')
+        }
+        publishing.repositories {
+            maven { name = 'Staging'; url = rootProject.layout.buildDirectory.dir('repository') }
+        }
+        if (providers.gradleProperty('signRelease').isPresent()) {
+            apply plugin: 'signing'
+            def key = providers.environmentVariable('MAVEN_SIGNING_KEY').orNull
+            if (!key) throw new GradleException('MAVEN_SIGNING_KEY must contain an ASCII-armored private signing key')
+            signing {
+                useInMemoryPgpKeys(key, providers.environmentVariable('MAVEN_SIGNING_PASSWORD').getOrElse(''))
+            }
+            publishing.publications.withType(MavenPublication).configureEach { publication ->
+                signing.sign(publication)
+            }
+        }
+    }
+}
+
+tasks.register('centralBundle', Zip) {
+    dependsOn ':workers:publishReleasePublicationToStagingRepository'
+    from(layout.buildDirectory.dir('repository')) {
+        include "jp/rdlabo/workers-native-android/${sdkVersion}/**"
+        exclude '**/maven-metadata*'
+    }
+    archiveFileName = "workers-native-android-${sdkVersion}-central.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    doFirst {
+        if (!providers.gradleProperty('signRelease').isPresent()) {
+            throw new GradleException('centralBundle requires -PsignRelease; unsigned staging is for local verification only')
+        }
+    }
+}
