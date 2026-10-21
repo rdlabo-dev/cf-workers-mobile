@@ -60,9 +60,9 @@ export async function compileOpenNext(
   const next = JSON.parse(
     await readFile(require.resolve("next/package.json"), "utf8"),
   ).version;
-  if (version !== "1.20.12" || next !== "16.4.2")
+  if (version !== "1.20.12" || !["15.5.28", "16.4.2"].includes(next))
     return reject(
-      "Route splitting requires OpenNext 1.20.12 and Next.js 16.4.2; update older applications",
+      "Route splitting requires OpenNext 1.20.12 and Next.js 15.5.28 or 16.4.2",
     );
   const json = async (file: string) =>
     JSON.parse(await readFile(join(app, ".next", file), "utf8"));
@@ -97,9 +97,7 @@ export async function compileOpenNext(
       "OpenNext headers, redirects, rewrites or basePath require remote execution",
     );
   if (!existsSync(join(app, ".next/server/webpack-runtime.js")))
-    return reject(
-      "OpenNext Next.js 16 route splitting requires Webpack output",
-    );
+    return reject("OpenNext route splitting requires Webpack output");
   const functionsFile = "server/functions-config-manifest.json";
   if (existsSync(join(app, ".next", functionsFile))) {
     const functions = await json(functionsFile);

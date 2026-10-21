@@ -94,6 +94,8 @@ await build(
   config,
   { minify: true, skipNextBuild: true, sourceDir: app },
   await readWranglerConfig({}),
+  // Retain the exact legacy profile when repackaging already-built output.
+  options.nextVersion === "15.5.28",
 );
 await cp(
   join(app, ".open-next/cloudflare/next-env.mjs"),
