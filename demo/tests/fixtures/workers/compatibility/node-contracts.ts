@@ -4,6 +4,10 @@ import { mixedModule } from "./mixed.mjs";
 import commonJsAssertions from "./assert.cjs";
 // @ts-expect-error This fixture verifies CommonJS constructor exports.
 import commonJsStreams from "./stream.cjs";
+// @ts-expect-error This fixture verifies mutable CommonJS builtin objects.
+import commonJsTimers from "./timers.cjs";
+import timers from "node:timers";
+import timersPromises from "node:timers/promises";
 // Type-only views: execution must use the installed public globals.
 const { Headers, Request } = globalThis as unknown as {
   Headers: typeof import("../../../../../src/browser/headers").Headers;
@@ -26,6 +30,7 @@ export default {
       contracts: await runNodeContracts("bundled"),
       commonJsAssertions: commonJsAssertions(),
       commonJsStreams: commonJsStreams(),
+      commonJsTimers: commonJsTimers(timers, timersPromises),
       mixedModule: mixedModule(),
       webGlobals: {
         entry: topLevelWebGlobals,

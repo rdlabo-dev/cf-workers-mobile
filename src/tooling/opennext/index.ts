@@ -60,9 +60,9 @@ export async function compileOpenNext(
   const next = JSON.parse(
     await readFile(require.resolve("next/package.json"), "utf8"),
   ).version;
-  if (version !== "1.20.12" || next !== "15.5.28")
+  if (version !== "1.20.12" || !["15.5.28", "16.4.2"].includes(next))
     return reject(
-      "Route splitting currently requires OpenNext 1.20.12 and Next.js 15.5.28",
+      "Route splitting currently requires OpenNext 1.20.12 and Next.js 15.5.28 or 16.4.2",
     );
   const json = async (file: string) =>
     JSON.parse(await readFile(join(app, ".next", file), "utf8"));
@@ -96,6 +96,31 @@ export async function compileOpenNext(
     return reject(
       "OpenNext headers, redirects, rewrites or basePath require remote execution",
     );
+  if (
+    next === "16.4.2" &&
+    !existsSync(join(app, ".next/server/webpack-runtime.js"))
+  )
+    return reject(
+      "OpenNext Next.js 16 route splitting requires Webpack output",
+    );
+  const functionsFile = "server/functions-config-manifest.json";
+  if (existsSync(join(app, ".next", functionsFile))) {
+    const functions = await json(functionsFile);
+    if (
+      functions.version !== 1 ||
+      !functions.functions ||
+      typeof functions.functions !== "object" ||
+      Array.isArray(functions.functions) ||
+      Object.hasOwn(functions.functions, "/_middleware")
+    )
+      return reject(
+        "OpenNext Node middleware or unknown functions require remote execution",
+      );
+  } else if (next === "16.4.2") {
+    return reject(
+      "Missing OpenNext functions manifest requires remote execution",
+    );
+  }
   const middleware = await json("server/middleware-manifest.json");
   const patterns: string[] = [];
   for (const value of Object.values(middleware.middleware ?? {}) as {

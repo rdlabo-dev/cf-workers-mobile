@@ -18,7 +18,13 @@ const parent = fileURLToPath(
   new URL("../../../opennext/artifacts/", import.meta.url),
 );
 for (const tool of ["vite", "esbuild"])
-  for (const scenario of ["private-env", "custom-config"])
+  for (const scenario of [
+    "private-env",
+    "custom-config",
+    "node-middleware",
+    "unknown-functions",
+    "non-webpack",
+  ])
     test(
       `${tool}: ${scenario} keeps server code and environment values out of every output`,
       { timeout: 60000 },
@@ -41,6 +47,19 @@ for (const tool of ["vite", "esbuild"])
               : "export const production={};",
           ".next/required-server-files.json": '{"config":{}}',
           ".next/routes-manifest.json": "{}",
+          ".next/server/functions-config-manifest.json": JSON.stringify(
+            scenario === "node-middleware"
+              ? {
+                  version: 1,
+                  functions: { "/_middleware": { runtime: "nodejs" } },
+                }
+              : scenario === "unknown-functions"
+                ? { version: 2, functions: {} }
+                : { version: 1, functions: {} },
+          ),
+          ...(scenario === "non-webpack"
+            ? {}
+            : { ".next/server/webpack-runtime.js": "" }),
           ".next/server/middleware-manifest.json": "{}",
           ".next/server/app-paths-manifest.json": '{"/page":"app/page.js"}',
         };
@@ -86,7 +105,14 @@ for (const tool of ["vite", "esbuild"])
           assert.equal(report.mode, "worker");
           assert.match(
             report.reason,
-            scenario === "private-env" ? /environment/ : /Custom OpenNext/,
+            scenario === "private-env"
+              ? /environment/
+              : scenario === "node-middleware" ||
+                  scenario === "unknown-functions"
+                ? /Node middleware|unknown functions/
+                : scenario === "non-webpack"
+                  ? /Webpack output/
+                  : /Custom OpenNext/,
           );
           for (const name of await readdir(outdir, { recursive: true }))
             if (/\.(js|map|json)$/.test(name)) {

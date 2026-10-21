@@ -20,6 +20,7 @@ async function run(prefer: ExecutionPreference) {
       contracts: payload.contracts,
       commonJsAssertions: payload.commonJsAssertions,
       commonJsStreams: payload.commonJsStreams,
+      commonJsTimers: payload.commonJsTimers,
       mixedModule: payload.mixedModule,
       globals: payload.globals,
       webGlobals: payload.webGlobals,
