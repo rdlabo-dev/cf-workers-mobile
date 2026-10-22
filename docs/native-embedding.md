@@ -12,18 +12,18 @@ You will build the web assets in your web project, add the native SDK to your
 app, then open and close a Workers screen through its native API. The SDK resolves
 Capacitor internally; your native app does not need Capacitor configuration or CLI commands.
 
-**0.1.2 Preview:** install `cf-workers-mobile@0.1.2` with matching
+**0.1.2 Preview:** install `cf-workers-native@0.1.2` with matching
 [native dependencies](#dependency-setup). Android requires WebView `MULTI_PROFILE`
 support and a locally built SDK artifact; no public Maven release is provided yet.
 
 ## Shared web build
 
 The Workers application uses the same Worker source, options, and
-[Vite/esbuild build configuration](build-setup.md) as cf-workers-mobile. Select
+[Vite/esbuild build configuration](build-setup.md) as cf-workers-native. Select
 the entry for the target platform:
 
 ```ts
-import { workersIOS } from "cf-workers-mobile/ios";
+import { workersIOS } from "cf-workers-native/ios";
 
 const app = workersIOS({
   baseURL: "https://worker.invalid",
@@ -32,7 +32,7 @@ const app = workersIOS({
 await app.ready;
 ```
 
-For Android, import `workersAndroid` from `cf-workers-mobile/android` with the
+For Android, import `workersAndroid` from `cf-workers-native/android` with the
 same options. Both entries return `ready`, `execution`, `drain()` and `dispose()`.
 They also connect native screen closure to disposal in the Worker runtime.
 Keep the generated asset directory intact, including the manifests and runtime
@@ -59,7 +59,7 @@ Use a separate mobile Vite configuration:
 ```ts
 // vite.mobile.config.ts
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/vite";
 
 export default defineConfig({
   plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
@@ -83,17 +83,18 @@ The SDK starts the bundled entry; `render: "/"` selects the initial Worker page.
 
 ## Dependency setup
 
-There is one npm package, `cf-workers-mobile`. Its `/ios`, `/android` and `/capacitor`
+There is one npm package, `cf-workers-native`. Its `/ios`, `/android` and `/capacitor`
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
-`io.github.rdlabo:workers-native-android` is an Android Maven artifact.
+`io.github.rdlabo:cf-workers-native-android` is an Android Maven artifact.
 
-Install 0.1.2 Preview in the web project:
+The renamed npm package is pending publication. After publication, install
+0.1.2 Preview in the web project:
 
 ```sh
-npm install cf-workers-mobile@0.1.2
+npm install cf-workers-native@0.1.2
 ```
 
-For a source build instead, create a JavaScript package tarball from the matching checkout:
+Until then, create a JavaScript package tarball from the matching checkout:
 
 ```sh
 # In the SDK checkout:
@@ -101,7 +102,7 @@ npm install
 npm pack
 
 # In the web project:
-npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.2.tgz
+npm install /path/to/cf-workers-native/cf-workers-native-0.1.2.tgz
 ```
 
 `npm pack` runs the build through `prepack`; the filename above uses the current
@@ -110,14 +111,14 @@ a symlink back into the SDK tree, which can create recursive paths for apps insi
 that checkout. Use the same Git revision for the iOS Swift package and Android publication. Installing the published
 `workers-capacitor@0.1.1` does not provide these entry points.
 
-When migrating from the old npm package, remove the `workers-capacitor` dependency before installing `cf-workers-mobile`; see the [migration steps](integration.md#migrating-from-the-old-npm-package). Keep only the renamed package in the web project.
+When migrating from the old npm package, remove the `workers-capacitor` dependency before installing `cf-workers-native`; see the [migration steps](integration.md#migrating-from-the-old-npm-package). Keep only the renamed package in the web project.
 
 The native project consumes generated assets and native dependencies only.
 The source checkout's npm and build tools belong in the web build or CI.
 
 ## iOS
 
-Add `https://github.com/rdlabo-dev/cf-workers-mobile` as a Swift package pinned to
+Add `https://github.com/rdlabo-dev/cf-workers-native` as a Swift package pinned to
 tag `v0.1.2` for the 0.1.2 Preview npm package (or the matching revision for a source build), and select the `WorkersIOS` product. Use Xcode 26 /
 Swift 6.2 or newer, as required by the native dependency toolchain.
 Add your generated assets as a folder resource, for example `WorkerWeb`, then
@@ -162,15 +163,17 @@ from JavaScript. Explicit closure cancels the pending startup notification.
 Add the SDK's Android Maven publication to your app's dependencies and include
 the generated web directory under `src/main/assets/`, for example `worker-web`.
 The publication resolves Capacitor and its other native dependencies.
-Version `0.1.2` is available from Maven Central as
-`io.github.rdlabo:workers-native-android:0.1.2`.
+The new Maven coordinate is `io.github.rdlabo:cf-workers-native-android:0.1.2`.
+It is pending publication. Until then, build a local Maven publication using the
+[independent Android consumer](../demo/tests/native-embedding/android/README.md).
+After publication, it resolves from Maven Central.
 Use Java 21 and Android SDK 36, with `ANDROID_HOME` pointing to the installed SDK.
 Include `google()` and `mavenCentral()` in your app's dependency repositories.
 In your app's Groovy `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'io.github.rdlabo:workers-native-android:0.1.2'
+    implementation 'io.github.rdlabo:cf-workers-native-android:0.1.2'
 }
 android {
     compileOptions {
@@ -225,7 +228,7 @@ the SDK screen and returns to the existing Activity.
 ## Compatibility
 
 Use matching JS and native SDK revisions. The new hosts share the existing
-cf-workers-mobile runtime and build tooling; they do not change Cloudflare
+cf-workers-native runtime and build tooling; they do not change Cloudflare
 deployment inputs or add a remote Worker deployment.
 
 For general native plugins, use the existing

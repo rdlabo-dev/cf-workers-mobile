@@ -32,7 +32,7 @@ follow these roles: `tooling/vite`, `tooling/esbuild`, `shared/contracts`, `shar
 `cloudflare/bindings/kv/testing`, `cloudflare/apis/types`, and `browser/isolated`.
 `environment` exposes host detection. The iOS and Android embedding entries are
 not included in the earlier `workers-capacitor@0.1.1` Preview. The renamed
-`cf-workers-mobile@0.1.2` Preview includes them; install it once published and
+`cf-workers-native@0.1.2` Preview includes them; install it once published and
 use matching native dependencies.
 
 Folder presence does not establish complete API support; see the

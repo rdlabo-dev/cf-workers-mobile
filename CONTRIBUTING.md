@@ -81,7 +81,7 @@ This exception applies only to existing implementations in 0.1.0 Preview. It doe
 
 ### 0.1.2 Preview follow-up
 
-`cf-workers-mobile@0.1.2` Preview is explicitly authorized with the current limitations documented in the [compatibility inventory](docs/compatibility.md). This version-specific exception retains existing incomplete compatibility implementations; it does not certify complete Workers or Node.js compatibility, authorize new incomplete units, bypass required regression checks or CI, or extend to later releases. Keep unsupported behavior and verification boundaries visible.
+`cf-workers-native@0.1.2` Preview is explicitly authorized with the current limitations documented in the [compatibility inventory](docs/compatibility.md). This version-specific exception retains existing incomplete compatibility implementations; it does not certify complete Workers or Node.js compatibility, authorize new incomplete units, bypass required regression checks or CI, or extend to later releases. Keep unsupported behavior and verification boundaries visible.
 
 ## Layout and tests
 
@@ -156,7 +156,7 @@ Direct pushes and PR branches do not automatically publish beta packages. A newe
 
 For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility on main to validate reuse or finish the necessary full run. Then tag that commit and push the tag, for example `git tag v0.1.2` followed by `git push origin v0.1.2`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
 
-The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `cf-workers-mobile`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
+The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `cf-workers-native`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
 
 ### PR beta requests
 
@@ -186,7 +186,7 @@ branch/commit and tarball SHA-256. Preparation does not publish or use npm crede
 The command prints the exact `npm publish <tarball> --ignore-scripts --access public
 --tag beta --registry https://registry.npmjs.org` invocation. After reviewing the
 artifact, use your local npm account (`npm login` if needed) with permission to
-publish `cf-workers-mobile`, and run that printed command. Append `--dry-run` to
+publish `cf-workers-native`, and run that printed command. Append `--dry-run` to
 inspect it without publishing. Complete npm's authentication/2FA prompts when
 requested; keep credentials outside the repository. Local publication does not
 use the workflow's OIDC identity or its `--provenance` option.

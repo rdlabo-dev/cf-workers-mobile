@@ -73,7 +73,7 @@ if (
   if (!CENTRAL_USERNAME || !CENTRAL_PASSWORD)
     throw new Error("Central user token secrets are required");
   const version = JSON.parse(await readFile("package.json", "utf8")).version;
-  const name = `workers-native-android-${version}`;
+  const name = `cf-workers-native-android-${version}`;
   const bundle = await readFile(
     `scripts/android-release/build/distributions/${name}-central.zip`,
   );

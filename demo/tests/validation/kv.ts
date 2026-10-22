@@ -1,6 +1,6 @@
-import { LocalStorageKV } from "cf-workers-mobile/cloudflare/bindings/kv";
-import { openFeature } from "cf-workers-mobile/shared/contracts";
-import { FetchImplementation } from "cf-workers-mobile/cloudflare/workers";
+import { LocalStorageKV } from "cf-workers-native/cloudflare/bindings/kv";
+import { openFeature } from "cf-workers-native/shared/contracts";
+import { FetchImplementation } from "cf-workers-native/cloudflare/workers";
 import worker from "../fixtures/workers/compatibility/kv";
 export async function kvRequest(
   namespace: string,

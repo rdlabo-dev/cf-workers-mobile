@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 import hono from "../fixtures/workers/hono/standard";
 import express from "../fixtures/workers/express/standard";
 import { runContract, type Result } from "./contracts/http";

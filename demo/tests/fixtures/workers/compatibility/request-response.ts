@@ -1,4 +1,4 @@
-import { runContract } from "cf-workers-mobile/shared/contracts/testing";
+import { runContract } from "cf-workers-native/shared/contracts/testing";
 import { Request as LocalRequest } from "../../../../../src/browser/request";
 import { Response as LocalResponse } from "../../../../../src/browser/response";
 import {

@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 import * as api from "./index.js";
 const equal = (value: unknown, expected: unknown) => {
   if (JSON.stringify(value) !== JSON.stringify(expected))

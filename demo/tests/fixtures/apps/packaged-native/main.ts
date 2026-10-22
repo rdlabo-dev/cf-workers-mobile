@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 localStorage.removeItem("packaged-stop");
 let app = workersCapacitor({
   baseURL: "https://worker.invalid",

@@ -1,6 +1,6 @@
 # Android SDK publication
 
-Prepare `io.github.rdlabo:workers-native-android` for Maven Central independently of a
+Prepare `io.github.rdlabo:cf-workers-native-android` for Maven Central independently of a
 Capacitor application. This build uses the existing native library and Gradle
 wrapper. It does not upload or publish anything externally.
 

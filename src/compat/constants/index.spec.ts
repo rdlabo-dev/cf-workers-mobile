@@ -2,8 +2,8 @@ import constants, * as namespace from "node:constants";
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 import { expectedValues } from "./values.spec";
 export const constantsFeature = defineFeature<typeof constants>()(
   "node.constants",

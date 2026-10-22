@@ -3,7 +3,7 @@
 Use your identity provider's native SDK when one is already installed. The small `login.ts` example demonstrates a public OAuth client using Capacitor App/Browser, authorization code + S256 PKCE, exact callback matching and state validation. It connects to an existing provider; it does not implement an identity provider or change the Worker's authentication middleware.
 
 ```ts
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 import { login } from "./login";
 import { Capacitor, CapacitorHttp } from "@capacitor/core";
 

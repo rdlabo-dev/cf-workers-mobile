@@ -1,16 +1,16 @@
 import { verifyKVPersistence } from "./kv";
-import { FetchImplementation } from "cf-workers-mobile/cloudflare/workers";
+import { FetchImplementation } from "cf-workers-native/cloudflare/workers";
 import {
   assertContract,
   runContract,
-} from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts/testing";
 import worker from "../fixtures/workers/compatibility/fetch";
 const isolated = () =>
   new Worker(new URL("./entries/fetch.ts", import.meta.url), {
     type: "module",
   });
-import { fetchContract } from "cf-workers-mobile/cloudflare/workers/testing";
-import { kvContract } from "cf-workers-mobile/cloudflare/bindings/kv/testing";
+import { fetchContract } from "cf-workers-native/cloudflare/workers/testing";
+import { kvContract } from "cf-workers-native/cloudflare/bindings/kv/testing";
 import { wasmContract } from "./contracts/wasm";
 import { runLocalNodeContracts } from "./node-modules";
 import { runNodeContractsInWorker } from "./node-worker";

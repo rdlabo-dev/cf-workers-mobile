@@ -9,7 +9,7 @@ or maintain a second router.
 
 ```ts
 // vite.config.ts — Capacitor build only
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/vite";
 
 export default {
   plugins: [workersCapacitorPlugin({ worker: "worker/src/index.ts" })],
@@ -25,7 +25,7 @@ The esbuild plugin accepts the same options.
 
 ```ts
 // App startup — the business Worker remains unchanged
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://local.invalid/",

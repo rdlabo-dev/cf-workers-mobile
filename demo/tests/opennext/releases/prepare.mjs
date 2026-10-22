@@ -43,10 +43,10 @@ for (const release of ["A", "B"]) {
     mode: constants.COPYFILE_FICLONE,
     verbatimSymlinks: true,
   });
-  const library = join(root, "node_modules/cf-workers-mobile");
+  const library = join(root, "node_modules/cf-workers-native");
   await rm(library, { recursive: true, force: true });
   await symlink(
-    await realpath(join(source, "node_modules/cf-workers-mobile")),
+    await realpath(join(source, "node_modules/cf-workers-native")),
     library,
     "dir",
   );

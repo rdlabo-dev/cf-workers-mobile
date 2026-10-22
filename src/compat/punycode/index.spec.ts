@@ -2,8 +2,8 @@ import punycode, * as namespace from "node:punycode";
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 import { testPunycode } from "./upstream.spec";
 const groups = [
   "exports",

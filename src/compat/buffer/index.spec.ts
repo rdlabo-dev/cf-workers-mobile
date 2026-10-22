@@ -3,8 +3,8 @@ import * as bareBuffer from "buffer";
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 
 type Api = typeof import("./index.js");
 function equal(actual: unknown, expected: unknown, label = "") {

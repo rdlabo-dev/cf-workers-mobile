@@ -1,8 +1,8 @@
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 // @ts-expect-error The pinned Workers builtin is not declared by @types/node.
 import * as actual from "node:_http_incoming";
 import * as http from "node:http";

@@ -29,7 +29,7 @@ installing Capacitor.
 ## Application entry
 
 ```ts
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 const app = workersCapacitor({
   baseURL: "https://worker.invalid",

@@ -9,8 +9,8 @@
     "esModuleInterop": true,
     "types": ["node"],
     "paths": {
-      "cf-workers-mobile/shared/contracts": ["./src/shared/contracts/index.ts"],
-      "cf-workers-mobile/shared/contracts/testing": [
+      "cf-workers-native/shared/contracts": ["./src/shared/contracts/index.ts"],
+      "cf-workers-native/shared/contracts/testing": [
         "./src/shared/contracts/testing.ts"
       ]
     }

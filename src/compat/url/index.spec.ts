@@ -4,8 +4,8 @@ import * as namespace from "node:url";
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 import { legacyCases } from "./legacy.spec";
 import { modernCases } from "./modern.spec";
 import assert, {

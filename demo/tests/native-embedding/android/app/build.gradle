@@ -8,6 +8,6 @@ android {
 }
 dependencies {
     def sdkVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../../../../package.json')).version
-    implementation "io.github.rdlabo:workers-native-android:${sdkVersion}"
+    implementation "io.github.rdlabo:cf-workers-native-android:${sdkVersion}"
     implementation 'androidx.activity:activity:1.10.1'
 }

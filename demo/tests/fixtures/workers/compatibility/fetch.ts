@@ -1,1 +1,1 @@
-export { fetchContractWorker as default } from "cf-workers-mobile/cloudflare/workers/testing";
+export { fetchContractWorker as default } from "cf-workers-native/cloudflare/workers/testing";

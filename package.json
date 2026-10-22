@@ -1,15 +1,15 @@
 {
-  "name": "cf-workers-mobile",
+  "name": "cf-workers-native",
   "version": "0.1.2",
   "license": "MIT",
   "description": "Bring Cloudflare Workers apps to iOS and Android.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rdlabo-dev/cf-workers-mobile.git"
+    "url": "git+https://github.com/rdlabo-dev/cf-workers-native.git"
   },
-  "homepage": "https://github.com/rdlabo-dev/cf-workers-mobile#readme",
+  "homepage": "https://github.com/rdlabo-dev/cf-workers-native#readme",
   "bugs": {
-    "url": "https://github.com/rdlabo-dev/cf-workers-mobile/issues"
+    "url": "https://github.com/rdlabo-dev/cf-workers-native/issues"
   },
   "keywords": [
     "cloudflare",

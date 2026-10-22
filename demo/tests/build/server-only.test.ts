@@ -12,12 +12,12 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import { build as vite } from "vite";
-import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-mobile/tooling/esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-native/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "cf-workers-native/tooling/vite";
 
 const secret = "PRIVATE_DECLARED_FILE_ef271a";
 const library = fileURLToPath(
-  import.meta.resolve("cf-workers-mobile/capacitor"),
+  import.meta.resolve("cf-workers-native/capacitor"),
 );
 for (const tool of ["vite", "esbuild"] as const) {
   it(`${tool}: declared files stay remote and every supported distribution path rejects them`, async () => {

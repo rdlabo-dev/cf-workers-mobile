@@ -4,7 +4,7 @@ import { context } from "esbuild";
 import { readFile, writeFile, readdir, readlink } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/esbuild";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/esbuild";
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const hash = (contents) => createHash("sha256").update(contents).digest("hex");

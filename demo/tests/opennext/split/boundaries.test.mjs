@@ -12,8 +12,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as vite } from "vite";
 import { build as esbuild } from "esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "cf-workers-mobile/tooling/vite";
-import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-mobile/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "cf-workers-native/tooling/vite";
+import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-native/tooling/esbuild";
 const parent = fileURLToPath(
   new URL("../../../opennext/artifacts/", import.meta.url),
 );
@@ -37,7 +37,7 @@ for (const tool of ["vite", "esbuild"])
           "wrangler.json": "{}",
           "index.html": '<script type="module" src="/main.js"></script>',
           "main.js":
-            'import {workersCapacitor} from "cf-workers-mobile/capacitor";window.runtime=workersCapacitor({baseURL:"https://worker.invalid",remote:{origin:"https://backend.invalid"}});',
+            'import {workersCapacitor} from "cf-workers-native/capacitor";window.runtime=workersCapacitor({baseURL:"https://worker.invalid",remote:{origin:"https://backend.invalid"}});',
           ".open-next/worker.js": `import {production} from "./cloudflare/next-env.mjs";export default {fetch(){return new Response(${JSON.stringify(marker)}+JSON.stringify(production))}};`,
           ".open-next/.build/open-next.config.mjs":
             'export default {functions:{custom:{routes:["app/page"]}}};',

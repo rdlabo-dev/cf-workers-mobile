@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/vite";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig(({ mode }) => ({
   root: here("."),

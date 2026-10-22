@@ -1,4 +1,4 @@
-# cf-workers-mobile
+# cf-workers-native
 
 **Bring the app you built with Workers or Void to iOS and Android.**
 
@@ -13,7 +13,7 @@ Reach people who prefer the browser and people who look for apps in the store. O
 - **Create a new mobile app**
   Use Capacitor to build an iOS and Android app for distribution through the App Store and Google Play. [Capacitor guide](docs/integration.md).
 
-[Documentation](docs/README.md) · [Examples](demo/README.md) · [0.1.2 Preview release](https://github.com/rdlabo-dev/cf-workers-mobile/releases/tag/v0.1.2)
+[Documentation](docs/README.md) · [Examples](demo/README.md)
 
 ## Keep building the app you know
 
@@ -39,14 +39,18 @@ Each guide describes its tested versions and boundaries. Already have a separate
 
 Install the shared JavaScript package in your web project:
 
+The renamed package is being prepared for publication. Until it is available on
+npm, use the [source tarball instructions](docs/native-embedding.md#dependency-setup).
+After publication:
+
 ```sh
-npm install cf-workers-mobile@0.1.2
+npm install cf-workers-native@0.1.2
 ```
 
 The mobile entry selects the host. For example, an iOS web entry starts with:
 
 ```ts
-import { workersIOS } from "cf-workers-mobile/ios";
+import { workersIOS } from "cf-workers-native/ios";
 
 const app = workersIOS({
   baseURL: "https://your-worker.example.com/",
@@ -55,7 +59,7 @@ const app = workersIOS({
 await app.ready;
 ```
 
-Use `workersAndroid` from `cf-workers-mobile/android` or `workersCapacitor` from `cf-workers-mobile/capacitor` for the other hosts. All three share the same runtime options and [Vite/esbuild tooling](docs/build-setup.md).
+Use `workersAndroid` from `cf-workers-native/android` or `workersCapacitor` from `cf-workers-native/capacitor` for the other hosts. All three share the same runtime options and [Vite/esbuild tooling](docs/build-setup.md).
 
 This entry is one part of the setup: connect the existing Worker to a **separate mobile build**, then package its output with your chosen native host. The [embedding guide](docs/native-embedding.md) and [Capacitor guide](docs/integration.md) cover the complete path. For an existing native app, build the web assets in the web project or CI; the native project does not need Capacitor CLI commands or configuration.
 
@@ -66,9 +70,9 @@ This entry is one part of the setup: connect the existing Worker to a **separate
 Open your application repository and give your assistant this prompt, replacing the target with **iOS**, **Android** or **Capacitor**:
 
 ```text
-Read https://github.com/rdlabo-dev/cf-workers-mobile/blob/v0.1.2/README.md
+Read https://github.com/rdlabo-dev/cf-workers-native/blob/main/README.md
 and the integration guide for our target: <iOS, Android or Capacitor>.
-Bring this Workers application to that target using cf-workers-mobile@0.1.2.
+Bring this Workers application to that target using cf-workers-native@0.1.2.
 Preserve its pages, routes, authentication and Cloudflare deployment configuration.
 For an existing native app, preserve its entry point and navigation.
 Verify the actual user flows on the target platform and report remaining limits.

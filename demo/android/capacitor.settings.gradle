@@ -2,5 +2,5 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
-include ':cf-workers-mobile'
-project(':cf-workers-mobile').projectDir = new File('../node_modules/cf-workers-mobile/native/android')
+include ':cf-workers-native'
+project(':cf-workers-native').projectDir = new File('../node_modules/cf-workers-native/native/android')

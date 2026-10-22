@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",
   remote: {

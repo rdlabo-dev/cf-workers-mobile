@@ -1,4 +1,4 @@
-import type { ContractResult } from "cf-workers-mobile/shared/contracts/testing";
+import type { ContractResult } from "cf-workers-native/shared/contracts/testing";
 
 // This runtime fixture is built by Vite. Build-tool tests separately exercise
 // the configured Worker entry through both Vite and esbuild.

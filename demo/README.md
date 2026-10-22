@@ -1,4 +1,4 @@
-# cf-workers-mobile examples
+# cf-workers-native examples
 
 Choose the example closest to the experience you want to build:
 
@@ -42,7 +42,7 @@ The path is relative to the configured Vite root, `src/`. The example uses [the 
 [src/main.ts](src/main.ts) initializes the runtime and displays the HTML returned by `/`:
 
 ```ts
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",

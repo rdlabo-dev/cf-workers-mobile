@@ -11,7 +11,7 @@ root = Path(__file__).resolve().parents[2]
 version = json.loads((root / 'package.json').read_text())['version']
 release = root / 'scripts/android-release'
 gradle = [str(root / 'demo/android/gradlew'), '-p', str(release), '--console=plain']
-archive = release / f'build/distributions/workers-native-android-{version}-central.zip'
+archive = release / f'build/distributions/cf-workers-native-android-{version}-central.zip'
 
 with tempfile.TemporaryDirectory(prefix='workers-central-test-') as home:
     gpg = ['gpg', '--homedir', home, '--batch', '--pinentry-mode', 'loopback', '--passphrase', '']
@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='workers-central-test-') as home:
     env = dict(os.environ, MAVEN_SIGNING_KEY=key, MAVEN_SIGNING_PASSWORD='')
     try:
         subprocess.run(gradle + ['-PsignRelease', 'centralBundle'], cwd=root, env=env, check=True)
-        base = f'io/github/rdlabo/workers-native-android/{version}/workers-native-android-{version}'
+        base = f'io/github/rdlabo/cf-workers-native-android/{version}/cf-workers-native-android-{version}'
         required = [base + suffix for suffix in
                     ['.aar', '.pom', '.module', '-sources.jar', '-javadoc.jar']]
         with zipfile.ZipFile(archive) as bundle:

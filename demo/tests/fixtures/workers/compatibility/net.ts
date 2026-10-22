@@ -1,4 +1,4 @@
-import { runContract } from "cf-workers-mobile/shared/contracts/testing";
+import { runContract } from "cf-workers-native/shared/contracts/testing";
 import {
   NetImplementation,
   netContract,

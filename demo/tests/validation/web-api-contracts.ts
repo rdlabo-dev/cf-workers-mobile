@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 import {
   EncodingImplementation,
   encodingContract,
@@ -7,7 +7,7 @@ import {
   AbortImplementation,
   abortContract,
 } from "../../../src/browser/abort/index.spec";
-import { runContract } from "cf-workers-mobile/shared/contracts/testing";
+import { runContract } from "cf-workers-native/shared/contracts/testing";
 import {
   HeadersImplementation,
   headersContract,

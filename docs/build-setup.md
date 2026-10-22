@@ -27,11 +27,11 @@ application's runtime import changes; Worker source and execution options are sh
 
 | Host      | Runtime import                                        | Native setup                                        |
 | --------- | ----------------------------------------------------- | --------------------------------------------------- |
-| iOS       | `workersIOS` from `cf-workers-mobile/ios`             | [UIKit / SwiftUI](native-embedding.md#ios)          |
-| Android   | `workersAndroid` from `cf-workers-mobile/android`     | [Existing Android app](native-embedding.md#android) |
-| Capacitor | `workersCapacitor` from `cf-workers-mobile/capacitor` | [Capacitor app](integration.md)                     |
+| iOS       | `workersIOS` from `cf-workers-native/ios`             | [UIKit / SwiftUI](native-embedding.md#ios)          |
+| Android   | `workersAndroid` from `cf-workers-native/android`     | [Existing Android app](native-embedding.md#android) |
+| Capacitor | `workersCapacitor` from `cf-workers-native/capacitor` | [Capacitor app](integration.md)                     |
 
-Use `cf-workers-mobile@0.1.2` with matching
+Use `cf-workers-native@0.1.2` with matching
 native dependencies; see [dependency setup](native-embedding.md#dependency-setup).
 Build the corresponding entry for each target, then package the entire output
 directory. Existing Capacitor examples below use `workersCapacitor`; the same
@@ -106,7 +106,7 @@ Configured server bindings make `local` fail the build. See
 The package provides the `cloudflare:node` type for its supported `httpServerHandler` adapter. For a browser build without existing Workers type declarations, add it to `compilerOptions.types` in `tsconfig.json`:
 
 ```json
-{ "compilerOptions": { "types": ["cf-workers-mobile/cloudflare/apis/types"] } }
+{ "compilerOptions": { "types": ["cf-workers-native/cloudflare/apis/types"] } }
 ```
 
 Keep any other types your project already uses. This is a type-only entry; do not import it at runtime. Projects with generated Workers types should keep those declarations instead. No application-owned `cloudflare.d.ts` or `client.d.ts` is needed.
@@ -129,8 +129,8 @@ its generated Worker as described in the framework guide.
 
 | Build              | Setup                                      | Input                                                                              |
 | ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| Vite 7             | `cf-workers-mobile/tooling/vite` plugin    | TypeScript / JavaScript Worker entries, including framework output described above |
-| esbuild 0.28       | `cf-workers-mobile/tooling/esbuild` plugin | TypeScript / JavaScript Worker entries, including framework output described above |
+| Vite 7             | `cf-workers-native/tooling/vite` plugin    | TypeScript / JavaScript Worker entries, including framework output described above |
+| esbuild 0.28       | `cf-workers-native/tooling/esbuild` plugin | TypeScript / JavaScript Worker entries, including framework output described above |
 | Browser ES Modules | Explicit Worker source below               | Browser-compatible JavaScript only                                                 |
 
 Other bundlers are not currently supported. Add these plugins only to the mobile/browser build, never the Cloudflare build.
@@ -141,7 +141,7 @@ Add the plugin to the mobile/browser Vite configuration:
 
 ```ts
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/vite";
 
 export default defineConfig({
   plugins: [workersCapacitorPlugin({ worker: "./src/worker.ts" })],
@@ -156,7 +156,7 @@ For esbuild, use the same application code with this build configuration:
 
 ```js
 import { build } from "esbuild";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/esbuild";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/esbuild";
 
 await build({
   entryPoints: ["src/main.ts"],
@@ -198,4 +198,4 @@ import worker from "./worker.js";
 serve(worker);
 ```
 
-`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `cf-workers-mobile/browser/isolated`.
+`worker.js` exports the existing Fetch Handler. All its dependencies must also be browser-compatible ES Modules with resolvable URLs. This path does not transform TypeScript, bare npm imports, Node APIs or `cloudflare:*` imports. The public bundled equivalent of `lib/browser/isolated/transport.js` is `cf-workers-native/browser/isolated`.

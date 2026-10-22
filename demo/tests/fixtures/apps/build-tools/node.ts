@@ -1,7 +1,7 @@
 import {
   workersCapacitor,
   type ExecutionPreference,
-} from "cf-workers-mobile/capacitor";
+} from "cf-workers-native/capacitor";
 
 // The configured worker is tests/fixtures/workers/compatibility/node-contracts.ts
 // for this build; direct executes it in-page, worker executes it as a

@@ -28,7 +28,7 @@ for (const bundler of ["vite", "esbuild"]) {
       const temp = await mkdtemp(join(demo, "artifacts/void-routes-"));
       let server;
       try {
-        const main = `import {workersCapacitor} from "cf-workers-mobile/capacitor";
+        const main = `import {workersCapacitor} from "cf-workers-native/capacitor";
 window.runtime=workersCapacitor({baseURL:"https://worker.invalid/",remote:{origin:"https://remote.invalid"}});`;
         await writeFile(join(temp, "main.js"), main);
         await writeFile(

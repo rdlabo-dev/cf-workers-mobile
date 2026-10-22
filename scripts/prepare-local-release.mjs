@@ -16,7 +16,7 @@ if (run("git", ["status", "--porcelain", "--untracked-files=normal"]))
 const sha = run("git", ["rev-parse", "HEAD"]);
 const branch = run("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
 const source = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
-if (source.name !== "cf-workers-mobile")
+if (source.name !== "cf-workers-native")
   throw new Error("Unexpected package name.");
 const base = source.version
   .match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-|$)/)?.[0]
@@ -24,7 +24,7 @@ const base = source.version
 if (!base) throw new Error("Invalid source package version.");
 const version = `${base}-beta.local.sha${sha.slice(0, 12)}`;
 const output = join(root, "artifacts", "npm", sha);
-const staging = await mkdtemp(join(tmpdir(), "cf-workers-mobile-release-"));
+const staging = await mkdtemp(join(tmpdir(), "cf-workers-native-release-"));
 try {
   // Build through the ordinary prepack hook, then change only staged metadata.
   const [built] = JSON.parse(
