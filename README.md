@@ -4,25 +4,45 @@
 
 Reach people who prefer the browser and people who look for apps in the store. Offer a mobile app alongside your web app, so your users can choose the platform that works for them.
 
-## Choose how to bring your app to mobile
+## Your web app can have a mobile version
 
-- **Embed in an existing iOS app**
-  Add a Workers-powered screen to your UIKit or SwiftUI app. [iOS guide](docs/native-embedding.md#ios).
-- **Embed in an existing Android app**
-  Add a Workers-powered screen to your existing Android app. [Android guide](docs/native-embedding.md#android).
-- **Create a new mobile app**
-  Use Capacitor to build an iOS and Android app for distribution through the App Store and Google Play. [Capacitor guide](docs/integration.md).
+If you have a web app running on Cloudflare Workers, you can add an iOS and Android
+app built around its existing pages and backend. For example, a Void app with
+D1-backed forms can keep its loaders, actions and database on Workers while the
+mobile app displays its pages and bundles its public JavaScript and CSS.
 
-[Documentation](docs/README.md) · [Examples](demo/README.md)
+cf-workers-native connects your Workers application to a mobile app built with
+Capacitor. Capacitor supplies the iOS and Android projects and access to native
+plugins. You add a separate mobile build and test your application's flows; you
+keep developing and deploying your web app to Cloudflare.
 
-## Keep building the app you know
+**Start here: [Add a mobile version to your existing app](docs/integration.md).**
+You do not need an existing native app. The guide takes you from choosing your
+Worker entry to running your pages on a simulator or emulator.
 
-- **Reuse your pages and flows.** Bring Worker-rendered HTML, links and forms into a mobile WebView. Keep the application's existing rendering model; an SPA rewrite is not a prerequisite.
-- **Give your app a mobile home.** Create an iOS and Android app with Capacitor, or bring your Workers pages into a native app you already have.
-- **Keep your backend on Workers.** D1, server secrets and cloud-dependent logic stay on the deployed Worker. The separate mobile build leaves your Cloudflare deployment inputs unchanged.
-- **Choose what runs on the device.** Start with the default network execution. Where supported, explicitly select public routes for local execution and bundle client assets with the app.
+## See an example close to your app
 
-Local execution has [compatibility limits](docs/compatibility.md). Cloud-backed pages still need a connection; bundling their client assets does not make them offline applications.
+| What you have                           | What to try                                      | What the example demonstrates                                                                |
+| --------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| HTML pages served by a Worker           | [Hono / Express pages](demo/rendering/README.md) | Page navigation, forms and redirects inside a mobile app.                                    |
+| A Void React Pages app using D1         | [Void + D1 sample](demo/void/README.md)          | Server-rendered pages, React interaction and a form that writes to D1.                       |
+| A Next.js app deployed through OpenNext | [OpenNext sample](demo/opennext/README.md)       | Connecting generated pages and assets to a mobile build; see its version and feature limits. |
+
+These are examples and test fixtures, not customer deployment stories. Each guide
+states what has been verified. Start with the flow closest to yours, then try it
+with your own app.
+
+## What stays, what you add
+
+- **Keep your pages and backend.** Reuse supported HTML, links, forms and client interactions. D1, server secrets and cloud-dependent logic stay on Workers.
+- **Add a mobile build.** Connect your Worker and public assets to a Capacitor app with its own name and application ID.
+- **Check the mobile experience.** Verify login, navigation, data changes, reopening and connection recovery in your application.
+- **Prepare for distribution.** Configure signing and store information through the native application workflow. Store submission and review remain separate steps.
+
+Start with requests running on your existing deployed Worker. Cloud-backed pages
+need a connection. Bundled client assets do not make them offline applications.
+Optional local execution is covered by the [execution guide](docs/cloudflare-bindings.md#choosing-execution)
+and [compatibility limits](docs/compatibility.md).
 
 ## Start from your framework
 
@@ -35,46 +55,50 @@ Local execution has [compatibility limits](docs/compatibility.md). Cloud-backed 
 
 Each guide describes its tested versions and boundaries. Already have a separate frontend calling Worker APIs? Keep that frontend and use the [Fetch-only integration](docs/runtime.md#fetch-only-integration).
 
-## Get your app onto your phone
+## Try it with your app
 
-Install the shared JavaScript package in your web project:
+You need the application's source, its Worker build and a test Worker URL for
+cloud-backed flows. Running iOS requires macOS and Xcode; Android requires the
+Android development tools. The [setup guide](docs/integration.md#before-you-start)
+links the platform prerequisites.
 
-The `latest` npm tag includes 0.x Preview releases. Install this release explicitly:
+Install the package in your web project, then follow the
+[complete mobile setup](docs/integration.md#workflow):
 
 ```sh
 npm install --save-exact cf-workers-native@0.1.3
 ```
 
-The mobile entry selects the host. For example, an iOS web entry starts with:
+Installation alone does not generate a mobile project. The guide covers adding
+Capacitor, configuring the mobile build, and running it on iOS or Android. Your
+first milestone is one existing page, a link to another page, and a working form
+or data action on a simulator or emulator.
 
-```ts
-import { workersIOS } from "cf-workers-native/ios";
-
-const app = workersIOS({
-  baseURL: "https://your-worker.example.com/",
-  render: "/",
-});
-await app.ready;
-```
-
-Use `workersAndroid` from `cf-workers-native/android` or `workersCapacitor` from `cf-workers-native/capacitor` for the other hosts. All three share the same runtime options and [Vite/esbuild tooling](docs/build-setup.md).
-
-This entry is one part of the setup: connect the existing Worker to a **separate mobile build**, then package its output with your chosen native host. The [embedding guide](docs/native-embedding.md) and [Capacitor guide](docs/integration.md) cover the complete path. For an existing native app, build the web assets in the web project or CI; the native project does not need Capacitor CLI commands or configuration.
-
-**All 0.x releases are Preview releases.** APIs may change. Android embedding requires WebView `MULTI_PROFILE` support. The native Android SDK is available from Maven Central at version `0.1.2`. Read the [native requirements](docs/native-embedding.md#dependency-setup) before integrating. Upgrading from `workers-capacitor`? Follow the [migration steps](docs/integration.md#migrating-from-the-old-npm-package).
+**All 0.x releases are Preview releases**, including those on npm's `latest` tag.
+APIs may change. Use your app's actual flows to evaluate the fit before distribution.
+Upgrading from `workers-capacitor`? Follow the [migration steps](docs/integration.md#migrating-from-the-old-npm-package).
 
 ## Build with your AI assistant
 
-Open your application repository and give your assistant this prompt, replacing the target with **iOS**, **Android** or **Capacitor**:
+Open your application repository and give your assistant this prompt:
 
 ```text
-Read https://github.com/rdlabo-dev/cf-workers-native/blob/main/README.md
-and the integration guide for our target: <iOS, Android or Capacitor>.
-Bring this Workers application to that target using cf-workers-native@0.1.3.
-Preserve its pages, routes, authentication and Cloudflare deployment configuration.
-For an existing native app, preserve its entry point and navigation.
-Verify the actual user flows on the target platform and report remaining limits.
+Read https://github.com/rdlabo-dev/cf-workers-native/blob/main/docs/integration.md.
+Add an iOS and Android version of this Workers web app using cf-workers-native@0.1.3
+and Capacitor. Preserve the existing pages, backend and Cloudflare deployment configuration.
+Use an existing test Worker for cloud-backed requests; ask before any cloud deployment.
+Start by verifying one page, navigation and a form or data action on a simulator/emulator.
+Then verify the app's authentication and main user flow, and report remaining limits.
 ```
+
+Provide your app name, application ID and test Worker URL if you have them.
+
+## Already have a native app?
+
+Embed a Workers-powered screen in your existing [UIKit / SwiftUI app](docs/native-embedding.md#ios)
+or [Android app](docs/native-embedding.md#android). These integrations use the
+native SDKs and a shared web build. Follow the [dependency setup](docs/native-embedding.md#dependency-setup)
+for the matching npm, SwiftPM and Maven versions and Android WebView requirements.
 
 ## Make it ready for your users
 
