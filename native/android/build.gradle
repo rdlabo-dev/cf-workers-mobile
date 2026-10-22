@@ -2,7 +2,7 @@ apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 
 group = 'io.github.rdlabo'
-version = '0.1.3'
+version = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
 
 
 android {
