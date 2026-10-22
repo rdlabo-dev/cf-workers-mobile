@@ -12,9 +12,9 @@ You will build the web assets in your web project, add the native SDK to your
 app, then open and close a Workers screen through its native API. The SDK resolves
 Capacitor internally; your native app does not need Capacitor configuration or CLI commands.
 
-**0.1.2 Preview:** install `cf-workers-native@0.1.2` with matching
+**0.1.2 Preview:** install `cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51` with matching
 [native dependencies](#dependency-setup). Android requires WebView `MULTI_PROFILE`
-support and a locally built SDK artifact; no public Maven release is provided yet.
+support. The native Android SDK is available from Maven Central at version `0.1.2`.
 
 ## Shared web build
 
@@ -87,14 +87,23 @@ There is one npm package, `cf-workers-native`. Its `/ios`, `/android` and `/capa
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
 `io.github.rdlabo:cf-workers-native-android` is an Android Maven artifact.
 
-The renamed npm package is pending publication. After publication, install
-0.1.2 Preview in the web project:
+Install the published npm Preview in the web project. Pin this exact beta; npm
+`latest` points to an older beta and npm version `0.1.2` is not yet published:
 
 ```sh
-npm install cf-workers-native@0.1.2
+npm install --save-exact cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51
 ```
 
-Until then, create a JavaScript package tarball from the matching checkout:
+The published components below share source revision
+`e5092d3abc51c573d44999568db8c06d79e6227d`, although their version labels differ:
+
+| Component  | Dependency                                                                        |
+| ---------- | --------------------------------------------------------------------------------- |
+| JavaScript | `cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51`                               |
+| iOS        | SwiftPM revision `e5092d3abc51c573d44999568db8c06d79e6227d`, product `WorkersIOS` |
+| Android    | `io.github.rdlabo:cf-workers-native-android:0.1.2` from Maven Central             |
+
+For local SDK development, create a JavaScript package tarball from the matching checkout:
 
 ```sh
 # In the SDK checkout:
@@ -119,7 +128,7 @@ The source checkout's npm and build tools belong in the web build or CI.
 ## iOS
 
 Add `https://github.com/rdlabo-dev/cf-workers-native` as a Swift package pinned to
-tag `v0.1.2` for the 0.1.2 Preview npm package (or the matching revision for a source build), and select the `WorkersIOS` product. Use Xcode 26 /
+revision `e5092d3abc51c573d44999568db8c06d79e6227d` for the npm beta above (or the matching revision for a source build), and select the `WorkersIOS` product. The existing `v0.1.2` tag predates the package rename; do not use it for this beta. Use Xcode 26 /
 Swift 6.2 or newer, as required by the native dependency toolchain.
 Add your generated assets as a folder resource, for example `WorkerWeb`, then
 create the controller from that directory on the main actor:
@@ -164,9 +173,8 @@ Add the SDK's Android Maven publication to your app's dependencies and include
 the generated web directory under `src/main/assets/`, for example `worker-web`.
 The publication resolves Capacitor and its other native dependencies.
 The new Maven coordinate is `io.github.rdlabo:cf-workers-native-android:0.1.2`.
-It is pending publication. Until then, build a local Maven publication using the
-[independent Android consumer](../demo/tests/native-embedding/android/README.md).
-After publication, it resolves from Maven Central.
+It is published and resolves from Maven Central. This native version and the
+npm beta above were released from revision `e5092d3abc51c573d44999568db8c06d79e6227d`.
 Use Java 21 and Android SDK 36, with `ANDROID_HOME` pointing to the installed SDK.
 Include `google()` and `mavenCentral()` in your app's dependency repositories.
 In your app's Groovy `build.gradle`:

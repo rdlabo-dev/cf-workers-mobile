@@ -25,10 +25,21 @@ const previewPort = Number(process.env.CONSUMER_PREVIEW_PORT ?? 4189);
 const previewURL = `http://127.0.0.1:${previewPort}`;
 const temp = await mkdtemp(join(tmpdir(), "capacitor-workers-consumer-"));
 const pack = JSON.parse(
-  execFileSync("npm", ["pack", "--json", "--pack-destination", temp], {
-    encoding: "utf8",
-  }),
+  execFileSync(
+    "npm",
+    [
+      "pack",
+      ...(process.env.CONSUMER_PACKAGE ? [process.env.CONSUMER_PACKAGE] : []),
+      "--json",
+      "--pack-destination",
+      temp,
+    ],
+    {
+      encoding: "utf8",
+    },
+  ),
 )[0];
+console.log(`Consumer package: ${pack.name}@${pack.version} (${temp})`);
 for (const required of [
   "dist/ios.js",
   "dist/android.js",
@@ -536,7 +547,13 @@ export default {root:'demo/tests/fixtures/apps/runtime',plugins:[workersCapacito
   await writeFile(
     resolve(root, "artifacts/package-results.json"),
     JSON.stringify(
-      { consumer: temp, direct: results, isolated, features },
+      {
+        consumer: temp,
+        package: { name: pack.name, version: pack.version },
+        direct: results,
+        isolated,
+        features,
+      },
       null,
       2,
     ),

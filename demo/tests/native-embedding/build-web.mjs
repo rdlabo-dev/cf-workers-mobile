@@ -1,7 +1,16 @@
 import { build } from "esbuild";
 import { mkdir, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import { workersCapacitorPlugin } from "../../../dist/tooling/esbuild.js";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import path from "node:path";
+
+const distribution = process.env.WORKERS_NPM_PACKAGE_DIR
+  ? pathToFileURL(
+      path.resolve(process.env.WORKERS_NPM_PACKAGE_DIR, "dist") + "/",
+    )
+  : new URL("../../../dist/", import.meta.url);
+const { workersCapacitorPlugin } = await import(
+  new URL("tooling/esbuild.js", distribution)
+);
 
 const platform = process.argv[2];
 const scenario = process.argv[3] ?? "normal";
@@ -16,7 +25,7 @@ const output = new URL(
     : `android/app/src/main/assets/sdk-web${scenario === "normal" ? "" : scenario === "startup-failure" ? "-failure" : "-broken"}/`,
   root,
 );
-const entry = new URL(`../../../dist/${platform}.js`, import.meta.url);
+const entry = new URL(`${platform}.js`, distribution);
 await mkdir(output, { recursive: true });
 await build({
   absWorkingDir: fileURLToPath(root),
