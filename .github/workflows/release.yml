@@ -17,7 +17,7 @@ jobs:
   prepare:
     if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && github.event.comment.body == '/beta')
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 70
     permissions:
       contents: read
       actions: read
@@ -28,6 +28,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Wait for the tagged main commit's Compatibility run
+        if: github.event_name == 'push'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const { waitForReleaseCI } = await import(`${process.env.GITHUB_WORKSPACE}/.github/scripts/release-wait.mjs`);
+            await waitForReleaseCI(github, context, { log: core.info });
       - name: Resolve release and require successful main CI
         id: plan
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8

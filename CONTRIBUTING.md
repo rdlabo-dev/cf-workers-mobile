@@ -160,7 +160,30 @@ All 0.x versions are Preview releases, including plain versions published to `la
 
 Direct pushes and PR branches do not automatically publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
 
-For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility on main to validate reuse or finish the necessary full run. Then tag that commit and push the tag, for example `git tag v0.1.3` followed by `git push origin v0.1.3`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
+Use the same `np` entry point as the other repositories, from a clean, up-to-date
+`main` checkout:
+
+```sh
+git switch main
+git pull --ff-only
+npm run release
+# Or select the increment without the version-selection prompt:
+npm run release -- patch
+```
+
+`np --no-tests --no-publish --branch main` selects the version, creates the version
+commit and Git tag, and pushes them. It never publishes to npm locally. Android's
+source publication version is read from `package.json`, so no separate Gradle
+version edit is needed. The tag-triggered Release workflow waits for Compatibility
+to succeed on that exact main commit, then builds and publishes with Trusted
+Publishing and provenance. Failed or missing CI prevents publication. The workflow
+revalidates the candidate before publishing; local `--no-tests` does not bypass CI.
+
+A plain version such as `0.1.3` goes to `latest`; a prerelease version such as
+`0.2.0-rc.1` goes to `next`. Existing versions and tags are immutable. If a release
+version was already prepared and merged through a PR, wait for that main commit's
+CI and push its matching tag instead of asking `np` to bump it again. Never retarget
+an existing release tag.
 
 The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `cf-workers-native`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
 
