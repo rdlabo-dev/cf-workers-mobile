@@ -49,6 +49,10 @@ import WebKit
 @objc class AppDelegate: UIResponder, UIApplicationDelegate {}
 @objc(SceneDelegate) class SceneDelegate: UIResponder, UIWindowSceneDelegate {
  var window: UIWindow?
+ var enteredBackground = false
+ var resumed = false
+ func sceneDidEnterBackground(_ scene: UIScene) { enteredBackground = true }
+ func sceneDidBecomeActive(_ scene: UIScene) { if enteredBackground { resumed = true } }
  func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
   print("SDK_SCENE_STARTED")
   fflush(stdout)
@@ -93,8 +97,27 @@ import WebKit
    return
   }
   Task { @MainActor in
+     let startedAt = Date()
      let (runtime, page) = try! await waitForWorkerHome(in: child)
      print("SDK_DOCUMENT Worker Home")
+     print("SDK_READY_MS", Date().timeIntervalSince(startedAt) * 1000)
+     if CommandLine.arguments.contains("--lifecycle") {
+       print("SDK_BACKGROUND_READY"); fflush(stdout)
+       for _ in 0..<200 {
+         if self.resumed { break }
+         try! await Task.sleep(nanoseconds: 100_000_000)
+       }
+       assert(self.enteredBackground && self.resumed)
+       try! await waitForText("Worker Home", in: page)
+       print("SDK_BACKGROUND_RESUMED")
+       for (route, expected, marker) in [("/network-ok", "Network recovered", "SDK_NETWORK_ONLINE"), ("/network-drop", "Network interrupted", "SDK_NETWORK_INTERRUPTED"), ("/network-ok", "Network recovered", "SDK_NETWORK_RECOVERED")] {
+         _ = try! await page.evaluateJavaScript("document.querySelector('a').href='\(route)'; document.querySelector('a').click()")
+         try! await waitForText(expected, in: page)
+         print(marker)
+       }
+       _ = try! await page.evaluateJavaScript("document.querySelector('a').href='/'; document.querySelector('a').click()")
+       try! await waitForText("Worker Home", in: page)
+     }
      let hook = try! await runtime.webView!.evaluateJavaScript("typeof globalThis.__workersNativeDispose")
      assert(hook as? String == "function")
      print("SDK_HOOK function")

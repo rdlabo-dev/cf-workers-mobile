@@ -21,6 +21,7 @@ public final class Launcher extends androidx.activity.ComponentActivity {
     private boolean recreateNextWorker;
     private final android.app.Application.ActivityLifecycleCallbacks recreationProbe = new android.app.Application.ActivityLifecycleCallbacks() {
         @Override public void onActivityResumed(android.app.Activity activity) {
+            if (activity.getClass().getName().endsWith("WorkersNativeActivity")) Log.i("HostIsolation", "SDK Activity resumed " + System.identityHashCode(activity));
             if (recreateNextWorker && activity.getClass().getName().endsWith("WorkersNativeActivity")) {
                 recreateNextWorker = false;
                 new android.os.Handler(getMainLooper()).postDelayed(() -> {
@@ -34,7 +35,11 @@ public final class Launcher extends androidx.activity.ComponentActivity {
         }
         @Override public void onActivityStarted(android.app.Activity a) {}
         @Override public void onActivityPaused(android.app.Activity a) {}
-        @Override public void onActivityStopped(android.app.Activity a) {}
+        @Override public void onActivityStopped(android.app.Activity a) {
+            if (a.getClass().getName().endsWith("WorkersNativeActivity")) {
+                Log.i("HostIsolation", "SDK Activity stopped " + System.identityHashCode(a));
+            }
+        }
         @Override public void onActivitySaveInstanceState(android.app.Activity a, Bundle b) {}
         @Override public void onActivityDestroyed(android.app.Activity a) {
             if (a.getClass().getName().endsWith("WorkersNativeActivity")) Log.i("HostIsolation", "SDK Activity destroyed " + System.identityHashCode(a));

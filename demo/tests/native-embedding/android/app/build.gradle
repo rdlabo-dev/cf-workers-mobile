@@ -2,12 +2,14 @@ apply plugin: 'com.android.application'
 android {
     namespace 'probe'
     compileSdk 36
-    defaultConfig { applicationId 'probe.workersembed'; minSdk 24; targetSdk 36 }
+    buildTypes { release { signingConfig signingConfigs.debug } }
+    defaultConfig { applicationId 'probe.workersembed'; minSdk 24; targetSdk 36; testInstrumentationRunner 'probe.AccessibilityProbe' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_21; targetCompatibility JavaVersion.VERSION_21 }
     packaging.resources { excludes += 'META-INF/INDEX.LIST'; merges += 'META-INF/io.netty.versions.properties' }
 }
 dependencies {
-    def sdkVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../../../../package.json')).version
+    def sdkVersion = providers.gradleProperty('sdkVersion').getOrElse(new groovy.json.JsonSlurper().parse(rootProject.file('../../../../package.json')).version)
     implementation "io.github.rdlabo:cf-workers-native-android:${sdkVersion}"
+    debugImplementation 'androidx.webkit:webkit:1.14.0'
     implementation 'androidx.activity:activity:1.10.1'
 }
