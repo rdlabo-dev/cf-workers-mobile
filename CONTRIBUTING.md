@@ -6,7 +6,7 @@ Run `npm run format` from the repository root before submitting changes. `npm ru
 
 ## Complete compatibility units only
 
-New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1, 0.1.2 and 0.1.3 follow-ups](#010-preview-exception).
+New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1, 0.1.2, 0.1.3 and 0.1.4 follow-ups](#010-preview-exception).
 
 For Node.js compatibility, the acceptance unit is a module, including its Workers
 exports, subpaths and observable behavior. For a binding or Web API, define the
@@ -73,7 +73,7 @@ unfinished production behavior.
 
 0.1.0 Preview may include existing compatibility implementations with the limitations documented in the [compatibility inventory](docs/compatibility.md). Their inclusion does not establish complete module compatibility or certify untested behavior. Keep missing exports, unsupported operations and verification boundaries visible; a passing application scenario does not make its dependencies complete.
 
-This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1, 0.1.2 and 0.1.3 follow-ups below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
+This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1, 0.1.2, 0.1.3 and 0.1.4 follow-ups below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
 
 ### 0.1.1 Preview follow-up
 
@@ -86,6 +86,14 @@ This exception applies only to existing implementations in 0.1.0 Preview. It doe
 ### 0.1.3 Preview follow-up
 
 `cf-workers-native@0.1.3` is authorized as a CI-published continuation of the existing Preview, retaining the limitations in the [compatibility inventory](docs/compatibility.md). Its runtime implementation is unchanged from 0.1.2. This version-specific exception does not authorize new incomplete compatibility units or bypass regression checks and CI.
+
+### 0.1.4 follow-up
+
+`cf-workers-native@0.1.4` is authorized to retain the documented compatibility
+limits. It updates onboarding, release tooling and native verification; SDK runtime
+sources are unchanged from 0.1.3. Existing limitations remain in the compatibility
+inventory. This exception does not authorize new incomplete implementations or
+bypass regression checks and CI.
 
 ## Layout and tests
 
@@ -113,8 +121,8 @@ test; a single passing “globals” result must not stand in for individual API
 ## CI and regression protection
 
 The `CI` check aggregates library, the compatibility matrix, bindings,
-streams-fallback, package and upstream jobs. Main requires a pull request and
-blocks force pushes and deletion; CI is not a required merge status check.
+streams-fallback, package and upstream jobs. The main branch ruleset is disabled so `npm run release` can push the version
+commit and tag directly. CI is not a merge status requirement.
 Publishing still requires successful Compatibility for the release commit.
 Workflow configuration is in [ci.yml](.github/workflows/ci.yml); CodeQL is separate.
 
@@ -149,7 +157,7 @@ or a namespace match to full behavioral support.
 
 ## npm releases
 
-All 0.x versions are Preview releases, including plain versions published to `latest`. The npm dist-tag selects the installation channel; `latest` does not imply production stability. Publish release versions through the GitHub Actions Release workflow from the exact CI-passing main commit, rather than from a local npm session.
+All 0.x versions are implicitly Preview releases, including plain versions published to `latest`. Use the plain version (for example, `0.1.4`) as the GitHub release title; do not repeat a Preview label in release notes. Document concrete changes and compatibility limits there. The npm dist-tag selects the installation channel; `latest` does not imply production stability. Publish release versions through the GitHub Actions Release workflow from the exact CI-passing main commit, rather than from a local npm session.
 
 | Trigger                                                                   | npm dist-tag | Version                                    |
 | ------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
