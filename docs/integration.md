@@ -83,10 +83,10 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. The renamed package is pending publication; use the source tarball below until then. After publication, install 0.1.2 Preview from npm:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. Install the published Preview beta from npm using its exact version. npm `latest` currently points to an older beta; npm version `0.1.2` is not yet published:
 
 ```sh
-npm install cf-workers-native@0.1.2
+npm install --save-exact cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51
 ```
 
 For a source build instead, create a package tarball from a checkout of this repository:
@@ -110,7 +110,7 @@ If your application already depends on `workers-capacitor`, remove it before ins
 
 ```sh
 npm uninstall workers-capacitor
-npm install cf-workers-native@0.1.2
+npm install --save-exact cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51
 ```
 
 Change runtime imports from `workers-capacitor` to `cf-workers-native/capacitor`, and change other package subpaths to the `cf-workers-native` prefix. Rebuild the application's mobile web assets with its existing build command, then run `npx cap sync` to regenerate native plugin dependencies. New applications use the installation steps above directly.

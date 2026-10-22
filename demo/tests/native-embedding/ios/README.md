@@ -17,3 +17,14 @@ The runner resolves and builds the independent SwiftPM consumer for the selected
 The normal scenario deliberately keeps the ready Worker visible for 35 seconds before navigation and POST. This verifies that a successful ready handshake cancels the 30-second startup deadline. Its scenario deadline includes SDK startup and this required survival interval; simulator launch does not consume that budget. SDK startup, disposal and assertion deadlines are unchanged.
 
 In the broken-entry scenario only, closing a host that has not become ready may report the SDK’s five-second JavaScript disposal timeout. The fixture logs this specific `NSURLErrorDomain/-1001` outcome and still requires native child cleanup and suppression of late startup callbacks. Other disposal errors fail acceptance; normal ready-host disposal must succeed.
+
+## Verify published dependencies
+
+Set `WORKERS_SWIFT_REVISION` to a full Git commit SHA to resolve the SDK from
+GitHub instead of the local checkout. Set `WORKERS_NPM_PACKAGE_DIR` to the absolute
+path of an installed `cf-workers-native` package to build the fixture with its
+published JavaScript and esbuild plugin. Both dependencies must correspond to the
+same source revision; see the [published dependency matrix](../../../../docs/native-embedding.md#dependency-setup).
+Use a fresh `WORKERS_IOS_PROBE_DIR` for a release verification so the build evidence
+is separate from local SDK runs. Run all three scenarios above with those variables.
+Without these variables the runner keeps using the local SDK and local `dist`.

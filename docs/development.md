@@ -129,3 +129,18 @@ prepare and verify the Android SDK independently of a Capacitor application.
 Native embedding CI checks a disposable-key signed bundle and builds an
 independent consumer from that Maven repository. Actual Central publication
 requires a verified namespace, release signing key and explicit publication.
+
+## Verify a published npm package
+
+Run the independent consumer suite against an exact registry version:
+
+```sh
+CONSUMER_PACKAGE=cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51 npm run test:package
+```
+
+This downloads the published tarball instead of packing the checkout. The same
+checks cover packed files, TypeScript imports, Vite/esbuild, browser execution and
+shared runtime contracts. `artifacts/package-results.json` records the temporary
+consumer directory. Its `node_modules/cf-workers-native` directory can also be
+passed as `WORKERS_NPM_PACKAGE_DIR` to the native embedding runners. Without
+`CONSUMER_PACKAGE`, the suite builds and packs the local checkout as before.

@@ -20,3 +20,9 @@ It keeps the first healthy Worker screen open beyond the native startup deadline
 The host remains a ComponentActivity and calls only `WorkersNative.open`. No Capacitor configuration, CLI sync, plugin registration or host superclass changes are needed.
 
 Only one SDK screen may be active per process. The SDK uses a separate WebView profile, including its cookie and service-worker routing state. The host installs session and persistent cookies, a process CookieHandler sentinel, and its own ServiceWorkerClient. A separate host WebView registers a real service worker and fetches a sentinel through that client before, during and after SDK use; all host state must survive.
+
+To verify the published JavaScript alongside the Maven SDK, set
+`WORKERS_NPM_PACKAGE_DIR` to the absolute path of an installed `cf-workers-native`
+package before running with `--central`. The fixture uses that package's runtime
+and esbuild plugin instead of local `dist`. Match its source revision to the
+Maven artifact using the [dependency matrix](../../../../docs/native-embedding.md#dependency-setup).
