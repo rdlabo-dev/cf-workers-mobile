@@ -1,28 +1,45 @@
-# Bring your Workers app to mobile
+# Add a mobile version to your Cloudflare Workers app
 
-Bring the app you built with Workers or Void to people who use the web and people who find apps in the store. Start with the integration that fits your app, then connect its existing Workers build.
+Keep your web application on Cloudflare and bring its pages and flows to iOS and
+Android. Start by running a small part of your existing app on a simulator or
+emulator, then verify the rest of the experience before distribution.
 
-## Choose your mobile host
+## Start with something you recognize
 
-| Target        | Guide                                                   | What to expect                                                                                                           |
-| ------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **iOS**       | [Embed in UIKit or SwiftUI](native-embedding.md#ios)    | Add the `WorkersIOS` Swift package product and a bundled web build to your existing app.                                 |
-| **Android**   | [Embed in an existing app](native-embedding.md#android) | Build the Android SDK artifact locally and open its dedicated screen from an Activity. Requires WebView `MULTI_PROFILE`. |
-| **Capacitor** | [Build a mobile app](integration.md)                    | Use a Capacitor app shell and general native plugins, starting from your existing Worker.                                |
+| Your starting point                   | See it in an example                                | Connect your own app                                        |
+| ------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
+| Worker-rendered HTML and forms        | [Hono / Express pages](../demo/rendering/README.md) | [Worker build setup](build-setup.md#frameworks)             |
+| Void React Pages with D1              | [Void sample](../demo/void/README.md)               | [Void integration](void.md)                                 |
+| Next.js on Workers through OpenNext   | [OpenNext sample](../demo/opennext/README.md)       | [OpenNext integration](opennext.md)                         |
+| A separate frontend using Worker APIs | [Fetch-only demo](../demo/README.md)                | [Fetch-only integration](runtime.md#fetch-only-integration) |
 
-The [shared web build](native-embedding.md#shared-web-build) connects the iOS and Android hosts to your Worker. The Capacitor guide includes its own build steps. All three use `cf-workers-native@0.1.3`, with a separate mobile build that preserves the Cloudflare deployment inputs.
+Samples show specific integrations and their verification boundaries. They do not
+establish that every application using the same framework will work unchanged.
 
-## Connect your framework
+## Make your first mobile build
 
-Choose the framework's Worker entry and asset setup before building:
+Follow [Add a mobile version with Capacitor](integration.md). Capacitor creates the
+iOS and Android projects; cf-workers-native connects them to your Workers app.
+You do not need an existing native application.
 
-- [Hono](build-setup.md#hono): Fetch handlers and Worker-rendered HTML.
-- [Workers Express](build-setup.md#workers-express): Express through the Workers `cloudflare:node` entry.
-- [Void React Pages](void.md): generated Worker, React client assets and D1-backed pages.
-- [Next.js / OpenNext](opennext.md): generated Worker and client assets, with explicit version and execution limits.
-- [Separate frontend](runtime.md#fetch-only-integration): keep your UI and connect its existing API requests.
+1. Identify your Worker build, public assets and test Worker URL.
+2. Add the mobile project and its separate build configuration.
+3. Run one existing page, follow a link, and submit a form or perform a data action.
+4. Verify login, data changes, reopening and network recovery in your own app.
+5. Prepare signing and distribution using the native app's release workflow.
 
-Use [Vite or esbuild](build-setup.md#tools) for the mobile build. Framework support is scoped to each guide's verified paths; [compatibility](compatibility.md) records the wider API boundaries.
+The guide includes [prerequisites](integration.md#before-you-start) and a
+[prompt for your AI assistant](integration.md#prompt-to-give-your-ai-assistant).
+Start with the existing Worker handling requests remotely; local execution is an
+optional later step. Setup currently requires configuration, not a single project-generation command.
+
+## Add a screen to an existing native app
+
+If you already maintain an iOS or Android app, use [native embedding](native-embedding.md)
+instead. Follow the [UIKit / SwiftUI](native-embedding.md#ios) or
+[Android](native-embedding.md#android) guide and the
+[published dependency matrix](native-embedding.md#dependency-setup). Android uses
+the Maven SDK and requires WebView `MULTI_PROFILE` support.
 
 ## Understand where your code runs
 

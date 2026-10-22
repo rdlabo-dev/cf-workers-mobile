@@ -10,25 +10,26 @@ Follow the [workflow](#workflow) below yourself, or give the [integration prompt
 
 The primary success criterion is a working native application with minimal integration effort, not a new application architecture. Keep ordinary HTML documents, links and forms where the application uses them. SPA conversion, a new client router, App Shell redesign, SSR/API separation and adding hydration are not prerequisites.
 
-## How existing Worker pages reach the screen
+## Before you start
 
-With `render`, the library supplies the Worker's response as the response to a WebView document request. The WebView renders that HTML as a page, executes its scripts and loads its resources. The application does not need to insert HTML into an existing DOM or display it in an iframe.
+This path is for a developer who has a Workers web app and wants to add a mobile
+version. Capacitor supplies the native projects; cf-workers-native connects the
+existing Worker pages and requests to them.
 
-```text
-WebView opens /notes at the app's local origin
-  → the library receives the document request
-  → generated dispatch selects local or remote execution
-      local:  the existing Fetch handler runs on the device
-      remote: the request goes to the existing deployed Worker
-  → response status, headers and HTML body return through the document bridge
-  → WebView renders the page
-```
+Have these ready:
 
-Both execution paths use the same document response mechanism. A D1-backed page can retain authentication, its query and SSR on the remote Worker; a compatible independent page can render locally. The build may select the entire Worker for remote execution when safe separation is not possible. This is request dispatch, not moving D1 operations individually between runtimes.
+- Your application's source and a working web build. For a first example, use [Hono / Express pages](../demo/rendering/README.md) or [Void + D1](../demo/void/README.md).
+- A deployed **test** Worker URL for cloud-backed pages, data and authentication. Keep D1 and server credentials on that Worker.
+- Node and the platform development tools: macOS with Xcode for iOS, or the Android toolchain for Android. Follow [Capacitor's environment setup](https://capacitorjs.com/docs/getting-started/environment-setup) and your framework's version requirements.
+- An application name and ID for the mobile projects. A simulator or emulator is enough for the first run.
 
-Following an ordinary link produces the next document request through the same mechanism. Supported form submissions and same-origin redirects also retain document navigation. Existing client scripts can provide interaction or hydration where the framework uses it. Bundled assets bypass the Worker router; other requests follow their configured routing. Preserve the application's existing page model before considering any redesign.
+The first milestone is an existing page displayed in the app, a link that navigates,
+and a form or data action that succeeds. Then verify the full flow, including
+login and session handling, in [the acceptance checklist](#6-verify-the-existing-application-in-capacitor).
+Web authentication may need mobile callback configuration; assess it in your app.
 
-On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker. The visible page keeps the app-local URL (normally `capacitor://localhost` on iOS and `https://localhost` on Android), while the Worker receives its logical HTTP(S) URL. This is native document rendering, not a remote browser tab or a local HTTP server. See the [native rendering guide](native-rendering-api.md) for form, redirect, asset and lifecycle limits; this does not guarantee every browser or framework feature.
+This guide requires a mobile build configuration and native project setup.
+Signing, store accounts, submission and review come after the application works.
 
 ## Prompt to give your AI assistant
 
@@ -382,3 +383,23 @@ Test the target iOS and Android platforms using an actual user flow:
 - Run the application's existing cloud tests to check that integration has not changed its server behavior. Browser tests do not replace native navigation/session tests.
 
 Report the integration files added, each necessary application change and its reason, commands executed, tested platforms, execution boundaries and remaining limitations. Distinguish simulator/emulator checks from physical-device checks, and remote execution from local compatibility. If there is no deployed test backend or native SDK available, state what could and could not be verified rather than claiming completion.
+
+## How existing Worker pages reach the screen
+
+With `render`, the library supplies the Worker's response as the response to a WebView document request. The WebView renders that HTML as a page, executes its scripts and loads its resources. The application does not need to insert HTML into an existing DOM or display it in an iframe.
+
+```text
+WebView opens /notes at the app's local origin
+  → the library receives the document request
+  → generated dispatch selects local or remote execution
+      local:  the existing Fetch handler runs on the device
+      remote: the request goes to the existing deployed Worker
+  → response status, headers and HTML body return through the document bridge
+  → WebView renders the page
+```
+
+Both execution paths use the same document response mechanism. A D1-backed page can retain authentication, its query and SSR on the remote Worker; a compatible independent page can render locally. The build may select the entire Worker for remote execution when safe separation is not possible. This is request dispatch, not moving D1 operations individually between runtimes.
+
+Following an ordinary link produces the next document request through the same mechanism. Supported form submissions and same-origin redirects also retain document navigation. Existing client scripts can provide interaction or hydration where the framework uses it. Bundled assets bypass the Worker router; other requests follow their configured routing. Preserve the application's existing page model before considering any redesign.
+
+On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker. The visible page keeps the app-local URL (normally `capacitor://localhost` on iOS and `https://localhost` on Android), while the Worker receives its logical HTTP(S) URL. This is native document rendering, not a remote browser tab or a local HTTP server. See the [native rendering guide](native-rendering-api.md) for form, redirect, asset and lifecycle limits; this does not guarantee every browser or framework feature.

@@ -1,17 +1,25 @@
 # cf-workers-native examples
 
-Choose the example closest to the experience you want to build:
+Start with an example that resembles your existing Cloudflare Workers app, then
+use the [integration guide](../docs/integration.md) to add a mobile version of your
+own application.
 
-| Experience                                          | Example                                                                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------ |
-| A Workers screen in an existing iOS app             | [UIKit and SwiftUI consumer](tests/native-embedding/ios/README.md)       |
-| A Workers screen in an existing Android app         | [Independent Android consumer](tests/native-embedding/android/README.md) |
-| Worker-rendered pages, links and forms in Capacitor | [Hono and Express document rendering](rendering/README.md)               |
-| React pages with D1-backed forms                    | [Void sample](void/README.md)                                            |
-| Next.js pages through OpenNext                      | [OpenNext sample](opennext/README.md)                                    |
-| An existing frontend calling a Worker               | The Fetch-only demo below                                                |
+| Your app                             | Example                                 | What to look for                                                         |
+| ------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------ |
+| Worker-rendered pages and forms      | [Hono and Express](rendering/README.md) | Follow a link, submit a form and navigate after a redirect.              |
+| Void React Pages with D1             | [Void sample](void/README.md)           | Render a page, interact with React, and persist a form submission in D1. |
+| Next.js deployed through OpenNext    | [OpenNext sample](opennext/README.md)   | Connect generated pages and assets; check the sample's supported flows.  |
+| A separate frontend calling a Worker | The Fetch-only demo below               | Keep the frontend and connect its requests.                              |
 
-The native consumers are executable acceptance fixtures; use the [embedding guide](../docs/native-embedding.md) for application integration. Framework samples describe their own execution and verification boundaries.
+These are repository examples and test fixtures. Read each sample's setup and
+verification boundaries; there is no shared one-command launcher for all samples.
+For your first mobile run, choose a page and one action you can verify on both the
+web and mobile app. Authentication and distribution need checks in your own app.
+
+Already maintain a native app? The [UIKit / SwiftUI consumer](tests/native-embedding/ios/README.md)
+and [Android consumer](tests/native-embedding/android/README.md) are executable
+acceptance fixtures for embedding. Use the [embedding guide](../docs/native-embedding.md)
+for application integration.
 
 The rest of this page runs a minimal Workers Fetch Handler inside Capacitor. It illustrates Fetch-only integration; use the rendering example above for full document navigation.
 
