@@ -216,3 +216,20 @@ API int wk_rsa(EVP_PKEY *key,int operation,const unsigned char *data,size_t leng
  status=1;
  done: EVP_PKEY_CTX_free(ctx);return status;
 }
+API int wk_spkac(const unsigned char *data,int length,int operation) {
+ while(length>0 && (data[length-1]==' ' || data[length-1]=='\n' || data[length-1]=='\r' || data[length-1]=='\t'))length--;
+ if(!length)return 0;
+ NETSCAPE_SPKI *spki=NETSCAPE_SPKI_b64_decode((const char*)data,length);if(!spki)return 0;
+ int ok=0;EVP_PKEY *key=NULL;BIO *bio=NULL;
+ if(operation==2){
+  const ASN1_IA5STRING *challenge=spki->spkac->challenge;clear_output();output_length=ASN1_STRING_length(challenge);output=OPENSSL_malloc(output_length?output_length:1);
+  if(output){memcpy(output,ASN1_STRING_get0_data(challenge),output_length);ok=1;}
+ } else {
+  key=NETSCAPE_SPKI_get_pubkey(spki);
+  if(key && operation==1){bio=BIO_new(BIO_s_mem());ok=bio && PEM_write_bio_PUBKEY(bio,key) && save_bio(bio);}
+  // Workers' FIPS backend rejects MD5 signatures. This is an API behavior
+  // restriction, not a claim that the bundled OpenSSL build is FIPS certified.
+  else if(key && OBJ_obj2nid(spki->sig_algor.algorithm)!=NID_md5WithRSAEncryption)ok=NETSCAPE_SPKI_verify(spki,key)==1;
+ }
+ BIO_free(bio);EVP_PKEY_free(key);NETSCAPE_SPKI_free(spki);return ok;
+}

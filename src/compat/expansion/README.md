@@ -12,7 +12,7 @@ util/types predicates, crypto random integers/UUIDs/Web Crypto exports,
 hash/HKDF/scrypt, the four Workers ECDH curves, crypto engine/secure-heap stubs,
 writable memory-backed /tmp, module metadata, HTTP internal
 helpers, adapter-owned secret and asymmetric KeyObjects, prime generation and
-checking, incremental signatures, Brotli/Zstd codecs and CRC32.
+checking, incremental signatures, Certificate SPKAC operations, Brotli/Zstd codecs and CRC32.
 Additional profiles cover process resource/permission/report stubs, its pinned
 wall-clock hrtime behavior, and TLS hostname/ALPN/options contracts. Native runs
 also test real TLS exchange and hostname mismatch rejection.
@@ -38,8 +38,11 @@ HMAC, HKDF and symmetric ciphers. KeyObject.from can retain a host CryptoKey, bu
 synchronous extraction of its opaque key material is unavailable. RSA, EC, Ed25519 and X25519 key generation and PEM/DER/JWK conversion use
 bundled OpenSSL 3.5.9 WebAssembly; RSA/EC streaming and one-shot signatures
 are compared with Workers and independent test signatures. This covers selected
-algorithms and operations, not the whole crypto module. X509/Certificate,
+algorithms and operations, not the whole crypto module. X509Certificate,
 additional key-generation options and remaining error contracts still need work.
+Certificate SPKAC operations preserve the pinned Workers rejection of MD5
+signatures while verifying SHA-256 signatures and extracting public keys and
+challenges. Invalid SPKAC data returns false or empty buffers, as in Workers.
 The pinned revisions and hashes are in crypto/native-crypto.build.json; rebuild
 with scripts/build-native-crypto.mjs and the pinned Emscripten SDK. Entropy comes
 from the host crypto.getRandomValues; there is no noncryptographic fallback.

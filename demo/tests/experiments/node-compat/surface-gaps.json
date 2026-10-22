@@ -1,13 +1,7 @@
 {
   "common": {
     "crypto": {
-      "missing": [
-        "Certificate",
-        "X509Certificate",
-        "fips",
-        "getCipherInfo",
-        "getFips"
-      ],
+      "missing": ["X509Certificate", "fips", "getCipherInfo", "getFips"],
       "extra": ["createCredentials", "listCiphers", "prng", "rng"]
     },
     "fs": {

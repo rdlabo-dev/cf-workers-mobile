@@ -1,4 +1,71 @@
 export const eventCases = {
+  certificates: function ({ crypto: c }) {
+    const signatures = [
+      "MIIBVDCBvjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAzEBFZlRokWwqjZlV3uIZCb4XHlCRHi11xrIKzd3+zjmeqJdb3UMkZCQH52zU7DO+mfYwD1+pB9QHh0NsLlkUqkc+Ko5k2KHs0EuWL4NoOMf++wiRD39b2XpEyBdI7NYlsfZHhrXihsyVZsNrfXlWv6+gqGvFjh4nXEzZ2+kxfvECAwEAARYacG9ydGFibGUtd29ya2Vycy1jaGFsbGVuZ2UwDQYJKoZIhvcNAQEEBQADgYEAdBV72QBrvJdRpeG7kVjGpPlW8BRVVBO7arGOQjYs6q7W03dkMPj4uzVyGYZLj59eScSYGA7PnyiOGwy5loRIMVPciLK3YKz74auiRz+XUHFJysOK28Y6QPuRr48CRFu8H7e081ZOHkeyhcwRhd7wjEI4ngHoJ3dhqMy0syA5Vi0=",
+      "MIIBVDCBvjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAzEBFZlRokWwqjZlV3uIZCb4XHlCRHi11xrIKzd3+zjmeqJdb3UMkZCQH52zU7DO+mfYwD1+pB9QHh0NsLlkUqkc+Ko5k2KHs0EuWL4NoOMf++wiRD39b2XpEyBdI7NYlsfZHhrXihsyVZsNrfXlWv6+gqGvFjh4nXEzZ2+kxfvECAwEAARYacG9ydGFibGUtd29ya2Vycy1jaGFsbGVuZ2UwDQYJKoZIhvcNAQELBQADgYEAyzRKqH1NI8+WT1sXzMIDzxnPl+GiD9aEsGjRPMZek+NYOxb63DpXBaZ4PcAc7no1nymhoysWxibrj/gJjG2hOUTRkzNamyF4vdRij5FsAtyWMUaV0uDZFkuasiL3R/Q/oh5XEP+uWqlysfeGG+z/JKoWU5nL/Ac2kT4evqx5pMU=",
+    ];
+    const api = c.Certificate;
+    const instance = new api(),
+      called = api();
+    const describe = (value) => ({
+      verified: api.verifySpkac(value),
+      publicKey: api.exportPublicKey(value).toString("utf8"),
+      challenge: api.exportChallenge(value).toString("hex"),
+    });
+    const cases = signatures.flatMap((value) => {
+      const data = new TextEncoder().encode(value),
+        padded = new Uint8Array(data.length + 4);
+      padded.set(data, 2);
+      const view = new DataView(padded.buffer, 2, data.length);
+      const damaged = value.slice(0, -8) + "AAAAAAAA";
+      return [
+        describe(value),
+        describe(data.buffer),
+        describe(view),
+        describe(value + " \n\r\t"),
+        describe(damaged),
+        {
+          hex: api
+            .exportChallenge(
+              Array.from(data, (b) => b.toString(16).padStart(2, "0")).join(""),
+              "hex",
+            )
+            .toString("hex"),
+          legacy: instance
+            .exportPublicKey(data)
+            .equals(api.exportPublicKey(data)),
+          called: called
+            .exportChallenge(data)
+            .equals(api.exportChallenge(data)),
+          bufferEncoding: api.exportChallenge(value, "buffer").toString("hex"),
+        },
+      ];
+    });
+    const invalid = ["", " \n\t", "not-base64", "SPKAC=" + signatures[0]].map(
+      describe,
+    );
+    const errors = [];
+    for (const name of ["verifySpkac", "exportPublicKey", "exportChallenge"])
+      for (const value of [undefined, null, 42, {}]) {
+        try {
+          api[name](value);
+          errors.push(null);
+        } catch (e) {
+          errors.push({ name: e.name, code: e.code, message: e.message });
+        }
+      }
+    return {
+      cases,
+      invalid,
+      errors,
+      instance: instance instanceof api,
+      called: called instanceof api,
+      methods: ["verifySpkac", "exportPublicKey", "exportChallenge"].map(
+        (n) => instance[n] === api[n],
+      ),
+    };
+  },
+
   primeNumbers: async function ({ crypto }) {
     const capture = (fn) => {
       try {

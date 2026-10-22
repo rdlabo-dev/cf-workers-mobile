@@ -1,3 +1,5 @@
+import { Certificate } from "./certificate.js";
+export { Certificate };
 import { ECDH, createECDH } from "./ecdh.js";
 export { ECDH, createECDH };
 import * as signatures from "./signatures.js";
@@ -102,6 +104,7 @@ export function hash(
   return outputEncoding === "buffer" ? result : result.toString(outputEncoding);
 }
 export default {
+  Certificate,
   ...original,
   ...metadata,
   ...asymmetric,

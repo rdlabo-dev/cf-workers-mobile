@@ -23,7 +23,7 @@ const assessments = [
     modules: ["crypto", "zlib"],
     priority: 2,
     category: "implementation-gap",
-    next: "Inventory algorithms, key/codec classes, synchronous and streaming behavior. Evaluate JS/Wasm implementations against all pinned operations; random/hash/HKDF/scrypt, owned secret/asymmetric keys, RSA/EC/Ed25519 signatures, prime generation/checking and Brotli/Zstd profiles now supplement dependency polyfills. X509/Certificate, additional key-generation options, remaining algorithms and complete codec contracts remain open. No technical-impossibility claim has been established.",
+    next: "Inventory algorithms, key/codec classes, synchronous and streaming behavior. Evaluate JS/Wasm implementations against all pinned operations; random/hash/HKDF/scrypt, owned secret/asymmetric keys, RSA/EC/Ed25519 signatures, prime generation/checking and Brotli/Zstd profiles now supplement dependency polyfills. X509Certificate, additional key-generation options, remaining algorithms and complete codec contracts remain open. No technical-impossibility claim has been established.",
     evidence: [
       "surface-gaps.json",
       "expansion-contracts.probe.mjs",

@@ -483,3 +483,13 @@ function ecFormat(format: string) {
   if (format === "hybrid") throw new Error("Failed to get public key length");
   return format === "compressed" ? 2 : 4;
 }
+
+export function nativeSpkac(
+  data: Uint8Array,
+  operation: number,
+): boolean | Uint8Array {
+  return inputs([data], (api, [p]) => {
+    const ok = api.wk_spkac(p, data.byteLength, operation);
+    return operation === 0 ? !!ok : ok ? result(api) : new Uint8Array();
+  });
+}

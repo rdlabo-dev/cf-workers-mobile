@@ -34,6 +34,6 @@
     "--no-entry",
     "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\"]"
   ],
-  "bindingSha256": "bc0d4d182a4bf3d67cce1517d779ebb46b67f49e418340b62cd9cdd08f02c376",
-  "sha256": "b0c0ed73e8d1b50e7092e48e13088e34b46742571b3488f4b99f71d109e62f20"
+  "bindingSha256": "bf5443ca18c7267973bffae11974fd1e457e88c1b224048beb606ab32121d285",
+  "sha256": "65203395b64d6985b192e32e5c4e249ae53633b34eb9430297b549b0e0584c74"
 }
