@@ -9,7 +9,7 @@ Dedicated Web Worker runs on the device, not on Cloudflare.
 For an existing frontend calling Worker APIs, configure the Worker in the [Capacitor build](build-setup.md) and omit `render`. Initialize before mounting the UI:
 
 ```ts
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://api.example.com/api/",
@@ -126,7 +126,7 @@ The isolated transport streams uploads and responses as pull-driven MessagePort 
 The original Worker handler remains the Cloudflare entry. Install the Vite/esbuild
 plugin only in the Capacitor/browser build: its aliases select the local API
 implementations; the Cloudflare build retains native `node:*` and `cloudflare:*`.
-`getExecutionEnvironment()` (also available from `cf-workers-mobile/environment`)
+`getExecutionEnvironment()` (also available from `cf-workers-native/environment`)
 distinguishes Cloudflare Workers, native Capacitor hosts, browser workers, browsers,
 and unknown realms. A browser Dedicated Worker is not Cloudflare Workers.
 Installing the Capacitor runtime in Cloudflare Workers fails before changing globals.

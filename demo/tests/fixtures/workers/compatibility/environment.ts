@@ -1,4 +1,4 @@
-import { getExecutionEnvironment } from "cf-workers-mobile/environment";
+import { getExecutionEnvironment } from "cf-workers-native/environment";
 import { AsyncLocalStorage } from "node:async_hooks";
 export default {
   async fetch() {

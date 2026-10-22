@@ -84,11 +84,16 @@ export interface VoidRoute {
   renderMode?: "server" | "client";
 }
 
+/** Vite 8.3.5 emits plain module comments instead of region comments. */
+export function voidRoutingStart(source: string) {
+  return source.search(/^\/\/(?:#region)? virtual:void-routes\r?$/m);
+}
+
 /** Read only the pinned generator's literal registrations, never application source. */
 export function readVoidPlan(source: string) {
-  const start = source.indexOf("//#region virtual:void-routes\n");
-  const end = source.indexOf("//#region .void/entry.ts\n", start);
-  if (start < 0 || end < 0)
+  const start = voidRoutingStart(source);
+  const end = source.search(/^\/\/(?:#region)? \.void\/entry\.ts\r?$/m);
+  if (start < 0 || end <= start)
     throw new Error("Unknown Void generated routing entry");
   const program = parseAst(source);
   const declarations = new Map<string, Node>();

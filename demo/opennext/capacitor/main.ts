@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 const origin = import.meta.env.VITE_WORKER_ORIGIN;
 if (!origin)
   throw new Error(

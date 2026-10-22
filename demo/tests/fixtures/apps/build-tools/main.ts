@@ -1,7 +1,7 @@
 import {
   workersCapacitor,
   type ExecutionPreference,
-} from "cf-workers-mobile/capacitor";
+} from "cf-workers-native/capacitor";
 import { runContract } from "../../../validation/contracts/http";
 // Bare, node:-prefixed, subpath, named and default import forms must all
 // resolve to the same compat profiles under both bundlers.

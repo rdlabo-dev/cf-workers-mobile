@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import {
   assertContract,
   runContract,
-} from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts/testing";
 import {
   localStructuredCloneApi,
   StructuredCloneImplementation,

@@ -18,7 +18,7 @@ In the separate Capacitor Vite 7 configuration, use those generated files. Keep 
 
 ```ts
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/vite";
 
 export default defineConfig({
   publicDir: "../dist/client",
@@ -38,7 +38,7 @@ These paths assume the Capacitor build root is an application subdirectory such 
 The Capacitor entry uses the ordinary public API:
 
 ```ts
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 const runtime = workersCapacitor({
   baseURL: "https://worker.invalid/",

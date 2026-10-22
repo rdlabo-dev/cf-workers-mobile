@@ -7,6 +7,7 @@ android {
     packaging.resources { excludes += 'META-INF/INDEX.LIST'; merges += 'META-INF/io.netty.versions.properties' }
 }
 dependencies {
-    implementation 'jp.rdlabo:workers-native-android:0.1.2'
+    def sdkVersion = new groovy.json.JsonSlurper().parse(rootProject.file('../../../../package.json')).version
+    implementation "io.github.rdlabo:cf-workers-native-android:${sdkVersion}"
     implementation 'androidx.activity:activity:1.10.1'
 }

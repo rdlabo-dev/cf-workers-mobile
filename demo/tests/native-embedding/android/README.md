@@ -10,6 +10,11 @@ node run.mjs emulator-5554
 
 The runner uses the repository's Gradle wrapper to publish the SDK into `build/maven`, then builds the consumer without including the SDK source project. Dependencies resolve from the published AAR, POM/Gradle metadata, and Maven Central. Set `JAVA_HOME` to Java 21 and configure `ANDROID_HOME` (or `local.properties`) for your SDK installation.
 
+After a release reaches Maven Central, run `node run.mjs emulator-5554 --central`
+to verify the released coordinate using the same acceptance checks. This skips
+local SDK publication and removes the local Maven repository from dependency
+resolution; only Google and Maven Central are used.
+
 It keeps the first healthy Worker screen open beyond the native startup deadline, then asserts Worker navigation, POST, rotation, back/reopen, Activity recreation, automatic recovery after startup failure or a missing JavaScript entry, and recovery after renderer loss. The missing-entry scenario waits for the native startup deadline before returning. The native screen's visit counter must survive every round trip. Logs and failure snapshots are saved under `build/acceptance/`. The fixture restores emulator rotation settings after the run.
 
 The host remains a ComponentActivity and calls only `WorkersNative.open`. No Capacitor configuration, CLI sync, plugin registration or host superclass changes are needed.

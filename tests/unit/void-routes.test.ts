@@ -40,24 +40,31 @@ describe("generated Void route boundaries", () => {
     ])
       expect(usesServerProcess(code)).toBe(true);
   });
-  it("reads generated GET registrations and extracts only the selected renderer graph", () => {
-    const plan = readVoidPlan(entry);
-    expect(plan.routes).toEqual([
-      { path: "/api/hello", method: "GET", module: "./assets/api.js" },
-      {
-        path: "/about",
-        method: "GET",
-        module: undefined,
-        component: "about",
-        renderMode: "server",
-      },
-      { path: "/about", method: "POST/PUT/PATCH/DELETE" },
-    ]);
-    expect(plan.renderer(["about"])).toContain("./assets/about.js");
-    expect(plan.renderer(["about"])).not.toContain("private.js");
-    expect(plan.renderer(["about"])).not.toContain("/__void/");
-    expect(plan.renderer(["about"])).not.toContain("createPageMutationHandler");
-  });
+  it.each(["region", "plain"])(
+    "reads %s module boundaries and extracts only the selected renderer graph",
+    (format) => {
+      const source =
+        format === "plain" ? entry.replaceAll("//#region ", "// ") : entry;
+      const plan = readVoidPlan(source);
+      expect(plan.routes).toEqual([
+        { path: "/api/hello", method: "GET", module: "./assets/api.js" },
+        {
+          path: "/about",
+          method: "GET",
+          module: undefined,
+          component: "about",
+          renderMode: "server",
+        },
+        { path: "/about", method: "POST/PUT/PATCH/DELETE" },
+      ]);
+      expect(plan.renderer(["about"])).toContain("./assets/about.js");
+      expect(plan.renderer(["about"])).not.toContain("private.js");
+      expect(plan.renderer(["about"])).not.toContain("/__void/");
+      expect(plan.renderer(["about"])).not.toContain(
+        "createPageMutationHandler",
+      );
+    },
+  );
   it("rejects application middleware and unknown output", () => {
     expect(() =>
       readVoidPlan(

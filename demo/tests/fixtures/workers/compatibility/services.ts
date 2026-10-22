@@ -1,7 +1,7 @@
 import kvWorker from "./kv";
-import { runContract } from "cf-workers-mobile/shared/contracts/testing";
-import { kvContract } from "cf-workers-mobile/cloudflare/bindings/kv/testing";
-import type { KVNamespace } from "cf-workers-mobile/cloudflare/bindings/kv";
+import { runContract } from "cf-workers-native/shared/contracts/testing";
+import { kvContract } from "cf-workers-native/cloudflare/bindings/kv/testing";
+import type { KVNamespace } from "cf-workers-native/cloudflare/bindings/kv";
 import { wasmContract } from "../../../validation/contracts/wasm";
 import {
   WorkersText,

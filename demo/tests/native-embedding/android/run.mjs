@@ -6,6 +6,7 @@ import path from "node:path";
 
 const here = fileURLToPath(new URL("./", import.meta.url));
 const device = process.argv[2];
+const centralOnly = process.argv.includes("--central");
 if (!device) throw new Error("Usage: node run.mjs <emulator-serial>");
 if (!device.startsWith("emulator-"))
   throw new Error("This fixture requires an emulator");
@@ -26,15 +27,22 @@ const adb = (...args) =>
   run("adb", ["-s", device, ...args], { timeout: 60_000 });
 for (const scenario of ["normal", "startup-failure", "broken-entry"])
   run(process.execPath, ["../build-web.mjs", "android", scenario]);
+if (!centralOnly)
+  run(gradle, [
+    "-p",
+    here,
+    "-PincludeSdk",
+    ":workers:publishReleasePublicationToProbeRepository",
+    "--console=plain",
+  ]);
+// No SDK project in this invocation: resolve the AAR and its metadata.
 run(gradle, [
   "-p",
   here,
-  "-PincludeSdk",
-  ":workers:publishReleasePublicationToProbeRepository",
+  ...(centralOnly ? ["-PcentralOnly", "--refresh-dependencies"] : []),
+  ":app:assembleDebug",
   "--console=plain",
 ]);
-// No SDK project in this invocation: resolve the AAR and its metadata.
-run(gradle, ["-p", here, ":app:assembleDebug", "--console=plain"]);
 adb("install", "-r", "app/build/outputs/apk/debug/app-debug.apk");
 adb("shell", "am", "force-stop", "probe.workersembed");
 adb("logcat", "-c");

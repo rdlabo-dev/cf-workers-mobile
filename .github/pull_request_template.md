@@ -10,7 +10,7 @@ Record commands, results and relevant native evidence.
 
 For a new or expanded compatibility implementation, name the complete module/API
 unit and pinned Workers baseline. Keep the PR in draft until the
-[acceptance gate](https://github.com/rdlabo-dev/cf-workers-mobile/blob/main/CONTRIBUTING.md#acceptance-gate) is met.
+[acceptance gate](https://github.com/rdlabo-dev/cf-workers-native/blob/main/CONTRIBUTING.md#acceptance-gate) is met.
 For documentation-only or unrelated changes, mark this section not applicable.
 
 - [ ] Export/API inventory has no unresolved coverage decisions.

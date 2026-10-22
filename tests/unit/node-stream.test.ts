@@ -4,7 +4,7 @@ import {
   streamContract,
   StreamImplementation,
 } from "../../src/compat/stream/index.spec.js";
-import { runContract } from "cf-workers-mobile/shared/contracts/testing";
+import { runContract } from "cf-workers-native/shared/contracts/testing";
 it("runs the pinned Workers stream contract", async () => {
   const report = await runContract(
     new StreamImplementation(

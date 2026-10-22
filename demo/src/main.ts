@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 // The Worker entry is configured in vite.config.ts.
 const runtime = workersCapacitor({

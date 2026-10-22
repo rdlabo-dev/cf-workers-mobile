@@ -1,8 +1,8 @@
 import { afterAll, expect, it } from "vitest";
 import { build as viteBuild } from "vite";
 import { build as esbuildBuild } from "esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "cf-workers-mobile/tooling/vite";
-import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-mobile/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "cf-workers-native/tooling/vite";
+import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-native/tooling/esbuild";
 import { cp, mkdtemp, readFile, rm, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";

@@ -13,8 +13,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { build as esbuild } from "esbuild";
 import { build as vite, createServer } from "vite";
-import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-mobile/tooling/esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin as esbuildPlugin } from "cf-workers-native/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "cf-workers-native/tooling/vite";
 
 async function fixture() {
   const root = await mkdtemp(resolve(tmpdir(), "cloudflare-isolation-"));
@@ -35,7 +35,7 @@ async function fixture() {
   );
   await writeFile(
     resolve(root, "main.js"),
-    `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("cf-workers-mobile/capacitor")))};globalThis.runtime=workersCapacitor({baseURL:'https://worker.example'});`,
+    `import {workersCapacitor} from ${JSON.stringify(fileURLToPath(import.meta.resolve("cf-workers-native/capacitor")))};globalThis.runtime=workersCapacitor({baseURL:'https://worker.example'});`,
   );
   await writeFile(
     resolve(root, "cloudflare/keep.txt"),

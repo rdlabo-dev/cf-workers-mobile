@@ -10,7 +10,7 @@ Bring the app you built with Workers or Void to people who use the web and peopl
 | **Android**   | [Embed in an existing app](native-embedding.md#android) | Build the Android SDK artifact locally and open its dedicated screen from an Activity. Requires WebView `MULTI_PROFILE`. |
 | **Capacitor** | [Build a mobile app](integration.md)                    | Use a Capacitor app shell and general native plugins, starting from your existing Worker.                                |
 
-The [shared web build](native-embedding.md#shared-web-build) connects the iOS and Android hosts to your Worker. The Capacitor guide includes its own build steps. All three use `cf-workers-mobile@0.1.2`, with a separate mobile build that preserves the Cloudflare deployment inputs.
+The [shared web build](native-embedding.md#shared-web-build) connects the iOS and Android hosts to your Worker. The Capacitor guide includes its own build steps. All three use `cf-workers-native@0.1.2`, with a separate mobile build that preserves the Cloudflare deployment inputs.
 
 ## Connect your framework
 

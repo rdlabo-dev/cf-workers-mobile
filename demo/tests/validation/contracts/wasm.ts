@@ -1,5 +1,5 @@
-import { defineFeature } from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+import { defineFeature } from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected))
     throw new Error(`${JSON.stringify(actual)} != ${JSON.stringify(expected)}`);

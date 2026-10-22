@@ -33,8 +33,8 @@ On iOS the bridge uses `WKURLSchemeHandler`; on Android it uses a Service Worker
 ## Prompt to give your AI assistant
 
 ```text
-Follow https://github.com/rdlabo-dev/cf-workers-mobile/blob/main/docs/integration.md
-to bring this app to iOS and Android with cf-workers-mobile.
+Follow https://github.com/rdlabo-dev/cf-workers-native/blob/main/docs/integration.md
+to bring this app to iOS and Android with cf-workers-native.
 Preserve its pages, routes and authentication; verify it on the target platforms.
 ```
 
@@ -83,10 +83,10 @@ npx cap init
 
 For the Vite example below, install `vite@7` as a dev dependency if it is not already present. Keep an existing supported esbuild setup instead of adding Vite.
 
-Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. For 0.1.2 Preview, install the npm package from npm:
+Set the application's own ID/name and `webDir: "www"`. Use Swift Package Manager for iOS; this library does not include CocoaPods integration. The renamed package is pending publication; use the source tarball below until then. After publication, install 0.1.2 Preview from npm:
 
 ```sh
-npm install cf-workers-mobile@0.1.2
+npm install cf-workers-native@0.1.2
 ```
 
 For a source build instead, create a package tarball from a checkout of this repository:
@@ -97,12 +97,12 @@ npm install
 npm pack
 
 # In the application package:
-npm install /path/to/cf-workers-mobile/cf-workers-mobile-0.1.2.tgz
+npm install /path/to/cf-workers-native/cf-workers-native-0.1.2.tgz
 ```
 
 `npm pack` runs the SDK build through `prepack`. Install the generated tarball rather than the checkout directory: directory installs can create a symlink back to the SDK tree, including a recursive path when the app lives inside that checkout. The tarball filename above uses the current source version.
 
-The installed package is named `cf-workers-mobile`; the checkout directory can retain the repository name. The earlier published `workers-capacitor@0.1.1` Preview uses the old package name and does not provide the imports shown here. Keep JavaScript and native dependencies on the same source revision.
+The installed package is named `cf-workers-native`; the checkout directory can retain the repository name. The earlier published `workers-capacitor@0.1.1` Preview uses the old package name and does not provide the imports shown here. Keep JavaScript and native dependencies on the same source revision.
 
 ### Migrating from the old npm package
 
@@ -110,10 +110,10 @@ If your application already depends on `workers-capacitor`, remove it before ins
 
 ```sh
 npm uninstall workers-capacitor
-npm install cf-workers-mobile@0.1.2
+npm install cf-workers-native@0.1.2
 ```
 
-Change runtime imports from `workers-capacitor` to `cf-workers-mobile/capacitor`, and change other package subpaths to the `cf-workers-mobile` prefix. Rebuild the application's mobile web assets with its existing build command, then run `npx cap sync` to regenerate native plugin dependencies. New applications use the installation steps above directly.
+Change runtime imports from `workers-capacitor` to `cf-workers-native/capacitor`, and change other package subpaths to the `cf-workers-native` prefix. Rebuild the application's mobile web assets with its existing build command, then run `npx cap sync` to regenerate native plugin dependencies. New applications use the installation steps above directly.
 
 Before building a native target, check the [native SDK requirements and Android Gradle resource rules](development.md#capacitor-native-demo). The Android resource rules belong in the application's `android/app/build.gradle`.
 
@@ -149,7 +149,7 @@ capacitor.config.ts      webDir: "www"
 // capacitor/vite.config.ts
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/vite";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   root: here("."),
@@ -170,7 +170,7 @@ Adjust paths to the actual application. For OpenNext the entry is the generated 
 
 ```ts
 // capacitor/main.ts — local document setup
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 const runtime = workersCapacitor({
   baseURL: "https://your-worker.example.com/",
   render: "/",

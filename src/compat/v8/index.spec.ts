@@ -2,8 +2,8 @@ import v8, * as namespace from "node:v8";
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 import type local from "./index.js";
 type Api = typeof local;
 const groups = [

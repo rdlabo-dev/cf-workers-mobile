@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 
 const prefer =
   new URL(location.href).searchParams.get("prefer") === "direct"

@@ -53,7 +53,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "cf-workers-mobile": `file:./${packed.filename}`,
+        "cf-workers-native": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -116,7 +116,7 @@ await writeFile(
 );
 await writeFile(
   join(consumer, "vite.config.js"),
-  `import {workersCapacitorPlugin} from "cf-workers-mobile/tooling/vite";export default {plugins:[workersCapacitorPlugin(${JSON.stringify({ worker: "worker.js", execution: [{ method: "*", path: "*" }], ...(cloudflare ? { assetsExecution: "remote" } : {}), ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
+  `import {workersCapacitorPlugin} from "cf-workers-native/tooling/vite";export default {plugins:[workersCapacitorPlugin(${JSON.stringify({ worker: "worker.js", execution: [{ method: "*", path: "*" }], ...(cloudflare ? { assetsExecution: "remote" } : {}), ...(services ? { kvExecution: { CLOUD_KV: "local", SHARED_KV: "remote" } } : {}) })})],build:{target:"es2022",sourcemap:true}};`,
 );
 await writeFile(
   join(consumer, "capacitor.config.json"),

@@ -1,7 +1,7 @@
 import * as nodeHttp from "node:http";
 import * as localHttp from "../../../../../src/compat/http";
 import { nodeHttpNetworkContract } from "../../../../../src/compat/http/index.spec";
-import { runContract } from "cf-workers-mobile/shared/contracts/testing";
+import { runContract } from "cf-workers-native/shared/contracts/testing";
 import {
   FetchPolicyImplementation,
   fetchPolicyContract,

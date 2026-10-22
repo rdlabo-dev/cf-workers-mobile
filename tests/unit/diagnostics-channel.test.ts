@@ -7,7 +7,7 @@ import {
 import {
   assertContract,
   runContract,
-} from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts/testing";
 it("matches the Workers diagnostics contract", async () => {
   const report = await runContract(
     new DiagnosticsImplementation(api),

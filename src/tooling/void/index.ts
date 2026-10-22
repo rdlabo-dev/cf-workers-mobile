@@ -8,7 +8,12 @@ import {
   type ServerCompilation,
 } from "../server.js";
 import { permitsPath } from "../route-permissions.js";
-import { readVoidPlan, voidSelector, usesServerProcess } from "./plan.js";
+import {
+  readVoidPlan,
+  voidSelector,
+  usesServerProcess,
+  voidRoutingStart,
+} from "./plan.js";
 
 /** Generated Void Pages builds only. Unknown generators keep the Worker boundary. */
 export async function compileVoid(
@@ -19,7 +24,7 @@ export async function compileVoid(
   if (basename(entry) !== "index.js" || basename(dirname(entry)) !== "ssr")
     return;
   const source = await readFile(entry, "utf8");
-  if (!source.includes("//#region virtual:void-routes\n")) return;
+  if (voidRoutingStart(source) < 0) return;
   const remote = await compileServerWorker(entry, bindings, {
     execution: "network",
   });

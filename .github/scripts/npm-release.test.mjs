@@ -20,17 +20,17 @@ function fixture() {
       },
     ],
     runs: [{ run_number: 2, status: "completed", conclusion: "success" }],
-    pkg: { name: "cf-workers-mobile", version: "0.1.1" },
+    pkg: { name: "cf-workers-native", version: "0.1.1" },
   };
   const context = {
-    repo: { owner: "rdlabo-dev", repo: "cf-workers-mobile" },
+    repo: { owner: "rdlabo-dev", repo: "cf-workers-native" },
     eventName: "workflow_run",
     payload: {
       workflow_run: {
         event: "push",
         head_branch: "main",
         head_sha: sha,
-        head_repository: { full_name: "rdlabo-dev/cf-workers-mobile" },
+        head_repository: { full_name: "rdlabo-dev/cf-workers-native" },
         path: ".github/workflows/ci.yml",
         conclusion: "success",
       },

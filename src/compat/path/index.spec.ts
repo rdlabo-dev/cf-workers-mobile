@@ -2,8 +2,8 @@ import path from "node:path";
 import {
   defineFeature,
   FeatureImplementation,
-} from "cf-workers-mobile/shared/contracts";
-import type { ContractSuite } from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts";
+import type { ContractSuite } from "cf-workers-native/shared/contracts/testing";
 
 /** node:path module contract, matching the Workers baseline. */
 export interface NodePathApi {

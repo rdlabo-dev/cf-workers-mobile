@@ -4,7 +4,7 @@ import { createTestHarness } from "wrangler";
 import {
   assertContract,
   type ContractResult,
-} from "cf-workers-mobile/shared/contracts/testing";
+} from "cf-workers-native/shared/contracts/testing";
 const harness = createTestHarness({
   workers: [
     {

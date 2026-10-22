@@ -50,7 +50,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "cf-workers-mobile": `file:./${packed.filename}`,
+        "cf-workers-native": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -143,8 +143,8 @@ await writeFile(
 );
 run("npm", ["install"], consumer);
 assert.equal(
-  await realpath(join(consumer, "node_modules/cf-workers-mobile")),
-  join(consumer, "node_modules/cf-workers-mobile"),
+  await realpath(join(consumer, "node_modules/cf-workers-native")),
+  join(consumer, "node_modules/cf-workers-native"),
   "Must install tarball, not link repo",
 );
 // Bundle the installed package entry as a classic script so the Android
@@ -152,7 +152,7 @@ assert.equal(
 // document, the same checks as the historical CDP --lifecycle probe.
 const { build } = await import("esbuild");
 const lifecycle = await build({
-  entryPoints: [join(consumer, "node_modules/cf-workers-mobile/dist/index.js")],
+  entryPoints: [join(consumer, "node_modules/cf-workers-native/dist/index.js")],
   bundle: true,
   format: "iife",
   globalName: "DocumentLifecycleTest",

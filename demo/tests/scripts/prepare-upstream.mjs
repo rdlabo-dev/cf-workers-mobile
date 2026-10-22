@@ -117,7 +117,7 @@ await writeFile(
       type: "module",
       scripts: { build: "vite build" },
       dependencies: {
-        "cf-workers-mobile": `file:./${packed.filename}`,
+        "cf-workers-native": `file:./${packed.filename}`,
         "@capacitor/core": "8.5.3",
         "@capacitor/android": "8.5.3",
         "@capacitor/ios": "8.5.3",
@@ -149,8 +149,8 @@ assert.ok(
 );
 run("npm", ["install"], consumer);
 assert.equal(
-  await realpath(join(consumer, "node_modules/cf-workers-mobile")),
-  join(consumer, "node_modules/cf-workers-mobile"),
+  await realpath(join(consumer, "node_modules/cf-workers-native")),
+  join(consumer, "node_modules/cf-workers-native"),
   "Must install tarball, not link repo",
 );
 run("npm", ["run", "build"], consumer);

@@ -1,4 +1,4 @@
-import { workersCapacitor } from "cf-workers-mobile/capacitor";
+import { workersCapacitor } from "cf-workers-native/capacitor";
 import worker from "./static-node-worker";
 
 async function run() {

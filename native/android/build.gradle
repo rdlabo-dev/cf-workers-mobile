@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 
-group = 'jp.rdlabo'
+group = 'io.github.rdlabo'
 version = '0.1.2'
 
 
@@ -37,11 +37,11 @@ afterEvaluate {
         publications {
             release(MavenPublication) {
                 from components.release
-                artifactId = 'workers-native-android'
+                artifactId = 'cf-workers-native-android'
                 pom {
-                    name = 'Workers Native Android'
+                    name = 'CF Workers Native Android'
                     description = 'Embed Cloudflare Workers applications in existing Android apps'
-                    url = 'https://github.com/rdlabo-dev/cf-workers-mobile'
+                    url = 'https://github.com/rdlabo-dev/cf-workers-native'
                     licenses {
                         license {
                             name = 'MIT License'
@@ -57,9 +57,9 @@ afterEvaluate {
                         }
                     }
                     scm {
-                        connection = 'scm:git:https://github.com/rdlabo-dev/cf-workers-mobile.git'
-                        developerConnection = 'scm:git:ssh://git@github.com/rdlabo-dev/cf-workers-mobile.git'
-                        url = 'https://github.com/rdlabo-dev/cf-workers-mobile'
+                        connection = 'scm:git:https://github.com/rdlabo-dev/cf-workers-native.git'
+                        developerConnection = 'scm:git:ssh://git@github.com/rdlabo-dev/cf-workers-native.git'
+                        url = 'https://github.com/rdlabo-dev/cf-workers-native'
                     }
                 }
             }

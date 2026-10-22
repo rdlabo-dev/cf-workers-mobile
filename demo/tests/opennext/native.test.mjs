@@ -112,7 +112,7 @@ test(
           configPath,
           originalConfig.replace(
             'webDir: "www",',
-            'webDir: "www", includePlugins: ["cf-workers-mobile", "@workers-capacitor-test/bridge-probe"],',
+            'webDir: "www", includePlugins: ["cf-workers-native", "@workers-capacitor-test/bridge-probe"],',
           ),
         );
       }

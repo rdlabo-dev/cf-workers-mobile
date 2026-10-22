@@ -3,8 +3,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build as viteBuild } from "vite";
 import { build as esbuild } from "esbuild";
-import { workersCapacitorPlugin } from "cf-workers-mobile/tooling/esbuild";
-import { workersCapacitorPlugin as vitePlugin } from "cf-workers-mobile/tooling/vite";
+import { workersCapacitorPlugin } from "cf-workers-native/tooling/esbuild";
+import { workersCapacitorPlugin as vitePlugin } from "cf-workers-native/tooling/vite";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 // Dedicated Worker contract via the configured-worker route: the node
 // contract worker is the configured entry of these builds.
@@ -100,6 +100,6 @@ await cp(resolve(root, "tests/fixtures/apps/build-tools/raw"), raw, {
 });
 // Copy the ESM distribution verbatim: these files are never bundled.
 const dist = dirname(
-  fileURLToPath(import.meta.resolve("cf-workers-mobile/capacitor")),
+  fileURLToPath(import.meta.resolve("cf-workers-native/capacitor")),
 );
 await cp(dist, resolve(raw, "lib"), { recursive: true });

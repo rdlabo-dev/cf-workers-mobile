@@ -2,10 +2,10 @@
 import PackageDescription
 
 let package = Package(
-    name: "CfWorkersMobile",
+    name: "CfWorkersNative",
     platforms: [.iOS(.v15)],
     products: [
-        .library(name: "CfWorkersMobile", targets: ["WorkersCapacitor"]),
+        .library(name: "CfWorkersNative", targets: ["WorkersCapacitor"]),
         .library(name: "WorkersIOS", targets: ["WorkersIOS"])
     ],
     dependencies: [
