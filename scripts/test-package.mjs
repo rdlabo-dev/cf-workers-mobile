@@ -104,6 +104,22 @@ for (const module of [
       throw new Error(`Missing upstream license notice in tarball: ${notice}`);
   }
 }
+for (const notice of [
+  "dist/compat/stream-web/LICENSE",
+  ...["openssl", "emscripten", "musl"].map(
+    (name) => `dist/compat/crypto/LICENSE.${name}`,
+  ),
+  "dist/compat/crypto/LICENSE-APACHE",
+  "dist/compat/crypto/LICENSE-3RD-PARTY.md",
+  ...["brotli", "zstd", "emscripten", "musl"].map(
+    (name) => `dist/compat/zlib/LICENSE.${name}`,
+  ),
+]) {
+  assert.ok(
+    pack.files.some((file) => file.path === notice),
+    `Missing bundled implementation license: ${notice}`,
+  );
+}
 for (const name of ["NOTICE.md", "LICENSE-APACHE"]) {
   const notice = `dist/compat/async-hooks/${name}`;
   if (!pack.files.some((file) => file.path === notice))

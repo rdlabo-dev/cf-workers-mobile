@@ -1,0 +1,38 @@
+declare module "cf-workers-native:process-base" {
+  const process: Record<string, any>;
+  export default process;
+  export const addListener: any;
+  export const arch: any;
+  export const argv: any;
+  export const binding: any;
+  export const browser: any;
+  export const chdir: any;
+  export const cwd: any;
+  export const dlopen: any;
+  export const emit: any;
+  export const emitWarning: any;
+  export const env: any;
+  export const execArgv: any;
+  export const execPath: any;
+  export const exit: any;
+  export const features: any;
+  export const kill: any;
+  export const listeners: any;
+  export const memoryUsage: any;
+  export const nextTick: any;
+  export const off: any;
+  export const on: any;
+  export const once: any;
+  export const pid: any;
+  export const platform: any;
+  export const prependListener: any;
+  export const prependOnceListener: any;
+  export const removeAllListeners: any;
+  export const removeListener: any;
+  export const title: any;
+  export const umask: any;
+  export const uptime: any;
+  export const uvCounters: any;
+  export const version: any;
+  export const versions: any;
+}

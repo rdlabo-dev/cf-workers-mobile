@@ -46,6 +46,8 @@ export default defineConfig({
       "src/browser/fetch/native-network.spec.ts",
       "src/browser/fetch/scope.spec.ts",
       "src/compat/net/sockets.spec.ts",
+      "src/compat/tls/upgrade.spec.ts",
+      "src/compat/fs/writable.spec.ts",
       "src/shared/http-wire/index.spec.ts",
     ],
   },

@@ -12,6 +12,14 @@ import { workersCapacitorPlugin } from "../../../../dist/tooling/esbuild.js";
 const baseline = JSON.parse(
   await readFile(new URL("exports.json", import.meta.url), "utf8"),
 );
+const baselineTypes = JSON.parse(
+  await readFile(new URL("export-types.json", import.meta.url), "utf8"),
+);
+assert.deepEqual(baselineTypes.profile, baseline.profile);
+assert.deepEqual(
+  Object.keys(baselineTypes.modules).sort(),
+  Object.keys(baseline.modules).sort(),
+);
 const root = fileURLToPath(new URL("../../../..", import.meta.url));
 const artifacts = new URL(
   "../../../artifacts/node-inventory/",
@@ -65,9 +73,15 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         // Each module gets a fresh realm: import-time side effects cannot make
         // a later module appear supported or mask its initialization failure.
         const page = await browser.newPage();
+        // Capacitor runs in a secure context; Web Crypto is unavailable on
+        // opaque about:blank origins in the browser harness.
+        await page.route("http://localhost/", (route) =>
+          route.fulfill({ contentType: "text/html", body: "<!doctype html>" }),
+        );
+        await page.goto("http://localhost/");
         try {
           modules[name] = await page.evaluate(
-            async ({ source, expected }) => {
+            async ({ source, expected, expectedTypes }) => {
               const url = URL.createObjectURL(
                 new Blob([source], { type: "text/javascript" }),
               );
@@ -76,6 +90,17 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
                 const names = Object.keys(surface).sort();
                 return {
                   surface,
+                  typeMismatches: Object.fromEntries(
+                    Object.entries(surface)
+                      .filter(
+                        ([key, value]) =>
+                          key in expectedTypes && value !== expectedTypes[key],
+                      )
+                      .map(([key, actual]) => [
+                        key,
+                        { expected: expectedTypes[key], actual },
+                      ]),
+                  ),
                   missing: expected.filter((name) => !names.includes(name)),
                   extra: names.filter((name) => !expected.includes(name)),
                 };
@@ -87,7 +112,11 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
                 URL.revokeObjectURL(url);
               }
             },
-            { source: compiled.source, expected: baseline.modules[name] },
+            {
+              source: compiled.source,
+              expected: baseline.modules[name],
+              expectedTypes: baselineTypes.modules[name],
+            },
           );
         } finally {
           await page.close();
@@ -110,7 +139,8 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
         result.buildError ||
         result.evaluationError ||
         result.missing?.length ||
-        result.extra?.length,
+        result.extra?.length ||
+        Object.keys(result.typeMismatches ?? {}).length,
     );
     for (const [name, result] of gaps) {
       assertNoSurfaceRegression(
@@ -124,7 +154,7 @@ for (const [engine, browserType] of Object.entries({ chromium, webkit })) {
     );
     for (const [name, result] of gaps)
       console.log(
-        `${name}: ${JSON.stringify(result.buildError ?? result.evaluationError ?? { missing: result.missing, extra: result.extra })}`,
+        `${name}: ${JSON.stringify(result.buildError ?? result.evaluationError ?? { missing: result.missing, extra: result.extra, typeMismatches: result.typeMismatches })}`,
       );
   });
 }

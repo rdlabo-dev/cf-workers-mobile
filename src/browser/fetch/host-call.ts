@@ -10,6 +10,7 @@ type Host = {
     host: string,
     port: number,
     tls: boolean,
+    servername: string,
   ): void;
   socketWrite(callback: string, id: string, chunk: string): void;
   socketEnd(callback: string, id: string): void;
@@ -76,6 +77,9 @@ export function getHostCall(): NativeCall | undefined {
               String(args.host),
               Number(args.port),
               args.tls === true,
+              typeof args.servername === "string"
+                ? args.servername
+                : String(args.host),
             );
             break;
           case "socketWrite":

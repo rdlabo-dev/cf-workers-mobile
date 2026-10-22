@@ -1,4 +1,5 @@
-import { platform } from "../../shared/globals/platform.js";
+import { readable } from "../../compat/stream-web/interop.js";
+import { nativeStreams, platform } from "../../shared/globals/platform.js";
 import { hasBody, inheritBodySource } from "../body/index.js";
 import {
   Body,
@@ -161,7 +162,12 @@ export class Request extends Body {
         "Request with a GET or HEAD method cannot have a body.",
       );
     // Transfer only after all initializer validation succeeds.
-    if (nativeSource?.body) body = new platform.Request(nativeSource).body;
+    if (nativeSource?.body)
+      body = readable(
+        nativeSource.body.pipeThrough(
+          new nativeStreams.TransformStream<Uint8Array, Uint8Array>(),
+        ),
+      );
     else if (original && init.body === undefined) body = moveBody(original);
     super(body, headers);
     if (original && init.body === undefined) inheritBodySource(this, original);

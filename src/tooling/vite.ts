@@ -20,6 +20,7 @@ import {
   configuredPath,
   compatibilityAliases,
   compatibilityDependencies,
+  processStatePath,
   commonJSCompatibilityAliases,
   globalsInstallPath,
   nodeGlobalsInstallPath,
@@ -168,8 +169,9 @@ function compatibilityPlugins(
       ...inject({
         Buffer: [globalsInjectPath, "Buffer"],
         // util reads process during Buffer initialization. Keep this import
-        // independent of the injector that also imports Buffer.
-        process: [aliases["process/"], "default"],
+        // on the shared state leaf: importing the full process adapter here
+        // would cycle through events/util in optimized development chunks.
+        process: [processStatePath, "default"],
         global: [globalsRuntimePath, "global"],
         setImmediate: [globalsRuntimePath, "setImmediate"],
         clearImmediate: [globalsRuntimePath, "clearImmediate"],

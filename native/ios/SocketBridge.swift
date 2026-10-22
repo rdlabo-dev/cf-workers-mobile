@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Security
 import Capacitor
 
 /// TCP byte transport. All state and completions belong to one serial queue.
@@ -51,11 +52,17 @@ final class SocketBridge: @unchecked Sendable {
         let waiters = value.closeWaiters; value.closeWaiters.removeAll()
         for waiter in waiters { waiter() }
     }
-    func open(id: String, host: String, port: Int, tls: Bool, completion: @escaping Completion) {
+    func open(id: String, host: String, port: Int, tls: Bool, servername: String? = nil, completion: @escaping Completion) {
         queue.async {
             guard !self.stopped, !id.isEmpty, !host.isEmpty, port > 0, port <= 65535,
                   self.values[id] == nil, let endpointPort = NWEndpoint.Port(rawValue: UInt16(port)) else { completion(.failure(Failure.invalid)); return }
-            let transport = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: tls ? .tls : .tcp)
+            let parameters: NWParameters
+            if tls {
+                let options = NWProtocolTLS.Options()
+                sec_protocol_options_set_tls_server_name(options.securityProtocolOptions, servername ?? host)
+                parameters = NWParameters(tls: options, tcp: NWProtocolTCP.Options())
+            } else { parameters = .tcp }
+            let transport = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: parameters)
             let value = Connection(id, transport)
             value.opening = completion
             self.values[id] = value

@@ -1,0 +1,218 @@
+import { build as viteBuild } from "vite";
+import { workersCapacitorPlugin as viteWorkers } from "../../../../dist/tooling/vite.js";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
+import { chromium, webkit } from "@playwright/test";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
+import { workersCapacitorPlugin } from "../../../../dist/tooling/esbuild.js";
+import { eventCases } from "../../../../src/compat/events/index.spec.mjs";
+
+const root = fileURLToPath(new URL("../../../..", import.meta.url));
+const profile = JSON.parse(
+  await readFile(new URL("exports.json", import.meta.url), "utf8"),
+).profile;
+const require = createRequire(import.meta.url);
+const mfRequire = createRequire(require.resolve("miniflare/package.json"));
+assert.equal(
+  JSON.parse(await readFile(mfRequire.resolve("workerd/package.json"), "utf8"))
+    .version,
+  profile.workerd,
+);
+const runtime = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: true,
+    compatibilityDate: profile.compatibilityDate,
+    script: `import * as events from 'node:events';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import process from 'node:process';
+const cases = {${Object.entries(eventCases)
+      .map(([name, fn]) => `${JSON.stringify(name)}: (${fn.toString()})`)
+      .join(",")}};
+export default {async fetch(request) {
+ const name = new URL(request.url).pathname.slice(1);
+ return Response.json(await cases[name]({events, AsyncLocalStorage, process}));
+}};`,
+  }),
+);
+const baseline = {};
+try {
+  for (const name of Object.keys(eventCases)) {
+    const response = await runtime.dispatchFetch(
+      `https://events.invalid/${name}`,
+    );
+    assert.equal(response.status, 200, name);
+    baseline[name] = await response.json();
+  }
+} finally {
+  await runtime.dispose();
+}
+const output = new URL("../../../artifacts/node-inventory/", import.meta.url);
+await mkdir(output, { recursive: true });
+await writeFile(
+  new URL("events-contracts-workerd.json", output),
+  JSON.stringify({ profile, results: baseline }, null, 2) + "\n",
+);
+const compiled = await build({
+  absWorkingDir: root,
+  stdin: {
+    resolveDir: root,
+    contents: `import * as events from 'node:events';
+import { eventCases } from './src/compat/events/index.spec.mjs';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import process from 'node:process';
+export const run = name => eventCases[name]({events, AsyncLocalStorage, process});`,
+  },
+  bundle: true,
+  platform: "browser",
+  format: "esm",
+  write: false,
+  outfile: "demo/artifacts/node-inventory/events-contracts.js",
+  plugins: [
+    workersCapacitorPlugin({
+      execution: "local",
+      worker: "demo/src/workers/hono/standard.ts",
+    }),
+  ],
+});
+const entry = fileURLToPath(new URL("events-vite-entry.mjs", output));
+await writeFile(
+  entry,
+  `import * as events from ${JSON.stringify("node:events")};
+import { eventCases } from ${JSON.stringify(fileURLToPath(new URL("../../../../src/compat/events/index.spec.mjs", import.meta.url)))};
+import { AsyncLocalStorage } from 'node:async_hooks';
+import process from 'node:process';
+export const run = name => eventCases[name]({events, AsyncLocalStorage, process});`,
+);
+const viteResult = await viteBuild({
+  configFile: false,
+  root,
+  logLevel: "error",
+  plugins: [
+    viteWorkers({
+      execution: "local",
+      worker: "demo/src/workers/hono/standard.ts",
+    }),
+  ],
+  build: {
+    write: false,
+    minify: false,
+    rollupOptions: {
+      input: entry,
+      preserveEntrySignatures: "strict",
+      output: { inlineDynamicImports: true },
+    },
+  },
+});
+const viteChunk = viteResult.output.find(
+  (item) => item.type === "chunk" && item.isEntry,
+);
+assert.ok(viteChunk);
+for (const [builder, source] of Object.entries({
+  esbuild: compiled.outputFiles[0].text,
+  vite: viteChunk.code,
+})) {
+  for (const [engine, launcher] of Object.entries({ chromium, webkit })) {
+    for (const mode of ["page", "worker"]) {
+      test(`${builder}/${engine}/${mode}: events contracts through public imports`, async (t) => {
+        const browser = await launcher.launch();
+        const results = {};
+        try {
+          for (const name of Object.keys(eventCases)) {
+            await t.test(name, { timeout: 15000 }, async () => {
+              const page = await browser.newPage();
+              await page.route("http://events.test/", (route) =>
+                route.fulfill({
+                  contentType: "text/html",
+                  body: "<!doctype html><title>Events contracts</title>",
+                }),
+              );
+              await page.goto("http://events.test/");
+              try {
+                const result = await page.evaluate(
+                  async ({ source, name, mode }) => {
+                    const url = URL.createObjectURL(
+                      new Blob([source], { type: "text/javascript" }),
+                    );
+                    try {
+                      if (mode === "page") {
+                        const api = await import(url);
+                        return JSON.parse(JSON.stringify(await api.run(name)));
+                      }
+                      const workerUrl = URL.createObjectURL(
+                        new Blob(
+                          [
+                            `import { run } from ${JSON.stringify(url)};\nself.onmessage = async ({data}) => { try { self.postMessage({value: JSON.parse(JSON.stringify(await run(data)))}); } catch (error) { self.postMessage({error: String(error)}); } };`,
+                          ],
+                          { type: "text/javascript" },
+                        ),
+                      );
+                      const worker = new Worker(workerUrl, { type: "module" });
+                      try {
+                        return await new Promise((resolve, reject) => {
+                          const timer = setTimeout(
+                            () =>
+                              reject(new Error("Worker operation timed out")),
+                            8000,
+                          );
+                          worker.onerror = (event) => {
+                            clearTimeout(timer);
+                            reject(new Error(event.message));
+                          };
+                          worker.onmessage = ({ data }) => {
+                            clearTimeout(timer);
+                            data.error
+                              ? reject(new Error(data.error))
+                              : resolve(data.value);
+                          };
+                          worker.postMessage(name);
+                        });
+                      } finally {
+                        worker.terminate();
+                        URL.revokeObjectURL(workerUrl);
+                      }
+                    } finally {
+                      URL.revokeObjectURL(url);
+                    }
+                  },
+                  { source, name, mode },
+                );
+                results[name] = result;
+                assert.deepEqual(result, baseline[name]);
+              } finally {
+                await page.close();
+              }
+            });
+          }
+        } finally {
+          await browser.close();
+          await writeFile(
+            new URL(
+              `events-contracts-${builder}-${engine}-${mode}.json`,
+              output,
+            ),
+            JSON.stringify(
+              {
+                profile,
+                builder,
+                engine,
+                mode,
+                status: "webview-profile-operation-contracts",
+                knownGaps: {
+                  process:
+                    "existing partial process profile; native stack inspection remains engine-dependent",
+                },
+                results,
+              },
+              null,
+              2,
+            ) + "\n",
+          );
+        }
+      });
+    }
+  }
+}

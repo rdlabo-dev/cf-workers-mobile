@@ -24,3 +24,17 @@ test("import failure debt permits recovery but not a different failure", () => {
     check("module", { evaluationError: { name: "TypeError" } }, debt),
   );
 });
+
+test("an export retaining its name but losing callability is a regression", () => {
+  const broken = {
+    missing: [],
+    extra: [],
+    typeMismatches: { once: { expected: "function", actual: "object" } },
+  };
+  assert.throws(() => check("events", broken), /changed export types/);
+  assert.throws(
+    () => check("events", broken, { buildError: ["unresolved"] }),
+    /changed export types/,
+  );
+  check("events", { missing: [], extra: [], typeMismatches: {} });
+});

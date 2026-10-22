@@ -85,7 +85,8 @@ final class WorkerSockets {
             fail("Socket failed: "+error.getMessage());
         }
     }
-    synchronized void open(String id,String host,int port,boolean tls,Result result) {
+    synchronized void open(String id,String host,int port,boolean tls,Result result) { open(id,host,port,tls,null,result); }
+    synchronized void open(String id,String host,int port,boolean tls,String servername,Result result) {
         if(stopped || id==null || id.isEmpty() || connections.containsKey(id) || host==null || host.isEmpty() || port<1 || port>65535) { result.reject("Invalid socket open"); return; }
         try {
             final SSLEngine engine;
@@ -96,7 +97,7 @@ final class WorkerSockets {
                     SSLContext context=SSLContext.getInstance("TLS");
                     context.init(null,null,null); tlsContext=context;
                 }
-                engine=tlsContext.createSSLEngine(host,port); engine.setUseClientMode(true);
+                engine=tlsContext.createSSLEngine(servername==null || servername.isEmpty() ? host : servername,port); engine.setUseClientMode(true);
                 SSLParameters parameters=engine.getSSLParameters(); parameters.setEndpointIdentificationAlgorithm("HTTPS"); engine.setSSLParameters(parameters);
             } else engine=null;
             if(group==null) group=new NioEventLoopGroup(1);

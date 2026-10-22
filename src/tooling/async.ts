@@ -35,21 +35,44 @@ export async function lowerAsync(
       ],
     },
     plugins: [
-      () => ({
-        visitor: {
-          Program(path) {
-            // Type-only `this` parameters must not contribute to the wrapper
-            // arity computed by Babel before esbuild strips TypeScript syntax.
-            path.traverse({
-              Function(path) {
-                const first = path.node.params[0];
-                if (first?.type === "Identifier" && first.name === "this")
-                  path.node.params.shift();
-              },
-            });
+      () => {
+        const intrinsicFunctions: Array<{ async: boolean }> = [];
+        return {
+          visitor: {
+            Program(path) {
+              // Type-only `this` parameters must not contribute to the wrapper
+              // arity computed by Babel before esbuild strips TypeScript syntax.
+              path.traverse({
+                Function(path) {
+                  const first = path.node.params[0];
+                  if (first?.type === "Identifier" && first.name === "this")
+                    path.node.params.shift();
+                  // Empty anonymous async generators are used to discover native
+                  // iterator intrinsics (including by workerd's events module).
+                  // They have no continuation to instrument. Hide only this
+                  // exact form from lowering, then restore its native syntax.
+                  const node = path.node;
+                  if (
+                    node.type === "FunctionExpression" &&
+                    !node.id &&
+                    node.async &&
+                    node.generator &&
+                    node.params.length === 0 &&
+                    node.body.body.length === 0 &&
+                    node.body.directives.length === 0
+                  ) {
+                    intrinsicFunctions.push(node);
+                    node.async = false;
+                  }
+                },
+              });
+            },
           },
-        },
-      }),
+          post() {
+            for (const node of intrinsicFunctions) node.async = true;
+          },
+        };
+      },
       asyncGenerators,
       asyncFunctions,
     ],

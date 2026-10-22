@@ -28,7 +28,7 @@ final class NetworkBridge {
     }
     func socketOpen(_ call: CAPPluginCall) {
         guard let id = call.getString("id"), let host = call.getString("host"), let port = call.getInt("port") else { reject(call, "Invalid socket open"); return }
-        sockets.open(id: id, host: host, port: port, tls: call.getBool("tls") ?? false, completion: socketResult(call))
+        sockets.open(id: id, host: host, port: port, tls: call.getBool("tls") ?? false, servername: call.getString("servername"), completion: socketResult(call))
     }
     func socketWrite(_ call: CAPPluginCall) {
         guard let id = call.getString("id"), let encoded = call.getString("chunk"), encoded.utf8.count <= 87384, let data = Data(base64Encoded: encoded) else { reject(call, "Invalid socket write"); return }

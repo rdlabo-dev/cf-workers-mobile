@@ -102,6 +102,8 @@ jobs:
           - suite: workers
             commands: |
               npm run test:node-inventory
+              npm run test:events
+              npm run test:node-expansion
               npm run test:workers -- --allowOnly=false
               npm run test:browser
           - suite: runtime

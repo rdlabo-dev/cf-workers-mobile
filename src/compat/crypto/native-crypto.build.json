@@ -1,0 +1,39 @@
+{
+  "revisions": {
+    "emsdk": "e4fe26ef59168ff44f4c23c466e497bf60b3411e",
+    "openssl": "45e844fa2a14ec92d146bd8f5778ac130b6625fb"
+  },
+  "configure": [
+    "linux-generic32",
+    "--cross-compile-prefix=",
+    "no-asm",
+    "no-shared",
+    "no-threads",
+    "no-tests",
+    "no-dso",
+    "no-module",
+    "no-apps",
+    "no-docs",
+    "no-sock",
+    "no-ui-console",
+    "no-autoload-config",
+    "no-engine",
+    "no-afalgeng",
+    "--with-rand-seed=getrandom",
+    "-O3"
+  ],
+  "flags": [
+    "-O3",
+    "-Wno-deprecated-declarations",
+    "-sSTANDALONE_WASM=1",
+    "-sALLOW_MEMORY_GROWTH=1",
+    "-sFILESYSTEM=0",
+    "-sASSERTIONS=0",
+    "-sMALLOC=emmalloc",
+    "-sABORTING_MALLOC=0",
+    "--no-entry",
+    "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\"]"
+  ],
+  "bindingSha256": "bc0d4d182a4bf3d67cce1517d779ebb46b67f49e418340b62cd9cdd08f02c376",
+  "sha256": "b0c0ed73e8d1b50e7092e48e13088e34b46742571b3488f4b99f71d109e62f20"
+}

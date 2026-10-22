@@ -7,6 +7,11 @@ export function assertNoSurfaceRegression(name, actual, known = {}) {
     if (actual[stage])
       assert.deepEqual(actual[stage], known[stage], `${name}: new ${stage}`);
   }
+  assert.deepEqual(
+    actual.typeMismatches ?? {},
+    known.typeMismatches ?? {},
+    `${name}: changed export types`,
+  );
   // Previously unimportable modules may become importable incrementally.
   if (known.buildError || known.evaluationError) return;
   for (const kind of ["missing", "extra"]) {

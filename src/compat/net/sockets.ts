@@ -26,6 +26,7 @@ function encoded(value: Uint8Array) {
 export function connect(
   address: string,
   options: {
+    expectedServerHostname?: string;
     allowHalfOpen?: boolean;
     secureTransport?: "on" | "off" | "starttls";
   } = {},
@@ -116,6 +117,9 @@ export function connect(
         host: url.hostname.replace(/^\[|\]$/g, ""),
         port,
         tls: options.secureTransport === "on",
+        ...(options.expectedServerHostname
+          ? { servername: options.expectedServerHostname }
+          : {}),
       });
     })
     .then(async (value) => {

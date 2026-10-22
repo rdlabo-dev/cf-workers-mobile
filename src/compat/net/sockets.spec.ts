@@ -146,3 +146,24 @@ it("does not announce native EOF until the reader consumes buffered bytes", asyn
     call.mock.calls.filter((args) => args[1] === "socketRead"),
   ).toHaveLength(1);
 });
+
+it("preserves the TLS verification name when connecting to a resolved address", async () => {
+  const call = vi.fn<NativeCall>(async (_, method) =>
+    method === "socketWatch" ? new Promise(() => {}) : {},
+  );
+  restore = setNativeCall(call);
+  const socket = connect("127.0.0.1:443", {
+    secureTransport: "on",
+    expectedServerHostname: "example.com",
+  });
+  await socket.opened;
+  expect(
+    call.mock.calls.find((args) => args[1] === "socketOpen")?.[2],
+  ).toMatchObject({
+    host: "127.0.0.1",
+    port: 443,
+    tls: true,
+    servername: "example.com",
+  });
+  await socket.close();
+});

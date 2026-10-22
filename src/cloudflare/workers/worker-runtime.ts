@@ -1,3 +1,4 @@
+import { runWithRequestScope } from "../../shared/request-scope.js";
 import { installWebGlobals } from "../../shared/globals/web.js";
 import { createOutboundFetch } from "../../browser/fetch/outbound.js";
 import { browserFetch, isRequest } from "../../browser/fetch/interop.js";
@@ -61,7 +62,7 @@ export class DirectFetchRuntime<Env> extends FetchRuntime<Env> {
     this.restoreWeb();
   }
   protected dispatch(request: Request, env: Env, ctx: WorkerContext) {
-    return this.worker.fetch(request, env, ctx);
+    return runWithRequestScope(() => this.worker.fetch(request, env, ctx));
   }
 }
 
