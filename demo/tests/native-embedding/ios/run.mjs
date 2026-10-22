@@ -17,6 +17,21 @@ const scratch =
   process.env.WORKERS_IOS_PROBE_DIR || "/private/tmp/workers-ios-acceptance";
 const device = process.argv[2];
 const scenario = process.argv[3] || "normal";
+const lifecycle = process.argv.includes("--lifecycle");
+if (lifecycle && scenario !== "normal")
+  throw new Error("--lifecycle requires normal scenario");
+if (lifecycle) {
+  const response = await fetch("http://127.0.0.1:18764/ok", {
+    signal: AbortSignal.timeout(3000),
+  });
+  if (!response.ok || (await response.text()) !== "network-ok")
+    throw new Error(
+      "Start the native-embedding/network-server.mjs fixture first",
+    );
+}
+const configuration = process.env.WORKERS_BUILD_CONFIGURATION || "debug";
+if (!["debug", "release"].includes(configuration))
+  throw new Error("Invalid build configuration");
 const finalMarker =
   scenario === "broken-entry"
     ? "SDK_BROKEN_ENTRY_CLEANED 0"
@@ -41,6 +56,8 @@ const sdk = run("xcrun", ["--sdk", "iphonesimulator", "--show-sdk-path"]);
 const arch = process.arch === "arm64" ? "arm64" : "x86_64";
 const buildArgs = [
   "build",
+  "-c",
+  configuration,
   ...(process.env.WORKERS_IOS_BUILD_SYSTEM
     ? ["--build-system", process.env.WORKERS_IOS_BUILD_SYSTEM]
     : []),
@@ -118,6 +135,7 @@ await writeFile(
 );
 run("xcrun", [
   "swiftc",
+  ...(configuration === "release" ? ["-O", "-assert-config", "Debug"] : []),
   "-target",
   `${arch}-apple-ios15.0-simulator`,
   "-sdk",
@@ -153,13 +171,17 @@ const output = await new Promise((resolve, reject) => {
     device,
     "jp.rdlabo.workers.sdkacceptance",
     scenario,
+    ...(lifecycle ? ["--lifecycle"] : []),
   ]);
   let log = "";
   let settled = false;
+  let resumeTimer;
+  let memoryRecorded = false;
   const finish = (error) => {
     if (settled) return;
     settled = true;
     deadline.stop();
+    clearTimeout(resumeTimer);
     if (error) log += `\nSDK_PROBE_FAILURE ${error.message.split("\n")[0]}\n`;
     writeFileSync(`${scratch}/${scenario}.log`, log);
     child.kill();
@@ -173,9 +195,52 @@ const output = await new Promise((resolve, reject) => {
       log += `\n${message}\n`;
     },
   });
+  let backgroundStarted = false;
   const receive = (chunk) => {
     log += chunk.toString();
     if (log.includes("SDK_SCENE_STARTED")) deadline.sceneStarted();
+    if (!memoryRecorded && log.includes("SDK_DOCUMENT Worker Home")) {
+      memoryRecorded = true;
+      const snapshot = spawnSync("ps", ["-axo", "pid,rss,command"], {
+        encoding: "utf8",
+      });
+      writeFileSync(
+        `${scratch}/memory-ready.txt`,
+        "PID RSS_KiB COMMAND (host only; excludes WebKit subprocesses)\n" +
+          (snapshot.stdout || "")
+            .split("\n")
+            .filter(
+              (line) =>
+                line.includes(device) && line.includes("/Probe.app/Probe"),
+            )
+            .join("\n"),
+      );
+    }
+    if (
+      lifecycle &&
+      !backgroundStarted &&
+      log.includes("SDK_BACKGROUND_READY")
+    ) {
+      backgroundStarted = true;
+      try {
+        run("xcrun", ["simctl", "launch", device, "com.apple.Preferences"]);
+      } catch (error) {
+        finish(error);
+        return;
+      }
+      resumeTimer = setTimeout(() => {
+        try {
+          run("xcrun", [
+            "simctl",
+            "launch",
+            device,
+            "jp.rdlabo.workers.sdkacceptance",
+          ]);
+        } catch (error) {
+          finish(error);
+        }
+      }, 2000);
+    }
     if (log.includes(finalMarker)) {
       finish();
     }
@@ -201,6 +266,15 @@ if (scenario === "normal")
   ])
     if (!output.includes(marker))
       throw new Error(`Missing ${marker}\n${output}`);
+if (lifecycle) {
+  for (const marker of [
+    "SDK_BACKGROUND_RESUMED",
+    "SDK_NETWORK_RECOVERED",
+    "SDK_NETWORK_INTERRUPTED",
+  ])
+    if (!output.includes(marker))
+      throw new Error(`Missing ${marker}\n${output}`);
+}
 if (scenario === "broken-entry") {
   for (const marker of [
     "SDK_MANUAL_CLOSE_NO_LATE_ERROR 0",

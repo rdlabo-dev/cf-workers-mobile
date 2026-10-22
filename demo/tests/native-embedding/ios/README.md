@@ -28,3 +28,22 @@ same source revision; see the [published dependency matrix](../../../../docs/nat
 Use a fresh `WORKERS_IOS_PROBE_DIR` for a release verification so the build evidence
 is separate from local SDK runs. Run all three scenarios above with those variables.
 Without these variables the runner keeps using the local SDK and local `dist`.
+
+## Lifecycle and connection recovery
+
+Start `node ../network-server.mjs` in a separate terminal, then add
+`--lifecycle` to the **normal** runner invocation. The runner opens Settings,
+returns to the same application, and requires actual scene background/active
+callbacks before testing navigation. It then checks a successful native HTTP
+request, a connection closed before response headers, and a successful retry.
+The server binds only loopback port 18764. Stop it after testing. This models
+connection loss, not airplane mode or an offline cloud binding.
+
+Set `WORKERS_BUILD_CONFIGURATION=release` to compile the Swift package and probe
+with optimization. Probe assertions remain enabled explicitly. `SDK_READY_MS`
+measures from the start of the probe task to observed Worker Home content; it is
+not OS launch time. The separate `launchElapsedMs` includes simulator launch.
+
+`memory-ready.txt` records the host process RSS in KiB at the first observed
+Worker Home marker. It excludes WebKit subprocesses and is a single simulator
+sample, not total application memory or a physical-device performance claim.
