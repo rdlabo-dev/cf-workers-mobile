@@ -39,11 +39,10 @@ Each guide describes its tested versions and boundaries. Already have a separate
 
 Install the shared JavaScript package in your web project:
 
-The current published Preview is the exact beta below. Pin it explicitly: npm
-`latest` currently points to an older beta, and npm version `0.1.2` is not published.
+The `latest` npm tag includes 0.x Preview releases. Install this release explicitly:
 
 ```sh
-npm install --save-exact cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51
+npm install --save-exact cf-workers-native@0.1.3
 ```
 
 The mobile entry selects the host. For example, an iOS web entry starts with:
@@ -62,7 +61,7 @@ Use `workersAndroid` from `cf-workers-native/android` or `workersCapacitor` from
 
 This entry is one part of the setup: connect the existing Worker to a **separate mobile build**, then package its output with your chosen native host. The [embedding guide](docs/native-embedding.md) and [Capacitor guide](docs/integration.md) cover the complete path. For an existing native app, build the web assets in the web project or CI; the native project does not need Capacitor CLI commands or configuration.
 
-**0.1.2 is a Preview.** APIs may change. Android embedding requires WebView `MULTI_PROFILE` support. The native Android SDK is available from Maven Central at version `0.1.2`. Read the [native requirements](docs/native-embedding.md#dependency-setup) before integrating. Upgrading from `workers-capacitor`? Follow the [migration steps](docs/integration.md#migrating-from-the-old-npm-package).
+**All 0.x releases are Preview releases.** APIs may change. Android embedding requires WebView `MULTI_PROFILE` support. The native Android SDK is available from Maven Central at version `0.1.2`. Read the [native requirements](docs/native-embedding.md#dependency-setup) before integrating. Upgrading from `workers-capacitor`? Follow the [migration steps](docs/integration.md#migrating-from-the-old-npm-package).
 
 ## Build with your AI assistant
 
@@ -71,7 +70,7 @@ Open your application repository and give your assistant this prompt, replacing 
 ```text
 Read https://github.com/rdlabo-dev/cf-workers-native/blob/main/README.md
 and the integration guide for our target: <iOS, Android or Capacitor>.
-Bring this Workers application to that target using cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51.
+Bring this Workers application to that target using cf-workers-native@0.1.3.
 Preserve its pages, routes, authentication and Cloudflare deployment configuration.
 For an existing native app, preserve its entry point and navigation.
 Verify the actual user flows on the target platform and report remaining limits.

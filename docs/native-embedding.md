@@ -12,7 +12,7 @@ You will build the web assets in your web project, add the native SDK to your
 app, then open and close a Workers screen through its native API. The SDK resolves
 Capacitor internally; your native app does not need Capacitor configuration or CLI commands.
 
-**0.1.2 Preview:** install `cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51` with matching
+**0.1.3 Preview:** install `cf-workers-native@0.1.3` with matching
 [native dependencies](#dependency-setup). Android requires WebView `MULTI_PROFILE`
 support. The native Android SDK is available from Maven Central at version `0.1.2`.
 
@@ -87,21 +87,21 @@ There is one npm package, `cf-workers-native`. Its `/ios`, `/android` and `/capa
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
 `io.github.rdlabo:cf-workers-native-android` is an Android Maven artifact.
 
-Install the published npm Preview in the web project. Pin this exact beta; npm
-`latest` points to an older beta and npm version `0.1.2` is not yet published:
+Install the npm Preview in the web project. The `latest` tag includes 0.x Preview releases:
 
 ```sh
-npm install --save-exact cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51
+npm install --save-exact cf-workers-native@0.1.3
 ```
 
-The published components below share source revision
-`e5092d3abc51c573d44999568db8c06d79e6227d`, although their version labels differ:
+Use the dependency set below. npm 0.1.3 and SwiftPM `v0.1.3` share the release
+commit. The Android native implementation is unchanged from Maven 0.1.2, so
+existing Android applications can continue using that published artifact:
 
-| Component  | Dependency                                                                        |
-| ---------- | --------------------------------------------------------------------------------- |
-| JavaScript | `cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51`                               |
-| iOS        | SwiftPM revision `e5092d3abc51c573d44999568db8c06d79e6227d`, product `WorkersIOS` |
-| Android    | `io.github.rdlabo:cf-workers-native-android:0.1.2` from Maven Central             |
+| Component  | Dependency                                                            |
+| ---------- | --------------------------------------------------------------------- |
+| JavaScript | `cf-workers-native@0.1.3`                                             |
+| iOS        | SwiftPM tag `v0.1.3`, product `WorkersIOS`                            |
+| Android    | `io.github.rdlabo:cf-workers-native-android:0.1.2` from Maven Central |
 
 For local SDK development, create a JavaScript package tarball from the matching checkout:
 
@@ -111,7 +111,7 @@ npm install
 npm pack
 
 # In the web project:
-npm install /path/to/cf-workers-native/cf-workers-native-0.1.2.tgz
+npm install /path/to/cf-workers-native/cf-workers-native-0.1.3.tgz
 ```
 
 `npm pack` runs the build through `prepack`; the filename above uses the current
@@ -128,7 +128,7 @@ The source checkout's npm and build tools belong in the web build or CI.
 ## iOS
 
 Add `https://github.com/rdlabo-dev/cf-workers-native` as a Swift package pinned to
-revision `e5092d3abc51c573d44999568db8c06d79e6227d` for the npm beta above (or the matching revision for a source build), and select the `WorkersIOS` product. The existing `v0.1.2` tag predates the package rename; do not use it for this beta. Use Xcode 26 /
+tag `v0.1.3` for npm 0.1.3 (or the matching revision for a source build), and select the `WorkersIOS` product. The existing `v0.1.2` tag predates the package rename; use `v0.1.3` for this release. Use Xcode 26 /
 Swift 6.2 or newer, as required by the native dependency toolchain.
 Add your generated assets as a folder resource, for example `WorkerWeb`, then
 create the controller from that directory on the main actor:
@@ -173,8 +173,8 @@ Add the SDK's Android Maven publication to your app's dependencies and include
 the generated web directory under `src/main/assets/`, for example `worker-web`.
 The publication resolves Capacitor and its other native dependencies.
 The new Maven coordinate is `io.github.rdlabo:cf-workers-native-android:0.1.2`.
-It is published and resolves from Maven Central. This native version and the
-npm beta above were released from revision `e5092d3abc51c573d44999568db8c06d79e6227d`.
+It is published and resolves from Maven Central. npm 0.1.3 does not change the
+Android native implementation; this existing artifact remains compatible.
 Use Java 21 and Android SDK 36, with `ANDROID_HOME` pointing to the installed SDK.
 Include `google()` and `mavenCentral()` in your app's dependency repositories.
 In your app's Groovy `build.gradle`:
@@ -235,7 +235,8 @@ the SDK screen and returns to the existing Activity.
 
 ## Compatibility
 
-Use matching JS and native SDK revisions. The new hosts share the existing
+Use the compatible JS/native dependency set above. For source builds, use matching
+revisions. The new hosts share the existing
 cf-workers-native runtime and build tooling; they do not change Cloudflare
 deployment inputs or add a remote Worker deployment.
 

@@ -135,7 +135,7 @@ requires a verified namespace, release signing key and explicit publication.
 Run the independent consumer suite against an exact registry version:
 
 ```sh
-CONSUMER_PACKAGE=cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51 npm run test:package
+CONSUMER_PACKAGE=cf-workers-native@0.1.3 npm run test:package
 ```
 
 This downloads the published tarball instead of packing the checkout. The same
