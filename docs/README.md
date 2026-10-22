@@ -10,7 +10,7 @@ Bring the app you built with Workers or Void to people who use the web and peopl
 | **Android**   | [Embed in an existing app](native-embedding.md#android) | Build the Android SDK artifact locally and open its dedicated screen from an Activity. Requires WebView `MULTI_PROFILE`. |
 | **Capacitor** | [Build a mobile app](integration.md)                    | Use a Capacitor app shell and general native plugins, starting from your existing Worker.                                |
 
-The [shared web build](native-embedding.md#shared-web-build) connects the iOS and Android hosts to your Worker. The Capacitor guide includes its own build steps. All three use `cf-workers-native@0.1.2-beta.pr65.shae5092d3abc51`, with a separate mobile build that preserves the Cloudflare deployment inputs.
+The [shared web build](native-embedding.md#shared-web-build) connects the iOS and Android hosts to your Worker. The Capacitor guide includes its own build steps. All three use `cf-workers-native@0.1.3`, with a separate mobile build that preserves the Cloudflare deployment inputs.
 
 ## Connect your framework
 
@@ -40,7 +40,7 @@ Start with network execution: requests go to your existing deployed Worker. Bund
 
 Follow the [native embedding verification](native-embedding.md#verification) or [Capacitor acceptance flow](integration.md#6-verify-the-existing-application-in-capacitor). Test navigation, authentication, mutations, lifecycle and network failures in your own app. Simulator/emulator results do not replace checking the devices you intend to support.
 
-Review [security responsibilities](integration.md#5-security-the-device-is-not-a-trusted-server) and [known limitations](compatibility.md). This release is **0.1.2 Preview**; native embedding does not supply general Capacitor plugin integration or automatic store publication.
+Review [security responsibilities](integration.md#5-security-the-device-is-not-a-trusted-server) and [known limitations](compatibility.md). This release is **0.1.3 Preview**; native embedding does not supply general Capacitor plugin integration or automatic store publication.
 
 ## Examples and development
 

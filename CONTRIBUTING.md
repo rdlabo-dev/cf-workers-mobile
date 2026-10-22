@@ -6,7 +6,7 @@ Run `npm run format` from the repository root before submitting changes. `npm ru
 
 ## Complete compatibility units only
 
-New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1 and 0.1.2 follow-ups](#010-preview-exception).
+New compatibility implementations must be completed before merge or release. A useful subset, a working framework demo, or passing tests for selected methods is not enough. The release exceptions cover existing implementations in [0.1.0 Preview and its explicitly authorized 0.1.1, 0.1.2 and 0.1.3 follow-ups](#010-preview-exception).
 
 For Node.js compatibility, the acceptance unit is a module, including its Workers
 exports, subpaths and observable behavior. For a binding or Web API, define the
@@ -73,7 +73,7 @@ unfinished production behavior.
 
 0.1.0 Preview may include existing compatibility implementations with the limitations documented in the [compatibility inventory](docs/compatibility.md). Their inclusion does not establish complete module compatibility or certify untested behavior. Keep missing exports, unsupported operations and verification boundaries visible; a passing application scenario does not make its dependencies complete.
 
-This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1 and 0.1.2 follow-ups below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
+This exception applies only to existing implementations in 0.1.0 Preview. It does not permit new incomplete compatibility units, bypass required CI or application acceptance, or automatically extend to subsequent releases. New compatibility implementations must satisfy the acceptance gate above. Except for the explicitly authorized 0.1.1, 0.1.2 and 0.1.3 follow-ups below, existing incomplete units remain completion debt and must be completed and verified, or excluded, before a subsequent release includes them.
 
 ### 0.1.1 Preview follow-up
 
@@ -82,6 +82,10 @@ This exception applies only to existing implementations in 0.1.0 Preview. It doe
 ### 0.1.2 Preview follow-up
 
 `cf-workers-native@0.1.2` Preview is explicitly authorized with the current limitations documented in the [compatibility inventory](docs/compatibility.md). This version-specific exception retains existing incomplete compatibility implementations; it does not certify complete Workers or Node.js compatibility, authorize new incomplete units, bypass required regression checks or CI, or extend to later releases. Keep unsupported behavior and verification boundaries visible.
+
+### 0.1.3 Preview follow-up
+
+`cf-workers-native@0.1.3` is authorized as a CI-published continuation of the existing Preview, retaining the limitations in the [compatibility inventory](docs/compatibility.md). Its runtime implementation is unchanged from 0.1.2. This version-specific exception does not authorize new incomplete compatibility units or bypass regression checks and CI.
 
 ## Layout and tests
 
@@ -145,16 +149,18 @@ or a namespace match to full behavioral support.
 
 ## npm releases
 
+All 0.x versions are Preview releases, including plain versions published to `latest`. The npm dist-tag selects the installation channel; `latest` does not imply production stability. Publish release versions through the GitHub Actions Release workflow from the exact CI-passing main commit, rather than from a local npm session.
+
 | Trigger                                                                   | npm dist-tag | Version                                    |
 | ------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
 | Maintainer comments `/beta` on a CI-passing PR                            | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
 | PR merged into `main`, after Compatibility succeeds for that merge commit | `beta`       | `<base>-beta.pr<PR>.sha<12-character SHA>` |
-| Stable tag such as `v0.1.2`                                               | `latest`     | `0.1.2`                                    |
+| Release tag such as `v0.1.3`                                              | `latest`     | `0.1.3`                                    |
 | Prerelease/revision tag such as `v0.2.0-rc.1`                             | `next`       | `0.2.0-rc.1`                               |
 
 Direct pushes and PR branches do not automatically publish beta packages. A newer main commit supersedes an older beta candidate. Beta and next releases do not change `latest`.
 
-For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility on main to validate reuse or finish the necessary full run. Then tag that commit and push the tag, for example `git tag v0.1.2` followed by `git push origin v0.1.2`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
+For a tagged release, update `package.json` to the intended version in a PR, merge it and wait for Compatibility on main to validate reuse or finish the necessary full run. Then tag that commit and push the tag, for example `git tag v0.1.3` followed by `git push origin v0.1.3`. The tag must match the package version and refer to a commit on main with successful CI. Already published versions cannot be republished; create a new version when changing package contents.
 
 The [release workflow](.github/workflows/release.yml) builds without npm publishing credentials, then publishes the resulting tarball in a separate job with lifecycle scripts disabled. It uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/) rather than an npm token. Configure the npm package's Trusted Publisher once with GitHub owner `rdlabo-dev`, repository `cf-workers-native`, workflow filename `release.yml`, no environment name, and permission to publish directly. No `NPM_TOKEN` secret is required.
 

@@ -5,18 +5,18 @@ profile uses workerd `1.20261012.1`, compatibility date `2026-10-17`, without
 additional flags. Other dates and flags are not covered by this profile.
 The WebView does not contain workerd or V8; iOS uses its own JavaScript engine.
 
-The earlier `workers-capacitor` package releases 0.1.0 Preview and the explicitly authorized 0.1.1 Preview follow-up include existing compatibility implementations with the limits below under a [version-specific release exception](../CONTRIBUTING.md#010-preview-exception). The explicitly authorized `cf-workers-native@0.1.2` Preview retains the documented limitations under its [release exception](../CONTRIBUTING.md#012-preview-follow-up). Inclusion is not a claim of complete Workers or Node.js compatibility.
+The earlier `workers-capacitor` package releases 0.1.0 Preview and the explicitly authorized 0.1.1 Preview follow-up include existing compatibility implementations with the limits below under a [version-specific release exception](../CONTRIBUTING.md#010-preview-exception). The explicitly authorized `cf-workers-native@0.1.3` Preview retains the documented limitations under its [release exception](../CONTRIBUTING.md#013-preview-follow-up). Inclusion is not a claim of complete Workers or Node.js compatibility.
 
 ## Native hosts
 
 | Host              | Scope                                                                                                                                                                                     |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS embedding     | 0.1.2 Preview `WorkersIOS` SwiftPM product for UIKit/SwiftUI. Close before removing a UIKit controller; SwiftUI dismantling closes automatically.                                         |
+| iOS embedding     | 0.1.3 Preview `WorkersIOS` SwiftPM product for UIKit/SwiftUI. Close before removing a UIKit controller; SwiftUI dismantling closes automatically.                                         |
 | Android embedding | Maven Central SDK `io.github.rdlabo:cf-workers-native-android:0.1.2`. Requires WebView `MULTI_PROFILE`; one SDK screen at a time, with persistent SDK cookies isolated from host cookies. |
 | Capacitor         | Existing Capacitor 8 integration, verified with 8.5.3; use this path for general native plugins.                                                                                          |
 
-The published npm beta uses the name `cf-workers-native`; use the exact version
-and matching native dependencies in the [dependency matrix](native-embedding.md#dependency-setup). The embedding hosts require matching JS/native source revisions; they are not included in the earlier
+The npm Preview uses the name `cf-workers-native`; use the exact version
+and matching native dependencies in the [dependency matrix](native-embedding.md#dependency-setup). Use the documented compatible JS/native dependency set; they are not included in the earlier
 `workers-capacitor@0.1.1` release. Both detect incomplete startup after 30 seconds. They reuse the
 runtime and build tooling, so they retain the API/framework limits below. See
 [embedding setup and lifecycle](native-embedding.md) for the platform behavior
