@@ -1,13 +1,13 @@
 # Android SDK publication
 
-Prepare `jp.rdlabo:workers-native-android` for Maven Central independently of a
+Prepare `io.github.rdlabo:workers-native-android` for Maven Central independently of a
 Capacitor application. This build uses the existing native library and Gradle
 wrapper. It does not upload or publish anything externally.
 
 ## Prerequisites
 
 - Java 21 and Android SDK 36 (`JAVA_HOME` and `ANDROID_HOME`).
-- A Central Portal account with the verified `jp.rdlabo` namespace.
+- A Central Portal account with the verified `io.github.rdlabo` namespace.
 - A GPG signing key whose public key is discoverable as required by Central.
 
 Follow the official [registration](https://central.sonatype.org/register/central-portal/)
@@ -64,3 +64,30 @@ After Central reports publication, build an independent consumer using only
 `google()` and `mavenCentral()` and the exact published coordinate. Verify the
 native flow before changing user documentation to claim public availability.
 Until that succeeds, the existing local-publication instructions remain valid.
+
+## GitHub Actions publication
+
+The `Android release` workflow is manually dispatched on `main`. Enter the exact
+`package.json` version to authorize immutable publication. The workflow requires
+successful Compatibility CI on that exact main commit and refuses a version
+already present on Maven Central. The Android version must match the npm version.
+It does not publish for npm beta builds or pull requests.
+
+Configure these environment secrets in the repository's `maven-central`
+environment, restricted to the `main` branch:
+
+- `MAVEN_SIGNING_KEY`: ASCII-armored private signing key.
+- `MAVEN_SIGNING_PASSWORD`: the key's passphrase.
+- `CENTRAL_USERNAME` and `CENTRAL_PASSWORD`: the two values from a Central Portal
+  **user token**, not your login password.
+
+The workflow builds and saves the signed ZIP, uploads it with automatic
+publication after Central validation, records the deployment ID in the run
+summary, and waits for publication and Maven distribution. It then builds the
+independent consumer using only Google and Maven Central. For emulator acceptance
+against the released artifact, run
+`node demo/tests/native-embedding/android/run.mjs emulator-5554 --central`.
+
+If upload or polling fails, inspect the deployment in Central Portal before
+retrying. An upload timeout may still have created a deployment; the workflow
+does not blindly retry uploads. A distribution timeout does not undo publication.

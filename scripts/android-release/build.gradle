@@ -34,7 +34,7 @@ project(':workers') {
 tasks.register('centralBundle', Zip) {
     dependsOn ':workers:publishReleasePublicationToStagingRepository'
     from(layout.buildDirectory.dir('repository')) {
-        include "jp/rdlabo/workers-native-android/${sdkVersion}/**"
+        include "io/github/rdlabo/workers-native-android/${sdkVersion}/**"
         exclude '**/maven-metadata*'
     }
     archiveFileName = "workers-native-android-${sdkVersion}-central.zip"

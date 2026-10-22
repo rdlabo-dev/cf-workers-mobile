@@ -1,7 +1,7 @@
 apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 
-group = 'jp.rdlabo'
+group = 'io.github.rdlabo'
 version = '0.1.2'
 
 

@@ -6,6 +6,7 @@ on:
       - ".github/workflows/native-embedding.yml"
       - "native/**"
       - "scripts/android-release/**"
+      - ".github/workflows/android-release.yml"
       - "Package.swift"
       - "package.json"
       - "src/**"
@@ -70,6 +71,7 @@ jobs:
       - run: npm run build
       - name: Verify standalone Maven publication and consumer
         run: |
+          node --test scripts/android-release/publish.test.mjs
           python3 scripts/android-release/verify.py
           demo/android/gradlew -p demo/tests/native-embedding/android -PsdkRepository="$GITHUB_WORKSPACE/scripts/android-release/build/repository" :app:assembleDebug --console=plain
       - name: Enable emulator acceleration

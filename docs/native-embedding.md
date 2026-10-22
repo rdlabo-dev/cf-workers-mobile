@@ -85,7 +85,7 @@ The SDK starts the bundled entry; `render: "/"` selects the initial Worker page.
 
 There is one npm package, `cf-workers-mobile`. Its `/ios`, `/android` and `/capacitor`
 entries are subpath imports, not separate npm packages. There is no bare package-root runtime entry. `WorkersIOS` is a SwiftPM product;
-`jp.rdlabo:workers-native-android` is an Android Maven artifact.
+`io.github.rdlabo:workers-native-android` is an Android Maven artifact.
 
 Install 0.1.2 Preview in the web project:
 
@@ -161,27 +161,16 @@ from JavaScript. Explicit closure cancels the pending startup notification.
 
 Add the SDK's Android Maven publication to your app's dependencies and include
 the generated web directory under `src/main/assets/`, for example `worker-web`.
-The publication resolves Capacitor and its other native dependencies. See the
-[independent Android consumer](../demo/tests/native-embedding/android/README.md)
-for local publication and verification before a release artifact is available.
-
-The Maven coordinate is `jp.rdlabo:workers-native-android:<sdk-version>`. For the
-current checkout, generate the local publication from the repository root:
-
-```sh
-demo/android/gradlew -p demo/tests/native-embedding/android -PincludeSdk \
-  :workers:publishReleasePublicationToProbeRepository
-```
-
-Use Java 21 and Android SDK 36, with `ANDROID_HOME` pointing to the installed SDK. Add the resulting
-`demo/tests/native-embedding/android/build/maven` directory as a Maven repository
-in your app's dependency repositories, alongside Google and Maven Central.
-The current local publication uses version `0.1.2`; it is a source-build version,
-not evidence of a public Maven release. In your app's Groovy `build.gradle`:
+The publication resolves Capacitor and its other native dependencies.
+Version `0.1.2` is available from Maven Central as
+`io.github.rdlabo:workers-native-android:0.1.2`.
+Use Java 21 and Android SDK 36, with `ANDROID_HOME` pointing to the installed SDK.
+Include `google()` and `mavenCentral()` in your app's dependency repositories.
+In your app's Groovy `build.gradle`:
 
 ```groovy
 dependencies {
-    implementation 'jp.rdlabo:workers-native-android:0.1.2'
+    implementation 'io.github.rdlabo:workers-native-android:0.1.2'
 }
 android {
     compileOptions {
@@ -196,6 +185,8 @@ android {
 ```
 
 The resource rules combine the native networking dependencies' metadata.
+For local SDK development or release verification, see the
+[independent Android consumer](../demo/tests/native-embedding/android/README.md).
 Keep the generated directory at `src/main/assets/worker-web/`, with its
 `index.html` directly inside it.
 

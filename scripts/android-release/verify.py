@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(prefix='workers-central-test-') as home:
     env = dict(os.environ, MAVEN_SIGNING_KEY=key, MAVEN_SIGNING_PASSWORD='')
     try:
         subprocess.run(gradle + ['-PsignRelease', 'centralBundle'], cwd=root, env=env, check=True)
-        base = f'jp/rdlabo/workers-native-android/{version}/workers-native-android-{version}'
+        base = f'io/github/rdlabo/workers-native-android/{version}/workers-native-android-{version}'
         required = [base + suffix for suffix in
                     ['.aar', '.pom', '.module', '-sources.jar', '-javadoc.jar']]
         with zipfile.ZipFile(archive) as bundle:
