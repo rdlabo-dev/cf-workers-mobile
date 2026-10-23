@@ -1,4 +1,919 @@
 export const eventCases = {
+  httpEndBodyStates: async function ({ http: h, cloudflareNode: n }) {
+    const out = {};
+    for (const [id, chunk] of [
+      ["empty", ""],
+      ["zero", 0],
+      ["false", false],
+      ["invalid", {}],
+      ["bytes", new Uint8Array(0)],
+    ]) {
+      const req = new h.IncomingMessage();
+      req.method = "HEAD";
+      const res = new h.ServerResponse(req, {
+        rejectNonStandardBodyWrites: true,
+      });
+      res._hasBody = false;
+      res.on("error", () => {});
+      try {
+        res.end(chunk);
+        out[id] = "ok";
+      } catch (e) {
+        out[id] = { name: e.name, code: e.code ?? null, message: e.message };
+      }
+    }
+    return out;
+  },
+  httpUploadLifetime: async function ({ http: h, cloudflareNode: n }) {
+    const out = {};
+    for (const mode of ["early", "readerCancel"]) {
+      let cancelled = false;
+      const upload = new ReadableStream({
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        request = new Request("https://example.test/", {
+          method: "POST",
+          body: upload,
+          duplex: "half",
+        });
+      let req, res;
+      const log = [];
+      const server = h.createServer((q, s) => {
+        req = q;
+        res = s;
+        q.on("aborted", () => log.push("aborted"));
+        q.on("close", () => log.push("reqClose"));
+        s.on("close", () => log.push("resClose"));
+        if (mode === "early") s.end("early");
+        else s.flushHeaders();
+      });
+      try {
+        const response = await n.httpServerHandler(server).fetch(request);
+        let body;
+        if (mode === "early") body = await response.text();
+        else await response.body.cancel();
+        await new Promise((r) => setTimeout(r, 0));
+        out[mode] = {
+          body,
+          cancelled,
+          locked: request.body.locked,
+          reqDestroyed: req.destroyed,
+          resDestroyed: res.destroyed,
+          log,
+        };
+      } catch (e) {
+        out[mode] = { name: e.name, message: e.message };
+      } finally {
+        server.close();
+      }
+    }
+    return out;
+  },
+  httpServerStateTransitions: async function ({ http: h, cloudflareNode: n }) {
+    const out = {},
+      error = (e) => ({
+        name: e.name,
+        code: e.code ?? null,
+        message: e.message,
+      });
+    for (const mode of [
+      "lateSetHeader",
+      "lateWriteHead",
+      "headReject",
+      "noContentWrite",
+      "abortPending",
+      "custom",
+    ]) {
+      let server, req, res;
+      const log = [];
+      let observed;
+      const options = {};
+      if (mode === "headReject") options.rejectNonStandardBodyWrites = true;
+      if (mode === "custom") {
+        options.IncomingMessage = class extends h.IncomingMessage {
+          constructor(...a) {
+            super(...a);
+            log.push("customRequest");
+          }
+        };
+        options.ServerResponse = class extends h.ServerResponse {
+          constructor(...a) {
+            super(...a);
+            log.push("customResponse");
+          }
+        };
+      }
+      const abort = new AbortController();
+      try {
+        server = h.createServer(options, (q, s) => {
+          req = q;
+          res = s;
+          q.on("error", (e) => log.push(["requestError", error(e)]));
+          q.on("aborted", () => log.push("aborted"));
+          q.on("close", () => log.push("requestClose"));
+          s.on("error", (e) => log.push(["responseError", error(e)]));
+          s.on("close", () => log.push("responseClose"));
+          if (mode === "abortPending") return;
+          try {
+            if (mode === "lateSetHeader") {
+              s.flushHeaders();
+              s.setHeader("x-late", "yes");
+            }
+            if (mode === "lateWriteHead") {
+              s.flushHeaders();
+              s.writeHead(201);
+            }
+            if (mode === "headReject" || mode === "noContentWrite") {
+              if (mode === "noContentWrite") s.statusCode = 204;
+              observed = s.write("data", (e) =>
+                log.push(["writeCallback", e ? error(e) : null]),
+              );
+            }
+            if (mode === "custom")
+              observed = [
+                q instanceof options.IncomingMessage,
+                s instanceof options.ServerResponse,
+              ];
+          } catch (e) {
+            observed = error(e);
+          }
+          s.end();
+        });
+        const pending = n.httpServerHandler(server).fetch(
+          new Request("https://test/", {
+            method: mode === "headReject" ? "HEAD" : "GET",
+            signal: abort.signal,
+          }),
+        );
+        let response;
+        if (mode === "abortPending") {
+          await Promise.resolve();
+          abort.abort(new Error("cancel-request"));
+          const result = await Promise.race([
+            pending.then(
+              (r) => ({ response: r }),
+              (e) => ({ failure: error(e) }),
+            ),
+            new Promise((resolve) =>
+              setTimeout(() => resolve({ pending: true }), 30),
+            ),
+          ]);
+          observed = {
+            ...result,
+            response: result.response ? true : undefined,
+            requestDestroyed: req?.destroyed,
+            responseDestroyed: res?.destroyed,
+          };
+          if (result.response) response = result.response;
+          else {
+            res.end();
+            try {
+              response = await pending;
+            } catch {}
+          }
+        } else response = await pending;
+        let body;
+        if (response)
+          try {
+            body = await response.text();
+          } catch (e) {
+            body = error(e);
+          }
+        await new Promise((r) => setTimeout(r, 0));
+        out[mode] = { observed, status: response?.status, body, log };
+      } catch (e) {
+        out[mode] = { error: error(e), log };
+      } finally {
+        server?.close();
+      }
+    }
+    return out;
+  },
+
+  zlibParamsStates: async function ({ zlib: z }) {
+    const out = [];
+    for (const stage of ["before", "between", "after"])
+      for (const level of [1, 10]) {
+        const stream = z.createDeflate(),
+          trace = [],
+          original = globalThis.queueMicrotask;
+        stream.on("error", (e) =>
+          trace.push(["error", e.name, e.code ?? null, e.message]),
+        );
+        stream.resume();
+        try {
+          if (stage === "between")
+            await new Promise((resolve, reject) =>
+              stream.write("payload", (e) => (e ? reject(e) : resolve())),
+            );
+          if (stage === "after")
+            await new Promise((resolve) => {
+              stream.once("close", resolve);
+              stream.end("payload");
+            });
+          globalThis.queueMicrotask = (callback) =>
+            original(() => {
+              try {
+                callback();
+              } catch (error) {
+                trace.push([
+                  "uncaught",
+                  error.name,
+                  error.code ?? null,
+                  error.message,
+                ]);
+              }
+            });
+          try {
+            stream.params(level, 0, (error) =>
+              trace.push(["callback", error?.name ?? null]),
+            );
+            trace.push(["returned"]);
+          } catch (error) {
+            trace.push([
+              "throw",
+              error.name,
+              error.code ?? null,
+              error.message,
+            ]);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        } finally {
+          globalThis.queueMicrotask = original;
+          stream.destroy();
+        }
+        out.push({ stage, level, trace });
+      }
+    for (const operation of [
+      "invalid-flush",
+      "invalid-callback",
+      "close-twice",
+    ]) {
+      const stream = z.createDeflate(),
+        trace = [];
+      stream.on("error", (error) =>
+        trace.push(["error", error.name, error.code ?? null, error.message]),
+      );
+      stream.on("close", () => trace.push(["close"]));
+      const callback = () => trace.push(["callback"]);
+      try {
+        if (operation === "invalid-flush") stream.flush(-1, callback);
+        else if (operation === "invalid-callback") stream.flush(0, 1);
+        else {
+          stream.close(callback);
+          stream.close(callback);
+        }
+      } catch (error) {
+        trace.push(["throw", error.name, error.code ?? null, error.message]);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      stream.destroy();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      out.push({ operation, trace });
+    }
+    return out;
+  },
+
+  cryptoRsaOperationStates: function ({ crypto: c }) {
+    const pair = c.generateKeyPairSync("rsa", {
+        modulusLength: 1024,
+        publicKeyEncoding: { format: "pem", type: "spki" },
+        privateKeyEncoding: { format: "pem", type: "pkcs8" },
+      }),
+      secret = c.createSecretKey(new Uint8Array(16)),
+      out = [];
+    const capture = (fn) => {
+      try {
+        const value = fn();
+        return { length: value.length };
+      } catch (error) {
+        return {
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message,
+        };
+      }
+    };
+    for (const method of [
+      "publicEncrypt",
+      "privateDecrypt",
+      "privateEncrypt",
+      "publicDecrypt",
+    ]) {
+      const key = method.startsWith("private")
+        ? pair.privateKey
+        : pair.publicKey;
+      for (const scenario of [
+        "wrong-key",
+        "short-input",
+        "malformed-ciphertext",
+        "invalid-padding",
+      ]) {
+        out.push({
+          method,
+          scenario,
+          result: capture(() =>
+            c[method](
+              {
+                key: scenario === "wrong-key" ? secret : key,
+                ...(scenario === "invalid-padding" ? { padding: 999 } : {}),
+              },
+              scenario === "malformed-ciphertext"
+                ? new Uint8Array(128)
+                : new Uint8Array([1]),
+            ),
+          ),
+        });
+      }
+    }
+    const text = "label",
+      bytes = new TextEncoder().encode(text),
+      extended = new Uint8Array([0, ...bytes, 0]);
+    for (const [kind, label] of [
+      ["string", text],
+      ["buffer", bytes.buffer],
+      ["offset", new DataView(extended.buffer, 1, bytes.length)],
+      ["mismatch", bytes],
+    ]) {
+      const encrypted = c.publicEncrypt(
+        { key: pair.publicKey, padding: 4, oaepLabel: label },
+        new Uint8Array([1, 2, 3]),
+      );
+      out.push({
+        kind,
+        result: capture(() =>
+          c.privateDecrypt(
+            {
+              key: pair.privateKey,
+              padding: 4,
+              oaepLabel: kind === "mismatch" ? "wrong" : label,
+            },
+            encrypted,
+          ),
+        ),
+      });
+    }
+    for (const [encrypt, decrypt] of [
+      ["publicEncrypt", "privateDecrypt"],
+      ["privateEncrypt", "publicDecrypt"],
+    ]) {
+      const input = new Uint8Array([1, 2, 3]);
+      const encoded = c[encrypt](
+        encrypt.startsWith("public") ? pair.publicKey : pair.privateKey,
+        input,
+      );
+      const decoded = c[decrypt](
+        decrypt.startsWith("public") ? pair.publicKey : pair.privateKey,
+        encoded,
+      );
+      out.push({ encrypt, decrypt, roundTrip: Array.from(decoded) });
+    }
+    return out;
+  },
+
+  cryptoSubtleOperations: async function ({ crypto: c }) {
+    const subtle = c.webcrypto.subtle,
+      bytes = new Uint8Array([1, 2, 3, 4]),
+      out = [];
+    const equal = (a, b) => {
+      a = new Uint8Array(a);
+      b = new Uint8Array(b);
+      return (
+        a.length === b.length && a.every((value, index) => value === b[index])
+      );
+    };
+    for (const extractable of [true, false])
+      for (const flow of [
+        "AES-GCM",
+        "HMAC",
+        "RSA-OAEP",
+        "ECDSA",
+        "ECDH",
+        "HKDF",
+        "PBKDF2",
+        "AES-KW",
+        "raw-JWK",
+      ]) {
+        try {
+          let result;
+          if (flow === "AES-GCM") {
+            const key = await subtle.generateKey(
+                { name: flow, length: 128 },
+                extractable,
+                ["encrypt", "decrypt"],
+              ),
+              algorithm = {
+                name: flow,
+                iv: new Uint8Array(12),
+                additionalData: bytes,
+              };
+            const encrypted = await subtle.encrypt(algorithm, key, bytes);
+            result = {
+              length: encrypted.byteLength,
+              roundTrip: equal(
+                await subtle.decrypt(algorithm, key, encrypted),
+                bytes,
+              ),
+            };
+          } else if (flow === "HMAC") {
+            const key = await subtle.generateKey(
+                { name: flow, hash: "SHA-256", length: 128 },
+                extractable,
+                ["sign", "verify"],
+              ),
+              signature = await subtle.sign(flow, key, bytes);
+            result = {
+              length: signature.byteLength,
+              valid: await subtle.verify(flow, key, signature, bytes),
+              invalid: await subtle.verify(
+                flow,
+                key,
+                signature,
+                new Uint8Array([9]),
+              ),
+            };
+          } else if (flow === "RSA-OAEP") {
+            const key = await subtle.generateKey(
+                {
+                  name: flow,
+                  modulusLength: 1024,
+                  publicExponent: new Uint8Array([1, 0, 1]),
+                  hash: "SHA-256",
+                },
+                extractable,
+                ["encrypt", "decrypt"],
+              ),
+              algorithm = { name: flow, label: bytes };
+            const encrypted = await subtle.encrypt(
+              algorithm,
+              key.publicKey,
+              bytes,
+            );
+            result = {
+              length: encrypted.byteLength,
+              roundTrip: equal(
+                await subtle.decrypt(algorithm, key.privateKey, encrypted),
+                bytes,
+              ),
+            };
+          } else if (flow === "ECDSA") {
+            const key = await subtle.generateKey(
+                { name: flow, namedCurve: "P-256" },
+                extractable,
+                ["sign", "verify"],
+              ),
+              algorithm = { name: flow, hash: "SHA-256" },
+              signature = await subtle.sign(algorithm, key.privateKey, bytes);
+            result = {
+              length: signature.byteLength,
+              valid: await subtle.verify(
+                algorithm,
+                key.publicKey,
+                signature,
+                bytes,
+              ),
+              invalid: await subtle.verify(
+                algorithm,
+                key.publicKey,
+                signature,
+                new Uint8Array([9]),
+              ),
+            };
+          } else if (flow === "ECDH") {
+            const a = await subtle.generateKey(
+                { name: flow, namedCurve: "P-256" },
+                extractable,
+                ["deriveBits"],
+              ),
+              b = await subtle.generateKey(
+                { name: flow, namedCurve: "P-256" },
+                extractable,
+                ["deriveBits"],
+              );
+            const left = await subtle.deriveBits(
+                { name: flow, public: b.publicKey },
+                a.privateKey,
+                256,
+              ),
+              right = await subtle.deriveBits(
+                { name: flow, public: a.publicKey },
+                b.privateKey,
+                256,
+              );
+            result = { length: left.byteLength, equal: equal(left, right) };
+          } else if (flow === "HKDF" || flow === "PBKDF2") {
+            const key = await subtle.importKey(
+              "raw",
+              bytes,
+              flow,
+              extractable,
+              ["deriveBits"],
+            );
+            const algorithm =
+              flow === "HKDF"
+                ? { name: flow, hash: "SHA-256", salt: bytes, info: bytes }
+                : { name: flow, hash: "SHA-256", salt: bytes, iterations: 2 };
+            result = {
+              bytes: Array.from(
+                new Uint8Array(await subtle.deriveBits(algorithm, key, 128)),
+              ),
+            };
+          } else if (flow === "AES-KW") {
+            const wrapping = await subtle.generateKey(
+                { name: flow, length: 128 },
+                extractable,
+                ["wrapKey", "unwrapKey"],
+              ),
+              original = await subtle.generateKey(
+                { name: "AES-GCM", length: 128 },
+                true,
+                ["encrypt", "decrypt"],
+              );
+            const wrapped = await subtle.wrapKey(
+                "raw",
+                original,
+                wrapping,
+                flow,
+              ),
+              restored = await subtle.unwrapKey(
+                "raw",
+                wrapped,
+                wrapping,
+                flow,
+                { name: "AES-GCM" },
+                extractable,
+                ["encrypt", "decrypt"],
+              );
+            const algorithm = { name: "AES-GCM", iv: new Uint8Array(12) },
+              encrypted = await subtle.encrypt(algorithm, original, bytes);
+            result = {
+              length: wrapped.byteLength,
+              extractable: restored.extractable,
+              roundTrip: equal(
+                await subtle.decrypt(algorithm, restored, encrypted),
+                bytes,
+              ),
+            };
+          } else {
+            const raw = new Uint8Array(16),
+              key = await subtle.importKey(
+                "raw",
+                raw,
+                { name: "AES-GCM" },
+                extractable,
+                ["encrypt", "decrypt"],
+              );
+            const exported = await subtle.exportKey("jwk", key),
+              imported = await subtle.importKey(
+                "jwk",
+                exported,
+                { name: "AES-GCM" },
+                extractable,
+                ["encrypt", "decrypt"],
+              );
+            result = {
+              kty: exported.kty,
+              alg: exported.alg,
+              ext: exported.ext,
+              roundTrip: equal(await subtle.exportKey("raw", imported), raw),
+            };
+          }
+          out.push({ flow, extractable, result });
+        } catch (error) {
+          out.push({ flow, extractable, error: error.name });
+        }
+      }
+    return out;
+  },
+
+  tlsIdentityBoundaries: function ({ tls }) {
+    const out = { names: [], alpn: [] };
+    for (const [host, cert] of [
+      ["api.example.com", { subjectaltname: 'DNS:"api.example.com"' }],
+      ["api.example.com", { subjectaltname: 'DNS:"api\\u002eexample.com"' }],
+      ["api.example.com", { subjectaltname: 'DNS:"api\\qexample.com"' }],
+      [
+        "two.example.com",
+        { subject: { CN: ["one.example.com", "two.example.com"] } },
+      ],
+      ["api.one.example.com", { subjectaltname: "DNS:api.*.example.com" }],
+      [
+        "xn--bcher-kva.example",
+        { subjectaltname: "DNS:xn--bcher-kva.example" },
+      ],
+      ["bücher.example", { subjectaltname: "DNS:xn--bcher-kva.example" }],
+    ]) {
+      try {
+        const error = tls.checkServerIdentity(host, cert);
+        out.names.push(
+          error
+            ? {
+                name: error.name,
+                code: error.code,
+                message: error.message,
+                sameCert: error.cert === cert,
+              }
+            : null,
+        );
+      } catch (error) {
+        out.names.push({
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message,
+        });
+      }
+    }
+    for (const value of [
+      [],
+      ["x".repeat(255)],
+      new Uint8Array(0),
+      new Uint8Array([2, 104, 50]),
+      new DataView(new Uint8Array([0, 2, 104, 50, 0]).buffer, 1, 3),
+    ]) {
+      const target = {};
+      tls.convertALPNProtocols(value, target);
+      const before = target.ALPNProtocols
+        ? Array.from(target.ALPNProtocols)
+        : null;
+      if (ArrayBuffer.isView(value))
+        new Uint8Array(value.buffer)[value.byteOffset] = 99;
+      out.alpn.push({
+        before,
+        after: target.ALPNProtocols ? Array.from(target.ALPNProtocols) : null,
+        same: target.ALPNProtocols === value,
+      });
+    }
+    return out;
+  },
+
+  fsWholeFileSignals: async function ({ fs }) {
+    const out = [],
+      path = "/tmp/signal-whole-file";
+    try {
+      for (const method of ["readFile", "writeFile", "appendFile"])
+        for (const timing of ["before", "getter"])
+          for (const mode of ["callback", "promise"]) {
+            fs.writeFileSync(path, "seed");
+            const controller = new AbortController(),
+              reads = [],
+              reason = new Error("cancel-file");
+            if (timing === "before") controller.abort(reason);
+            const options = {
+              get encoding() {
+                reads.push("encoding");
+                if (timing === "getter") controller.abort(reason);
+                return "utf8";
+              },
+              get signal() {
+                reads.push("signal");
+                return controller.signal;
+              },
+            };
+            let returned = false;
+            const args =
+              method === "readFile"
+                ? [path, options]
+                : [path, "payload", options];
+            let result;
+            try {
+              const pending =
+                mode === "promise"
+                  ? fs.promises[method](...args)
+                  : new Promise((resolve, reject) =>
+                      fs[method](...args, (error, value) =>
+                        error ? reject(error) : resolve(value),
+                      ),
+                    );
+              returned = true;
+              const value = await pending;
+              result = { value: value ?? null, type: typeof value };
+            } catch (error) {
+              result = {
+                error: {
+                  name: error.name,
+                  code: error.code ?? null,
+                  message: error.message,
+                },
+                sameReason: error === reason,
+                returned,
+              };
+            }
+            out.push({
+              method,
+              timing,
+              mode,
+              reads,
+              result,
+              contents: fs.readFileSync(path, "utf8"),
+            });
+          }
+    } finally {
+      fs.rmSync(path, { force: true });
+    }
+    return out;
+  },
+  fsBlobDirectoryLifetime: async function ({ fs }) {
+    const root = "/tmp/lifetime-matrix",
+      out = {};
+    fs.mkdirSync(root, { recursive: true });
+    try {
+      for (const change of ["overwrite", "unlink"]) {
+        const path = root + "/blob";
+        fs.writeFileSync(path, "before");
+        const blob = await fs.openAsBlob(path);
+        if (change === "overwrite") fs.writeFileSync(path, "after");
+        else fs.unlinkSync(path);
+        try {
+          out[change] = { text: await blob.text(), size: blob.size };
+        } catch (error) {
+          out[change] = {
+            name: error.name,
+            code: error.code ?? null,
+            message: error.message,
+          };
+        }
+        fs.rmSync(path, { force: true });
+      }
+      fs.writeFileSync(root + "/a", "a");
+      fs.writeFileSync(root + "/b", "b");
+      const dir = await fs.promises.opendir(root),
+        seen = [];
+      for await (const entry of dir) {
+        seen.push(entry.name);
+        break;
+      }
+      const attempt = async (fn) => {
+        try {
+          const value = await fn();
+          return value?.name ?? value ?? null;
+        } catch (error) {
+          return {
+            name: error.name,
+            code: error.code ?? null,
+            message: error.message,
+          };
+        }
+      };
+      out.early = {
+        seen,
+        next: await attempt(() => dir.read()),
+        close: await attempt(() => dir.close()),
+      };
+      const concurrent = await fs.promises.opendir(root);
+      out.concurrent = (
+        await Promise.all([
+          concurrent.read(),
+          concurrent.read(),
+          concurrent.read(),
+        ])
+      ).map((entry) => entry?.name ?? null);
+      await concurrent.close();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+    return out;
+  },
+
+  zlibDictionaryStates: async function ({ zlib: z }) {
+    const dictionary = new TextEncoder().encode("common-prefix-common-prefix");
+    const wrong = new TextEncoder().encode("different");
+    const plain = "common-prefix-common-prefix-payload";
+    const out = [];
+    for (const [encode, decode, Constructor] of [
+      ["deflateSync", "inflate", "Inflate"],
+      ["deflateRawSync", "inflateRaw", "InflateRaw"],
+    ]) {
+      const input = z[encode](plain, { dictionary });
+      for (const dict of [undefined, wrong, dictionary]) {
+        const options = dict === undefined ? {} : { dictionary: dict };
+        for (const mode of ["sync", "callback", "info", "stream"]) {
+          try {
+            let value;
+            if (mode === "sync") value = z[decode + "Sync"](input, options);
+            else if (mode === "info")
+              value = z[decode + "Sync"](input, {
+                ...options,
+                info: true,
+              }).buffer;
+            else if (mode === "callback")
+              value = await new Promise((resolve, reject) =>
+                z[decode](input, options, (error, result) =>
+                  error ? reject(error) : resolve(result),
+                ),
+              );
+            else
+              value = await new Promise((resolve, reject) => {
+                const stream = new z[Constructor](options),
+                  chunks = [];
+                stream.on("data", (chunk) => chunks.push(...chunk));
+                stream.once("error", (error) => {
+                  stream.destroy();
+                  reject(error);
+                });
+                stream.once("end", () => resolve(new Uint8Array(chunks)));
+                stream.end(input);
+              });
+            out.push({ decode, mode, text: new TextDecoder().decode(value) });
+          } catch (error) {
+            out.push({
+              decode,
+              mode,
+              error: {
+                name: error.name,
+                code: error.code ?? null,
+                message: error.message,
+              },
+            });
+          }
+        }
+      }
+    }
+    return out;
+  },
+  zlibUnzipHeaderStates: async function ({ zlib: z }) {
+    const out = [];
+    for (const method of ["gzipSync", "deflateSync"])
+      for (const split of [1, 2])
+        for (const truncate of [false, true]) {
+          const encoded = z[method]("split-header-payload");
+          out.push(
+            await new Promise((resolve) => {
+              const stream = z.createUnzip(),
+                chunks = [];
+              stream.on("data", (chunk) => chunks.push(...chunk));
+              stream.once("error", (error) => {
+                stream.destroy();
+                resolve({
+                  method,
+                  split,
+                  truncate,
+                  error: {
+                    name: error.name,
+                    code: error.code ?? null,
+                    message: error.message,
+                  },
+                });
+              });
+              stream.once("end", () =>
+                resolve({
+                  method,
+                  split,
+                  truncate,
+                  text: new TextDecoder().decode(new Uint8Array(chunks)),
+                }),
+              );
+              stream.write(encoded.subarray(0, split));
+              stream.end(truncate ? undefined : encoded.subarray(split));
+            }),
+          );
+        }
+    return out;
+  },
+  zlibTerminalRaces: async function ({ zlib: z }) {
+    const out = [];
+    for (const Constructor of ["Deflate", "BrotliCompress", "ZstdCompress"])
+      for (const scenario of ["write-destroy", "flush-destroy", "end-write"]) {
+        const stream = new z[Constructor](),
+          trace = [],
+          failure = new Error("controlled-cancel");
+        const callback = (name) => (error) =>
+          trace.push([name, error?.message ?? null]);
+        stream.on("error", callback("error"));
+        stream.on("end", () => trace.push(["end", null]));
+        stream.on("finish", () => trace.push(["finish", null]));
+        const closed = new Promise((resolve) =>
+          stream.once("close", () => {
+            trace.push(["close", null]);
+            resolve();
+          }),
+        );
+        stream.resume();
+        if (scenario === "write-destroy") {
+          stream.write("payload", callback("write"));
+          stream.destroy(failure);
+        } else if (scenario === "flush-destroy") {
+          stream.write("payload", callback("write"));
+          stream.flush(callback("flush"));
+          stream.destroy(failure);
+        } else {
+          stream.end("payload", callback("end-callback"));
+          stream.write("late", callback("late-write"));
+        }
+        await closed;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        out.push({
+          Constructor,
+          scenario,
+          trace,
+          destroyed: stream.destroyed,
+          closed: stream._closed,
+        });
+      }
+    return out;
+  },
+
   zlibFrameBoundaries: async function ({ zlib: z }) {
     const out = {};
     for (const size of [64, 16384, 32769])
@@ -4698,6 +5613,26 @@ export const eventCases = {
     };
     return {
       nulNames,
+      receiverChecks: [
+        () =>
+          Object.getOwnPropertyDescriptor(
+            c.X509Certificate.prototype,
+            "subject",
+          ).get.call({}),
+        () =>
+          c.X509Certificate.prototype.checkHost.call({}, "valid.example.test"),
+      ].map((fn) => {
+        try {
+          return fn() ?? null;
+        } catch (error) {
+          return { name: error.name, code: error.code ?? null };
+        }
+      }),
+      cache: {
+        raw: cert.raw === cert.raw,
+        publicKey: cert.publicKey === cert.publicKey,
+        legacy: cert.toLegacyObject() === cert.toLegacyObject(),
+      },
       subject: cert.subject,
       san: cert.subjectAltName,
       info: cert.infoAccess,
@@ -4708,6 +5643,13 @@ export const eventCases = {
         attempt(() => cert.checkHost("café.example.test", o)),
       ),
       invalid: [
+        () => cert.checkEmail("test@example.test", { subject: "invalid" }),
+        () =>
+          cert.checkHost("valid.example.test", {
+            get subject() {
+              throw new Error("option-getter");
+            },
+          }),
         () => cert.checkEmail("a\0b"),
         () => cert.checkIP("127.0.0.1\0evil"),
         () => cert.checkHost("valid.example.test", { partialWildcards: 1 }),

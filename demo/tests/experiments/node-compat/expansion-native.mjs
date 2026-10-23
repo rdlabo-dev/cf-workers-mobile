@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { createServer as tcpServer } from "node:net";
 import { TLSSocket, createSecureContext } from "node:tls";
 import { execFileSync } from "node:child_process";
@@ -7,13 +8,24 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import { build } from "esbuild";
 
-import { eventCases } from "../../../../src/compat/expansion/index.spec.mjs";
+import { eventCases as allEventCases } from "../../../../src/compat/expansion/index.spec.mjs";
 import {
   localBoundaryCases,
   localBoundaryExpected,
 } from "../../../../src/compat/expansion/boundaries.spec.mjs";
 import { nativeBackend } from "../../native/backend.mjs";
 import { runNativeAcceptance } from "../../native/acceptance.mjs";
+import { createLifecycleFixture } from "./network-lifecycle-fixture.mjs";
+import { networkLifecycleBaseline } from "./network-lifecycle-baseline.mjs";
+const requestedCases = process.env.NODE_COMPAT_CASES?.split(",");
+if (requestedCases)
+  for (const name of requestedCases)
+    assert.ok(Object.hasOwn(allEventCases, name), `Unknown case: ${name}`);
+const eventCases = requestedCases
+  ? Object.fromEntries(
+      requestedCases.map((name) => [name, allEventCases[name]]),
+    )
+  : allEventCases;
 const [platform, device] = process.argv.slice(2);
 assert.ok(
   ["ios", "android"].includes(platform) && device,
@@ -32,6 +44,16 @@ const baseline = JSON.parse(
 const profile = JSON.parse(
   await readFile(new URL("exports.json", import.meta.url), "utf8"),
 ).profile;
+if (requestedCases)
+  for (const name of requestedCases)
+    assert.ok(
+      Object.hasOwn(baseline.results, name),
+      `Missing baseline case: ${name}`,
+    );
+if (requestedCases)
+  baseline.results = Object.fromEntries(
+    requestedCases.map((name) => [name, baseline.results[name]]),
+  );
 assert.deepEqual(baseline.profile, profile);
 assert.deepEqual(Object.keys(baseline.results), Object.keys(eventCases));
 const artifacts = fileURLToPath(
@@ -102,8 +124,16 @@ const compiled = await build({
   absWorkingDir: consumer,
   stdin: {
     resolveDir: consumer,
-    contents: `import * as net from 'node:net'; import * as tls from 'node:tls'; import * as classicStreams from 'node:stream'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as cloudflareNode from 'cloudflare:node'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
+    contents: `import * as https from 'node:https'; import * as net from 'node:net'; import * as tls from 'node:tls'; import * as classicStreams from 'node:stream'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as cloudflareNode from 'cloudflare:node'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { eventCases } from ${JSON.stringify(root + "/src/compat/expansion/index.spec.mjs")};
+import {runNetworkLifecycle} from ${JSON.stringify(root + "/src/compat/http/network.spec.mjs")};
+import {runTlsLifecycle} from ${JSON.stringify(root + "/src/compat/tls/network.spec.mjs")};
+import {runWebSocketLifecycle} from ${JSON.stringify(root + "/src/compat/http/websocket-network.spec.mjs")};
+import {createFsLifetimeContract} from ${JSON.stringify(root + "/src/compat/fs/request-lifetime.spec.mjs")};
+const runFsLifetime = async () => {const step=createFsLifetimeContract(fs),out={};for(const kind of ["direct","handle"]){await withRequestScope(()=>step("first",kind));out[kind]=await withRequestScope(()=>step("second",kind));}return out};
+import {runWebSocketSurface} from ${JSON.stringify(root + "/src/compat/http/websocket-surface.spec.mjs")};
+import {workersCapacitor} from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/index.js")};
+const runNativeNetwork = async ports => {const runtime=workersCapacitor({baseURL:"https://network-lifecycle.invalid",worker:{fetch(){return new Response("unused")}}});try{await runtime.ready;return {http:await runNetworkLifecycle({http,https},ports),tls:await runTlsLifecycle({net,tls},ports),websocket:await runWebSocketLifecycle(http.WebSocket,ports),fsLifetime:await runFsLifetime(),websocketSurface:runWebSocketSurface()}}finally{await runtime.dispose()}};
 import {localBoundaryCases} from ${JSON.stringify(root + "/src/compat/expansion/boundaries.spec.mjs")};
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
@@ -113,7 +143,7 @@ export {measurements};
 import { runWithRequestScope as withRequestScope } from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/shared/request-scope.js")};
 export const run = name => measureOperation(name,()=>(eventCases[name] ?? localBoundaryCases[name])({withRequestScope,process, tls, classicStreams, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http, cloudflareNode}),name==='classicCodecs'?()=>zlib.gzipSync('x'.repeat(1024)):undefined);
 export {createNetworkRelay, initializeWorkerNetwork} from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/browser/fetch/relay.js")};
-export const runTls = async ({port,upgradePort}) => {
+export const runTls = async ({port,upgradePort,networkPorts}) => {
  const attempt = (servername,halfClose=false) => new Promise((resolve,reject)=> {
   let accepted=false, body='';
   const socket=tls.connect({host:'127.0.0.1',port,servername});
@@ -145,7 +175,7 @@ export const runTls = async ({port,upgradePort}) => {
   plain.on('data',onGreeting);
  });
  const upgradeEnd=[];for(let i=0;i<3;i++)upgradeEnd.push(await upgrade('localhost',true));
- return {valid,directEnd,invalid,upgrade:await upgrade('localhost'),upgradeEnd,upgradeTls12:await upgrade('localhost',true,true),upgradeUntrusted:await upgrade('localhost',false,'untrusted'),upgradeInvalid:await upgrade('wrong.invalid')};
+ return {valid,directEnd,invalid,upgrade:await upgrade('localhost'),upgradeEnd,upgradeTls12:await upgrade('localhost',true,true),upgradeUntrusted:await upgrade('localhost',false,'untrusted'),upgradeInvalid:await upgrade('wrong.invalid'),network:await runNativeNetwork(networkPorts)};
 };`,
   },
   bundle: true,
@@ -161,7 +191,11 @@ export const runTls = async ({port,upgradePort}) => {
     }),
   ],
 });
-const source = compiled.outputFiles[0].text;
+const entryOutput = compiled.outputFiles.find(
+  (file) => file.path === resolve(artifacts, "candidate.js"),
+);
+assert.ok(entryOutput, "Missing native contract entry output");
+const source = entryOutput.text;
 const hash = createHash("sha256").update(source).digest("hex");
 await writeFile(`${artifacts}/candidate.js`, source);
 const harnessSource = await readFile(fileURLToPath(import.meta.url));
@@ -356,7 +390,80 @@ const upgradeServer = tcpServer((socket) => {
   socket.on("data", begin);
 });
 await new Promise((resolve) => upgradeServer.listen(0, "127.0.0.1", resolve));
-const tlsPorts = { port: 0, upgradePort: upgradeServer.address().port };
+// A valid chain with the wrong hostname isolates endpoint-name rejection.
+await writeFile(
+  `${tlsDirectory}/wrong.cnf`,
+  (await readFile(`${tlsDirectory}/ca.cnf`, "utf8")) +
+    "\n[wrong]\nsubjectAltName=DNS:wrong.invalid\nbasicConstraints=CA:FALSE\n",
+);
+execFileSync(
+  "openssl",
+  [
+    "req",
+    "-new",
+    "-key",
+    `${tlsDirectory}/key.pem`,
+    "-out",
+    `${tlsDirectory}/wrong-request.pem`,
+    "-subj",
+    "/CN=wrong.invalid",
+  ],
+  { stdio: "pipe" },
+);
+execFileSync(
+  "openssl",
+  [
+    "ca",
+    "-batch",
+    "-config",
+    `${tlsDirectory}/wrong.cnf`,
+    "-cert",
+    `${tlsDirectory}/ca.pem`,
+    "-extensions",
+    "wrong",
+    "-in",
+    `${tlsDirectory}/wrong-request.pem`,
+    "-out",
+    `${tlsDirectory}/wrong.pem`,
+    "-startdate",
+    certificateTime(Date.now() - 86400000),
+    "-enddate",
+    certificateTime(Date.now() + 172800000),
+  ],
+  { stdio: "pipe" },
+);
+const networkFixture = await createLifecycleFixture({
+  mismatchCert: await readFile(`${tlsDirectory}/wrong.pem`),
+  key: await readFile(`${tlsDirectory}/key.pem`),
+  cert: await readFile(`${tlsDirectory}/ca.pem`),
+});
+let networkExpected;
+try {
+  networkExpected = await networkLifecycleBaseline(
+    networkFixture.ports,
+    `${tlsDirectory}/ca.pem`,
+    `${artifacts}/network-baseline`,
+  );
+} catch (error) {
+  await networkFixture.close();
+  for (const socket of upgradeSockets) socket.destroy();
+  await new Promise((resolve) => upgradeServer.close(resolve));
+  throw error;
+}
+const tlsPorts = {
+  port: 0,
+  upgradePort: upgradeServer.address().port,
+  networkPorts: networkFixture.ports,
+};
+if (platform === "android")
+  for (const port of Object.values(networkFixture.ports))
+    execFileSync("adb", [
+      "-s",
+      device,
+      "reverse",
+      `tcp:${port}`,
+      `tcp:${port}`,
+    ]);
 if (platform === "android")
   execFileSync("adb", [
     "-s",
@@ -378,12 +485,22 @@ const backend = await nativeBackend({
         "--remove",
         `tcp:${tlsPorts.upgradePort}`,
       ]);
+    if (platform === "android")
+      for (const port of Object.values(networkFixture.ports))
+        execFileSync("adb", [
+          "-s",
+          device,
+          "reverse",
+          "--remove",
+          `tcp:${port}`,
+        ]);
+    await networkFixture.close();
     for (const socket of upgradeSockets) socket.destroy();
     await new Promise((resolve) => upgradeServer.close(resolve));
   },
   instrument: () => false,
 });
-tlsPorts.port = Number(backend.url.port);
+tlsPorts.port = networkFixture.ports.gracefulHttp;
 const bootstrapCode = `
 async function main() {
 const source = ${JSON.stringify(source)};
@@ -400,8 +517,31 @@ try {
   results[mode] = {}; measurements[mode] = {};
   for (const name of names) {
    activeCase = {mode,name};
+   document.body.textContent=mode+"/"+name;
+   globalThis.__compatActiveCase=activeCase;
+   if(Object.keys(results[mode]).length % 10 === 0)await report({stage:"progress",activeCase});
    const url = moduleURL+'#'+mode+'-'+name;
-    if (mode === 'page') { const api = await import(/* @vite-ignore */ url); results[mode][name] = JSON.parse(JSON.stringify(await api.run(name))); measurements[mode][name] = api.measurements[name]; }
+    if (mode === 'page') {
+      // Discard the realm after each cold case; module URL fragments alone keep
+      // every Wasm instance alive in the parent page's module map.
+      const frame=document.createElement('iframe');frame.hidden=true;
+      const token='case-'+name;
+      try {
+        const outcome=await new Promise((resolve,reject)=>{
+          const timer=setTimeout(()=>{window.removeEventListener('message',receive);reject(new Error('Page case timeout: '+name));},30000);
+          const receive=event=>{
+            if(event.source!==frame.contentWindow || event.data?.token!==token)return;
+            clearTimeout(timer);window.removeEventListener('message',receive);
+            event.data.error?reject(new Error(event.data.error)):resolve(event.data);
+          };
+          window.addEventListener('message',receive);
+          const code='globalThis.Capacitor=parent.Capacitor;try {const api=await import('+JSON.stringify(url)+');parent.postMessage({token:'+JSON.stringify(token)+',value:JSON.parse(JSON.stringify(await api.run('+JSON.stringify(name)+'))),measurements:api.measurements['+JSON.stringify(name)+']},"*");}catch(error){parent.postMessage({token:'+JSON.stringify(token)+',error:String(error)},"*");}';
+          frame.srcdoc='<script type="module">'+code+'<'+ '/script>';
+          document.body.append(frame);
+        });
+        results[mode][name]=outcome.value;measurements[mode][name]=outcome.measurements;
+      } finally {frame.remove();}
+    }
     else {
      const workerURL = URL.createObjectURL(new Blob(['import {run,measurements} from ' + JSON.stringify(url) + '; self.onmessage = async ({data}) => {try {self.postMessage({value:JSON.parse(JSON.stringify(await run(data))),measurements:measurements[data]});} catch(error) {self.postMessage({error:String(error)});}};'], {type:'text/javascript'}));
      const worker = new Worker(workerURL, {type:'module'});
@@ -436,7 +576,7 @@ try {
  });} finally {tlsWorker.terminate();await relay.dispose();URL.revokeObjectURL(workerURL);}
  await report({stage:'complete', measurements, localBoundaries, nativeTls, hash:${JSON.stringify(hash)}, results});
  document.body.textContent = 'Compatibility contracts complete';
-} catch(error) {await report({stage:'failure', activeCase, completed:{page:Object.keys(results.page??{}),worker:Object.keys(results.worker??{})}, message:String(error), stack:error.stack});document.body.textContent=String(error);}
+} catch(error) {globalThis.__compatFailure={activeCase,message:String(error),stack:error.stack};document.body.textContent=String(error);await report({stage:'failure', activeCase, completed:{page:Object.keys(results.page??{}),worker:Object.keys(results.worker??{})}, message:String(error), stack:error.stack});document.body.textContent=String(error);}
 finally {if(moduleURL) URL.revokeObjectURL(moduleURL);}
 }
 main();
@@ -445,7 +585,9 @@ await writeFile(`${artifacts}/bootstrap.js`, bootstrapCode);
 await runNativeAcceptance({
   // The expansion suite includes key derivation/encoding on both execution modes.
   // Keep its overall budget separate from the individual Worker/socket deadlines.
-  timeout: 180_000,
+  // 104 cold module instances per mode now take over 180s on Android.
+  // Individual Worker/socket deadlines remain unchanged.
+  timeout: 300_000,
   backend,
   artifacts,
   platform,
@@ -467,6 +609,7 @@ await runNativeAcceptance({
       assert.deepEqual(completed.localBoundaries[mode], localBoundaryExpected);
     for (const mode of ["page", "worker"])
       assert.deepEqual(completed.nativeTls[mode], {
+        network: networkExpected,
         valid: { accepted: true, received: true },
         directEnd: { accepted: true, received: true },
         invalid: { accepted: false, received: false },
@@ -486,7 +629,7 @@ await runNativeAcceptance({
         "cryptoCipherStates",
         "cryptoPbkdfContracts",
         "cryptoDigestContracts",
-      ])
+      ].filter((name) => Object.hasOwn(eventCases, name)))
         for (const kind of ["Module", "Instance"])
           assert.ok(
             completed.measurements[mode][name].wasm.some(

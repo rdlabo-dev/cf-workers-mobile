@@ -59,16 +59,55 @@ export function connect(
     throw new TypeError("Invalid TCP address");
   const id = crypto.randomUUID();
   const host = url.hostname.replace(/^\[|\]$/g, "");
-  return transport(call, id, host, options.secureTransport ?? "off", () =>
-    call("WorkersCapacitor", "socketOpen", {
-      id,
-      host,
-      port,
-      tls: options.secureTransport === "on",
-      ...(options.expectedServerHostname
-        ? { servername: options.expectedServerHostname }
-        : {}),
-    }),
+  const directTls = options.secureTransport === "on";
+  let secureCall = call;
+  return transport(
+    (...args) => {
+      const operation = secureCall(...args);
+      return directTls
+        ? operation.catch((error) => {
+            if (
+              error instanceof Error &&
+              error.message.includes(
+                "TLS connection closed without close_notify",
+              )
+            )
+              throw new Error("Network connection lost.");
+            throw error;
+          })
+        : operation;
+    },
+    id,
+    host,
+    options.secureTransport ?? "off",
+    async () => {
+      try {
+        const info = await call("WorkersCapacitor", "socketOpen", {
+          id,
+          host,
+          port,
+          tls: false,
+        });
+        if (options.secureTransport === "on") {
+          const servername = options.expectedServerHostname ?? host;
+          const result = (await call("WorkersCapacitor", "socketStartTls", {
+            id,
+            servername,
+          })) as { tlsEngine?: string } | undefined;
+          // Direct TLS and STARTTLS share the authenticated record engine. On iOS
+          // this also preserves TLS close_notify information that NW TLS hides.
+          if (result?.tlsEngine === "openssl-wasm")
+            secureCall = await nativeTlsSession(call, id, servername);
+        }
+        return info;
+      } catch (error) {
+        if (directTls)
+          throw new Error(
+            "proxy request failed, cannot connect to the specified address",
+          );
+        throw error;
+      }
+    },
   );
 }
 function transport(

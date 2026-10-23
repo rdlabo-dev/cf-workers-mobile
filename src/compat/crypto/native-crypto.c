@@ -227,7 +227,14 @@ API int wk_rsa(EVP_PKEY *key,int operation,const unsigned char *data,size_t leng
  int status=-1;if(initialized<=0)goto done;
  const EVP_MD *digest=NULL;
  if(operation<2){digest=EVP_get_digestbyname(hash);if(!digest){status=-2;goto done;}}
+ /* Match BoringSSL's accepted padding set and operation restrictions. */
+ if((padding!=RSA_PKCS1_PADDING&&padding!=RSA_NO_PADDING&&padding!=RSA_PKCS1_OAEP_PADDING&&padding!=RSA_PKCS1_PSS_PADDING)||
+    (padding==RSA_PKCS1_PSS_PADDING&&operation!=2)||
+    (padding==RSA_PKCS1_OAEP_PADDING&&operation>=2)){status=-3;goto done;}
  if(EVP_PKEY_CTX_set_rsa_padding(ctx,padding)<=0){status=-3;goto done;}
+ /* Workers rejects malformed PKCS#1 ciphertext rather than returning OpenSSL's
+    implicit-rejection substitute plaintext. Keep successful decoding unchanged. */
+ if(operation==1&&padding==RSA_PKCS1_PADDING&&EVP_PKEY_CTX_ctrl_str(ctx,"rsa_pkcs1_implicit_rejection","0")<=0){status=-3;goto done;}
  if(digest && padding==RSA_PKCS1_OAEP_PADDING){
   if(EVP_PKEY_CTX_set_rsa_oaep_md(ctx,digest)!=1){status=-4;goto done;}
   if(EVP_PKEY_CTX_set_rsa_mgf1_md(ctx,digest)!=1){status=-5;goto done;}

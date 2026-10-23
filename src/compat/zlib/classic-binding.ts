@@ -18,6 +18,7 @@ const codes: Record<number, string> = {
 export class ZlibStream {
   private api = library();
   private context = 0;
+  private dictionarySize = 0;
   private state!: Uint32Array;
   private callback!: () => void;
   private onerror?: (errno: number, code: string, message: string) => void;
@@ -34,6 +35,7 @@ export class ZlibStream {
     this.state = state;
     this.callback = callback;
     const bytes = dictionary && Buffer.from(viewBytes(dictionary));
+    this.dictionarySize = bytes?.length ?? 0;
     const pointer = bytes ? this.api.malloc(bytes.length || 1) : 0;
     try {
       if (bytes) {
@@ -115,7 +117,11 @@ export class ZlibStream {
           codes[result],
           result === -5
             ? "unexpected end of file"
-            : message(api, api.cz_message(this.context)),
+            : result === 2
+              ? this.dictionarySize === 0
+                ? "Missing dictionary"
+                : "Bad dictionary"
+              : message(api, api.cz_message(this.context)),
         );
     } finally {
       api.free(pointer);

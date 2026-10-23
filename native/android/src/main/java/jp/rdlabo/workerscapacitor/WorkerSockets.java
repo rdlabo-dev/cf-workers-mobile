@@ -11,6 +11,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.ChannelInputShutdownEvent;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.ssl.SslCloseCompletionEvent;
 import java.util.ArrayDeque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,7 +37,7 @@ final class WorkerSockets {
         Result reading, watching, upgrading;
         String host; int port;
         int count, offset;
-        boolean ready, closed, eof, ended, writing, reset;
+        boolean ready, closed, eof, ended, writing, reset, encrypted, closeNotify;
         Connection(String id, Result opening) { this.id=id; this.opening=opening; }
         void fail(String message) {
             if (closed) return;
@@ -76,15 +77,32 @@ final class WorkerSockets {
         }
         @Override public void channelReadComplete(ChannelHandlerContext context) { if(!ready && !closed) context.read(); else pump(); }
         @Override public void userEventTriggered(ChannelHandlerContext context,Object event) {
-            if(event instanceof ChannelInputShutdownEvent) { eof=true; drain(); notifyEnd(); }
+            if(event instanceof SslCloseCompletionEvent) {
+                SslCloseCompletionEvent tlsClose=(SslCloseCompletionEvent)event;
+                if(tlsClose.isSuccess()) { closeNotify=true; eof=true; drain(); notifyEnd(); }
+                else if(ready && encrypted && !closed) { fail("TLS connection closed without close_notify"); return; }
+                context.fireUserEventTriggered(event);
+            } else if(event instanceof ChannelInputShutdownEvent) {
+                if(!ready || upgrading!=null) { fail("TLS connection closed before handshake completed"); return; }
+                if(encrypted && !closeNotify) { fail("TLS connection closed without close_notify"); return; }
+                eof=true; drain(); notifyEnd();
+            }
             else context.fireUserEventTriggered(event);
         }
         @Override public void channelInactive(ChannelHandlerContext context) {
-            if(!closed) { eof=true; drain(); notifyEnd(); }
+            if(!closed) {
+                if(!ready || upgrading!=null) { fail("Socket closed before handshake completed"); return; }
+                if(encrypted && !closeNotify) { fail("TLS connection closed without close_notify"); return; }
+                eof=true; drain(); notifyEnd();
+            }
         }
         @Override public void exceptionCaught(ChannelHandlerContext context,Throwable error) {
-            reset = error instanceof java.io.IOException && String.valueOf(error.getMessage()).toLowerCase(java.util.Locale.ROOT).contains("reset");
-            fail("Socket failed: "+error.getMessage());
+            boolean peerReset = error instanceof java.io.IOException && String.valueOf(error.getMessage()).toLowerCase(java.util.Locale.ROOT).contains("reset");
+            // Workers' plain TCP reset-as-EOF behavior must not turn a truncated
+            // authenticated TLS stream into a successful end.
+            if(encrypted && peerReset && closeNotify) { eof=true; drain(); notifyEnd(); return; }
+            reset = !encrypted && peerReset;
+            fail(encrypted && peerReset ? "TLS connection closed without close_notify" : "Socket failed: "+error.getMessage());
         }
     }
     synchronized void open(String id,String host,int port,boolean tls,Result result) { open(id,host,port,tls,null,result); }
@@ -103,7 +121,7 @@ final class WorkerSockets {
                 SSLParameters parameters=engine.getSSLParameters(); parameters.setEndpointIdentificationAlgorithm("HTTPS"); engine.setSSLParameters(parameters);
             } else engine=null;
             if(group==null) group=new NioEventLoopGroup(1);
-            Connection connection=new Connection(id,result); connection.host=host; connection.port=port; connections.put(id,connection);
+            Connection connection=new Connection(id,result); connection.host=host; connection.port=port; connection.encrypted=tls; connections.put(id,connection);
             ChannelFuture future=new Bootstrap().group(group).channel(NioSocketChannel.class)
                 .option(ChannelOption.AUTO_READ,false).option(ChannelOption.ALLOW_HALF_CLOSURE,true)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS,30000)
@@ -144,7 +162,7 @@ final class WorkerSockets {
                 }
                 engine.setUseClientMode(true);
                 SSLParameters parameters=engine.getSSLParameters(); parameters.setEndpointIdentificationAlgorithm("HTTPS"); engine.setSSLParameters(parameters);
-                connection.upgrading=result;
+                connection.upgrading=result; connection.encrypted=true;
                 JSObject moved=new JSObject(); moved.put("upgraded",true);
                 if(connection.reading!=null) { Result pending=connection.reading; connection.reading=null; pending.resolve(moved); }
                 if(connection.watching!=null) { Result pending=connection.watching; connection.watching=null; pending.resolve(moved); }

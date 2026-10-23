@@ -279,6 +279,36 @@ export function installIo(api: any, promises: any) {
         );
       },
     );
+  // The callback frontends have their own pinned validation/default order.
+  api.readFile = (path: any, options: any, callback?: any) => {
+    if (typeof options === "function") {
+      callback = options;
+      options = {};
+    }
+    options = optionsObject(options);
+    validateObject(options, "options");
+    const { encoding = null } = options;
+    if (
+      encoding !== null &&
+      encoding !== "buffer" &&
+      !Buffer.isEncoding(encoding)
+    )
+      throw new ERR_INVALID_ARG_VALUE("options.encoding", encoding);
+    validateFunction(callback, "callback");
+    try {
+      const value = api.readFileSync(path, options);
+      queueMicrotask(() => callback(null, value));
+    } catch (error) {
+      queueMicrotask(() => callback(error));
+    }
+  };
+  api.appendFile = (path: any, data: any, options: any, callback?: any) => {
+    if (typeof options === "function") {
+      callback = options;
+      options = { encoding: "utf8", mode: 0o666, flag: "a", flush: false };
+    }
+    return api.writeFile(path, data, options, callback);
+  };
   const open = api.openSync;
   api.openSync = (path: any, flag: any = "r", mode?: any) => {
     let value = flags(flag);

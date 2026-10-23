@@ -162,7 +162,12 @@ it("preserves the TLS verification name when connecting to a resolved address", 
   ).toMatchObject({
     host: "127.0.0.1",
     port: 443,
-    tls: true,
+    tls: false,
+  });
+  expect(
+    call.mock.calls.find((args) => args[1] === "socketStartTls")?.[2],
+  ).toMatchObject({
+    id: call.mock.calls.find((args) => args[1] === "socketOpen")?.[2].id,
     servername: "example.com",
   });
   await socket.close();
@@ -202,4 +207,44 @@ it("flushes an active plain write before TLS handoff and invalidates the old wri
   expect(call.mock.calls.some(([, m]) => m === "socketClose")).toBe(false);
   await tls.close();
   expect(call.mock.calls.some(([, m]) => m === "socketClose")).toBe(true);
+});
+
+it("holds direct TLS open and application IO until authentication completes", async () => {
+  let authenticated!: (value: unknown) => void;
+  const call = vi.fn<NativeCall>(async (_, method) => {
+    if (method === "socketOpen") return { remoteAddress: "127.0.0.1:443" };
+    if (method === "socketStartTls")
+      return new Promise((resolve) => {
+        authenticated = resolve;
+      });
+    if (method === "socketRead" || method === "socketWatch")
+      return new Promise(() => {});
+    return {};
+  });
+  restore = setNativeCall(call);
+  const socket = connect("127.0.0.1:443", {
+    secureTransport: "on",
+    expectedServerHostname: "verified.test",
+  });
+  let opened = false;
+  void socket.opened.then(() => {
+    opened = true;
+  });
+  const write = socket.writable.getWriter().write(new Uint8Array([1]));
+  await vi.waitFor(() => expect(authenticated).toBeTypeOf("function"));
+  expect(opened).toBe(false);
+  expect(call.mock.calls.some(([, method]) => method === "socketWrite")).toBe(
+    false,
+  );
+  expect(
+    call.mock.calls.find(([, method]) => method === "socketOpen")?.[2],
+  ).toMatchObject({ tls: false });
+  expect(
+    call.mock.calls.find(([, method]) => method === "socketStartTls")?.[2],
+  ).toMatchObject({ servername: "verified.test" });
+  authenticated({});
+  await socket.opened;
+  await write;
+  expect(opened).toBe(true);
+  await socket.close();
 });

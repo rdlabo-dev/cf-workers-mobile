@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import * as fs from "./index.js";
-import { runWithTemporaryFiles } from "./writable.js";
+import { runWithTemporaryFiles, retainTemporaryFiles } from "./writable.js";
 
 test("access uses Workers permissions for temporary and embedded files", async () => {
   fs.registerVirtualFiles({ "/bundle/access-data": "read only" });
@@ -274,5 +274,47 @@ test("FileHandle metadata retains its originating volume after request scope exi
     expect((await handles[1].stat()).mode & 0o777).toBe(0o666);
   } finally {
     await Promise.all(handles.map((handle) => handle.close()));
+  }
+});
+
+test("streams created in an ended request retain their volume when consumed in another request", async () => {
+  // Pinned workerd two-request probe: the first stream reads A and writes A;
+  // request B retains its independent B contents (fs-cross-request.json).
+  for (const kind of ["direct", "handle"]) {
+    const held = await runWithTemporaryFiles(async () => {
+      fs.writeFileSync("/tmp/lifetime-read", "A");
+      fs.writeFileSync("/tmp/lifetime-write", "A");
+      const run = retainTemporaryFiles();
+      const read =
+        kind === "direct"
+          ? fs.createReadStream("/tmp/lifetime-read")
+          : (
+              await fs.promises.open("/tmp/lifetime-read", "r")
+            ).createReadStream();
+      const write =
+        kind === "direct"
+          ? fs.createWriteStream("/tmp/lifetime-write")
+          : (
+              await fs.promises.open("/tmp/lifetime-write", "w")
+            ).createWriteStream();
+      return { read, write, run };
+    });
+    await runWithTemporaryFiles(async () => {
+      fs.writeFileSync("/tmp/lifetime-read", "B");
+      fs.writeFileSync("/tmp/lifetime-write", "B");
+      const written = new Promise<void>((resolve, reject) => {
+        held.write.once("error", reject);
+        held.write.end("changed", () => resolve());
+      });
+      let text = "";
+      for await (const chunk of held.read) text += chunk.toString();
+      await written;
+      expect(text).toBe("A");
+      expect(fs.readFileSync("/tmp/lifetime-read", "utf8")).toBe("B");
+      expect(fs.readFileSync("/tmp/lifetime-write", "utf8")).toBe("B");
+      expect(
+        held.run(() => fs.readFileSync("/tmp/lifetime-write", "utf8")),
+      ).toBe("changed");
+    });
   }
 });

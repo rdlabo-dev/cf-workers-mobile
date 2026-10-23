@@ -123,10 +123,6 @@ export async function handleAsNodeRequest(
       reject(error);
       res.destroy(error);
     });
-    res.once("finish", () => {
-      request.signal.removeEventListener("abort", onAbort);
-      if (!req.complete) req.destroy();
-    });
     res.once("headers", () => {
       try {
         const headers = new Headers();
@@ -159,25 +155,9 @@ export async function handleAsNodeRequest(
         res.destroy(error instanceof Error ? error : new Error(String(error)));
       }
     });
-    const onAbort = () => {
-      const reason = request.signal.reason;
-      const error =
-        reason instanceof Error
-          ? reason
-          : new Error("The operation was aborted", { cause: reason });
-      req.destroy(error);
-      res.destroy(error);
-    };
     res.once("close", () => {
-      request.signal.removeEventListener("abort", onAbort);
-      if (!req.complete) req.destroy();
       if (!res.finished) reject(new Error("Premature close"));
     });
-    request.signal.addEventListener("abort", onAbort, { once: true });
-    if (request.signal.aborted) {
-      onAbort();
-      return;
-    }
     try {
       server.emit("connection", server, req);
       server.emit("request", req, res);
