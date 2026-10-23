@@ -1,4 +1,247 @@
 export const eventCases = {
+  cryptoPrimeBrands: function ({ crypto: c }) {
+    const result = {};
+    for (const operation of ["check", "add", "rem"]) {
+      for (const kind of [
+        "fake",
+        "taggedBuffer",
+        "taggedView",
+        "taggedDataView",
+      ]) {
+        const bytes = new Uint8Array([
+          operation === "check" ? 3 : operation === "add" ? 12 : 11,
+        ]);
+        const value =
+          kind === "fake"
+            ? { [Symbol.toStringTag]: "ArrayBuffer" }
+            : kind === "taggedBuffer"
+              ? bytes.buffer
+              : kind === "taggedDataView"
+                ? new DataView(bytes.buffer)
+                : bytes;
+        if (kind !== "fake")
+          Object.defineProperty(value, Symbol.toStringTag, { value: "Fake" });
+        try {
+          const output =
+            operation === "check"
+              ? c.checkPrimeSync(value)
+              : c.generatePrimeSync(8, {
+                  bigint: true,
+                  add: operation === "add" ? value : 12n,
+                  rem: operation === "rem" ? value : 11n,
+                });
+          result[`${operation}/${kind}`] =
+            typeof output === "bigint" ? output % 12n === 11n : output;
+        } catch (error) {
+          result[`${operation}/${kind}`] = {
+            name: error.name,
+            code: error.code ?? null,
+            message: error.message,
+          };
+        }
+      }
+    }
+    return result;
+  },
+  cryptoCipherInputViews: function ({ crypto: c }) {
+    const result = {};
+    for (const operation of [
+      "secretKey",
+      "cipherKey",
+      "iv",
+      "aad",
+      "tag",
+      "primeAdd",
+    ]) {
+      for (const type of ["typed", "data"]) {
+        for (const property of ["buffer", "byteOffset", "byteLength"]) {
+          const view = (input) => {
+            const bytes = new Uint8Array(input.length + 2);
+            bytes.set(input, 1);
+            const value =
+              type === "typed"
+                ? new Uint8Array(bytes.buffer, 1, input.length)
+                : new DataView(bytes.buffer, 1, input.length);
+            Object.defineProperty(value, property, {
+              get() {
+                throw new Error("shadow " + property);
+              },
+            });
+            return value;
+          };
+          const name = `${operation}/${type}/${property}`;
+          try {
+            let key = new Uint8Array(16),
+              iv = new Uint8Array(12);
+            if (operation === "secretKey") {
+              result[name] = Array.from(c.createSecretKey(view(key)).export());
+              continue;
+            }
+            if (operation === "primeAdd") {
+              const prime = c.generatePrimeSync(8, {
+                add: view([12]),
+                rem: view([11]),
+                bigint: true,
+              });
+              result[name] = prime % 12n === 11n;
+              continue;
+            }
+            if (operation === "cipherKey") key = view(key);
+            if (operation === "iv") iv = view(iv);
+            const enc = c.createCipheriv("aes-128-gcm", key, iv);
+            enc.setAAD(operation === "aad" ? view([3]) : new Uint8Array([3]));
+            const encrypted = enc.update("abc", "utf8");
+            enc.final();
+            const tag = enc.getAuthTag();
+            const dec = c.createDecipheriv("aes-128-gcm", key, iv);
+            dec.setAAD(new Uint8Array([3]));
+            dec.setAuthTag(operation === "tag" ? view(tag) : tag);
+            result[name] = Array.from(dec.update(encrypted));
+            dec.final();
+          } catch (error) {
+            result[name] = {
+              name: error.name,
+              code: error.code ?? null,
+              message: error.message,
+            };
+          }
+        }
+      }
+    }
+    return result;
+  },
+  cryptoRsaDigestRegistry: function ({ crypto: c }) {
+    const pair = c.generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const result = {};
+    for (const hash of [
+      ...c.getHashes(),
+      "SHA256",
+      "sha256\0ignored",
+      "sha3-256",
+      "ripemd160",
+      "blake2b512",
+      "",
+      "missing",
+    ]) {
+      for (const padding of [4, 1, 999]) {
+        for (const operation of [
+          "publicEncrypt",
+          "privateDecrypt",
+          "privateEncrypt",
+          "publicDecrypt",
+        ]) {
+          const options = {
+            key: operation.startsWith("private")
+              ? pair.privateKey
+              : pair.publicKey,
+            oaepHash: hash,
+            padding,
+          };
+          const name = `${operation}/${padding}/${hash}`;
+          try {
+            const output = c[operation](options, new Uint8Array([1]));
+            result[name] = { length: output.length };
+          } catch (error) {
+            result[name] = {
+              name: error.name,
+              code: error.code ?? null,
+              message: error.message,
+            };
+          }
+        }
+      }
+    }
+    return result;
+  },
+  cryptoInputViews: function ({ crypto: c }) {
+    const result = {};
+    const pair = c.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    for (const operation of [
+      "hash",
+      "hmacKey",
+      "hmacUpdate",
+      "cipher",
+      "prime",
+      "sign",
+      "verifySignature",
+    ]) {
+      for (const type of ["typed", "data"]) {
+        for (const property of [
+          "none",
+          "buffer",
+          "byteOffset",
+          "byteLength",
+          "detached",
+        ]) {
+          const original =
+            operation === "verifySignature"
+              ? c.createSign("sha256").update("message").sign(pair.privateKey)
+              : new Uint8Array([3]);
+          const backing = new Uint8Array(original.length + 2);
+          backing.set(original, 1);
+          const view =
+            type === "typed"
+              ? new Uint8Array(backing.buffer, 1, original.length)
+              : new DataView(backing.buffer, 1, original.length);
+          if (property === "detached")
+            structuredClone(backing.buffer, { transfer: [backing.buffer] });
+          else if (property !== "none")
+            Object.defineProperty(view, property, {
+              get() {
+                throw new Error("shadow " + property);
+              },
+            });
+          const name = `${operation}/${type}/${property}`;
+          try {
+            let output;
+            if (operation === "hash")
+              output = c.createHash("sha256").update(view).digest("hex");
+            if (operation === "hmacKey")
+              output = c.createHmac("sha256", view).update("a").digest("hex");
+            if (operation === "hmacUpdate")
+              output = c.createHmac("sha256", "key").update(view).digest("hex");
+            if (operation === "cipher") {
+              const cipher = c.createCipheriv(
+                "aes-128-ctr",
+                new Uint8Array(16),
+                new Uint8Array(16),
+              );
+              output = Array.from(cipher.update(view));
+              cipher.final();
+            }
+            if (operation === "prime") output = c.checkPrimeSync(view);
+            if (operation === "sign") {
+              const signature = c
+                .createSign("sha256")
+                .update(view)
+                .sign(pair.privateKey);
+              output = c
+                .createVerify("sha256")
+                .update(
+                  property === "detached"
+                    ? new Uint8Array()
+                    : new Uint8Array([3]),
+                )
+                .verify(pair.publicKey, signature);
+            }
+            if (operation === "verifySignature")
+              output = c
+                .createVerify("sha256")
+                .update("message")
+                .verify(pair.publicKey, view);
+            result[name] = output;
+          } catch (error) {
+            result[name] = {
+              name: error.name,
+              code: error.code ?? null,
+              message: error.message,
+            };
+          }
+        }
+      }
+    }
+    return result;
+  },
   codecNativeBounds: function ({ zlib: z }) {
     const result = {};
     for (const factory of [

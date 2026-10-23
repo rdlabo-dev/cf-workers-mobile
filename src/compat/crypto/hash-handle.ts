@@ -1,3 +1,4 @@
+import { bufferBytes, viewBytes } from "../../shared/buffer-source.js";
 import { validateCryptoLength } from "./validation.js";
 import { secretMaterial, KeyObject } from "./keys.js";
 import { Buffer } from "node:buffer";
@@ -25,10 +26,9 @@ class HashHandle {
         "Hash context has already been finalized.",
         "OperationError",
       );
-    validateCryptoLength(data.byteLength, "data is too long");
-    this.hash.update(
-      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    );
+    const input = viewBytes(data);
+    validateCryptoLength(input.byteLength, "data is too long");
+    this.hash.update(input);
     return 1;
   }
   digest() {
@@ -51,9 +51,7 @@ class HmacHandle {
     if (typeof CryptoKey !== "undefined" && key instanceof CryptoKey)
       key = KeyObject.from(key);
     key = secretMaterial(key);
-    const data = ArrayBuffer.isView(key)
-      ? new Uint8Array(key.buffer, key.byteOffset, key.byteLength)
-      : new Uint8Array(key);
+    const data = ArrayBuffer.isView(key) ? viewBytes(key) : bufferBytes(key);
     validateCryptoLength(data.byteLength, "key is too long");
     const normalized = aliases[algorithm.split("\0")[0]!.toLowerCase()];
     if (!normalized) throw new Error("Digest method not supported");
@@ -65,10 +63,9 @@ class HmacHandle {
         "HMAC context has already been finalized.",
         "OperationError",
       );
-    validateCryptoLength(data.byteLength, "data is too long");
-    this.hmac.update(
-      new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
-    );
+    const input = viewBytes(data);
+    validateCryptoLength(input.byteLength, "data is too long");
+    this.hmac.update(input);
     return 1;
   }
   digest() {

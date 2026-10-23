@@ -1,3 +1,4 @@
+import { bufferBytes, viewBytes } from "../../shared/buffer-source.js";
 import { isAnyBuffer } from "./validation.js";
 import { signatureDigest } from "./digests.js";
 import { Buffer } from "node:buffer";
@@ -76,9 +77,7 @@ export class SignHandle {
     this.hash = new NativeDigest(this.algorithm);
   }
   update(data: Uint8Array) {
-    this.hash.update(
-      Buffer.from(data.buffer, data.byteOffset, data.byteLength),
-    );
+    this.hash.update(viewBytes(data));
   }
   sign(value: any, padding?: number, saltLength?: number, encoding?: number) {
     this.hash.assertActive();
@@ -114,9 +113,7 @@ export class VerifyHandle {
     this.hash = new NativeDigest(this.algorithm, "Verification");
   }
   update(data: Uint8Array) {
-    this.hash.update(
-      Buffer.from(data.buffer, data.byteOffset, data.byteLength),
-    );
+    this.hash.update(viewBytes(data));
   }
   verify(
     value: any,
@@ -133,13 +130,9 @@ export class VerifyHandle {
     const native = key(value);
     if (native.type === "ed25519" || native.type === "ed448")
       throw new Error("Unsupported operation for this key");
-    let signatureBytes = isAnyBuffer(signature)
-      ? Buffer.from(signature)
-      : Buffer.from(
-          signature.buffer,
-          signature.byteOffset,
-          signature.byteLength,
-        );
+    let signatureBytes: Buffer = Buffer.from(
+      isAnyBuffer(signature) ? bufferBytes(signature) : viewBytes(signature),
+    );
     const hash = this.hash.final();
     if (native.type === "dsa")
       throw new Error("Verifying with DSA keys is not currently supported");

@@ -5,7 +5,7 @@ import { exportJwk } from "./key-formats.js";
 // synchronous-engine boundary; adapter-created secret keys own copied bytes.
 import { Buffer } from "node:buffer";
 import { keyStates, type KeyState } from "./key-state.js";
-import { bytes, validateInteger } from "./validation.js";
+import { bytes, isAnyBuffer, validateInteger } from "./validation.js";
 import {
   validateObject,
   validateString,
@@ -276,12 +276,8 @@ export function createSecretKey(
 ): SecretKeyObject {
   if (
     typeof value !== "string" &&
-    !(value instanceof ArrayBuffer) &&
-    !ArrayBuffer.isView(value) &&
-    !(
-      typeof SharedArrayBuffer !== "undefined" &&
-      value instanceof SharedArrayBuffer
-    )
+    !isAnyBuffer(value) &&
+    !ArrayBuffer.isView(value)
   )
     throw new ERR_INVALID_ARG_TYPE(
       "key",
@@ -291,10 +287,13 @@ export function createSecretKey(
   const data =
     typeof value === "string"
       ? Buffer.from(value, encoding)
-      : typeof SharedArrayBuffer !== "undefined" &&
-          value instanceof SharedArrayBuffer
+      : isAnyBuffer(value)
         ? new Uint8Array(value)
-        : bytes(value, "key");
+        : new Uint8Array(
+            (value as ArrayBufferView).buffer,
+            (value as ArrayBufferView).byteOffset,
+            (value as ArrayBufferView).byteLength,
+          );
   return create("secret", { bytes: new Uint8Array(data) }) as SecretKeyObject;
 }
 export function secretMaterial(value: unknown): any {

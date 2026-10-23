@@ -2,6 +2,7 @@
 // 5358e3d337336eaf696a48bc1563d808b10feba5 (crypto.c++), Apache-2.0.
 import { library, inputs, output, size } from "./native-cipher.js";
 import { secretMaterial } from "./keys.js";
+import { bufferBytes, viewBytes } from "../../shared/buffer-source.js";
 import { isAnyBuffer } from "./validation.js";
 const aeadNames = new Set([
   "aes-128-gcm",
@@ -26,9 +27,8 @@ function requireValue(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
 }
 function bytes(value: ArrayBuffer | ArrayBufferView): Uint8Array {
-  if (isAnyBuffer(value)) return new Uint8Array(value);
-  if (ArrayBuffer.isView(value))
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  if (isAnyBuffer(value)) return bufferBytes(value);
+  if (ArrayBuffer.isView(value)) return viewBytes(value);
   throw new TypeError("Expected an ArrayBuffer or ArrayBufferView");
 }
 const released = new FinalizationRegistry<{ pointer: number; aead: boolean }>(

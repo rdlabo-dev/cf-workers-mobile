@@ -1,4 +1,5 @@
 import binary from "./native-crypto.wasm";
+import { aliases } from "./digests.js";
 type API = Record<string, (...args: any[]) => any> & {
   memory: WebAssembly.Memory;
 };
@@ -134,7 +135,9 @@ export class NativeKey {
     return inputs(
       [
         data,
-        options.oaepHash,
+        operation < 2
+          ? (aliases[options.oaepHash.split("\0")[0].toLowerCase()] ?? "")
+          : options.oaepHash,
         label instanceof ArrayBuffer ? new Uint8Array(label) : label,
       ],
       (api, [p, h, l]) => {

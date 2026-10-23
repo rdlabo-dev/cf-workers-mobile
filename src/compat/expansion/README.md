@@ -193,6 +193,14 @@ Full TLS class and
 HTTP internal state contracts remain open.
 Consult the generated completion report for remaining work.
 
+Hash, HMAC, cipher data/IV/AAD/tag, streaming signature and prime native
+boundaries read intrinsic BufferSource extents, including detached empty inputs.
+Secret-key construction retains the Workers JavaScript frontend's observable
+buffer/offset/length copy, so a shadow getter may reject before native processing.
+RSA encrypt/decrypt digest names use the pinned Workers digest registry, including
+its aliases, case handling and NUL termination. OpenSSL-only digest names are
+rejected through the same native error path.
+
 Workers reports `fips=true` because of its own crypto backend. The WebView's
 JavaScript implementations do not establish FIPS compliance, so that flag is
 not copied merely to match the export inventory. `setFips` and `setEngine`
