@@ -13,6 +13,8 @@ public final class WorkersCapacitorPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "start", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "socketWatch", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "socketVerifyTls", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "socketStartTls", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "socketOpen", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "socketWrite", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "socketEnd", returnType: CAPPluginReturnPromise),
@@ -69,6 +71,8 @@ public final class WorkersCapacitorPlugin: CAPPlugin, CAPBridgedPlugin {
             Task { await owner.closeAll(); call.resolve() }
         }
     }
+    @objc func socketVerifyTls(_ call: CAPPluginCall) { network.socketVerifyTls(call) }
+    @objc func socketStartTls(_ call: CAPPluginCall) { network.socketStartTls(call) }
     @objc func socketWatch(_ call: CAPPluginCall) { network.socketWatch(call) }
     @objc func socketOpen(_ call: CAPPluginCall) { network.socketOpen(call) }
     @objc func socketWrite(_ call: CAPPluginCall) { network.socketWrite(call) }

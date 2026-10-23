@@ -167,3 +167,39 @@ it("preserves the TLS verification name when connecting to a resolved address", 
   });
   await socket.close();
 });
+
+it("flushes an active plain write before TLS handoff and invalidates the old writer", async () => {
+  let finish!: () => void;
+  const call = vi.fn<NativeCall>(async (_, method) => {
+    if (method === "socketWrite")
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    if (method === "socketRead" || method === "socketWatch")
+      return new Promise(() => {});
+    return {};
+  });
+  restore = setNativeCall(call);
+  const plain = connect("localhost:1234", { secureTransport: "starttls" });
+  await plain.opened;
+  const writer = plain.writable.getWriter();
+  void writer.closed.catch(() => {});
+  const writing = writer.write(new Uint8Array([1]));
+  await Promise.resolve();
+  await Promise.resolve();
+  const tls = plain.startTls({ expectedServerHostname: "localhost" });
+  await Promise.resolve();
+  expect(call.mock.calls.some(([, m]) => m === "socketStartTls")).toBe(false);
+  finish();
+  await writing;
+  await tls.opened;
+  await expect(writer.write(new Uint8Array([2]))).rejects.toThrow("upgraded");
+  expect(call.mock.calls.filter(([, m]) => m === "socketOpen")).toHaveLength(1);
+  expect(call.mock.calls.filter(([, m]) => m === "socketWrite")).toHaveLength(
+    1,
+  );
+  await plain.close();
+  expect(call.mock.calls.some(([, m]) => m === "socketClose")).toBe(false);
+  await tls.close();
+  expect(call.mock.calls.some(([, m]) => m === "socketClose")).toBe(true);
+});

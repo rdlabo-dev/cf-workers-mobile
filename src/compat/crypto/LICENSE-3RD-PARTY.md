@@ -13,3 +13,7 @@ Copyright Cloudflare, Inc.; Apache License 2.0. Node.js/Joyent and Deno MIT
 notices are retained in the corresponding source files. Host transport and
 module imports are adapted for Capacitor. Public exports remain those of the
 pinned workerd module; internal helpers are not added to the public facade.
+
+X509 certificate wrappers and safe name rendering are adapted from
+`src/node/internal/crypto_x509.ts` and `src/workerd/api/crypto/x509.c++` at
+workerd commit `5358e3d337336eaf696a48bc1563d808b10feba5` (Apache-2.0).

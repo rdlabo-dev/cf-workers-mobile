@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
+import { format, resolveConfig } from "prettier";
 const sdk = resolve(process.env.CODEC_EMSDK ?? "artifacts/toolchains/emsdk");
 const source = resolve("artifacts/upstream/openssl");
 const revision = (directory) =>
@@ -70,6 +71,7 @@ execFileSync(
   [
     binding,
     "-I" + join(source, "include"),
+    join(source, "libssl.a"),
     join(source, "libcrypto.a"),
     ...flags,
     "-o",
@@ -79,17 +81,18 @@ execFileSync(
 );
 const sha = (path) =>
   createHash("sha256").update(readFileSync(path)).digest("hex");
+const manifest = "src/compat/crypto/native-crypto.build.json";
 writeFileSync(
-  "src/compat/crypto/native-crypto.build.json",
-  JSON.stringify(
-    {
+  manifest,
+  await format(
+    JSON.stringify({
       revisions,
       configure,
       flags,
+      libraries: ["libssl.a", "libcrypto.a"],
       bindingSha256: sha(binding),
       sha256: sha(output),
-    },
-    null,
-    2,
-  ) + "\n",
+    }),
+    { ...(await resolveConfig(manifest)), parser: "json" },
+  ),
 );

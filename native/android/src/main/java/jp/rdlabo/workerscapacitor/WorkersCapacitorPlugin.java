@@ -110,6 +110,7 @@ public class WorkersCapacitorPlugin extends Plugin {
         };
     }
 
+    @PluginMethod public void socketStartTls(PluginCall call) { network.startTls(call.getString("id"),call.getString("servername"),result(call)); }
     @PluginMethod public void socketWatch(PluginCall call) { network.watch(call.getString("id"),result(call)); }
     @PluginMethod public void socketOpen(PluginCall call) {
         network.open(call.getString("id"),call.getString("host"),call.getInt("port",0),call.getBoolean("tls",false),call.getString("servername"),result(call));
@@ -246,6 +247,7 @@ public class WorkersCapacitorPlugin extends Plugin {
         }
         @JavascriptInterface public void cookiesGet(String callbackId,String url) { WorkersCapacitorPlugin.this.cookiesGet(url,hostResult(owner,callbackId)); }
         @JavascriptInterface public void cookiesSet(String callbackId,String url,String cookies) { WorkersCapacitorPlugin.this.cookiesSet(url,cookies,hostResult(owner,callbackId)); }
+        @JavascriptInterface public void socketStartTls(String callbackId,String id,String servername) { network.startTls(id,servername,hostResult(owner,callbackId)); }
         @JavascriptInterface public void socketWatch(String callbackId,String id) { network.watch(id,hostResult(owner,callbackId)); }
         @JavascriptInterface public void socketOpen(String callbackId,String id,String host,int port,boolean tls,String servername) { network.open(id,host,port,tls,servername,hostResult(owner,callbackId)); }
         @JavascriptInterface public void socketWrite(String callbackId,String id,String chunk) { network.write(id,chunk,hostResult(owner,callbackId)); }

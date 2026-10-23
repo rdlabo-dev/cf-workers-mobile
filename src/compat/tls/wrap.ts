@@ -247,13 +247,21 @@ export function TLSSocket(
     }
   }
 
-  // Native transports cannot upgrade an already-open connection yet. Reject
-  // before taking ownership of its writer: marking a plain socket encrypted
-  // without a handshake would allow TLS application data onto the wire as text.
-  if (socket != null) {
-    throw new ERR_METHOD_NOT_IMPLEMENTED("TLS upgrade of an existing socket");
+  if (socket != null && !(socket instanceof Socket)) {
+    throw new ERR_METHOD_NOT_IMPLEMENTED("TLS upgrade of a custom Duplex");
   }
 
+  if (
+    socket instanceof Socket &&
+    (socket.destroyed ||
+      (socket._handle &&
+        (socket._handle.handedOver ||
+          socket._handle.socket.secureTransport !== "starttls")))
+  ) {
+    throw new ERR_METHOD_NOT_IMPLEMENTED(
+      "TLS upgrade of an unavailable socket",
+    );
+  }
   this._tlsOptions = tlsOptions;
   this._secureEstablished = false;
   this._securePending = false;
@@ -308,6 +316,13 @@ export function TLSSocket(
   this.on("error", this._tlsError.bind(this));
 
   this._init();
+  if (socket != null) {
+    this.connecting = true;
+    queueMicrotask(() => {
+      this.connecting = false;
+      this._start();
+    });
+  }
 }
 Object.setPrototypeOf(TLSSocket.prototype, Socket.prototype);
 Object.setPrototypeOf(TLSSocket, Socket);
@@ -484,6 +499,7 @@ TLSSocket.prototype._finishInit = function _finishInit(this: TLSSocket): void {
 };
 
 TLSSocket.prototype._start = function _start(this: TLSSocket): void {
+  if (this.destroyed) return;
   if (this.connecting) {
     this.once("connect", this._start.bind(this));
     return;
@@ -534,7 +550,7 @@ TLSSocket.prototype._start = function _start(this: TLSSocket): void {
       reader: socketReader(socket.readable),
       bytesRead: 0,
       bytesWritten: 0,
-      reading: true,
+      reading: false,
       options: this._handle.options,
     };
 

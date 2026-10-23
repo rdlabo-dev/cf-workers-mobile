@@ -1,4 +1,147 @@
 export const eventCases = {
+  x509: function ({ crypto: c }) {
+    const pem =
+      "-----BEGIN CERTIFICATE-----\nMIIDhDCCAmygAwIBAgIUdN1my4bhw3mAm+rrvYEZBzi4nuAwDQYJKoZIhvcNAQEL\nBQAwJjESMBAGA1UEAwwJbG9jYWxob3N0MRAwDgYDVQQKDAdXb3JrZXJzMB4XDTI2\nMTAyMjIzMTEyNVoXDTI2MTAyNDIzMTEyNVowJjESMBAGA1UEAwwJbG9jYWxob3N0\nMRAwDgYDVQQKDAdXb3JrZXJzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC\nAQEAmdA4QcozdOsYQJXG5oDzOJEKHIoyM1HDVXgH2ZWTL0Qm9yJJ02uV55IhW2AY\nshAs1ZROFCae5891g4ohl1H4sFDE5HYuD4BLkh9RY8QcZ7170nA1fnxNfO0K0GZs\nJyCOerlt5fLJjcEQiiyjbs8/2yukxHJraHQIZ1cO/PbWJx9O7iZ5Ru7u2ompDrsz\nzTbVgjI/u4g+sHEf+11me+7WW13Lj4FvpDHZp1K9zoMtOj/ruURVs/5wO3gygNnO\nVVrtNc/0nOU0Qqlqyr0QC9ZkHpn374hL2m0KC9BNixbLdQ+Oy4O406UhQXUGOSPg\ndfN3MBgPJrs1yZ1Io6pL41LWXwIDAQABo4GpMIGmMB0GA1UdDgQWBBSlprvE05R3\nZRC3gulykkeMzbOIZzAPBgNVHRMBAf8EBTADAQH/MFUGA1UdEQROMEyCCWxvY2Fs\naG9zdIIOKi5leGFtcGxlLnRlc3SHBH8AAAGBEXRlc3RAZXhhbXBsZS50ZXN0hhZo\ndHRwczovL2V4YW1wbGUudGVzdC9hMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEF\nBQcDAjANBgkqhkiG9w0BAQsFAAOCAQEAWO4DydLOPOBNyKYw50dBT/UgF9l7zvk+\nl2C7v1dMVCtpKW4egHUjINf+tOHC7PLjMMSKDvM/NGszAePPRSAJzfvoIEF5nahz\nLAzcM3zIdp7vviP1yeSSgJH5QRvo4pMV13K4FHARR5L/ShZqEKvKbVwDCrzymkND\nV5SGa11p5xf0Fm6061vfgBQ85vNFANXByqznGhn9tBRf5pJGBl4cjTJ9WCl8zVCs\n++24wsetgXwxL9O1p+NvfM8SdTVGBSevAA/OAc2Fjoye4oJHH4n3sCsIxoEeRnb4\nZYhC9Q4UwNucHDFJASAMWC5AfX7P+HnaguZXGHsfBrw/39sZFdncwg==\n-----END CERTIFICATE-----\n";
+    const privatePem =
+      "-----BEGIN PRIVATE KEY-----\nMIIEugIBADANBgkqhkiG9w0BAQEFAASCBKQwggSgAgEAAoIBAQCZ0DhByjN06xhA\nlcbmgPM4kQocijIzUcNVeAfZlZMvRCb3IknTa5XnkiFbYBiyECzVlE4UJp7nz3WD\niiGXUfiwUMTkdi4PgEuSH1FjxBxnvXvScDV+fE187QrQZmwnII56uW3l8smNwRCK\nLKNuzz/bK6TEcmtodAhnVw789tYnH07uJnlG7u7aiakOuzPNNtWCMj+7iD6wcR/7\nXWZ77tZbXcuPgW+kMdmnUr3Ogy06P+u5RFWz/nA7eDKA2c5VWu01z/Sc5TRCqWrK\nvRAL1mQemffviEvabQoL0E2LFst1D47Lg7jTpSFBdQY5I+B183cwGA8muzXJnUij\nqkvjUtZfAgMBAAECgf8siPZrptQSyRG8lmJJGJoUo5EbjUEG5SHuRhshJdain2Fi\nXTQDAUbTk9qsyLx0Cc9R6i3D0LFeaXIvmqvgIprr+2vAYYKfT7S28Yb2hq6Y1WPW\nUQO5H3/zZ1IraUiG4uR0ZTEVoKP98mieEAgvlMr81UtF0V0uFwZ1kBpkjAE2nGj4\nISzH0MsafINRIYWsJ4cDGJikBY9e0DG2DhG1w4qNmJq+2cWM8+kLVII8V7u97ef1\nWGnSTa3OkmU5wlmUbS3Ju8bAoTkkJ+a49KT3OlKITdF7UKYGG2rseWgZULd5ZSek\nlcnuBAuqD7lJRBbVjI5AFr8fSQU0FzMwrvVAOpECgYEAy4ERAoBZfToz1ILH5u4K\n8N4uZmAafRlVtyPISP1KkSNDQI1gCxuuCsT03lgWOrXKE8gtqICSryMygycBSGni\n3+QUQU61+QnTuslIwTfIZUQG6zTdwEpAmLVJ3KsaaS4rpn3fpq+umPLmZ59h9eJp\nuevxhFv/muWjzRsxxTPsMfECgYEAwX2woht7j6NF9ilSrtSGoESPwCNci431mKJd\no3MOKtjtedYWfycJKUQ+B+do0xd7Y43dTrLcH52ZpvDMsyYg3bP9uWKnvqc4cm8q\ndn4AyYx0W1P4jf8iyLm6yEqif6J6UuLyyoMjsO3b8FBqAHRNdGFIg6f183MYcu4b\ndwUZPU8CgYA68hSiO9kv+7bdnFAY5OSIZmLcRoQFrlv0o0m1UqDRr3wga5LhRNBB\n0FD5QlyV/ugcmMQY5b0XO8O614Z4miscHO19CTaOfzk0Bm+rf+Ps6Spz4KlGtHtH\ngGN3ppwM0VHVdOpeVs7lAJ6ab0Epvr5PGzem1hsQm+m5VGIzM9n7kQKBgFYqY/t8\n46SOoDxEILcMm7tJbP6ygKcBG+rR+4MrXJbGLdMA/Nm5B4JiCoG4ktzWazNlXLWM\nPyyxIVjPiUkKZL52RjpFbdAgZanISY+lAzK+Ip79IQYTJWlgFIbXfc/7CiBZQqfe\niIllE3nMRbhYEpoOLJ28sXGtwqiD0qVJFvlPAoGAaf740rwvulTjEuaMfyaUf95/\n7fiRyD39Ct9GqDLvOiJAyWrVLaRYdV8warqWwwu0KHczAVs+eWe4WhTV7jZvPBLg\nLJcIZuJytVWIYFfSkHgdxk6sFYKCvETi6zgYBREnYkFPYzMdiOX57c2Di8SzAt/T\nUV3iEhCZhSw7+VFVgu8=\n-----END PRIVATE KEY-----\n";
+    const cert = new c.X509Certificate(pem),
+      key = c.createPrivateKey(privatePem);
+    const attempt = (fn) => {
+      try {
+        return fn() ?? null;
+      } catch (error) {
+        return { name: error.name, code: error.code, message: error.message };
+      }
+    };
+    const fields = [
+      "subject",
+      "issuer",
+      "subjectAltName",
+      "infoAccess",
+      "validFrom",
+      "validTo",
+      "fingerprint",
+      "fingerprint256",
+      "fingerprint512",
+      "keyUsage",
+      "serialNumber",
+      "ca",
+      "issuerCertificate",
+    ];
+    const padded = new Uint8Array(cert.raw.length + 4);
+    padded.set(cert.raw, 2);
+    return {
+      fields: Object.fromEntries(fields.map((k) => [k, cert[k] ?? null])),
+      raw: Array.from(cert.raw),
+      pem: cert.toString(),
+      json: cert.toJSON(),
+      legacy: cert.toLegacyObject(),
+      cached:
+        cert.raw === cert.raw &&
+        cert.publicKey === cert.publicKey &&
+        cert.toLegacyObject() === cert.toLegacyObject(),
+      publicKey: cert.publicKey.export({ format: "pem", type: "spki" }),
+      der: new c.X509Certificate(
+        new DataView(padded.buffer, 2, cert.raw.length),
+      ).fingerprint,
+      issued: cert.checkIssued(cert),
+      private: cert.checkPrivateKey(key),
+      verified: cert.verify(cert.publicKey),
+      wrongKey: cert.checkPrivateKey(
+        c.generateKeyPairSync("rsa", { modulusLength: 1024 }).privateKey,
+      ),
+      hosts: [
+        "localhost",
+        "x.example.test",
+        "x.y.example.test",
+        "wrong.invalid",
+        "localhost\0wrong",
+      ].map((n) => attempt(() => cert.checkHost(n))),
+      options: [
+        { wildcards: false },
+        { partialWildcards: false },
+        { multiLabelWildcards: true },
+        { subject: "never" },
+        { subject: "invalid" },
+        { wildcards: 0 },
+        false,
+      ].map((o) => attempt(() => cert.checkHost("x.y.example.test", o))),
+      emails: ["test@example.test", "other@example.test"].map((n) =>
+        attempt(() => cert.checkEmail(n)),
+      ),
+      ips: ["127.0.0.1", "127.0.0.2", "::1", "not-ip"].map((n) =>
+        attempt(() => cert.checkIP(n)),
+      ),
+      invalid: [
+        () => new c.X509Certificate("bad"),
+        () => new c.X509Certificate(new ArrayBuffer(4)),
+        () => cert.checkIssued({}),
+        () => cert.checkPrivateKey(cert.publicKey),
+        () => cert.verify(key),
+        () => cert.checkHost(1),
+      ].map(attempt),
+    };
+  },
+
+  x509Ec: function ({ crypto: c }) {
+    const pem =
+        "-----BEGIN CERTIFICATE-----\nMIIBaDCCAQ6gAwIBAgIUR0JYwBRWD1OQflPk9iq6c8s/90swCgYIKoZIzj0EAwIw\nGjEYMBYGA1UEAwwPZWMuZXhhbXBsZS50ZXN0MB4XDTI2MTAyMzAwNTEyN1oXDTI2\nMTAyNTAwNTEyN1owGjEYMBYGA1UEAwwPZWMuZXhhbXBsZS50ZXN0MFkwEwYHKoZI\nzj0CAQYIKoZIzj0DAQcDQgAE91VvPzxvJu7z28yu3162tL9f1pYoEAEsCbb0dYdG\nUGcUv3zuHz7fhcfqvuzuDnV2Jh8Y8qp+MtGlWxh8fOhYzKMyMDAwHQYDVR0OBBYE\nFAaHxuLK5SXnLdzXW7X0SclrQrvvMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0E\nAwIDSAAwRQIhAOZXfipKh5gsRprMHc/SO3TcjNqBBUSKHwOxr2nqpa1UAiB3ZSBJ\nuNDgK4eNIasqXlmgXmC8M3MD7LdTk0qwUc+fPQ==\n-----END CERTIFICATE-----\n",
+      keyPem =
+        "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg3MCUdaaqmJh19iLT\ny72VTuXH0U44yXi/D5VN89PXA6WhRANCAAT3VW8/PG8m7vPbzK7fXra0v1/WligQ\nASwJtvR1h0ZQZxS/fO4fPt+Fx+q+7O4OdXYmHxjyqn4y0aVbGHx86FjM\n-----END PRIVATE KEY-----\n";
+    const cert = new c.X509Certificate(pem),
+      raw = new Uint8Array(cert.raw);
+    raw[raw.length - 1] ^= 1;
+    const damaged = new c.X509Certificate(raw);
+    const key = c.createPrivateKey(keyPem);
+    return {
+      legacy: cert.toLegacyObject(),
+      publicKey: cert.publicKey.export({ format: "pem", type: "spki" }),
+      usage: cert.keyUsage ?? null,
+      subject: cert.subject,
+      issued: cert.checkIssued(cert),
+      private: cert.checkPrivateKey(key),
+      verified: cert.verify(cert.publicKey),
+      imported: cert.verify(c.createPublicKey(key)),
+      damaged: damaged.verify(cert.publicKey),
+      cached: cert.toLegacyObject() === cert.toLegacyObject(),
+    };
+  },
+  x509Names: function ({ crypto: c }) {
+    const cert = new c.X509Certificate(
+      "-----BEGIN CERTIFICATE-----\nMIICdjCCAhygAwIBAgIUQsn9ZMGrGViSPljhZDsSPq54huQwCgYIKoZIzj0EAwIw\nODEbMBkGA1UEAwwSY2Fmw6kuZXhhbXBsZS50ZXN0MRkwFwYDVQQKDBBXb3JrZXJz\nICsgTmF0aXZlMB4XDTI2MTAyMzAxMDEzOVoXDTI2MTAyNTAxMDEzOVowODEbMBkG\nA1UEAwwSY2Fmw6kuZXhhbXBsZS50ZXN0MRkwFwYDVQQKDBBXb3JrZXJzICsgTmF0\naXZlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBT9EJkWZClxIzvyp7SNufuJF\nEAYD8CzONWw47BsuaZCJElS8JEbVTNC5aWNy45S7IIRj6d4PS/GU6DT1M1sLoaOC\nAQIwgf8wCQYDVR0TBAIwADCBsQYDVR0RBIGpMIGmghJ2YWxpZC5leGFtcGxlLnRl\nc3SCF2NvbW1hLG5hbWUuZXhhbXBsZS50ZXN0hhhodHRwczovL2V4YW1wbGUudGVz\ndC9hLGKHECABDbgAAAAAAAAAAAAAAAGBEXRlc3RAZXhhbXBsZS50ZXN0oCEGCisG\nAQQBgjcUAgOgEwwRdXNlckBleGFtcGxlLnRlc3SkFTATMREwDwYDVQQDDAhEaXIs\nTmFtZTA+BggrBgEFBQcBAQQyMDAwLgYIKwYBBQUHMAGGImh0dHBzOi8vb2NzcC5l\neGFtcGxlLnRlc3QvdmFsaWRhdGUwCgYIKoZIzj0EAwIDSAAwRQIgfppXDfKn85vj\nDm1QS9agAk9W5P8Md841oJ+8nVaAg4ECIQDeXmgVDWiRqusAivE68OEKJB5arucO\nyLzk3hNzHXSQKg==\n-----END CERTIFICATE-----\n",
+    );
+    const raw = new Uint8Array(cert.raw),
+      marker = new TextEncoder().encode("Workers + Native");
+    for (let i = 0; i <= raw.length - marker.length; i++)
+      if (marker.every((byte, j) => raw[i + j] === byte)) raw[i] = 0;
+    const nulNames = new c.X509Certificate(raw).toLegacyObject();
+    const attempt = (fn) => {
+      try {
+        return fn() ?? null;
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code };
+      }
+    };
+    return {
+      nulNames,
+      subject: cert.subject,
+      san: cert.subjectAltName,
+      info: cert.infoAccess,
+      ca: cert.ca,
+      legacy: cert.toLegacyObject(),
+      ip: cert.checkIP("2001:db8::1"),
+      names: [{}, { subject: "always" }, { subject: "never" }].map((o) =>
+        attempt(() => cert.checkHost("café.example.test", o)),
+      ),
+      invalid: [
+        () => cert.checkEmail("a\0b"),
+        () => cert.checkIP("127.0.0.1\0evil"),
+        () => cert.checkHost("valid.example.test", { partialWildcards: 1 }),
+        () =>
+          cert.checkHost("valid.example.test", { singleLabelSubdomains: 1 }),
+      ].map(attempt),
+    };
+  },
   certificates: function ({ crypto: c }) {
     const signatures = [
       "MIIBVDCBvjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAzEBFZlRokWwqjZlV3uIZCb4XHlCRHi11xrIKzd3+zjmeqJdb3UMkZCQH52zU7DO+mfYwD1+pB9QHh0NsLlkUqkc+Ko5k2KHs0EuWL4NoOMf++wiRD39b2XpEyBdI7NYlsfZHhrXihsyVZsNrfXlWv6+gqGvFjh4nXEzZ2+kxfvECAwEAARYacG9ydGFibGUtd29ya2Vycy1jaGFsbGVuZ2UwDQYJKoZIhvcNAQEEBQADgYEAdBV72QBrvJdRpeG7kVjGpPlW8BRVVBO7arGOQjYs6q7W03dkMPj4uzVyGYZLj59eScSYGA7PnyiOGwy5loRIMVPciLK3YKz74auiRz+XUHFJysOK28Y6QPuRr48CRFu8H7e081ZOHkeyhcwRhd7wjEI4ngHoJ3dhqMy0syA5Vi0=",

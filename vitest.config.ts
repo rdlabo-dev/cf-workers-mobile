@@ -11,9 +11,9 @@ export default defineConfig({
       },
     },
     {
-      name: "test-brotli-binary",
+      name: "test-wasm-binary",
       async load(id) {
-        if (!id.endsWith("/brotli_dec_wasm_bg.wasm")) return;
+        if (!/\/(?:brotli_dec_wasm_bg|native-crypto)\.wasm$/.test(id)) return;
         const data = (await readFile(id)).toString("base64");
         return `export default Uint8Array.from(atob(${JSON.stringify(data)}), c => c.charCodeAt(0));`;
       },

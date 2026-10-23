@@ -23,7 +23,7 @@ const assessments = [
     modules: ["crypto", "zlib"],
     priority: 2,
     category: "implementation-gap",
-    next: "Inventory algorithms, key/codec classes, synchronous and streaming behavior. Evaluate JS/Wasm implementations against all pinned operations; random/hash/HKDF/scrypt, owned secret/asymmetric keys, RSA/EC/Ed25519 signatures, prime generation/checking and Brotli/Zstd profiles now supplement dependency polyfills. X509Certificate, additional key-generation options, remaining algorithms and complete codec contracts remain open. No technical-impossibility claim has been established.",
+    next: "Inventory algorithms, key/codec classes, synchronous and streaming behavior. Evaluate JS/Wasm implementations against all pinned operations; random/hash/HKDF/scrypt, owned secret/asymmetric keys, RSA/EC/Ed25519 signatures, prime generation/checking X509Certificate parsing/fields/name checks/signature checks and Brotli/Zstd profiles now supplement dependency polyfills. Pinned Workers X509 key-check restrictions are documented. Additional key-generation options, remaining algorithms and complete codec contracts remain open. No technical-impossibility claim has been established.",
     evidence: [
       "surface-gaps.json",
       "expansion-contracts.probe.mjs",
@@ -104,7 +104,7 @@ const assessments = [
     ],
     priority: 2,
     category: "implementation-and-native-transport",
-    next: "Audit class/prototype/state/event contracts together with native TCP/TLS behavior. Resolving internal imports or passing Fetch HTTP scenarios does not certify Node TLS/server APIs.",
+    next: "Direct TLS and same-connection STARTTLS exchange/hostname rejection are tested in page and Dedicated Worker on both OSes. TLS 1.2/1.3 and repeated write-half-close are covered on both OSes; custom Duplex wrapping remains unsupported. Audit remaining class/prototype/state/event contracts; these scenarios do not certify the whole TLS/server API.",
     evidence: ["surface-gaps.json", "../../../../docs/compatibility.md"],
   },
   {

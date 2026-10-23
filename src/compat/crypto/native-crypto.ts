@@ -123,6 +123,9 @@ const released = new FinalizationRegistry<number>((pointer) =>
   library().wk_key_free(pointer),
 );
 export class NativeKey {
+  checkCertificate(cert: number, operation: number) {
+    return library().wk_x509_compare(cert, this.handle(), operation) === 1;
+  }
   rsa(operation: number, data: Uint8Array, options: any): Uint8Array {
     if (this.type !== "rsa")
       throw new Error("publicEncrypt() currently only supports RSA keys");
@@ -492,4 +495,121 @@ export function nativeSpkac(
     const ok = api.wk_spkac(p, data.byteLength, operation);
     return operation === 0 ? !!ok : ok ? result(api) : new Uint8Array();
   });
+}
+
+const x509Released = new FinalizationRegistry<number>((pointer) =>
+  library().wk_x509_free(pointer),
+);
+export class NativeX509 {
+  private constructor(private pointer: number) {
+    x509Released.register(this, pointer);
+  }
+  static parse(data: Uint8Array) {
+    return inputs([data], (api, [p]) => {
+      const pointer = api.wk_x509_parse(p, data.byteLength);
+      return pointer ? new NativeX509(pointer) : undefined;
+    });
+  }
+  field(field: number): Uint8Array | undefined {
+    const api = library();
+    return api.wk_x509_field(this.pointer, field) ? result(api) : undefined;
+  }
+  string(field: number): string | undefined {
+    const value = this.field(field);
+    return value === undefined ? undefined : decoder.decode(value);
+  }
+  get isCA() {
+    return library().wk_x509_ca(this.pointer) === 1;
+  }
+  get publicKey() {
+    const pointer = library().wk_x509_key(this.pointer);
+    return pointer ? new NativeKey(pointer) : undefined;
+  }
+  check(name: string, flags: number, operation: number) {
+    return inputs([name], (api, [p]) => {
+      const status = api.wk_x509_check(
+        this.pointer,
+        p,
+        encoder.encode(name).length,
+        flags,
+        operation,
+      );
+      if (status < 0)
+        throw new Error(
+          status === -2
+            ? operation === 2
+              ? "Invalid IP"
+              : "Invalid name"
+            : "Operation failed",
+        );
+      return status === 1 ? decoder.decode(result(api)) : undefined;
+    });
+  }
+  checkIssued(other: NativeX509) {
+    return library().wk_x509_compare(this.pointer, other.pointer, 0) === 1;
+  }
+  checkKey(key: NativeKey, operation: number) {
+    return key.checkCertificate(this.pointer, operation);
+  }
+}
+
+const tlsReleased = new FinalizationRegistry<number>((pointer) =>
+  library().wk_tls_free(pointer),
+);
+export class NativeTLS {
+  private pointer: number;
+  constructor(host: string) {
+    this.pointer = inputs([host], (api, [p]) => api.wk_tls_new(p));
+    if (!this.pointer) throw error();
+    tlsReleased.register(this, this.pointer, this);
+  }
+  private handle() {
+    if (!this.pointer) throw new Error("TLS session closed");
+    return this.pointer;
+  }
+  dispose() {
+    if (this.pointer) {
+      library().wk_tls_free(this.pointer);
+      this.pointer = 0;
+      tlsReleased.unregister(this);
+    }
+  }
+  feed(data: Uint8Array) {
+    inputs([data], (api, [p]) => {
+      if (!api.wk_tls_feed(this.handle(), p, data.byteLength)) throw error();
+    });
+  }
+  handshake(): number {
+    return library().wk_tls_handshake(this.handle());
+  }
+  read(): number | Uint8Array {
+    const api = library(),
+      status = api.wk_tls_read(this.handle());
+    return status > 0 ? result(api) : status;
+  }
+  write(data: Uint8Array): number {
+    return inputs([data], (api, [p]) =>
+      api.wk_tls_write(this.handle(), p, data.byteLength),
+    );
+  }
+  shutdown(): number {
+    return library().wk_tls_shutdown(this.handle());
+  }
+  drain(): Uint8Array[] {
+    const api = library(),
+      chunks: Uint8Array[] = [];
+    for (;;) {
+      const status = api.wk_tls_drain(this.handle());
+      if (status === 0) return chunks;
+      if (status < 0) throw error();
+      chunks.push(result(api));
+    }
+  }
+  certificates(): Uint8Array[] {
+    const api = library(),
+      certs: Uint8Array[] = [];
+    for (let i = 0; api.wk_tls_certificate(this.handle(), i); i++)
+      certs.push(result(api));
+    return certs;
+  }
 }

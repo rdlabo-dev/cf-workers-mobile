@@ -7,6 +7,8 @@ export type NativeNetworkMethod =
   | "cookiesSet"
   | "socketWatch"
   | "socketOpen"
+  | "socketStartTls"
+  | "socketVerifyTls"
   | "socketWrite"
   | "socketEnd"
   | "socketRead"

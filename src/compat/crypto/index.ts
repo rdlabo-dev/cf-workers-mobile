@@ -1,3 +1,5 @@
+import { X509Certificate } from "./x509.js";
+export { X509Certificate };
 import { Certificate } from "./certificate.js";
 export { Certificate };
 import { ECDH, createECDH } from "./ecdh.js";
@@ -104,6 +106,7 @@ export function hash(
   return outputEncoding === "buffer" ? result : result.toString(outputEncoding);
 }
 export default {
+  X509Certificate,
   Certificate,
   ...original,
   ...metadata,

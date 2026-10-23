@@ -1,3 +1,5 @@
+import { createServer as tcpServer } from "node:net";
+import { TLSSocket, createSecureContext } from "node:tls";
 import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
@@ -90,26 +92,39 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 export const run = name => eventCases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});
 export {createNetworkRelay, initializeWorkerNetwork} from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/browser/fetch/relay.js")};
-export const runTls = async port => {
- const attempt = servername => new Promise((resolve,reject)=> {
+export const runTls = async ({port,upgradePort}) => {
+ const attempt = (servername,halfClose=false) => new Promise((resolve,reject)=> {
   let accepted=false, body='';
   const socket=tls.connect({host:'127.0.0.1',port,servername});
   const timer=setTimeout(()=>{socket.destroy();reject(new Error('TLS timeout: '+servername));},8000);
-  socket.on('secureConnect',()=>{accepted=socket.authorized && socket.encrypted;socket.write('GET /tls-native HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n');});
+  socket.on('secureConnect',()=>{accepted=socket.authorized && socket.encrypted;socket[halfClose?'end':'write']('GET /tls-native HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n');});
   socket.on('data',chunk=>{body+=chunk.toString();});
   socket.on('error',()=>{clearTimeout(timer);resolve({accepted,received:false});});
   socket.on('end',()=>{clearTimeout(timer);resolve({accepted,received:body.includes('404') && body.includes('Not found')});});
  });
- const valid=await attempt('localhost'), invalid=await attempt('wrong.invalid');
- const plain=net.connect({host:'127.0.0.1',port});
- plain.on('error',()=>{});
- let upgradeRejected=false;
- try {
-  await new Promise((resolve,reject)=>{plain.once('connect',resolve);plain.once('error',reject);});
-  try {tls.connect({socket:plain,servername:'localhost'}).write('must-never-be-plaintext');}
-  catch(error){if(error.code!=='ERR_METHOD_NOT_IMPLEMENTED')throw error;upgradeRejected=true;}
- } finally {plain.destroy();}
- return {valid,invalid,upgradeRejected};
+ const valid=await attempt('localhost'), directEnd=await attempt('localhost',true), invalid=await attempt('wrong.invalid');
+
+ const upgrade = (servername,halfClose=false,legacy=false) => new Promise((resolve,reject)=>{
+  const plain=net.connect({host:'127.0.0.1',port:upgradePort});
+  let socket=plain, accepted=false, body='', greeting='';
+  const timer=setTimeout(()=>{socket.destroy();plain.destroy();reject(new Error('Upgrade timeout: '+servername));},8000);
+  plain.on('error',()=>{});
+  plain.on('connect',()=>plain.write(legacy==='untrusted'?'UNTRUSTED\\r\\n':legacy?'UPGRADE12\\r\\n':'UPGRADE\\r\\n'));
+  const onGreeting=chunk=>{
+   greeting+=chunk.toString();if(!greeting.endsWith('\\r\\n'))return;
+   plain.off('data',onGreeting);
+   if(greeting!=='READY\\r\\n'){clearTimeout(timer);plain.destroy();reject(new Error('Invalid upgrade greeting'));return;}
+   socket=tls.connect({socket:plain,servername});
+   socket.on('secureConnect',()=>{accepted=socket.authorized&&socket.encrypted;});
+   socket.on('data',chunk=>{body+=chunk.toString();});
+   socket.on('end',()=>{clearTimeout(timer);socket.destroy();plain.destroy();resolve({accepted,received:body==='encrypted-response'});});
+   socket.on('error',()=>{clearTimeout(timer);plain.destroy();resolve({accepted,received:false});});
+   if(halfClose)socket.end('encrypted-request');else socket.write('encrypted-request');
+  };
+  plain.on('data',onGreeting);
+ });
+ const upgradeEnd=[];for(let i=0;i<3;i++)upgradeEnd.push(await upgrade('localhost',true));
+ return {valid,directEnd,invalid,upgrade:await upgrade('localhost'),upgradeEnd,upgradeTls12:await upgrade('localhost',true,true),upgradeUntrusted:await upgrade('localhost',false,'untrusted'),upgradeInvalid:await upgrade('wrong.invalid')};
 };`,
   },
   bundle: true,
@@ -210,13 +225,138 @@ execFileSync(
   ],
   { stdio: "pipe" },
 );
+// A separate, currently valid self-signed chain is deliberately not installed
+// in either OS trust store. Hostname-only validation must not accept it.
+await writeFile(
+  `${tlsDirectory}/untrusted.cnf`,
+  (await readFile(`${tlsDirectory}/ca.cnf`, "utf8")).replace(
+    `${tlsDirectory}/key.pem`,
+    `${tlsDirectory}/untrusted-key.pem`,
+  ),
+);
+execFileSync(
+  "openssl",
+  [
+    "req",
+    "-new",
+    "-newkey",
+    "rsa:2048",
+    "-nodes",
+    "-keyout",
+    `${tlsDirectory}/untrusted-key.pem`,
+    "-out",
+    `${tlsDirectory}/untrusted-request.pem`,
+    "-subj",
+    "/CN=Untrusted compatibility fixture",
+  ],
+  { stdio: "pipe" },
+);
+execFileSync(
+  "openssl",
+  [
+    "ca",
+    "-batch",
+    "-selfsign",
+    "-config",
+    `${tlsDirectory}/untrusted.cnf`,
+    "-in",
+    `${tlsDirectory}/untrusted-request.pem`,
+    "-out",
+    `${tlsDirectory}/untrusted.pem`,
+    "-startdate",
+    certificateTime(Date.now() - 86400000),
+    "-enddate",
+    certificateTime(Date.now() + 172800000),
+  ],
+  { stdio: "pipe" },
+);
+const untrustedContext = createSecureContext({
+  key: await readFile(`${tlsDirectory}/untrusted-key.pem`),
+  cert: await readFile(`${tlsDirectory}/untrusted.pem`),
+});
+const upgradeStats = { connections: 0, requests: 0, unexpected: 0 };
+const upgradeProtocols = [];
+const upgradeSockets = new Set();
+const context = createSecureContext({
+  key: await readFile(`${tlsDirectory}/key.pem`),
+  cert: await readFile(`${tlsDirectory}/ca.pem`),
+});
+const context12 = createSecureContext({
+  key: await readFile(`${tlsDirectory}/key.pem`),
+  cert: await readFile(`${tlsDirectory}/ca.pem`),
+  maxVersion: "TLSv1.2",
+});
+const upgradeServer = tcpServer((socket) => {
+  upgradeStats.connections++;
+  upgradeSockets.add(socket);
+  socket.on("close", () => upgradeSockets.delete(socket));
+  socket.on("error", () => {});
+  let greeting = "";
+  const begin = (chunk) => {
+    greeting += chunk.toString();
+    if (!greeting.endsWith("\r\n")) return;
+    socket.off("data", begin);
+    if (!["UPGRADE\r\n", "UPGRADE12\r\n", "UNTRUSTED\r\n"].includes(greeting)) {
+      upgradeStats.unexpected++;
+      socket.destroy();
+      return;
+    }
+    socket.write("READY\r\n", () => {
+      const secure = new TLSSocket(socket, {
+        isServer: true,
+        secureContext:
+          greeting === "UNTRUSTED\r\n"
+            ? untrustedContext
+            : greeting === "UPGRADE12\r\n"
+              ? context12
+              : context,
+      });
+      secure.on("error", () => {});
+      let body = "";
+      secure.on("data", (chunk) => {
+        body += chunk.toString();
+        if (body === "encrypted-request") {
+          upgradeStats.requests++;
+          upgradeProtocols.push(secure.getProtocol());
+          secure.end("encrypted-response");
+        } else if (!"encrypted-request".startsWith(body)) {
+          upgradeStats.unexpected++;
+          secure.destroy();
+        }
+      });
+    });
+  };
+  socket.on("data", begin);
+});
+await new Promise((resolve) => upgradeServer.listen(0, "127.0.0.1", resolve));
+const tlsPorts = { port: 0, upgradePort: upgradeServer.address().port };
+if (platform === "android")
+  execFileSync("adb", [
+    "-s",
+    device,
+    "reverse",
+    `tcp:${tlsPorts.upgradePort}`,
+    `tcp:${tlsPorts.upgradePort}`,
+  ]);
 const backend = await nativeBackend({
   tlsDirectory,
   dispatch: async () => new Response("Not found", { status: 404 }),
   driver: "",
-  dispose: async () => {},
+  dispose: async () => {
+    if (platform === "android")
+      execFileSync("adb", [
+        "-s",
+        device,
+        "reverse",
+        "--remove",
+        `tcp:${tlsPorts.upgradePort}`,
+      ]);
+    for (const socket of upgradeSockets) socket.destroy();
+    await new Promise((resolve) => upgradeServer.close(resolve));
+  },
   instrument: () => false,
 });
+tlsPorts.port = Number(backend.url.port);
 const bootstrapCode = `
 async function main() {
 const source = ${JSON.stringify(source)};
@@ -247,7 +387,7 @@ try {
  }
  const tlsURL=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
  const tlsApi=await import(/* @vite-ignore */ tlsURL);
- const nativeTls={page:await tlsApi.runTls(${JSON.stringify(Number(backend.url.port))})};
+ const nativeTls={page:await tlsApi.runTls(${JSON.stringify(tlsPorts)})};
  const workerURL=URL.createObjectURL(new Blob(['import {runTls, initializeWorkerNetwork} from '+JSON.stringify(tlsURL)+'; self.onmessage=async ({data})=>{try {await initializeWorkerNetwork();self.postMessage({tls:await runTls(data)});}catch(e){self.postMessage({error:String(e)});}};'],{type:'text/javascript'}));
  const tlsWorker=new Worker(workerURL,{type:'module'});
  const relay=tlsApi.createNetworkRelay(tlsWorker);
@@ -255,7 +395,7 @@ try {
  try {nativeTls.worker=await new Promise((resolve,reject)=>{
   const timer=setTimeout(()=>reject(new Error('Worker TLS timeout')),20000);
   tlsWorker.onmessage=({data})=>{if(data.tls || data.error){clearTimeout(timer);data.error?reject(new Error(data.error)):resolve(data.tls);}};
-  tlsWorker.postMessage(${JSON.stringify(Number(backend.url.port))});
+  tlsWorker.postMessage(${JSON.stringify(tlsPorts)});
  });} finally {tlsWorker.terminate();await relay.dispose();URL.revokeObjectURL(workerURL);URL.revokeObjectURL(tlsURL);}
  await report({stage:'complete', nativeTls, hash:${JSON.stringify(hash)}, results});
  document.body.textContent = 'Compatibility contracts complete';
@@ -281,12 +421,47 @@ await runNativeAcceptance({
     for (const mode of ["page", "worker"])
       assert.deepEqual(completed.nativeTls[mode], {
         valid: { accepted: true, received: true },
+        directEnd: { accepted: true, received: true },
         invalid: { accepted: false, received: false },
-        upgradeRejected: true,
+        upgrade: { accepted: true, received: true },
+        upgradeEnd: Array.from({ length: 3 }, () => ({
+          accepted: true,
+          received: true,
+        })),
+        upgradeTls12: { accepted: true, received: true },
+        upgradeUntrusted: { accepted: false, received: false },
+        upgradeInvalid: { accepted: false, received: false },
       });
+    assert.deepEqual(upgradeStats, {
+      connections: 14,
+      requests: 10,
+      unexpected: 0,
+    });
     assert.deepEqual(Object.keys(completed.results).sort(), ["page", "worker"]);
     for (const mode of ["page", "worker"])
       assert.deepEqual(completed.results[mode], baseline.results);
+    assert.equal(
+      upgradeProtocols.filter((protocol) => protocol === "TLSv1.3").length,
+      8,
+    );
+    assert.equal(
+      upgradeProtocols.filter((protocol) => protocol === "TLSv1.2").length,
+      2,
+    );
+    await writeFile(
+      `${artifacts}/tls-upgrade-evidence.json`,
+      JSON.stringify(
+        {
+          hash,
+          platform,
+          stats: upgradeStats,
+          protocols: upgradeProtocols,
+          results: completed.nativeTls,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
   },
 });
 console.log(

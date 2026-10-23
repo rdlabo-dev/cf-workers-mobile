@@ -1,5 +1,9 @@
+import { nativeTlsSession } from "../tls/native-session.js";
 import { observeConsumption } from "./reader.js";
-import { getNativeCall } from "../../browser/fetch/native-network.js";
+import {
+  getNativeCall,
+  type NativeCall,
+} from "../../browser/fetch/native-network.js";
 
 export interface SocketInfo {
   localAddress?: string | null;
@@ -7,6 +11,8 @@ export interface SocketInfo {
 }
 export interface PlatformSocket {
   upgraded?: boolean;
+  secureTransport: "on" | "off" | "starttls";
+  startTls(options?: { expectedServerHostname?: string }): PlatformSocket;
   opened: Promise<SocketInfo>;
   closed: Promise<void>;
   readable: ReadableStream<Uint8Array>;
@@ -52,6 +58,28 @@ export function connect(
   )
     throw new TypeError("Invalid TCP address");
   const id = crypto.randomUUID();
+  const host = url.hostname.replace(/^\[|\]$/g, "");
+  return transport(call, id, host, options.secureTransport ?? "off", () =>
+    call("WorkersCapacitor", "socketOpen", {
+      id,
+      host,
+      port,
+      tls: options.secureTransport === "on",
+      ...(options.expectedServerHostname
+        ? { servername: options.expectedServerHostname }
+        : {}),
+    }),
+  );
+}
+function transport(
+  call: NativeCall,
+  id: string,
+  host: string,
+  secureTransport: "on" | "off" | "starttls",
+  open: () => Promise<unknown>,
+): PlatformSocket {
+  let upgraded = false;
+  let activeWrite: Promise<void> | undefined;
   let readableController!: ReadableStreamDefaultController<Uint8Array>;
   let writableController!: WritableStreamDefaultController;
   let readEnded = false,
@@ -67,7 +95,8 @@ export function connect(
     readPending = false,
     pendingBytes = 0;
   const notifyTerminal = () => {
-    if (!terminal || stopped || readPending || pendingBytes !== 0) return;
+    if (upgraded || !terminal || stopped || readPending || pendingBytes !== 0)
+      return;
     if (!readEnded) {
       readEnded = true;
       readableController.close();
@@ -76,6 +105,7 @@ export function connect(
   };
   let closing: Promise<void> | undefined;
   const close = () => {
+    if (upgraded) return Promise.resolve();
     if (!closing) {
       stopped = true;
       closing = call("WorkersCapacitor", "socketClose", { id }).then(
@@ -99,7 +129,7 @@ export function connect(
     return closing;
   };
   const fail = (error: unknown) => {
-    if (!stopped) {
+    if (!stopped && !upgraded) {
       readableController.error(error);
       writableController.error(error);
       rejectClosed(error);
@@ -112,15 +142,7 @@ export function connect(
   const opened = Promise.resolve()
     .then(() => {
       if (stopped) throw new Error("Socket closed before connection");
-      return call("WorkersCapacitor", "socketOpen", {
-        id,
-        host: url.hostname.replace(/^\[|\]$/g, ""),
-        port,
-        tls: options.secureTransport === "on",
-        ...(options.expectedServerHostname
-          ? { servername: options.expectedServerHostname }
-          : {}),
-      });
+      return open();
     })
     .then(async (value) => {
       if (stopped) {
@@ -131,7 +153,7 @@ export function connect(
     });
   void opened
     .then(async () => {
-      if (stopped) return;
+      if (stopped || upgraded) return;
       await call("WorkersCapacitor", "socketWatch", { id });
       terminal = true;
       notifyTerminal();
@@ -148,12 +170,13 @@ export function connect(
           genericController as ReadableStreamDefaultController<Uint8Array>;
         try {
           await opened;
+          if (upgraded) return;
           readPending = true;
           const result = (await call("WorkersCapacitor", "socketRead", {
             id,
             maxBytes: 65536,
           })) as { chunk?: string; eof?: boolean };
-          if (stopped) return;
+          if (stopped || upgraded) return;
           if (result.eof) {
             if (!readEnded) {
               readEnded = true;
@@ -184,19 +207,27 @@ export function connect(
       writableController = controller;
     },
     async write(chunk) {
-      try {
+      if (upgraded) throw new Error("Socket has been upgraded");
+      const writing = (async () => {
         await opened;
         for (let offset = 0; offset < chunk.byteLength; offset += 65536)
           await call("WorkersCapacitor", "socketWrite", {
             id,
             chunk: encoded(chunk.subarray(offset, offset + 65536)),
           });
+      })();
+      activeWrite = writing;
+      try {
+        await writing;
       } catch (error) {
         fail(error);
         throw error;
+      } finally {
+        if (activeWrite === writing) activeWrite = undefined;
       }
     },
     async close() {
+      if (upgraded) throw new Error("Socket has been upgraded");
       try {
         await opened;
         await call("WorkersCapacitor", "socketEnd", { id });
@@ -216,6 +247,49 @@ export function connect(
     pendingBytes -= count;
     notifyTerminal();
   });
-  return { opened, closed, readable, writable, close };
+  const socket: PlatformSocket = {
+    opened,
+    closed,
+    readable,
+    writable,
+    close,
+    secureTransport,
+    startTls(options = {}) {
+      if (
+        upgraded ||
+        stopped ||
+        secureTransport !== "starttls" ||
+        readEnded ||
+        writeEnded
+      )
+        throw new Error("Socket cannot be upgraded");
+      upgraded = true;
+      socket.upgraded = true;
+      const error = new Error("Socket has been upgraded");
+      readableController.error(error);
+      writableController.error(error);
+      resolveClosed();
+      let secureCall = call;
+      return transport(
+        (...args) => secureCall(...args),
+        id,
+        host,
+        "on",
+        async () => {
+          const info = await opened;
+          await activeWrite;
+          const hostname = options.expectedServerHostname ?? host;
+          const result = (await call("WorkersCapacitor", "socketStartTls", {
+            id,
+            servername: hostname,
+          })) as { tlsEngine?: string } | undefined;
+          if (result?.tlsEngine === "openssl-wasm")
+            secureCall = await nativeTlsSession(call, id, hostname);
+          return info;
+        },
+      );
+    },
+  };
+  return socket;
 }
 export default { connect };
