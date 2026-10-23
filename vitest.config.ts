@@ -34,7 +34,12 @@ export default defineConfig({
     {
       name: "test-wasm-binary",
       async load(id) {
-        if (!/\/(?:brotli_dec_wasm_bg|native-crypto)\.wasm$/.test(id)) return;
+        if (
+          !/\/(?:brotli_dec_wasm_bg|native-crypto|native-cipher)\.wasm$/.test(
+            id,
+          )
+        )
+          return;
         const data = (await readFile(id)).toString("base64");
         return `export default Uint8Array.from(atob(${JSON.stringify(data)}), c => c.charCodeAt(0));`;
       },
@@ -68,6 +73,7 @@ export default defineConfig({
       "src/browser/fetch/scope.spec.ts",
       "src/compat/net/sockets.spec.ts",
       "src/compat/tls/upgrade.spec.ts",
+      "src/compat/crypto/cipher.spec.ts",
       "src/compat/crypto/hash.spec.ts",
       "src/compat/crypto/hash-types.spec.ts",
       "src/compat/fs/writable.spec.ts",

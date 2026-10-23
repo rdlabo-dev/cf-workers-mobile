@@ -26,3 +26,9 @@ Imports use the owned adapters. Latin-1 fixture expectations written as literal
 caret notation upstream are decoded using independently verified digest bytes;
 comments identify those adaptations. Float16 input-brand cases require the
 engine's intrinsic; native evidence records its availability.
+
+The Cipheriv/Decipheriv frontend is adapted from `src/node/internal/crypto_cipher.ts`
+and lifecycle behavior from `src/workerd/api/node/crypto.c++` at that same workerd
+revision. The cipher fixture retains the upstream `crypto_cipher-test.js` notices.
+BoringSSL commit `427ec40cc8edc545253289232e885708c409e5ea` supplies the bundled cipher
+primitives; its license and bundled third-party notices are in `LICENSE.boringssl`.

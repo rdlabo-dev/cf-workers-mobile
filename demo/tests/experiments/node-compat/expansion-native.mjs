@@ -158,6 +158,9 @@ export const runTls = async ({port,upgradePort}) => {
 const source = compiled.outputFiles[0].text;
 const hash = createHash("sha256").update(source).digest("hex");
 await writeFile(`${artifacts}/candidate.js`, source);
+const harnessSource = await readFile(fileURLToPath(import.meta.url));
+const harnessSha256 = createHash("sha256").update(harnessSource).digest("hex");
+await writeFile(`${artifacts}/harness.mjs`, harnessSource);
 await writeFile(
   `${artifacts}/inputs.json`,
   JSON.stringify(
@@ -168,6 +171,7 @@ await writeFile(
       device,
       tarball,
       tarballSha256,
+      harnessSha256,
       consumerEvidence,
       cases: Object.keys(eventCases),
     },
@@ -379,12 +383,16 @@ const source = ${JSON.stringify(source)};
 const names = ${JSON.stringify(Object.keys(eventCases))};
 const report = async value => {await fetch(${JSON.stringify(backend.url.origin + "/__acceptance/report")}, {method:'POST', mode:'no-cors', headers:{'content-type':'text/plain'}, body:JSON.stringify(value)});};
 const results = {}, measurements = {};
+// One immutable Blob avoids accumulating copies of the large fixture payload.
+// URL fragments retain separate module identities for cold per-case measurements.
+let moduleURL, activeCase;
 try {
+ moduleURL = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
  for (const mode of ['page', 'worker']) {
   results[mode] = {}; measurements[mode] = {};
   for (const name of names) {
-   const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
-   try {
+   activeCase = {mode,name};
+   const url = moduleURL+'#'+mode+'-'+name;
     if (mode === 'page') { const api = await import(/* @vite-ignore */ url); results[mode][name] = JSON.parse(JSON.stringify(await api.run(name))); measurements[mode][name] = api.measurements[name]; }
     else {
      const workerURL = URL.createObjectURL(new Blob(['import {run,measurements} from ' + JSON.stringify(url) + '; self.onmessage = async ({data}) => {try {self.postMessage({value:JSON.parse(JSON.stringify(await run(data))),measurements:measurements[data]});} catch(error) {self.postMessage({error:String(error)});}};'], {type:'text/javascript'}));
@@ -393,17 +401,18 @@ try {
       results[mode][name] = await new Promise((resolve,reject) => {
        const timer = setTimeout(() => reject(new Error('Worker timeout: '+name)), 8000);
        worker.onmessage = ({data}) => {clearTimeout(timer); if(data.error)reject(new Error(data.error));else {measurements[mode][name]=data.measurements;resolve(data.value);}};
-       worker.onerror = event => {clearTimeout(timer);reject(new Error(event.message || 'Worker error'));};
+       worker.onerror = event => {clearTimeout(timer);reject(new Error('Worker error in '+name+': '+JSON.stringify({message:event.message,filename:event.filename,line:event.lineno,column:event.colno,type:event.type})));};
        worker.postMessage(name);
       });
      } finally {worker.terminate(); URL.revokeObjectURL(workerURL);}
     }
-   } finally {URL.revokeObjectURL(url);}
   }
  }
- const tlsURL=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+ activeCase={mode:'page',name:'nativeTls'};
+ const tlsURL=moduleURL+'#native-tls';
  const tlsApi=await import(/* @vite-ignore */ tlsURL);
  const nativeTls={page:await tlsApi.runTls(${JSON.stringify(tlsPorts)})};
+ activeCase={mode:'worker',name:'nativeTls'};
  const workerURL=URL.createObjectURL(new Blob(['import {runTls, initializeWorkerNetwork} from '+JSON.stringify(tlsURL)+'; self.onmessage=async ({data})=>{try {await initializeWorkerNetwork();self.postMessage({tls:await runTls(data)});}catch(e){self.postMessage({error:String(e)});}};'],{type:'text/javascript'}));
  const tlsWorker=new Worker(workerURL,{type:'module'});
  const relay=tlsApi.createNetworkRelay(tlsWorker);
@@ -412,13 +421,15 @@ try {
   const timer=setTimeout(()=>reject(new Error('Worker TLS timeout')),20000);
   tlsWorker.onmessage=({data})=>{if(data.tls || data.error){clearTimeout(timer);data.error?reject(new Error(data.error)):resolve(data.tls);}};
   tlsWorker.postMessage(${JSON.stringify(tlsPorts)});
- });} finally {tlsWorker.terminate();await relay.dispose();URL.revokeObjectURL(workerURL);URL.revokeObjectURL(tlsURL);}
+ });} finally {tlsWorker.terminate();await relay.dispose();URL.revokeObjectURL(workerURL);}
  await report({stage:'complete', measurements, nativeTls, hash:${JSON.stringify(hash)}, results});
  document.body.textContent = 'Compatibility contracts complete';
-} catch(error) {await report({stage:'failure', message:String(error), stack:error.stack});document.body.textContent=String(error);}
+} catch(error) {await report({stage:'failure', activeCase, completed:{page:Object.keys(results.page??{}),worker:Object.keys(results.worker??{})}, message:String(error), stack:error.stack});document.body.textContent=String(error);}
+finally {if(moduleURL) URL.revokeObjectURL(moduleURL);}
 }
 main();
 `;
+await writeFile(`${artifacts}/bootstrap.js`, bootstrapCode);
 await runNativeAcceptance({
   backend,
   artifacts,
@@ -451,6 +462,21 @@ await runNativeAcceptance({
         upgradeUntrusted: { accepted: false, received: false },
         upgradeInvalid: { accepted: false, received: false },
       });
+    // Fragmented module URLs must still instantiate a fresh backend per case.
+    for (const mode of ["page", "worker"])
+      for (const name of [
+        "cryptoCipherAlgorithms",
+        "cryptoCipherStates",
+        "cryptoPbkdfContracts",
+        "cryptoDigestContracts",
+      ])
+        for (const kind of ["Module", "Instance"])
+          assert.ok(
+            completed.measurements[mode][name].wasm.some(
+              (entry) => entry.kind === kind,
+            ),
+            `${mode}/${name}: missing cold Wasm ${kind}`,
+          );
     assert.deepEqual(upgradeStats, {
       connections: 14,
       requests: 10,

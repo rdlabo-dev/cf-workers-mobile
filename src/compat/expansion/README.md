@@ -62,7 +62,19 @@ synchronous extraction of its opaque key material is unavailable. RSA, EC, Ed255
 bundled OpenSSL 3.5.9 WebAssembly; RSA/EC streaming and one-shot signatures
 are compared with Workers and independent test signatures. This covers selected
 algorithms and operations, not the whole crypto module. Additional key-generation
-options and remaining error contracts still need work. `getCipherInfo` returns pinned Workers metadata; a successful lookup does not establish local availability of the named encryption algorithm.
+options and remaining error contracts still need work. Cipheriv/Decipheriv use the same pinned BoringSSL revision as Workers. Their
+frontend preserves Workers' `authLengthTag` option spelling, AEAD's one-update
+limit, early authentication-tag requirements, tag consumption and buffer copies.
+The listed classic and AEAD cipher names have shared algorithm/state contracts;
+metadata lookup still does not certify every option or the entire crypto module.
+The separate cipher Wasm and provenance are in `crypto/native-cipher.*`.
+Rebuild with `node scripts/build-native-cipher.mjs` after checking out the pinned
+BoringSSL commit into `artifacts/upstream/boringssl` and installing Emscripten
+4.0.20 at the pinned SDK revision. The script uses CMake 4.2.0 and Ninja 1.13.0
+from a Python venv at `artifacts/toolchains/boringssl-build` (install with
+`python3 -m venv artifacts/toolchains/boringssl-build` then that venv's
+`pip install cmake==4.2.0 ninja==1.13.0`). `--link-only` requires libraries
+previously built with those settings. No FIPS certification is claimed.
 X509Certificate parses PEM/DER, exposes certificate fields and legacy objects,
 extracts RSA/EC public keys, checks names and issuers, and verifies signatures
 with certificate public keys. The pinned Workers runtime returns false for

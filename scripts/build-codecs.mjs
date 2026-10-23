@@ -9,6 +9,10 @@ for (const [asset, manifest] of [
     "src/compat/zlib/native-zlib.build.json",
   ],
   [
+    "src/compat/crypto/native-cipher.wasm",
+    "src/compat/crypto/native-cipher.build.json",
+  ],
+  [
     "src/compat/crypto/native-crypto.wasm",
     "src/compat/crypto/native-crypto.build.json",
   ],
@@ -88,3 +92,12 @@ await copyFile(
   "src/compat/zlib/classic-base.d.cts",
   "dist/compat/zlib/classic-base.d.cts",
 );
+
+await build({
+  entryPoints: ["src/compat/crypto/native-cipher.ts"],
+  outfile: "dist/compat/crypto/native-cipher.js",
+  bundle: true,
+  format: "esm",
+  target: "es2022",
+  loader: { ".wasm": "binary" },
+});

@@ -1,4 +1,193 @@
 export const eventCases = {
+  cryptoCipherAlgorithms: async function ({ crypto }) {
+    const results = [];
+    for (const name of [
+      ...new Set(
+        crypto.getCiphers().flatMap((name) => [name, name.toUpperCase()]),
+      ),
+    ].sort())
+      for (const authLengthTag of [undefined, 16, 8, 4, 28]) {
+        const info = crypto.getCipherInfo(name),
+          result = { name, authLengthTag: authLengthTag ?? null };
+        let stage = "construct";
+        try {
+          const key = new Uint8Array(info.keyLength),
+            iv = new Uint8Array(info.ivLength);
+          const cipher = crypto.createCipheriv(name, key, iv, {
+            authLengthTag,
+          });
+          stage = "aad";
+          try {
+            cipher.setAAD("aad", { plaintextLength: 5 });
+            result.aad = true;
+          } catch (error) {
+            result.aad = error.message;
+          }
+          stage = "update";
+          const first = cipher.update("hello", "utf8");
+          stage = "final";
+          const last = cipher.final();
+          stage = "tag";
+          const tag = cipher.getAuthTag();
+          const ciphertext = new Uint8Array(first.length + last.length);
+          ciphertext.set(first);
+          ciphertext.set(last, first.length);
+          const hex = (value) =>
+            Array.from(value, (byte) =>
+              byte.toString(16).padStart(2, "0"),
+            ).join("");
+          result.data = name.toLowerCase().includes("randnonce")
+            ? ciphertext.length
+            : hex(ciphertext);
+          result.tag = name.toLowerCase().includes("randnonce")
+            ? tag.length
+            : hex(tag);
+          result.secondTag = cipher.getAuthTag().length;
+          stage = "decrypt";
+          const decipher = crypto.createDecipheriv(name, key, iv, {
+            authLengthTag,
+          });
+          if (tag.length) decipher.setAuthTag(tag);
+          if (result.aad === true)
+            decipher.setAAD("aad", { plaintextLength: 5 });
+          result.plain =
+            decipher.update(ciphertext).toString() +
+            decipher.final().toString();
+          if (tag.length) {
+            const invalid = crypto.createDecipheriv(name, key, iv, {
+              authLengthTag,
+            });
+            const damaged = new Uint8Array(tag);
+            damaged[0] ^= 1;
+            invalid.setAuthTag(damaged);
+            if (result.aad === true)
+              invalid.setAAD("aad", { plaintextLength: 5 });
+            try {
+              invalid.update(ciphertext);
+              invalid.final();
+              result.tamper = "accepted";
+            } catch (error) {
+              result.tamper = {
+                name: error.name,
+                code: error.code ?? null,
+                message: error.message.replace(
+                  /internal error; reference = .*/,
+                  "internal error",
+                ),
+              };
+            }
+          }
+        } catch (error) {
+          result.error = {
+            stage,
+            name: error.name,
+            code: error.code ?? null,
+            message: error.message.replace(
+              /internal error; reference = .*/,
+              "internal error",
+            ),
+          };
+        }
+        results.push(result);
+      }
+    return results;
+  },
+  cryptoCipherStates: async function ({ crypto }) {
+    const attempt = (operation) => {
+      try {
+        const result = operation();
+        return result?.byteLength ?? typeof result;
+      } catch (error) {
+        return {
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message.replace(
+            /internal error; reference = .*/,
+            "internal error",
+          ),
+        };
+      }
+    };
+    const result = [];
+    for (const name of [
+      "aes-128-cbc",
+      "aes-128-gcm",
+      "chacha20-poly1305",
+      "aes-128-eax",
+    ]) {
+      const info = crypto.getCipherInfo(name),
+        key = new Uint8Array(info.keyLength),
+        iv = new Uint8Array(info.ivLength);
+      const cipher = crypto.createCipheriv(name, key, iv, {
+        authLengthTag: 16,
+      });
+      const row = {
+        name,
+        before: attempt(() => cipher.getAuthTag()),
+        stringInput: attempt(() => cipher.update("abc")),
+        aad: attempt(() => cipher.setAAD(new Uint8Array([1, 2, 3]))),
+      };
+      row.update = attempt(() => cipher.update(new Uint8Array([1, 2, 3])));
+      row.secondUpdate = attempt(() => cipher.update(new Uint8Array([4])));
+      row.final = attempt(() => cipher.final());
+      row.tag = attempt(() => cipher.getAuthTag());
+      row.tagAgain = attempt(() => cipher.getAuthTag());
+      row.finalAgain = attempt(() => cipher.final());
+      row.updateAfterFinal = attempt(() => cipher.update(new Uint8Array()));
+      row.aadAfterFinal = attempt(() => cipher.setAAD(new Uint8Array()));
+      row.paddingAfterFinal = attempt(() => cipher.setAutoPadding());
+      const decipher = crypto.createDecipheriv(name, key, iv, {
+        authLengthTag: 16,
+      });
+      row.stringTag = attempt(() => decipher.setAuthTag("00", "hex"));
+      row.missingTag = attempt(() =>
+        decipher.update(new Uint8Array([1, 2, 3])),
+      );
+      row.setTag = attempt(() => decipher.setAuthTag(new Uint8Array(16)));
+      row.setTagAgain = attempt(() => decipher.setAuthTag(new Uint8Array(16)));
+      row.decryptFinal = attempt(() => decipher.final());
+      result.push(row);
+    }
+    result.push({
+      invalidNames: [
+        "aes_128_eax",
+        "aes-128-eax\0suffix",
+        "AES-128-EAX",
+        "aes-128-cbc\0suffix",
+        "unknown",
+      ].map((name) => [
+        name,
+        attempt(() =>
+          crypto.createCipheriv(name, new Uint8Array(16), new Uint8Array(16), {
+            authLengthTag: 16,
+          }),
+        ),
+      ]),
+    });
+    const changingKey = new Uint8Array(16);
+    const keyCopy = crypto.createCipheriv(
+      "aes-128-cbc",
+      changingKey,
+      new Uint8Array(16),
+      {
+        get authLengthTag() {
+          changingKey[0] = 1;
+          return 16;
+        },
+      },
+    );
+    result.push({
+      keyCopiedBeforeOptions:
+        keyCopy.update("hello", "utf8", "hex") + keyCopy.final("hex"),
+    });
+    result.push({
+      deprecated: ["Cipher", "Decipher", "createCipher", "createDecipher"].map(
+        (name) => [name, attempt(() => crypto[name]())],
+      ),
+    });
+    return result;
+  },
+
   cryptoPbkdfContracts: async function ({ crypto }) {
     const attempt = (fn) => {
       try {

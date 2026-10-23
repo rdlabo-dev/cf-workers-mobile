@@ -26,3 +26,83 @@ export function setFips(_enabled: boolean): never {
 // not Workers' FIPS backend. That capability remains an explicit boundary.
 
 export { getCipherInfo } from "./cipher-info.js";
+
+// Includes the duplicate GCM aliases exposed by the pinned backend.
+const cipherNames = [
+  "AES-128-CBC",
+  "AES-192-CBC",
+  "AES-256-CBC",
+  "AES-128-CTR",
+  "AES-192-CTR",
+  "AES-256-CTR",
+  "AES-128-ECB",
+  "AES-192-ECB",
+  "AES-256-ECB",
+  "AES-128-OFB",
+  "AES-192-OFB",
+  "AES-256-OFB",
+  "AES-128-GCM",
+  "AES-192-GCM",
+  "AES-256-GCM",
+  "DES-CBC",
+  "DES-ECB",
+  "DES-EDE",
+  "DES-EDE-CBC",
+  "DES-EDE3-CBC",
+  "RC2-CBC",
+  "RC4",
+  "aes-128-cbc",
+  "aes-192-cbc",
+  "aes-256-cbc",
+  "aes-128-ctr",
+  "aes-192-ctr",
+  "aes-256-ctr",
+  "aes-128-ecb",
+  "aes-192-ecb",
+  "aes-256-ecb",
+  "aes-128-ofb",
+  "aes-192-ofb",
+  "aes-256-ofb",
+  "aes-128-gcm",
+  "aes-192-gcm",
+  "aes-256-gcm",
+  "des-cbc",
+  "des-ecb",
+  "des-ede",
+  "des-ede-cbc",
+  "des-ede3-cbc",
+  "rc2-cbc",
+  "rc4",
+  "aes-256-eax",
+  "aes-128-ccm-matter",
+  "aes-128-ccm-bluetooth-8",
+  "aes-128-gcm-randnonce",
+  "aes-256-gcm-randnonce",
+  "aes-128-gcm-siv",
+  "aes-128-ccm-bluetooth",
+  "aes-256-ctr-hmac-sha256",
+  "aes-128-ctr-hmac-sha256",
+  "xchacha20-poly1305",
+  "aes-256-gcm-siv",
+  "aes-128-eax",
+  "chacha20-poly1305",
+  "aes-192-gcm",
+  "aes-256-gcm",
+  "aes-128-gcm",
+];
+export function getCiphers(): string[] {
+  return [...cipherNames];
+}
+
+export function Cipher(): never {
+  return unavailable("Cipher");
+}
+export function Decipher(): never {
+  return unavailable("Decipher");
+}
+export function createCipher(): never {
+  return unavailable("createCipher");
+}
+export function createDecipher(): never {
+  return unavailable("createDecipher");
+}

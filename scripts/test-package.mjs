@@ -113,6 +113,7 @@ for (const notice of [
     (name) => `dist/compat/crypto/LICENSE.${name}`,
   ),
   "dist/compat/crypto/LICENSE-APACHE",
+  "dist/compat/crypto/LICENSE.boringssl",
   "dist/compat/crypto/LICENSE-3RD-PARTY.md",
   "dist/compat/zlib/LICENSE-APACHE",
   "dist/compat/zlib/LICENSE-3RD-PARTY.md",
