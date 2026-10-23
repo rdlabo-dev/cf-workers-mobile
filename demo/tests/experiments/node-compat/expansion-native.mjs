@@ -105,7 +105,8 @@ import process from 'node:process';
 fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
 import {measureOperation,measurements} from ${JSON.stringify(root + "/demo/tests/experiments/node-compat/native-measurements.mjs")};
 export {measurements};
-export const run = name => measureOperation(name,()=>eventCases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http}),name==='classicCodecs'?()=>zlib.gzipSync('x'.repeat(1024)):undefined);
+import { runWithRequestScope as withRequestScope } from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/shared/request-scope.js")};
+export const run = name => measureOperation(name,()=>eventCases[name]({withRequestScope,process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http}),name==='classicCodecs'?()=>zlib.gzipSync('x'.repeat(1024)):undefined);
 export {createNetworkRelay, initializeWorkerNetwork} from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/browser/fetch/relay.js")};
 export const runTls = async ({port,upgradePort}) => {
  const attempt = (servername,halfClose=false) => new Promise((resolve,reject)=> {

@@ -1,4 +1,146 @@
 export const eventCases = {
+  cryptoDhContracts: function ({ crypto, withRequestScope = (fn) => fn() }) {
+    return withRequestScope(() => {
+      const attempt = (fn) => {
+        try {
+          return fn();
+        } catch (e) {
+          return {
+            name: e.name,
+            code: e.code ?? null,
+            message: e.message.replace(
+              /internal error; reference = .*/,
+              "internal error",
+            ),
+          };
+        }
+      };
+      const groups = [
+        "modp14",
+        "modp15",
+        "modp16",
+        "modp17",
+        "modp18",
+        "MODP14",
+        "modp14\0suffix",
+        "modp5",
+        "modp1",
+        "invalid",
+      ].map((name) =>
+        attempt(() => {
+          const d = crypto.getDiffieHellman(name);
+          return {
+            length: d.getPrime().length,
+            generator: d.getGenerator("hex"),
+            verify: d.verifyError,
+            setters: [typeof d.setPublicKey, typeof d.setPrivateKey],
+          };
+        }),
+      );
+      const errors = [
+        () => crypto.createDiffieHellman(10001),
+        () => crypto.createDiffieHellman(8, 100000),
+        () => crypto.createDiffieHellman(8, new Uint8Array([2])),
+        () => crypto.createDiffieHellman(new Uint8Array(1251)),
+        () => crypto.createDiffieHellman(new Uint8Array(0)),
+        () => crypto.createDiffieHellman(new Uint8Array([23]), 1),
+        () =>
+          crypto.createDiffieHellman(new Uint8Array([23]), new Uint8Array([1])),
+        () =>
+          crypto.createDiffieHellman(
+            new Uint8Array([23]),
+            new Uint8Array(1251),
+          ),
+        () => crypto.createDiffieHellman(new Uint8Array([22])),
+        () => crypto.createDiffieHellman(new Uint8Array([3])).generateKeys(),
+      ].map((fn) =>
+        attempt(() => {
+          fn();
+          return "accepted";
+        }),
+      );
+      const d = crypto.createDiffieHellman(new Uint8Array([23]));
+      const before = [
+        attempt(() => d.getPublicKey()),
+        attempt(() => d.getPrivateKey()),
+      ];
+      d.setPrivateKey(new Uint8Array([3]));
+      const pub = d.generateKeys("hex");
+      const peer = crypto.createDiffieHellman(new Uint8Array([23]));
+      peer.setPrivateKey(new Uint8Array([4]));
+      peer.generateKeys();
+      const secret = d.computeSecret(peer.getPublicKey(), undefined, "hex");
+      const keyErrors = [
+        new Uint8Array(0),
+        new Uint8Array([0]),
+        new Uint8Array([1]),
+        new Uint8Array([23]),
+      ].map((key) => [
+        attempt(() => d.setPublicKey(key)),
+        attempt(() => d.computeSecret(key)),
+      ]);
+      const numeric = crypto.createDiffieHellman(64);
+      const numericResult = {
+        length: numeric.getPrime().length,
+        generator: numeric.getGenerator("hex"),
+        verify: numeric.verifyError,
+      };
+      const properties = Object.getOwnPropertyNames(
+        crypto.DiffieHellman.prototype,
+      ).map((name) => {
+        const descriptor = Object.getOwnPropertyDescriptor(
+          crypto.DiffieHellman.prototype,
+          name,
+        );
+        return [
+          name,
+          descriptor.enumerable,
+          descriptor.configurable,
+          descriptor.writable ?? null,
+          typeof descriptor.value === "function" ? descriptor.value.name : null,
+        ];
+      });
+      const x = crypto.generateKeyPairSync("x25519"),
+        y = crypto.generateKeyPairSync("x25519");
+      const xSecret = crypto.diffieHellman({
+        publicKey: x.publicKey,
+        privateKey: y.privateKey,
+      });
+      const ec = crypto.generateKeyPairSync("ec", { namedCurve: "P-224" });
+      const ecResult = attempt(() =>
+        crypto.diffieHellman({
+          publicKey: ec.publicKey,
+          privateKey: ec.privateKey,
+        }),
+      );
+      return {
+        groups,
+        errors,
+        before,
+        pub,
+        secret,
+        verify: d.verifyError,
+        keyErrors,
+        numericResult,
+        properties,
+        lengths: [
+          crypto.DiffieHellman.length,
+          crypto.createDiffieHellman.length,
+        ],
+        x25519: {
+          length: xSecret.length,
+          equal: xSecret.equals(
+            crypto.diffieHellman({
+              publicKey: y.publicKey,
+              privateKey: x.privateKey,
+            }),
+          ),
+        },
+        ecResult,
+      };
+    });
+  },
+
   cryptoRandomContracts: async function ({ crypto }) {
     const attempt = (fn) => {
       try {

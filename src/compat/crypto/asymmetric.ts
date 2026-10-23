@@ -233,12 +233,14 @@ export function generateKeyPairSync(type: string, options: any = {}) {
     }
   } else key = NativeKey.generate(type.toUpperCase());
   const privateKey = create("private", { asymmetric: key }) as PrivateKeyObject;
-  // Workers retains the generated DH key in both wrappers. Imported public
-  // keys still contain only public material.
-  const publicKey =
-    type === "dh"
-      ? (create("public", { asymmetric: key }) as PublicKeyObject)
-      : createPublicKey(privateKey);
+  // Workers constructs a separate public-only EC key. Other generated pairs
+  // retain the same key material under their public and private wrappers.
+  const publicKey = create("public", {
+    asymmetric:
+      type === "ec"
+        ? NativeKey.parse(key.export(false, false, "spki"), false, false)
+        : key,
+  }) as PublicKeyObject;
   return {
     publicKey:
       publicKeyEncoding !== undefined

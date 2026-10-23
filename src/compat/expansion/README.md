@@ -79,6 +79,17 @@ generation and shared-secret calculation use the pinned BoringSSL backend,
 including small primes and rejection of mismatched parameters. Workers' DH key
 export rejection is preserved. The upstream key-generation and scrypt fixtures
 run with `npx vitest run src/compat/crypto/kdf-limits.spec.ts`.
+The DiffieHellman and DiffieHellmanGroup frontend uses the same BoringSSL backend
+for parameter checking, key generation, setters and padded shared secrets.
+Fixed groups are modp14 through modp18; their pinned `verifyError` is 8, including
+BoringSSL's generator-suitability flag. Numeric parameter generation requires an
+active local request, including when crypto is first dynamically imported within
+that request. The request marker is initialized at dispatch, without changing
+host globals merely by importing the dispatcher. Safe-prime generation is
+synchronous and can occupy the WebView for a long time. Workers' per-request
+CPU/memory limit-enforcer cancellation is not implemented; the maximum prime
+size alone does not provide that protection. The DH/ECDH upstream fixtures and
+consumer declaration checks run with `npx vitest run src/compat/crypto/dh.spec.ts`.
 Remaining key import/export and other crypto error contracts still need work. Cipheriv/Decipheriv use the same pinned BoringSSL revision as Workers. Their
 frontend preserves Workers' `authLengthTag` option spelling, AEAD's one-update
 limit, early authentication-tag requirements, tag consumption and buffer copies.

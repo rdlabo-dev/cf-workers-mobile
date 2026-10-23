@@ -62,3 +62,36 @@ API int cipher_dh_derive(const unsigned char *prime,int plen,const unsigned char
  result=DH_compute_key_padded(out,y,dh);
  done: BN_free(p);BN_free(g);BN_clear_free(x);BN_free(y);DH_free(dh);return result;
 }
+
+API DH *dh_create(const unsigned char *prime,int plen,const unsigned char *generator,int glen){
+ DH *dh=DH_new();BIGNUM *p=BN_bin2bn(prime,plen,NULL),*g=BN_bin2bn(generator,glen,NULL);
+ if(!dh || !p || !g || !DH_set0_pqg(dh,p,NULL,g)){DH_free(dh);BN_free(p);BN_free(g);return NULL;}return dh;
+}
+API DH *dh_parameters(int bits,int generator){
+ DH *dh=DH_new();if(!dh || !DH_generate_parameters_ex(dh,bits,generator,NULL)){DH_free(dh);return NULL;}return dh;
+}
+API DH *dh_group(int bits){
+ BIGNUM *p=bits==2048?BN_get_rfc3526_prime_2048(NULL):bits==3072?BN_get_rfc3526_prime_3072(NULL):bits==4096?BN_get_rfc3526_prime_4096(NULL):bits==6144?BN_get_rfc3526_prime_6144(NULL):bits==8192?BN_get_rfc3526_prime_8192(NULL):NULL;
+ BIGNUM *g=BN_new();DH *dh=DH_new();if(!p || !g || !dh || !BN_set_word(g,2) || !DH_set0_pqg(dh,p,NULL,g)){BN_free(p);BN_free(g);DH_free(dh);return NULL;}return dh;
+}
+API void dh_free(DH *dh){DH_free(dh);}
+API int dh_check(DH *dh){int code=0;return DH_check(dh,&code)?code:-1;}
+API int dh_generate(DH *dh){return DH_generate_key(dh);}
+API int dh_get(DH *dh,int kind,unsigned char *out){
+ const BIGNUM *bn=kind==0?DH_get0_p(dh):kind==1?DH_get0_g(dh):kind==2?DH_get0_pub_key(dh):DH_get0_priv_key(dh);
+ if(!bn)return -1;int length=BN_num_bytes(bn);if(out && !BN_bn2bin_padded(out,length,bn))return -1;return length;
+}
+API int dh_set(DH *dh,int private_key,const unsigned char *key,int length){
+ BIGNUM *bn=BN_bin2bn(key,length,NULL);if(!bn)return -1;
+ if(!private_key){int code=0;if(!DH_check_pub_key(dh,bn,&code)){BN_free(bn);return -1;}if(code){BN_free(bn);return code;}}
+ int ok=DH_set0_key(dh,private_key?NULL:bn,private_key?bn:NULL);if(!ok)BN_clear_free(bn);return ok?0:-1;
+}
+API int dh_peer_check(DH *dh,const unsigned char *key,int length){
+ BIGNUM *bn=BN_bin2bn(key,length,NULL);int code=0;int ok=bn && DH_check_pub_key(dh,bn,&code);BN_free(bn);return ok?code:-1;
+}
+API int dh_compute(DH *dh,const unsigned char *key,int length,unsigned char *out){
+ BIGNUM *bn=BN_bin2bn(key,length,NULL);if(!bn)return -1;int size=DH_compute_key_padded(out,bn,dh);BN_free(bn);return size;
+}
+API int dh_valid(DH *dh){return BN_is_odd(DH_get0_p(dh)) && BN_ucmp(DH_get0_g(dh),DH_get0_p(dh))<0;}
+
+API int dh_group_check(DH *dh){return BN_mod_word(DH_get0_p(dh),24)==11?0:DH_NOT_SUITABLE_GENERATOR;}

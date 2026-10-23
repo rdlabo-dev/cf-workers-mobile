@@ -74,10 +74,11 @@ const compiled = await build({
     resolveDir: root,
     contents: `import * as tls from 'node:tls'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { eventCases } from './src/compat/expansion/index.spec.mjs';
+import { runWithRequestScope as withRequestScope } from './dist/shared/request-scope.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
-export const run = name => eventCases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
+export const run = name => eventCases[name]({withRequestScope,process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
   },
   bundle: true,
   platform: "browser",
@@ -96,10 +97,11 @@ await writeFile(
   entry,
   `import * as tls from 'node:tls'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { eventCases } from ${JSON.stringify(fileURLToPath(new URL("../../../../src/compat/expansion/index.spec.mjs", import.meta.url)))};
+import { runWithRequestScope as withRequestScope } from ${JSON.stringify(fileURLToPath(new URL("../../../../dist/shared/request-scope.js", import.meta.url)))};
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
-export const run = name => eventCases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
+export const run = name => eventCases[name]({withRequestScope,process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
 );
 const viteResult = await viteBuild({
   configFile: false,

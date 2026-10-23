@@ -1,3 +1,5 @@
+import * as dh from "./dh.js";
+export * from "./dh.js";
 import { pbkdf2, pbkdf2Sync } from "./pbkdf2.js";
 export { pbkdf2, pbkdf2Sync };
 import { Hash, Hmac, createHmac, createHash, hash } from "./hash.js";
@@ -52,14 +54,7 @@ export { randomBytes, randomFill, randomFillSync };
 export const pseudoRandomBytes = randomBytes;
 import { scrypt, scryptSync } from "./scrypt.js";
 export { hkdf, hkdfSync, randomInt, randomUUID, scrypt, scryptSync };
-export const {
-  DiffieHellmanGroup,
-  createDiffieHellmanGroup,
-  getDiffieHellman,
-  createDiffieHellman,
-  DiffieHellman,
-  constants,
-} = original;
+export const { constants } = original;
 import {
   Cipheriv,
   Decipheriv,
@@ -82,6 +77,7 @@ export default {
   X509Certificate,
   Certificate,
   ...originalSupported,
+  ...dh,
   pbkdf2,
   pbkdf2Sync,
   Hash,
