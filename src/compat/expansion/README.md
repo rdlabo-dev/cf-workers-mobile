@@ -9,7 +9,7 @@ whole modules.
 
 Implemented profiles include console's Workers stubs, sys aliasing, public
 util/types predicates, crypto random integers/UUIDs/Web Crypto exports,
-hash/HKDF/scrypt, the four Workers ECDH curves, crypto engine/secure-heap stubs,
+Hash/HMAC/PBKDF2/HKDF/scrypt, the four Workers ECDH curves, crypto engine/secure-heap stubs,
 writable memory-backed /tmp, module metadata, HTTP internal
 helpers, adapter-owned secret and asymmetric KeyObjects, prime generation and
 checking, incremental signatures, Certificate SPKAC and X509Certificate operations,
@@ -42,6 +42,19 @@ The pinned source revisions and artifact hashes accompany the codecs; rebuild
 with scripts/build-native-codecs.mjs or scripts/build-native-zlib.mjs and the pinned Emscripten SDK. Gzip/deflate and Brotli/Zstd streams use the pinned Workers stream lifecycle. The comparative cases include constructor validation, callback timing, reset, close, byte accounting, dictionaries and output limits; whole-module acceptance remains a separate gate.
 Scrypt uses a synchronous JavaScript backend, including for callback completion,
 so large parameters can block the WebView.
+
+Hash and HMAC use the owned OpenSSL backend, including incremental input,
+Hash copying, stream finalization and repeated-digest behavior. `getHashes()`
+returns the pinned 17 names, including MD4, MD5-SHA1 and the RSA/DSA aliases.
+PBKDF2 and HKDF use the same digest mapping and preserve the pinned Workers
+limit of 255 digest blocks. Callback completion is asynchronous, while the
+underlying derivation runs synchronously; high PBKDF2 iteration counts can block
+the WebView. The upstream digest/KDF fixtures run with
+`npx vitest run src/compat/crypto/hash.spec.ts src/compat/crypto/hash-types.spec.ts`.
+Native measurements record whether the engine provides `Float16Array`.
+Where absent, its input brand is unverified; equivalent half-float bytes are
+still tested as a byte-array input. This does not certify complete crypto input
+coverage on that engine.
 
 Adapter-created secret keys support copied raw/JWK export, equality, generation,
 HMAC, HKDF and symmetric ciphers. KeyObject.from can retain a host CryptoKey, but

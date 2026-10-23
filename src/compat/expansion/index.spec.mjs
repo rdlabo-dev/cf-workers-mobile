@@ -1,4 +1,168 @@
 export const eventCases = {
+  cryptoPbkdfContracts: async function ({ crypto }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (error) {
+        return { name: error.name, code: error.code ?? null };
+      }
+    };
+    const result = { algorithms: [], typed: [], errors: [] };
+    for (const name of crypto.getHashes())
+      result.algorithms.push([
+        name,
+        crypto.pbkdf2Sync("pass", "salt", 3, 20, name).toString("hex"),
+      ]);
+    for (const Constructor of [
+      Uint8Array,
+      Uint16Array,
+      Uint32Array,
+      Float32Array,
+      Float64Array,
+    ]) {
+      const value = new Constructor(new ArrayBuffer(16));
+      value.set([1, 2]);
+      result.typed.push([
+        Constructor.name,
+        crypto
+          .pbkdf2Sync(value, new DataView(value.buffer, 2, 6), 2, 8, "sha256")
+          .toString("hex"),
+      ]);
+    }
+    // Half-float bytes are portable; the Float16Array input brand is tested
+    // only where the engine provides it, and native evidence records availability.
+    const halfBytes = new Uint8Array(16);
+    new DataView(halfBytes.buffer).setUint16(0, 0x3c00, true);
+    new DataView(halfBytes.buffer).setUint16(2, 0x4000, true);
+    result.halfFloatBytes = crypto
+      .pbkdf2Sync(
+        halfBytes,
+        new DataView(halfBytes.buffer, 2, 6),
+        2,
+        8,
+        "sha256",
+      )
+      .toString("hex");
+    if (typeof globalThis.Float16Array === "function") {
+      const half = new globalThis.Float16Array(8);
+      half.set([1, 2]);
+      const actual = crypto
+        .pbkdf2Sync(half, new DataView(half.buffer, 2, 6), 2, 8, "sha256")
+        .toString("hex");
+      if (actual !== result.halfFloatBytes)
+        throw new Error(
+          "Float16Array PBKDF2 differs from its byte representation",
+        );
+    }
+    for (const args of [
+      ["p", "s", 0, 1, "sha1"],
+      ["p", "s", 1, 5101, "sha1"],
+      ["p", "s", 1, 8161, "sha256"],
+      ["p", "s", 1, 0, "sha256"],
+      ["p", "s", 1, 1, "unknown"],
+    ])
+      result.errors.push(
+        attempt(() => crypto.pbkdf2Sync(...args).toString("hex")),
+      );
+    const order = [];
+    result.callback = await new Promise((resolve) => {
+      crypto.pbkdf2("p", "s", 2, 8, "sha256", (error, value) => {
+        order.push("callback");
+        resolve(error ? error.name : value.toString("hex"));
+      });
+      order.push("returned");
+    });
+    result.order = order;
+    result.callbackError = await new Promise((resolve) =>
+      crypto.pbkdf2("p", "s", 1, 1, "unknown", (error) =>
+        resolve([error.name, error.code ?? null]),
+      ),
+    );
+    const hex = (buffer) =>
+      Array.from(new Uint8Array(buffer), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join("");
+    result.hkdf = crypto
+      .getHashes()
+      .map((name) => [
+        name,
+        hex(
+          crypto.hkdfSync(
+            name,
+            crypto.createSecretKey(new Uint8Array([1, 2, 3])),
+            "salt",
+            "info",
+            10,
+          ),
+        ),
+      ]);
+    result.hkdfErrors = [
+      attempt(() => crypto.hkdfSync("unknown", "p", "s", "i", 1)),
+      attempt(() => crypto.hkdfSync("sha1", "p", "s", "i", 5101)),
+      attempt(() => crypto.hkdfSync("sha1", "p", "s", new Uint8Array(1025), 1)),
+    ];
+    return result;
+  },
+  cryptoDigestContracts: async function ({ crypto }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (error) {
+        return { name: error.name, code: error.code ?? null };
+      }
+    };
+    const result = { names: crypto.getHashes(), algorithms: [], errors: [] };
+    for (const name of result.names) {
+      const hash = crypto.createHash(name).update("a");
+      const copy = hash.copy();
+      result.algorithms.push({
+        name,
+        hash: hash.update("bc").digest("hex"),
+        copy: copy.update("d").digest("hex"),
+        hmac: attempt(() =>
+          crypto.createHmac(name, "key").update("abc").digest("hex"),
+        ),
+      });
+    }
+    for (const name of [
+      "ripemd160",
+      "sha-256",
+      "SHA",
+      "ssl3-md5",
+      "ssl3-sha1",
+      "SHA256",
+    ])
+      result.errors.push([
+        name,
+        attempt(() => crypto.createHash(name).digest("hex")),
+      ]);
+    for (const outputLength of [0, 28, 32, null, -1, "32"])
+      result.errors.push(
+        attempt(() =>
+          crypto.createHash("sha256", { outputLength }).digest("hex"),
+        ),
+      );
+    const hash = crypto.createHash("sha256");
+    hash.end("abc");
+    result.stream = [hash.read().toString("hex"), hash.digest("hex")];
+    result.final = [
+      attempt(() => hash.copy()),
+      attempt(() => hash.update("x")),
+      attempt(() => hash.digest()),
+    ];
+    const hmac = crypto.Hmac(
+      "sha256",
+      crypto.createSecretKey(new Uint8Array([1, 2, 3])),
+    );
+    hmac.end("abc");
+    result.hmacStream = [
+      hmac.read().toString("hex"),
+      hmac.digest("hex"),
+      hmac.digest("hex"),
+      attempt(() => hmac.update("x")),
+    ];
+    return result;
+  },
   fsIoContracts: async function ({ fs, process }) {
     const path = "/tmp/io-contract",
       result = {};

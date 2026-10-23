@@ -17,3 +17,12 @@ pinned workerd module; internal helpers are not added to the public facade.
 X509 certificate wrappers and safe name rendering are adapted from
 `src/node/internal/crypto_x509.ts` and `src/workerd/api/crypto/x509.c++` at
 workerd commit `5358e3d337336eaf696a48bc1563d808b10feba5` (Apache-2.0).
+
+Hash/HMAC and PBKDF2 frontends and digest/KDF test fixtures are adapted from
+`src/node/internal/crypto_hash.ts`, `src/node/internal/crypto_pbkdf2.ts` and
+`src/workerd/api/node/tests/crypto_{hash,hmac,pbkdf2,hkdf}-test.js` at the same
+pinned workerd commit. The Apache-2.0 and Node.js MIT headers are retained.
+Imports use the owned adapters. Latin-1 fixture expectations written as literal
+caret notation upstream are decoded using independently verified digest bytes;
+comments identify those adaptations. Float16 input-brand cases require the
+engine's intrinsic; native evidence records its availability.

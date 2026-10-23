@@ -1,9 +1,9 @@
-import { secretMaterial } from "./keys.js";
+import { KeyObject } from "./keys.js";
+import { createHmac } from "./hash.js";
+import { aliases } from "./hash-handle.js";
 // RFC 5869 extract-and-expand, using the existing HMAC implementation.
 import { Buffer } from "node:buffer";
-// @ts-expect-error dependency has no declarations
-import original from "crypto-browserify/index.js";
-import { bytes, validateInteger } from "./validation.js";
+import { bytes, validateInteger, validateCryptoLength } from "./validation.js";
 import { validateString, validateFunction } from "../net/validators.js";
 import { ERR_OUT_OF_RANGE } from "../net/errors.js";
 function parameters(
@@ -13,8 +13,9 @@ function parameters(
   info: unknown,
   length: number,
 ) {
+  if (key instanceof KeyObject) key = key.export();
   validateString(digest, "digest");
-  const ikm = bytes(secretMaterial(key), "ikm"),
+  const ikm = bytes(key, "ikm"),
     s = bytes(salt, "salt"),
     i = bytes(info, "info");
   validateInteger(length, "length", 0, 2147483647);
@@ -33,21 +34,26 @@ function derive({
   i,
   length,
 }: ReturnType<typeof parameters>): ArrayBuffer {
-  const prk = original.createHmac(digest, s).update(ikm).digest();
-  if (length > 255 * prk.length)
-    throw Object.assign(new RangeError("Invalid key length"), {
-      code: "ERR_CRYPTO_INVALID_KEYLEN",
-    });
-  const output = Buffer.alloc(length);
-  let previous = Buffer.alloc(0);
+  if (!aliases[digest.toLowerCase()])
+    throw new TypeError("Invalid Hkdf digest: " + digest);
+  validateCryptoLength(i.byteLength, "Hkdf failed: info is too large");
+  validateCryptoLength(s.byteLength, "Hkdf failed: salt is too large");
+  validateCryptoLength(ikm.byteLength, "Hkdf failed: key is too large");
+  const prk = createHmac(digest, s).update(ikm).digest();
+
+  let previous: Buffer = Buffer.alloc(0);
   try {
+    if (length > 255 * prk.length)
+      throw new RangeError("Invalid Hkdf key length");
+    const output = Buffer.alloc(length);
     for (let offset = 0, counter = 1; offset < length; counter++) {
-      previous = original
-        .createHmac(digest, prk)
+      const next = createHmac(digest, prk)
         .update(previous)
         .update(i)
         .update(Buffer.from([counter]))
         .digest();
+      previous.fill(0);
+      previous = next;
       const size = Math.min(previous.length, length - offset);
       output.set(previous.subarray(0, size), offset);
       offset += size;

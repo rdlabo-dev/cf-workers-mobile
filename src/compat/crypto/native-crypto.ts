@@ -389,11 +389,34 @@ export class NativeDigest {
   constructor(
     algorithm: string,
     private context = "Signing",
+    pointer?: number,
   ) {
-    this.pointer = inputs([algorithm], (api, [p]) => api.wk_digest_new(p));
+    this.pointer =
+      pointer ?? inputs([algorithm], (api, [p]) => api.wk_digest_new(p));
     if (!this.pointer) throw new Error(`Unknown digest: ${algorithm}`);
     digestReleased.register(this, this.pointer, this);
   }
+  dispose() {
+    if (this.pointer) {
+      library().wk_digest_free(this.pointer);
+      this.pointer = 0;
+      digestReleased.unregister(this);
+    }
+  }
+  get size() {
+    return library().wk_digest_size(this.pointer);
+  }
+  copy() {
+    if (!this.pointer)
+      throw new DOMException(
+        "Hash context has already been finalized.",
+        "OperationError",
+      );
+    const pointer = library().wk_digest_copy(this.pointer);
+    if (!pointer) throw error();
+    return new NativeDigest("", this.context, pointer);
+  }
+
   update(data: Uint8Array) {
     if (!this.pointer)
       throw new Error(`${this.context} context has already been finalized`);
@@ -612,4 +635,59 @@ export class NativeTLS {
       certs.push(result(api));
     return certs;
   }
+}
+
+const hmacReleased = new FinalizationRegistry<number>((pointer) =>
+  library().wk_hmac_free(pointer),
+);
+export class NativeHmac {
+  private pointer: number;
+  constructor(algorithm: string, key: Uint8Array) {
+    this.pointer = inputs([algorithm, key], (api, [a, k]) =>
+      api.wk_hmac_new(a, k, key.byteLength),
+    );
+    if (!this.pointer) throw new Error("Failed to initalize HMAC");
+    hmacReleased.register(this, this.pointer, this);
+  }
+  update(data: Uint8Array) {
+    inputs([data], (api, [p]) => {
+      if (!api.wk_hmac_update(this.pointer, p, data.byteLength)) throw error();
+    });
+  }
+  final() {
+    const api = library();
+    try {
+      if (!api.wk_hmac_final(this.pointer))
+        throw new Error("Failed to finalize HMAC");
+      return result(api);
+    } finally {
+      api.wk_hmac_free(this.pointer);
+      this.pointer = 0;
+      hmacReleased.unregister(this);
+    }
+  }
+}
+
+export function nativePbkdf2(
+  password: Uint8Array,
+  salt: Uint8Array,
+  iterations: number,
+  length: number,
+  digest: string,
+) {
+  return inputs([password, salt, digest], (api, [p, s, d]) => {
+    if (
+      !api.wk_pbkdf2(
+        p,
+        password.byteLength,
+        s,
+        salt.byteLength,
+        iterations,
+        length,
+        d,
+      )
+    )
+      throw new Error("Pbkdf2 failed");
+    return result(api);
+  });
 }

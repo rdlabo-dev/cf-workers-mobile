@@ -1,6 +1,7 @@
 // OpenSSL bridge owned by cf-workers-native (MIT).
 #include <emscripten/emscripten.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/ec.h>
@@ -145,14 +146,30 @@ API int wk_prime_generate(int bits,int safe,const unsigned char *add,int add_len
   BN_clear_free(a);BN_clear_free(r);BN_clear_free(prime);BN_CTX_free(ctx);return ok;
 }
 API EVP_MD_CTX *wk_digest_new(const char *algorithm) {
-  ERR_clear_error();const EVP_MD *md=EVP_get_digestbyname(algorithm);EVP_MD_CTX *ctx=EVP_MD_CTX_new();
+  ERR_clear_error();const EVP_MD *md=EVP_get_digestbyname(algorithm);
+  if(md && EVP_MD_type(md)==NID_md4){static int legacy_initialized=0;if(!legacy_initialized){OSSL_PROVIDER_load(NULL,"default");OSSL_PROVIDER_load(NULL,"legacy");legacy_initialized=1;}}
+  EVP_MD_CTX *ctx=EVP_MD_CTX_new();
   if(!md || !ctx || EVP_DigestInit_ex(ctx,md,NULL)!=1){EVP_MD_CTX_free(ctx);return NULL;}return ctx;
 }
+API EVP_MD_CTX *wk_digest_copy(EVP_MD_CTX *source) {EVP_MD_CTX *ctx=EVP_MD_CTX_new();if(!ctx || EVP_MD_CTX_copy_ex(ctx,source)!=1){EVP_MD_CTX_free(ctx);return NULL;}return ctx;}
+API int wk_digest_size(EVP_MD_CTX *ctx) {return EVP_MD_CTX_get_size(ctx);}
 API void wk_digest_free(EVP_MD_CTX *ctx) {EVP_MD_CTX_free(ctx);}
 API int wk_digest_update(EVP_MD_CTX *ctx,const unsigned char *data,size_t length) {return EVP_DigestUpdate(ctx,data,length);}
 API int wk_digest_final(EVP_MD_CTX *ctx) {
   unsigned int length=EVP_MAX_MD_SIZE;clear_output();output=OPENSSL_malloc(length);if(!output)return 0;
   output_length=length;if(EVP_DigestFinal_ex(ctx,output,&length)!=1){clear_output();return 0;}output_length=length;return 1;
+}
+API HMAC_CTX *wk_hmac_new(const char *algorithm,const unsigned char *key,int length) {
+ EVP_MD_CTX *check=wk_digest_new(algorithm);if(!check)return NULL;EVP_MD_CTX_free(check);
+ HMAC_CTX *ctx=HMAC_CTX_new();if(!ctx||HMAC_Init_ex(ctx,key,length,EVP_get_digestbyname(algorithm),NULL)!=1){HMAC_CTX_free(ctx);return NULL;}return ctx;
+}
+API void wk_hmac_free(HMAC_CTX *ctx){HMAC_CTX_free(ctx);}
+API int wk_hmac_update(HMAC_CTX *ctx,const unsigned char *data,size_t length){return HMAC_Update(ctx,data,length);}
+API int wk_hmac_final(HMAC_CTX *ctx){unsigned int length=EVP_MAX_MD_SIZE;clear_output();output=OPENSSL_malloc(length);if(!output)return 0;output_length=length;if(HMAC_Final(ctx,output,&length)!=1){clear_output();return 0;}output_length=length;return 1;}
+API int wk_pbkdf2(const unsigned char *password,int password_length,const unsigned char *salt,int salt_length,int iterations,int length,const char *algorithm){
+ EVP_MD_CTX *check=wk_digest_new(algorithm);if(!check)return 0;EVP_MD_CTX_free(check);
+ clear_output();output=OPENSSL_malloc(length?length:1);if(!output)return 0;output_length=length;
+ if(!PKCS5_PBKDF2_HMAC((const char*)password,password_length,salt,salt_length,iterations,EVP_get_digestbyname(algorithm),length,output)){clear_output();return 0;}return 1;
 }
 API int wk_sign_hash(EVP_PKEY *key,const char *digest,const unsigned char *data,size_t length,int padding,int saltlen) {
   ERR_clear_error();EVP_PKEY_CTX *ctx=EVP_PKEY_CTX_new(key,NULL);if(!ctx)return 0;

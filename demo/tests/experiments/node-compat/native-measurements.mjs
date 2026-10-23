@@ -26,6 +26,9 @@ export async function measureOperation(name, operation, warmOperation) {
   try {
     const value = await operation();
     measurements[name] = {
+      hostCapabilities: {
+        float16Array: typeof globalThis.Float16Array === "function",
+      },
       operationMs: performance.now() - started,
       wasm,
       wasmMemoryBytes: memories.reduce((n, m) => n + m.buffer.byteLength, 0),

@@ -6,43 +6,6 @@ import { secretMaterial } from "./keys.js";
 const BaseTransform =
   Transform as unknown as typeof import("node:stream").Transform;
 const handles = new WeakMap<object, any>();
-export class Hmac extends BaseTransform {
-  constructor(algorithm: string, key: unknown, options?: any) {
-    super(options);
-    handles.set(
-      this,
-      original.createHmac(
-        algorithm,
-        typeof key === "string"
-          ? Buffer.from(key, options?.encoding)
-          : secretMaterial(key),
-      ),
-    );
-  }
-  update(data: unknown, encoding?: string): this {
-    handles.get(this).update(data, encoding);
-    return this;
-  }
-  digest(encoding?: string): any {
-    return handles.get(this).digest(encoding);
-  }
-  override _transform(chunk: any, encoding: any, callback: any) {
-    try {
-      this.update(chunk, encoding);
-      callback();
-    } catch (error) {
-      callback(error);
-    }
-  }
-  override _flush(callback: any) {
-    try {
-      this.push(this.digest());
-      callback();
-    } catch (error) {
-      callback(error);
-    }
-  }
-}
 class CipherTransform extends BaseTransform {
   constructor(
     decrypt: boolean,
@@ -109,9 +72,6 @@ export class Decipheriv extends CipherTransform {
   constructor(algorithm: string, key: unknown, iv: unknown, options?: any) {
     super(true, algorithm, key, iv, options);
   }
-}
-export function createHmac(algorithm: string, key: unknown, options?: any) {
-  return new Hmac(algorithm, key, options);
 }
 export function createCipheriv(
   algorithm: string,

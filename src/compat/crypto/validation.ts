@@ -13,9 +13,27 @@ export function validateInteger(
   if (value < min || value > max)
     throw new ERR_OUT_OF_RANGE(name, `>= ${min} && <= ${max}`, value);
 }
+export function isAnyBuffer(value: unknown): value is ArrayBuffer {
+  try {
+    Reflect.getOwnPropertyDescriptor(
+      ArrayBuffer.prototype,
+      "byteLength",
+    )!.get!.call(value);
+    return true;
+  } catch {}
+  if (typeof SharedArrayBuffer !== "undefined")
+    try {
+      Reflect.getOwnPropertyDescriptor(
+        SharedArrayBuffer.prototype,
+        "byteLength",
+      )!.get!.call(value);
+      return true;
+    } catch {}
+  return false;
+}
 export function bytes(value: unknown, name: string): Buffer {
   if (typeof value === "string") return Buffer.from(value);
-  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (isAnyBuffer(value)) return Buffer.from(value);
   if (ArrayBuffer.isView(value))
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
   throw new ERR_INVALID_ARG_TYPE(
@@ -23,4 +41,9 @@ export function bytes(value: unknown, name: string): Buffer {
     ["string", "ArrayBuffer", "Buffer", "TypedArray", "DataView"],
     value,
   );
+}
+
+// Native Workers crypto entry points use signed 32-bit buffer lengths.
+export function validateCryptoLength(length: number, message: string): void {
+  if (length > 0x7fffffff) throw new RangeError(message);
 }

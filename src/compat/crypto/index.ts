@@ -1,3 +1,7 @@
+import { pbkdf2, pbkdf2Sync } from "./pbkdf2.js";
+export { pbkdf2, pbkdf2Sync };
+import { Hash, Hmac, createHmac, createHash, hash } from "./hash.js";
+export { Hash, Hmac, createHmac, createHash, hash };
 import { X509Certificate } from "./x509.js";
 export { X509Certificate };
 import { Certificate } from "./certificate.js";
@@ -36,19 +40,12 @@ import original from "crypto-browserify/index.js";
 import { hkdf, hkdfSync } from "./hkdf.js";
 import { randomInt, randomUUID } from "./random.js";
 import { scrypt, scryptSync } from "./scrypt.js";
-import { validateString } from "../net/validators.js";
-import { bytes } from "./validation.js";
 export { hkdf, hkdfSync, randomInt, randomUUID, scrypt, scryptSync };
 export const {
   prng,
   pseudoRandomBytes,
   rng,
   randomBytes,
-  Hash,
-  createHash,
-  getHashes,
-  pbkdf2,
-  pbkdf2Sync,
   Cipher,
   createCipher,
   Decipher,
@@ -66,21 +63,12 @@ export const {
   constants,
 } = original;
 import {
-  Hmac,
   Cipheriv,
   Decipheriv,
-  createHmac,
   createCipheriv,
   createDecipheriv,
 } from "./symmetric.js";
-export {
-  Hmac,
-  Cipheriv,
-  Decipheriv,
-  createHmac,
-  createCipheriv,
-  createDecipheriv,
-};
+export { Cipheriv, Decipheriv, createCipheriv, createDecipheriv };
 import {
   publicEncrypt,
   privateEncrypt,
@@ -92,23 +80,14 @@ export const webcrypto = globalThis.crypto;
 export const subtle = webcrypto.subtle;
 export const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
 export const CryptoKey = globalThis.CryptoKey;
-export function hash(
-  algorithm: string,
-  data: unknown,
-  outputEncoding: string = "hex",
-) {
-  validateString(algorithm, "algorithm");
-  validateString(outputEncoding, "outputEncoding");
-  const result = original
-    .createHash(algorithm)
-    .update(bytes(data, "data"))
-    .digest();
-  return outputEncoding === "buffer" ? result : result.toString(outputEncoding);
-}
 export default {
   X509Certificate,
   Certificate,
   ...original,
+  pbkdf2,
+  pbkdf2Sync,
+  Hash,
+  createHash,
   ...metadata,
   ...asymmetric,
   ...signatures,

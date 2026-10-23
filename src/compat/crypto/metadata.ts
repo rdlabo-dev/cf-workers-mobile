@@ -1,3 +1,7 @@
+import { hashNames } from "./hash-handle.js";
+export function getHashes() {
+  return [...hashNames];
+}
 // Copyright (c) 2017-2022 Cloudflare, Inc.
 // Licensed under Apache-2.0: https://opensource.org/licenses/Apache-2.0
 // Adapted from workerd@5358e3d337336eaf696a48bc1563d808b10feba5.
