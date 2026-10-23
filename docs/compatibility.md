@@ -81,6 +81,15 @@ Residual work has different causes:
 - **Verification gaps:** even an aligned export surface needs whole-module
   operation/prototype coverage and native acceptance before it is called complete.
 
+A codec option getter can mutate an input or dictionary before native processing;
+those ordinary mutations are preserved. Resizable ArrayBuffers and growable SharedArrayBuffer views are snapshotted
+at conversion, as in Workers. A fixed ArrayBuffer transferred by an option getter
+is a narrower engine boundary: Workers can retain its native backing store after
+detachment, while JavaScript cannot recover mutations made immediately before the
+transfer. Local fast codecs reject that case with `TypeError` instead of silently
+compressing empty data. Avoid transferring input or dictionary buffers from option
+getters. This limitation does not exempt other codec options or lifecycle behavior.
+
 Run `npm run test:node-boundaries --prefix demo` for the counterexamples and
 `npm run test:events --prefix demo` for the Workers events baseline and implementation. `node:events` is routed through the
 [WebView events profile](../src/compat/events/README.md); process warning delivery

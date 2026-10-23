@@ -74,3 +74,65 @@ test("native numeric conversion rejects BigInt without repeated coercion", () =>
     }),
   ).toBe(1.5);
 });
+
+// Empty buffers must be distinguished from detached buffers, even when their
+// byteLength is identical. RAB snapshots and fixed aliases have different lives.
+import { codecBytes, assertCodecInput } from "./input.js";
+const ResizableBuffer = ArrayBuffer as unknown as new (
+  length: number,
+  options?: { maxByteLength: number },
+) => ArrayBuffer & { resize(size: number): void };
+const GrowableBuffer = SharedArrayBuffer as unknown as new (
+  length: number,
+  options?: { maxByteLength: number },
+) => SharedArrayBuffer & { grow(size: number): void };
+test("codec input retention distinguishes empty and detached fixed buffers", () => {
+  for (const length of [0, 3]) {
+    const buffer = new ArrayBuffer(length);
+    const captured = codecBytes(buffer);
+    expect(() => assertCodecInput(captured)).not.toThrow();
+    structuredClone(buffer, { transfer: [buffer] });
+    expect(() => assertCodecInput(captured)).toThrow(
+      "Codec input was detached during option conversion",
+    );
+    // Already detached at entry is the Workers empty-input conversion.
+    expect(() => assertCodecInput(codecBytes(buffer))).not.toThrow();
+  }
+});
+test("codec conversion snapshots resizable memory and retains fixed input mutations", () => {
+  for (const resizable of [false, true]) {
+    const buffer = resizable
+      ? new ResizableBuffer(3, { maxByteLength: 6 })
+      : new ResizableBuffer(3);
+    const view = new Uint8Array(buffer);
+    view.set([97, 98, 99]);
+    const captured = codecBytes(view);
+    view[0] = 120;
+    expect(Array.from(captured)).toEqual(
+      resizable ? [97, 98, 99] : [120, 98, 99],
+    );
+    if (resizable) {
+      buffer.resize(0);
+      structuredClone(buffer, { transfer: [buffer] });
+      expect(() => assertCodecInput(captured)).not.toThrow();
+      expect(Array.from(captured)).toEqual([97, 98, 99]);
+    }
+  }
+});
+
+test("codec conversion snapshots growable shared memory but retains fixed shared mutations", () => {
+  for (const growable of [false, true]) {
+    const buffer = growable
+      ? new GrowableBuffer(3, { maxByteLength: 6 })
+      : new GrowableBuffer(3);
+    const view = new Uint8Array(buffer);
+    view.set([97, 98, 99]);
+    const captured = codecBytes(view);
+    view[0] = 120;
+    expect(Array.from(captured)).toEqual(
+      growable ? [97, 98, 99] : [120, 98, 99],
+    );
+    if (growable) buffer.grow(6);
+    expect(() => assertCodecInput(captured)).not.toThrow();
+  }
+});

@@ -9,6 +9,7 @@ class CodecBinding {
   private params!: Uint32Array | Int32Array;
   private pledged?: number;
   private finished = false;
+  private frameInProgress = false;
   constructor(
     private readonly kind: "brotli" | "zstd",
     private readonly encode: boolean,
@@ -20,6 +21,7 @@ class CodecBinding {
     pledged?: number,
   ): boolean {
     this.finished = false;
+    this.frameInProgress = false;
     this.params = params.slice();
     this.state = state;
     this.callback = callback;
@@ -124,6 +126,8 @@ class CodecBinding {
         state,
       );
       this.finished = this.kind === "brotli" ? result === 1 : result === 0;
+      if (this.kind === "zstd" && !this.encode && inputLength > 0)
+        this.frameInProgress = result > 0;
       const view = new DataView(api.memory.buffer);
       const consumed = view.getUint32(state, true),
         produced = view.getUint32(state + 4, true);
@@ -144,17 +148,26 @@ class CodecBinding {
         );
       } else if (this.kind === "zstd" && api.z_is_error(result))
         this.onerror?.(
-          result | 0,
-          "ZSTD_ERROR",
-          string(api, api.z_error(result)),
+          -1,
+          this.encode
+            ? "ERR_ZSTD_COMPRESSION_FAILED"
+            : "ERR_ZSTD_DECOMPRESSION_FAILED",
+          `Zstd ${this.encode ? "compression" : "decompression"} failed: ${string(api, api.z_error(result))}`,
         );
       else if (
         !this.encode &&
         flush === 2 &&
         produced < outputLength &&
-        (this.kind === "brotli" ? result !== 1 : result !== 0)
-      )
-        this.onerror?.(-5, "Z_BUF_ERROR", "Unexpected end of file");
+        (this.kind === "brotli" ? result !== 1 : this.frameInProgress)
+      ) {
+        if (this.kind === "zstd")
+          this.onerror?.(
+            -1,
+            "ERR_ZSTD_DECOMPRESSION_FAILED",
+            "unexpected end of file",
+          );
+        else this.onerror?.(-5, "Z_BUF_ERROR", "Unexpected end of file");
+      }
     } finally {
       api.free(pointer);
     }

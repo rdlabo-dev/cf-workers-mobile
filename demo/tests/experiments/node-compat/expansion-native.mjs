@@ -8,6 +8,10 @@ import { createHash } from "node:crypto";
 import { build } from "esbuild";
 
 import { eventCases } from "../../../../src/compat/expansion/index.spec.mjs";
+import {
+  localBoundaryCases,
+  localBoundaryExpected,
+} from "../../../../src/compat/expansion/boundaries.spec.mjs";
 import { nativeBackend } from "../../native/backend.mjs";
 import { runNativeAcceptance } from "../../native/acceptance.mjs";
 const [platform, device] = process.argv.slice(2);
@@ -100,13 +104,14 @@ const compiled = await build({
     resolveDir: consumer,
     contents: `import * as net from 'node:net'; import * as tls from 'node:tls'; import * as classicStreams from 'node:stream'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as cloudflareNode from 'cloudflare:node'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { eventCases } from ${JSON.stringify(root + "/src/compat/expansion/index.spec.mjs")};
+import {localBoundaryCases} from ${JSON.stringify(root + "/src/compat/expansion/boundaries.spec.mjs")};
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
 import {measureOperation,measurements} from ${JSON.stringify(root + "/demo/tests/experiments/node-compat/native-measurements.mjs")};
 export {measurements};
 import { runWithRequestScope as withRequestScope } from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/shared/request-scope.js")};
-export const run = name => measureOperation(name,()=>eventCases[name]({withRequestScope,process, tls, classicStreams, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http, cloudflareNode}),name==='classicCodecs'?()=>zlib.gzipSync('x'.repeat(1024)):undefined);
+export const run = name => measureOperation(name,()=>(eventCases[name] ?? localBoundaryCases[name])({withRequestScope,process, tls, classicStreams, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http, cloudflareNode}),name==='classicCodecs'?()=>zlib.gzipSync('x'.repeat(1024)):undefined);
 export {createNetworkRelay, initializeWorkerNetwork} from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/browser/fetch/relay.js")};
 export const runTls = async ({port,upgradePort}) => {
  const attempt = (servername,halfClose=false) => new Promise((resolve,reject)=> {
@@ -175,6 +180,7 @@ await writeFile(
       harnessSha256,
       consumerEvidence,
       cases: Object.keys(eventCases),
+      localBoundaryCases: Object.keys(localBoundaryCases),
     },
     null,
     2,
@@ -381,9 +387,10 @@ tlsPorts.port = Number(backend.url.port);
 const bootstrapCode = `
 async function main() {
 const source = ${JSON.stringify(source)};
-const names = ${JSON.stringify(Object.keys(eventCases))};
+const names = ${JSON.stringify([...Object.keys(eventCases), ...Object.keys(localBoundaryCases)])};
+const boundaryNames = ${JSON.stringify(Object.keys(localBoundaryCases))};
 const report = async value => {await fetch(${JSON.stringify(backend.url.origin + "/__acceptance/report")}, {method:'POST', mode:'no-cors', headers:{'content-type':'text/plain'}, body:JSON.stringify(value)});};
-const results = {}, measurements = {};
+const results = {}, measurements = {}, localBoundaries = {};
 // One immutable Blob avoids accumulating copies of the large fixture payload.
 // URL fragments retain separate module identities for cold per-case measurements.
 let moduleURL, activeCase;
@@ -409,6 +416,10 @@ try {
     }
   }
  }
+ for(const mode of ['page','worker']) {
+   localBoundaries[mode] = {};
+   for(const name of boundaryNames){localBoundaries[mode][name]=results[mode][name];delete results[mode][name];}
+ }
  activeCase={mode:'page',name:'nativeTls'};
  const tlsURL=moduleURL+'#native-tls';
  const tlsApi=await import(/* @vite-ignore */ tlsURL);
@@ -423,7 +434,7 @@ try {
   tlsWorker.onmessage=({data})=>{if(data.tls || data.error){clearTimeout(timer);data.error?reject(new Error(data.error)):resolve(data.tls);}};
   tlsWorker.postMessage(${JSON.stringify(tlsPorts)});
  });} finally {tlsWorker.terminate();await relay.dispose();URL.revokeObjectURL(workerURL);}
- await report({stage:'complete', measurements, nativeTls, hash:${JSON.stringify(hash)}, results});
+ await report({stage:'complete', measurements, localBoundaries, nativeTls, hash:${JSON.stringify(hash)}, results});
  document.body.textContent = 'Compatibility contracts complete';
 } catch(error) {await report({stage:'failure', activeCase, completed:{page:Object.keys(results.page??{}),worker:Object.keys(results.worker??{})}, message:String(error), stack:error.stack});document.body.textContent=String(error);}
 finally {if(moduleURL) URL.revokeObjectURL(moduleURL);}
@@ -452,6 +463,8 @@ await runNativeAcceptance({
       (report) => report.stage === "complete",
     );
     assert.equal(completed.hash, hash);
+    for (const mode of ["page", "worker"])
+      assert.deepEqual(completed.localBoundaries[mode], localBoundaryExpected);
     for (const mode of ["page", "worker"])
       assert.deepEqual(completed.nativeTls[mode], {
         valid: { accepted: true, received: true },
@@ -514,5 +527,5 @@ await runNativeAcceptance({
   },
 });
 console.log(
-  `${platform}: ${Object.keys(eventCases).length} operation groups passed in page and Dedicated Worker (${hash})`,
+  `${platform}: ${Object.keys(eventCases).length} operation groups and ${Object.keys(localBoundaryCases).length} local boundary groups passed in page and Dedicated Worker (${hash})`,
 );

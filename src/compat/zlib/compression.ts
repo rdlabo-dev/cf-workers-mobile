@@ -1,9 +1,11 @@
-import { nativeNumber } from "./input.js";
 import {
-  viewBytes,
-  isAnyBuffer,
-  bufferBytes,
-} from "../../shared/buffer-source.js";
+  nativeNumber,
+  codecBytes,
+  assertCodecInput,
+  nativeInt32,
+  optionInteger as integer,
+} from "./input.js";
+import { isAnyBuffer } from "../../shared/buffer-source.js";
 import { Buffer } from "node:buffer";
 import { NativeCodec, type Kind } from "./native-codecs.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
@@ -45,25 +47,12 @@ export const createZstdDecompress = (options?: any) =>
 
 function bytes(value: unknown, method: string): Uint8Array {
   if (typeof value === "string") return Buffer.from(value);
-  if (ArrayBuffer.isView(value)) return viewBytes(value);
-  if (isAnyBuffer(value)) return bufferBytes(value);
+  if (ArrayBuffer.isView(value) || isAnyBuffer(value)) return codecBytes(value);
   throw new TypeError(
     `Failed to execute '${method}' on 'ZlibUtil': parameter 1 is not of type 'string or ArrayBuffer or ArrayBufferView'.`,
   );
 }
-function integer(value: unknown, fallback: number, unsigned = true) {
-  if (value === undefined) return fallback;
-  const number = nativeNumber(value);
-  if (
-    !Number.isFinite(number) ||
-    number < (unsigned ? 0 : -2147483648) ||
-    number > (unsigned ? 4294967295 : 2147483647)
-  )
-    throw new TypeError(
-      "The value cannot be converted because it is not an integer.",
-    );
-  return Math.trunc(number);
-}
+
 function pledged(value: any) {
   if (value === undefined) return undefined;
   const number = nativeNumber(value);
@@ -73,31 +62,34 @@ function pledged(value: any) {
     );
   return Math.trunc(number);
 }
-function convert(options: any) {
+function convert(options: any, kind: Kind) {
   if (!options || typeof options !== "object")
     throw new TypeError("Options must be an object");
+  const flush = integer(options.flush, 0, false);
+  const finishFlush = integer(options.finishFlush, 2, false);
+  const chunkSize = integer(options.chunkSize, 16384);
+  const parameters = options.params;
   if (
-    options.params !== undefined &&
-    (!options.params || typeof options.params !== "object")
+    parameters !== undefined &&
+    (!parameters || typeof parameters !== "object")
   )
     throw new TypeError(
       "Incorrect type for the 'params' field on 'Options': the provided value is not of type 'object'.",
     );
-  const params = Object.fromEntries(
-    Object.entries(options.params ?? {}).map(([key, value]) => [
-      key,
-      nativeNumber(value) | 0,
-    ]),
-  );
+  const params: Record<string, number> = Object.create(null);
+  for (const key of Object.keys(parameters ?? {}))
+    params[key] = nativeInt32(parameters[key]);
+  const maxOutputLength = integer(options.maxOutputLength, 134217728);
   return {
-    chunkSize: integer(options.chunkSize, 16384),
-    maxOutputLength: integer(options.maxOutputLength, 134217728),
-    flush: integer(options.flush, 0, false),
-    finishFlush: integer(options.finishFlush, 2, false),
+    flush,
+    finishFlush,
+    chunkSize,
     params,
-    pledged: pledged(options.pledgedSrcSize),
+    maxOutputLength,
+    pledged: kind === "zstd" ? pledged(options.pledgedSrcSize) : undefined,
   };
 }
+
 function bounded(value: number, name: string, min: number, max: number) {
   if (value < min || value > max)
     throw new RangeError(
@@ -126,6 +118,7 @@ function fast(
   try {
     bounded(config.flush, "flush", 0, kind === "brotli" ? 3 : 2);
     bounded(config.finishFlush, "finishFlush", 0, kind === "brotli" ? 3 : 2);
+    assertCodecInput(data);
     codec.process(data, config.finishFlush, (output) => {
       length += output.length;
       if (length > config.maxOutputLength)
@@ -137,10 +130,20 @@ function fast(
     return Buffer.concat(chunks, length);
   } catch (error) {
     if (
+      error instanceof TypeError ||
       error instanceof RangeError ||
-      (error instanceof Error && error.message === "Unexpected end of file")
+      (error instanceof Error &&
+        ["Unexpected end of file", "unexpected end of file"].includes(
+          error.message,
+        ))
     )
       throw error;
+    if (
+      kind === "zstd" &&
+      !encode &&
+      (error as { code?: string })?.code === "ZSTD_ERROR"
+    )
+      throw new Error(`Zstd decompression failed: ${(error as Error).message}`);
     throw new Error("Compression failed");
   } finally {
     codec.close();
@@ -174,7 +177,7 @@ function sync(kind: Kind, encode: boolean, input: unknown, options: any = {}) {
     kind,
     encode,
     bytes(input, `${kind}${encode ? "Compress" : "Decompress"}Sync`),
-    convert(options),
+    convert(options, kind),
   );
 }
 function asyncOperation(
@@ -204,7 +207,7 @@ function asyncOperation(
     });
   } else {
     const data = bytes(input, `${kind}${encode ? "Compress" : "Decompress"}`),
-      config = convert(options);
+      config = convert(options, kind);
     run = () => fast(kind, encode, data, config);
   }
   let result: unknown, error: unknown;

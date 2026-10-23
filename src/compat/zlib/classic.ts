@@ -1,9 +1,9 @@
-import { nativeNumber } from "./input.js";
 import {
-  viewBytes,
-  isAnyBuffer,
-  bufferBytes,
-} from "../../shared/buffer-source.js";
+  optionInteger as integer,
+  codecBytes,
+  assertCodecInput,
+} from "./input.js";
+import { isAnyBuffer } from "../../shared/buffer-source.js";
 import { Buffer } from "node:buffer";
 import { Zlib } from "./classic-base.cjs";
 import { ZlibStream } from "./classic-binding.js";
@@ -61,33 +61,27 @@ export const createDeflateRaw = (options?: any) => new DeflateRaw(options);
 export const createInflateRaw = (options?: any) => new InflateRaw(options);
 export const createUnzip = (options?: any) => new Unzip(options);
 const maxChunk = 134217728;
-function bytes(input: any, parameter = 1, method = "zlibSync"): Buffer {
+function bytes(input: any, parameter = 1, method = "zlibSync"): Uint8Array {
   if (typeof input === "string") return Buffer.from(input);
-  if (ArrayBuffer.isView(input)) return Buffer.from(viewBytes(input));
-  if (isAnyBuffer(input)) return Buffer.from(bufferBytes(input));
+  if (ArrayBuffer.isView(input) || isAnyBuffer(input)) return codecBytes(input);
   throw new TypeError(
     `Failed to execute '${method}' on 'ZlibUtil': parameter ${parameter} is not of type 'string or ArrayBuffer or ArrayBufferView'.`,
   );
 }
-function integer(value: any, fallback: number, unsigned = true) {
-  if (value === undefined) return fallback;
-  const number = nativeNumber(value);
-  if (
-    !Number.isFinite(number) ||
-    number < (unsigned ? 0 : -2147483648) ||
-    number > (unsigned ? 4294967295 : 2147483647)
-  )
-    throw new TypeError(
-      "The value cannot be converted because it is not an integer.",
-    );
-  return Math.trunc(number);
-}
+
 function bounded(value: number, name: string, min: number, max: number) {
   if (value < min || value > max)
     throw new RangeError(
       `The value of "options.${name}" is out of range. It must be >= ${min} and <= ${max}. Received ${value}`,
     );
   return value;
+}
+function dictionary(value: unknown): Uint8Array | undefined {
+  if (value === undefined) return undefined;
+  if (ArrayBuffer.isView(value) || isAnyBuffer(value)) return codecBytes(value);
+  throw new TypeError(
+    "Incorrect type for the 'dictionary' field on 'Options': the provided value is not of type 'ArrayBuffer or ArrayBufferView'.",
+  );
 }
 function prepare(input: any, options: any, method = "zlibSync") {
   const data = bytes(input, 1, method);
@@ -104,27 +98,31 @@ function prepare(input: any, options: any, method = "zlibSync") {
     level: integer(options.level, -1, false),
     memLevel: integer(options.memLevel, 8),
     strategy: integer(options.strategy, 0),
-    dictionary:
-      options.dictionary === undefined ? undefined : bytes(options.dictionary),
+    dictionary: dictionary(options.dictionary),
     maxOutputLength: integer(options.maxOutputLength, maxChunk),
   };
   return { data, opts };
 }
 function fast(
   mode: number,
-  data: Buffer,
+  data: Uint8Array,
   opts: ReturnType<typeof prepare>["opts"],
 ) {
   bounded(opts.chunkSize, "chunkSize", 64, maxChunk);
   bounded(opts.maxOutputLength, "maxOutputLength", 1, maxChunk);
   if (!(opts.windowBits === 0 && [2, 4, 7].includes(mode)))
-    bounded(opts.windowBits, "windowBits", 8, 15);
+    bounded(opts.windowBits | 0, "windowBits", 8, 15);
   bounded(opts.level, "level", -1, 9);
-  bounded(opts.memLevel, "memLevel", 1, 9);
+  bounded(opts.memLevel | 0, "memLevel", 1, 9);
   if (opts.strategy > 4) throw new Error("invalid strategy");
   if (mode === 3 && opts.windowBits === 8) throw new Error("Zlib error");
   bounded(opts.flush, "flush", 0, 6);
-  bounded(opts.finishFlush, "finishFlush", 0, 6);
+  if (opts.finishFlush < 0 || opts.finishFlush > 6)
+    throw new RangeError(
+      `The value of "options.finishFlush" is out of range. It must be >= 0 and <= 6. Received ${opts.flush}`,
+    );
+  assertCodecInput(data);
+  assertCodecInput(opts.dictionary);
   const state = new Uint32Array(2),
     handle = new ZlibStream(mode),
     chunks: Buffer[] = [];

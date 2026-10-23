@@ -1,4 +1,422 @@
 export const eventCases = {
+  zlibFrameBoundaries: async function ({ zlib: z }) {
+    const out = {};
+    for (const size of [64, 16384, 32769])
+      for (const mode of ["valid", "truncated", "concat", "emptybetween"]) {
+        const plain = "a".repeat(size),
+          v = z.zstdCompressSync(plain),
+          input =
+            mode === "truncated"
+              ? v.subarray(0, v.length - 1)
+              : mode === "concat"
+                ? new Uint8Array([...v, ...v])
+                : v;
+        for (const split of [1, 7, input.length]) {
+          const key = size + "/" + mode + "/" + split;
+          try {
+            const n = await new Promise((res, rej) => {
+              const s = new z.ZstdDecompress({ chunkSize: 64 });
+              let len = 0;
+              s.on("data", (v) => (len += v.length));
+              s.on("error", rej);
+              s.on("end", () => res(len));
+              for (let i = 0; i < input.length; i += split) {
+                s.write(input.subarray(i, i + split));
+                if (mode === "emptybetween") s.write(new Uint8Array(0));
+              }
+              s.end();
+            });
+            out[key] = { len: n };
+          } catch (e) {
+            out[key] = {
+              name: e.name,
+              message: e.message,
+              code: e.code ?? null,
+              errno: e.errno ?? null,
+            };
+          }
+        }
+      }
+    return out;
+  },
+  zlibDecodeStates: async function ({ zlib: z }) {
+    const out = {};
+    for (const [decode, encode, ctor] of [
+      ["inflate", "deflate", "Inflate"],
+      ["gunzip", "gzip", "Gunzip"],
+      ["inflateRaw", "deflateRaw", "InflateRaw"],
+      ["unzip", "gzip", "Unzip"],
+      ["brotliDecompress", "brotliCompress", "BrotliDecompress"],
+      ["zstdDecompress", "zstdCompress", "ZstdDecompress"],
+    ]) {
+      const valid = z[encode + "Sync"]("abcdef");
+      const concat = (a, b) => new Uint8Array([...a, ...b]);
+      for (const [id, input] of [
+        ["empty", new Uint8Array(0)],
+        ["garbage", new Uint8Array([97, 98, 99])],
+        ["valid", valid],
+        ["truncated", valid.subarray(0, valid.length - 1)],
+        ["half", valid.subarray(0, Math.floor(valid.length / 2))],
+        ["concat", concat(valid, valid)],
+        ["trailing", concat(valid, new Uint8Array([97]))],
+      ])
+        for (const mode of [
+          "sync",
+          "info",
+          "callback",
+          "callbackInfo",
+          "stream",
+        ]) {
+          try {
+            let v;
+            if (mode === "stream")
+              v = await new Promise((resolve, reject) => {
+                const s = new z[ctor](),
+                  chunks = [];
+                s.on("data", (c) => chunks.push(...c));
+                s.on("error", reject);
+                s.on("end", () => resolve(chunks));
+                s.end(input);
+              });
+            else if (mode.startsWith("callback"))
+              v = await new Promise((resolve, reject) =>
+                z[decode](input, { info: mode === "callbackInfo" }, (e, v) => {
+                  if (e) reject(e);
+                  else if (mode === "callbackInfo") {
+                    resolve(v.buffer);
+                    v.engine.close();
+                  } else resolve(v);
+                }),
+              );
+            else {
+              v = z[decode + "Sync"](input, { info: mode === "info" });
+              if (mode === "info") {
+                const engine = v.engine;
+                v = v.buffer;
+                engine.close();
+              }
+            }
+            out[decode + "/" + id + "/" + mode] = {
+              ok: true,
+              value: Array.from(v),
+            };
+          } catch (e) {
+            out[decode + "/" + id + "/" + mode] = {
+              name: e.name,
+              message: e.message,
+              code: e.code ?? null,
+              errno: e.errno ?? null,
+            };
+          }
+        }
+    }
+    return out;
+  },
+  zlibCallbackOptions: async function ({ zlib: z }) {
+    const out = {};
+    for (const method of [
+      "deflate",
+      "inflate",
+      "gzip",
+      "gunzip",
+      "deflateRaw",
+      "inflateRaw",
+      "unzip",
+      "brotliCompress",
+      "brotliDecompress",
+      "zstdCompress",
+      "zstdDecompress",
+    ])
+      for (const info of [false, true])
+        for (const [id, options] of [
+          ["default", {}],
+          ["dictionary", { dictionary: "a" }],
+          ["flush", { flush: Infinity }],
+          ["finishFlush", { finishFlush: -1 }],
+          ["chunkSize", { chunkSize: -1 }],
+          ["params", { params: { 0: 2147483648 } }],
+        ]) {
+          let stage = "call";
+          let calls = 0;
+          const result = await new Promise((resolve) => {
+            try {
+              z[method]("abc", { ...options, info }, (error, value) => {
+                calls++;
+                if (error)
+                  resolve({
+                    stage,
+                    name: error.name,
+                    message: error.message,
+                    code: error.code ?? null,
+                  });
+                else {
+                  resolve({
+                    stage,
+                    ok: true,
+                    length: (info ? value.buffer : value).length,
+                    engine: info ? value.engine.constructor.name : null,
+                  });
+                  if (info) value.engine.close();
+                }
+              });
+              stage = "returned";
+            } catch (e) {
+              resolve({
+                stage,
+                name: e.name,
+                message: e.message,
+                code: e.code ?? null,
+              });
+            }
+          });
+          await Promise.resolve();
+          out[method + "/" + info + "/" + id] = { ...result, calls };
+        }
+    return out;
+  },
+  zlibBufferLifetimes: function ({ zlib: z }) {
+    const out = {};
+    for (const [encode, decode] of [
+      ["deflateSync", "inflateSync"],
+      ["brotliCompressSync", "brotliDecompressSync"],
+      ["zstdCompressSync", "zstdDecompressSync"],
+    ])
+      for (const form of ["buffer", "typed", "data"])
+        for (const mode of [
+          "mutate",
+          "detach",
+          "shrink",
+          "grow",
+          "dictionaryMutate",
+        ]) {
+          const buffer = new ArrayBuffer(3, { maxByteLength: 6 });
+          const view = new Uint8Array(buffer);
+          view.set([97, 98, 99]);
+          const input =
+            form === "buffer"
+              ? buffer
+              : form === "data"
+                ? new DataView(buffer)
+                : view;
+          const dictionary = new Uint8Array([97, 98, 99]);
+          const options = {
+            dictionary,
+            get maxOutputLength() {
+              if (mode === "mutate") view[0] = 120;
+              if (mode === "detach")
+                structuredClone(buffer, { transfer: [buffer] });
+              if (mode === "shrink") buffer.resize(1);
+              if (mode === "grow") buffer.resize(6);
+              if (mode === "dictionaryMutate") dictionary[0] = 120;
+              return 1000;
+            },
+          };
+          try {
+            const compressed = z[encode](input, options);
+            out[encode + "/" + form + "/" + mode] = Array.from(
+              z[decode](compressed, { dictionary }),
+            );
+          } catch (error) {
+            out[encode + "/" + form + "/" + mode] = {
+              name: error.name,
+              message: error.message,
+              code: error.code ?? null,
+            };
+          }
+        }
+    return out;
+  },
+  zlibFastOptions: function ({ zlib: z }) {
+    const out = {};
+    const attempt = (id, fn) => {
+      try {
+        const v = fn();
+        out[id] = { ok: true, type: typeof v, length: v?.length };
+      } catch (e) {
+        out[id] = { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    for (const method of [
+      "deflateSync",
+      "inflateSync",
+      "gzipSync",
+      "gunzipSync",
+      "deflateRawSync",
+      "inflateRawSync",
+      "unzipSync",
+      "brotliCompressSync",
+      "brotliDecompressSync",
+      "zstdCompressSync",
+      "zstdDecompressSync",
+    ]) {
+      for (const [id, value] of [
+        ["string", "a"],
+        ["buffer", new Uint8Array([1])],
+        ["number", 1],
+        ["null", null],
+      ])
+        attempt(method + "/dictionary/" + id, () =>
+          z[method]("abc", { dictionary: value }),
+        );
+      for (const key of [
+        "flush",
+        "finishFlush",
+        "chunkSize",
+        "windowBits",
+        "level",
+        "memLevel",
+        "strategy",
+        "maxOutputLength",
+      ])
+        for (const value of [-1, 0, 1.5, Infinity, "1", null])
+          attempt(method + "/" + key + "/" + String(value), () =>
+            z[method]("abc", { [key]: value }),
+          );
+    }
+    return out;
+  },
+  zlibNumericOptions: function ({ zlib: z }) {
+    const out = {};
+    const attempt = (id, fn) => {
+      try {
+        const v = fn();
+        out[id] = { ok: true, type: typeof v, length: v?.length };
+      } catch (e) {
+        out[id] = { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    for (const method of [
+      "deflateSync",
+      "inflateSync",
+      "gzipSync",
+      "gunzipSync",
+      "deflateRawSync",
+      "inflateRawSync",
+      "unzipSync",
+      "brotliCompressSync",
+      "brotliDecompressSync",
+      "zstdCompressSync",
+      "zstdDecompressSync",
+    ]) {
+      for (const [id, value] of [
+        ["string", "a"],
+        ["buffer", new Uint8Array([1])],
+        ["number", 1],
+        ["null", null],
+      ])
+        attempt(method + "/dictionary/" + id, () =>
+          z[method]("abc", { dictionary: value }),
+        );
+      for (const key of [
+        "flush",
+        "finishFlush",
+        "chunkSize",
+        "windowBits",
+        "level",
+        "memLevel",
+        "strategy",
+        "maxOutputLength",
+      ])
+        for (const value of [
+          -0.5,
+          NaN,
+          -Infinity,
+          4294967295,
+          4294967296,
+          2147483648,
+          BigInt(1),
+        ])
+          attempt(method + "/" + key + "/" + String(value), () =>
+            z[method]("abc", { [key]: value }),
+          );
+    }
+    return out;
+  },
+  zlibOptionOrder: function ({ zlib: z }) {
+    const out = {};
+    for (const method of [
+      "deflateSync",
+      "inflateSync",
+      "gzipSync",
+      "gunzipSync",
+      "deflateRawSync",
+      "inflateRawSync",
+      "unzipSync",
+      "brotliCompressSync",
+      "brotliDecompressSync",
+      "zstdCompressSync",
+      "zstdDecompressSync",
+    ])
+      for (const mode of ["default", "params", "mutate", "dictionary"]) {
+        const log = [];
+        const input = new Uint8Array([97, 98, 99]);
+        const value =
+          mode === "params"
+            ? {
+                params: new Proxy(
+                  {},
+                  {
+                    ownKeys(t) {
+                      log.push("params.ownKeys");
+                      return Reflect.ownKeys(t);
+                    },
+                    get(t, p, r) {
+                      log.push("params." + String(p));
+                      return Reflect.get(t, p, r);
+                    },
+                  },
+                ),
+              }
+            : mode === "dictionary"
+              ? { dictionary: new Uint8Array([97]) }
+              : {};
+        const options = new Proxy(value, {
+          get(t, p, r) {
+            log.push(String(p));
+            if (mode === "mutate" && p === "chunkSize") input[0] = 120;
+            return Reflect.get(t, p, r);
+          },
+        });
+        try {
+          const v = z[method](input, options);
+          out[method + "/" + mode] = {
+            value: Array.from(
+              {
+                deflateSync: "inflateSync",
+                gzipSync: "gunzipSync",
+                deflateRawSync: "inflateRawSync",
+                brotliCompressSync: "brotliDecompressSync",
+                zstdCompressSync: "zstdDecompressSync",
+              }[method]
+                ? z[
+                    {
+                      deflateSync: "inflateSync",
+                      gzipSync: "gunzipSync",
+                      deflateRawSync: "inflateRawSync",
+                      brotliCompressSync: "brotliDecompressSync",
+                      zstdCompressSync: "zstdDecompressSync",
+                    }[method]
+                  ](
+                    v,
+                    mode === "dictionary"
+                      ? { dictionary: new Uint8Array([97]) }
+                      : {},
+                  )
+                : v,
+            ),
+            log,
+          };
+        } catch (e) {
+          out[method + "/" + mode] = {
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+            log,
+          };
+        }
+      }
+    return out;
+  },
   httpUniqueHeaders: async function ({ http: h, cloudflareNode: n }) {
     const result = {};
     for (const uniqueHeaders of [

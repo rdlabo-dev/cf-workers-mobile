@@ -35,6 +35,7 @@ export class NativeCodec {
   private output: number;
   private closed = false;
   finished = false;
+  private frameInProgress = false;
   consumed = 0;
   constructor(
     readonly kind: Kind,
@@ -134,12 +135,11 @@ export class NativeCodec {
             new Uint8Array(api.memory.buffer, this.output, produced).slice(),
           );
         this.finished = this.kind === "brotli" ? result === 1 : result === 0;
-        if (
-          !this.encode &&
-          this.finished &&
-          (this.kind === "brotli" || offset === input.length)
-        )
-          break;
+        if (this.kind === "zstd" && !this.encode && input.length > 0)
+          this.frameInProgress = result > 0;
+        // Workers' fast helper stops after the first completed frame. The
+        // stream binding separately permits concatenated frames.
+        if (!this.encode && this.finished) break;
         if (this.encode && operation !== 0 && this.finished) break;
         if (offset === input.length && produced < this.chunkSize) {
           if (this.encode && operation === 2 && !this.finished) {
@@ -147,8 +147,17 @@ export class NativeCodec {
               throw new Error("Codec made no progress");
             continue;
           }
-          if (!this.encode && operation === 2 && !this.finished)
-            throw new Error("Unexpected end of file");
+          if (
+            !this.encode &&
+            operation === 2 &&
+            !this.finished &&
+            (this.kind === "brotli" || this.frameInProgress)
+          )
+            throw new Error(
+              this.kind === "zstd"
+                ? "unexpected end of file"
+                : "Unexpected end of file",
+            );
           break;
         }
         if (!consumed && !produced) throw new Error("Codec made no progress");
