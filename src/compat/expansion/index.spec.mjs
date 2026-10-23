@@ -1,4 +1,251 @@
 export const eventCases = {
+  fsIoContracts: async function ({ fs, process }) {
+    const path = "/tmp/io-contract",
+      result = {};
+    fs.writeFileSync(path, "abc");
+    const fd = fs.openSync(path, "a+");
+    fs.writeFileSync(fd, "def");
+    result.full = fs.readFileSync(fd, "utf8");
+    result.after = fs.readSync(fd, new Uint8Array(1));
+    fs.closeSync(fd);
+    fs.closeSync(fd);
+    fs.closeSync(123456);
+    const callbackFd = await new Promise((resolve, reject) =>
+      fs.open(path, fs.constants.O_TRUNC, (error, fd) =>
+        error ? reject(error) : resolve(fd),
+      ),
+    );
+    fs.closeSync(callbackFd);
+    const promiseHandle = await fs.promises.open(path, fs.constants.O_TRUNC);
+    await promiseHandle.close();
+    result.readonlyTruncate = fs.readFileSync(path, "utf8");
+    process.chdir("/tmp");
+    try {
+      result.cwd = process.cwd();
+      fs.writeFileSync("relative-io", "data");
+      result.relative = fs.readFileSync("/tmp/relative-io", "utf8");
+    } finally {
+      process.chdir("/bundle");
+    }
+    result.errors = [];
+    for (const call of [
+      () => fs.writeSync(1, "x", ""),
+      () => fs.writeSync(1, new Uint8Array(1), { offset: 2 }),
+      () => fs.ftruncateSync(1, -1),
+      () => fs.appendFileSync(path, []),
+      () => fs.copyFile(path, path, 123),
+      () => fs.readFile(path),
+    ]) {
+      try {
+        call();
+        result.errors.push(null);
+      } catch (error) {
+        result.errors.push(error.code);
+      }
+    }
+    result.constants = [
+      Object.getPrototypeOf(fs.constants) === null,
+      fs.constants.UV_FS_COPYFILE_EXCL,
+    ];
+    return result;
+  },
+  fsStreamsAndLinks: async function ({ fs }) {
+    const root = "/tmp/streams-links";
+    fs.mkdirSync(root);
+    const path = root + "/data";
+    fs.writeFileSync(path, "abcdef");
+    fs.symlinkSync(path, root + "/link");
+    fs.cpSync(root + "/link", root + "/copy");
+    const result = {
+      link: fs.readlinkSync(root + "/copy"),
+      text: fs.readFileSync(root + "/copy", "utf8"),
+    };
+    fs.symlinkSync(root + "/missing", root + "/broken");
+    fs.cpSync(root + "/broken", root + "/broken-copy");
+    result.broken = fs.realpathSync(root + "/broken-copy");
+    const handle = await fs.promises.open(path, "r");
+    const stream = handle.createReadStream({
+      start: 1,
+      end: 3,
+      encoding: "utf8",
+    });
+    let text = "";
+    for await (const chunk of stream) text += chunk;
+    result.read = [
+      text,
+      handle.fd === undefined,
+      stream.bytesRead,
+      stream.closed,
+    ];
+    const output = fs.createWriteStream(root + "/output");
+    const finished = new Promise((resolve, reject) => {
+      output.on("close", resolve);
+      output.on("error", reject);
+    });
+    output.cork();
+    output.write("one");
+    output.write("two");
+    output.uncork();
+    output.end("three");
+    await finished;
+    result.write = [
+      fs.readFileSync(root + "/output", "utf8"),
+      output.bytesWritten,
+      output.closed,
+    ];
+    const webHandle = await fs.promises.open(path, "r");
+    let webText = "";
+    for await (const chunk of webHandle.readableWebStream())
+      webText += new TextDecoder().decode(chunk);
+    result.web = [webText, webHandle.fd === undefined];
+    const aborted = await fs.promises.open(path, "r");
+    const closed = new Promise((resolve) => aborted.once("close", resolve));
+    const abortedStream = aborted.createReadStream({
+      signal: AbortSignal.abort(),
+    });
+    result.abort = await new Promise((resolve) =>
+      abortedStream.once("error", (error) => resolve(error.name)),
+    );
+    await closed;
+    result.closed = aborted.fd === undefined;
+    fs.writeFileSync(root + "/%64ata%3f", "encoded");
+    result.normalized = fs.readFileSync(root + "/data%3F", "utf8");
+    return result;
+  },
+  fsDevicesAndBounds: async function ({ fs }) {
+    const attempt = (fn) => {
+      try {
+        return fn() ?? null;
+      } catch (error) {
+        return { name: error.name, code: error.code ?? null };
+      }
+    };
+    const result = { devices: [], limits: [], times: [] };
+    for (const name of ["null", "zero", "full", "random"]) {
+      const path = "/dev/" + name,
+        fd = fs.openSync(path, "r+"),
+        buffer = new Uint8Array(4).fill(7);
+      const read = fs.readSync(fd, buffer, 0, 4, null),
+        stat = fs.fstatSync(fd);
+      result.devices.push({
+        name,
+        read,
+        buffer: name === "random" ? "entropy" : Array.from(buffer),
+        write: attempt(() => fs.writeSync(fd, "abc")),
+        truncate: attempt(() => fs.ftruncateSync(fd, 0)),
+        stat: [
+          stat.mode,
+          stat.dev,
+          stat.size,
+          stat.isCharacterDevice(),
+          stat.isFile(),
+          stat.mtimeMs,
+        ],
+        all: fs.readFileSync(path).length,
+      });
+      fs.closeSync(fd);
+    }
+    const path = "/tmp/bounds",
+      fd = fs.openSync(path, "w+");
+    result.times.push(fs.fstatSync(fd).mtimeMs);
+    fs.writeSync(fd, "x");
+    result.times.push(fs.fstatSync(fd).mtimeMs);
+    fs.futimesSync(fd, 123, 456);
+    fs.writeSync(fd, "y");
+    result.times.push(fs.fstatSync(fd).mtimeMs);
+    result.limits.push(
+      attempt(() => fs.writeSync(fd, new Uint8Array(1), 0, 1, 134217728)),
+    );
+    fs.closeSync(fd);
+    result.limits.push(
+      attempt(() => fs.openSync("/tmp/" + "a".repeat(4097), "r")),
+    );
+    result.limits.push(attempt(() => fs.openSync("/a".repeat(49), "r")));
+    const blob = fs.openAsBlob(path, { type: "text/plain" });
+    result.blob = [
+      blob instanceof Blob,
+      blob.size,
+      blob.type,
+      await blob.text(),
+    ];
+    return result;
+  },
+  fsDirectoryNavigation: async function ({ fs }) {
+    const root = "/tmp/navigation";
+    const created = fs.mkdirSync(root + "/a/nested", { recursive: true });
+    fs.mkdirSync(root + "/a/nested");
+    for (const name of ["a/one", "a/.hidden", "a/nested/two"])
+      fs.writeFileSync(root + "/" + name, "data");
+    const describe = (entry) => ({
+      name:
+        typeof entry.name === "string" ? entry.name : Array.from(entry.name),
+      parent: entry.parentPath,
+      file: entry.isFile(),
+      dir: entry.isDirectory(),
+      link: entry.isSymbolicLink(),
+      instance: entry instanceof fs.Dirent,
+    });
+    const result = {
+      created,
+      listing: fs.readdirSync(root, { recursive: true }),
+      entries: fs
+        .readdirSync(root, { recursive: true, withFileTypes: true })
+        .map(describe),
+      patterns: [],
+    };
+    for (const pattern of [
+      "**",
+      "a/*",
+      "a/**",
+      "a/{one,nested/**}",
+      "a/+(one|nested)",
+      "**/.hidden",
+      ["a/one", "a/nested/*"],
+    ])
+      result.patterns.push(fs.globSync(pattern, { cwd: root }));
+    result.exclude = fs.globSync("**", {
+      cwd: root,
+      exclude: ["**/nested/**"],
+    });
+    result.typed = fs
+      .globSync("a/*", { cwd: root, withFileTypes: true })
+      .map(describe);
+    result.callback = await new Promise((resolve, reject) =>
+      fs.glob("a/**", { cwd: root }, (e, value) =>
+        e ? reject(e) : resolve(value),
+      ),
+    );
+    result.promise = [];
+    for await (const value of fs.promises.glob("a/**", { cwd: root }))
+      result.promise.push(value);
+    const dir = await fs.promises.opendir(root, { recursive: true });
+    result.iterated = [];
+    for await (const entry of dir) result.iterated.push(describe(entry));
+    result.afterIteration = dir.readSync();
+    await dir.close();
+    try {
+      dir.readSync();
+    } catch (error) {
+      result.closed = error.code;
+    }
+    result.encoded = fs.readdirSync(root, "hex");
+    result.bundle = fs
+      .readdirSync("/bundle/nested", { withFileTypes: true })
+      .map(describe);
+    for (const options of [
+      { encoding: null },
+      { recursive: 1 },
+      { withFileTypes: 1 },
+    ]) {
+      try {
+        fs.readdirSync(root, options);
+        result.patterns.push(null);
+      } catch (error) {
+        result.patterns.push(error.code);
+      }
+    }
+    return result;
+  },
   fsTimes: async function ({ fs }) {
     const readonly = "/bundle/readonly.txt",
       writable = "/tmp/time-file";

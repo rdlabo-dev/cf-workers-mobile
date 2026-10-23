@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 const sdk = resolve(process.env.CODEC_EMSDK ?? "artifacts/toolchains/emsdk");
@@ -30,6 +30,7 @@ execFileSync(
   ],
   { stdio: "inherit" },
 );
+chmodSync(output, 0o644);
 const hash = (file) =>
   createHash("sha256").update(readFileSync(file)).digest("hex");
 writeFileSync(

@@ -22,7 +22,17 @@ The SDK starts a fresh /tmp volume for each local fetch dispatch. Handles opened
 inside that request retain their volume; embedded bundle assets stay read-only.
 Standalone imports outside SDK dispatch share a fallback volume. Copying embedded files to /tmp preserves immutable embedded bytes. Permission
 changes are validated no-ops and statfs returns the pinned Workers zero values.
-Embedded files support read-only descriptors, FileHandles, streams and links; copies into /tmp are writable and independent. Numeric file timestamps use milliseconds; embedded timestamps remain unchanged. Watching files is unsupported in Workers too. These profiles do not certify every filesystem operation.
+Embedded files support read-only descriptors, FileHandles, streams and links; copies into /tmp are writable and independent. Numeric file timestamps use milliseconds; embedded timestamps remain unchanged. Watching files is unsupported in Workers too. Directory iteration, recursive listings, glob patterns, device files, symlink copying,
+FD reuse, byte streams and stream fd/custom-fs options follow the pinned Workers
+profile. File sizes are capped at 128 MiB and paths at 4096 bytes/48 segments.
+`process.cwd()` and `process.chdir()` use the request-local virtual directory;
+streams retain the creating request's filesystem when external callbacks deliver
+chunks. FileHandle byte streams use the owned Web Streams implementation,
+including on WebViews without native BYOB support. These profiles do not certify
+every filesystem operation. The vendored upstream fixtures in `src/compat/fs`
+retain their license headers and run with `npx vitest run src/compat/fs/directory.spec.ts
+src/compat/fs/glob.spec.ts src/compat/fs/writable.spec.ts`; the zlib integration fixture
+also exercises a host stream crossing into the request-local filesystem.
 
 zlib 1.3.1, Brotli 1.1.0 and Zstd 1.5.7 use bundled, synchronously initialized WebAssembly.
 The profile covers parameters, synchronous/callback operations, incremental

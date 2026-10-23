@@ -1,8 +1,29 @@
+import { transform as transformFixture } from "esbuild";
 import { lowerAsync } from "./src/tooling/async.js";
 import { readFile } from "node:fs/promises";
 import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [
+    {
+      name: "test-upstream-resource-management",
+      enforce: "pre",
+      async transform(code, id) {
+        if (
+          !id.includes("/compat/fs/upstream-") ||
+          !id.endsWith(".fixture.mjs")
+        )
+          return;
+        // Lower await-using before the request-context async transform, as the
+        // production ES2022 build does. Keep upstream disposal assertions intact.
+        return (
+          await transformFixture(code, {
+            loader: "js",
+            target: "es2022",
+            format: "esm",
+          })
+        ).code;
+      },
+    },
     {
       name: "test-async-context",
       enforce: "post",
@@ -48,6 +69,8 @@ export default defineConfig({
       "src/compat/net/sockets.spec.ts",
       "src/compat/tls/upgrade.spec.ts",
       "src/compat/fs/writable.spec.ts",
+      "src/compat/fs/glob.spec.ts",
+      "src/compat/fs/directory.spec.ts",
       "src/shared/http-wire/index.spec.ts",
     ],
   },

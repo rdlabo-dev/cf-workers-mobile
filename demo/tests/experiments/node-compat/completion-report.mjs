@@ -35,7 +35,7 @@ const assessments = [
     modules: ["fs", "fs/promises"],
     priority: 2,
     category: "implementation-gap",
-    next: "Compare the Workers virtual filesystem, descriptors, FileHandle, writes, permissions and watch behavior. Request-local memory-backed /tmp now supports writes, descriptors and FileHandle; permission no-ops, statfs and embedded-file copying are tested; embedded descriptors/FileHandles, links, immutable copies, cp options, millisecond timestamps and readonly metadata are also compared. Complete the remaining operation/option inventory, including devices, directory iteration, glob and stream fd options.",
+    next: "Compare the Workers virtual filesystem, descriptors, FileHandle, writes, permissions and watch behavior. Request-local memory-backed /tmp now supports writes, descriptors and FileHandle; permission no-ops, statfs and embedded-file copying are tested; embedded descriptors/FileHandles, links, immutable copies, cp options, millisecond timestamps and readonly metadata are also compared. Devices, directory iteration, glob, stream fd/custom-fs options, byte streams, URL normalization, FD reuse and request-local cwd now have upstream and comparative coverage. Complete the remaining per-operation/option inventory and all-platform acceptance; these cases do not certify the whole module.",
     evidence: [
       "../../../../src/compat/fs/index.ts",
       "../../../../src/compat/fs/promises/index.ts",

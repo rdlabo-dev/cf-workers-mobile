@@ -98,13 +98,14 @@ test("a temporary symlink can read but cannot mutate embedded assets", async () 
   expect(fs.readFileSync("/bundle/secret", "utf8")).toBe("original");
 });
 
-test("relative temporary symlinks resolve against their parent directory", async () => {
+test("relative temporary symlinks resolve from the Workers bundle cwd", async () => {
   await runWithTemporaryFiles(async () => {
     fs.mkdirSync("/tmp/nested");
     fs.writeFileSync("/tmp/nested/data", "local");
+    fs.registerVirtualFiles({ "/bundle/data": "bundled" });
     fs.symlinkSync("data", "/tmp/nested/link");
-    expect(fs.readFileSync("/tmp/nested/link", "utf8")).toBe("local");
-    await fs.promises.symlink("../nested/data", "/tmp/nested/async-link");
+    expect(fs.readFileSync("/tmp/nested/link", "utf8")).toBe("bundled");
+    await fs.promises.symlink("../tmp/nested/data", "/tmp/nested/async-link");
     expect(await fs.promises.readFile("/tmp/nested/async-link", "utf8")).toBe(
       "local",
     );
