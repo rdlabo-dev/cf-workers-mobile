@@ -164,3 +164,36 @@ export function deriveDh(
     },
   );
 }
+
+export function encodeKey(
+  data: Uint8Array,
+  privateKey: boolean,
+  pem: boolean,
+  type: string,
+  cipher?: string,
+  password?: Uint8Array,
+  ecEncoding = -1,
+): Uint8Array {
+  return inputs([data, cipher ?? 0, password ?? 0], (api, [p, c, pass]) => {
+    try {
+      const result = api.cipher_key_export(
+        p,
+        data.byteLength,
+        +privateKey,
+        +pem,
+        type === "pkcs8" ? 0 : type === "pkcs1" ? 1 : type === "sec1" ? 2 : 3,
+        c,
+        +(cipher !== undefined),
+        pass,
+        password?.byteLength ?? 0,
+        +(password !== undefined),
+        ecEncoding,
+      );
+      if (result === -1) throw new Error("Unknown cipher: " + cipher);
+      if (result !== 1) throw new Error("Failed to export key");
+      return output(api, api.cipher_key_data(), api.cipher_key_der_size());
+    } finally {
+      api.cipher_key_clear();
+    }
+  });
+}

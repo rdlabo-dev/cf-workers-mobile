@@ -1,4 +1,203 @@
 export const eventCases = {
+  cryptoKeyExportRoundTrips: function ({ crypto: c }) {
+    const result = {};
+    for (const algorithm of ["rsa", "ec", "ed25519", "x25519"])
+      for (const encoding of algorithm === "ec"
+        ? ["default", "named", "explicit"]
+        : ["default"]) {
+        const pair = c.generateKeyPairSync(
+          algorithm,
+          algorithm === "rsa"
+            ? { modulusLength: 1024 }
+            : algorithm === "ec"
+              ? {
+                  namedCurve: "prime256v1",
+                  ...(encoding === "default"
+                    ? {}
+                    : { paramEncoding: encoding }),
+                }
+              : {},
+        );
+        for (const kind of ["private", "public"])
+          for (const format of ["pem", "der"])
+            for (const type of kind === "public"
+              ? algorithm === "rsa"
+                ? ["pkcs1", "spki"]
+                : ["spki"]
+              : algorithm === "rsa"
+                ? ["pkcs1", "pkcs8"]
+                : algorithm === "ec"
+                  ? ["sec1", "pkcs8"]
+                  : ["pkcs8"])
+              for (const cipher of [undefined, "aes-256-cbc", "des-ede3-cbc"]) {
+                const name = `${algorithm}/${encoding}/${kind}/${format}/${type}/${cipher}`;
+                try {
+                  const key = pair[kind + "Key"];
+                  const password =
+                    cipher !== undefined && kind === "private"
+                      ? { passphrase: "pass\0wordé" }
+                      : {};
+                  const exported = key.export({
+                    format,
+                    type,
+                    cipher,
+                    ...password,
+                  });
+                  const imported = c[
+                    kind === "private" ? "createPrivateKey" : "createPublicKey"
+                  ]({ key: exported, format, type, ...password });
+                  const raw = imported.export({ format: "der", type });
+                  const original = key.export({ format: "der", type });
+                  result[name] = {
+                    ...(algorithm === "ec"
+                      ? {
+                          originalLength: original.length,
+                          importedLength: raw.length,
+                        }
+                      : {}),
+                    equal: imported.equals(key),
+                    publicEqual: (kind === "private"
+                      ? c.createPublicKey(imported)
+                      : imported
+                    ).equals(pair.publicKey),
+                  };
+                } catch (error) {
+                  result[name] = {
+                    name: error.name,
+                    code: error.code ?? null,
+                    message: error.message,
+                  };
+                }
+              }
+      }
+    return result;
+  },
+  cryptoKeyExportDictionary: function ({ crypto: c }) {
+    const pair = c.generateKeyPairSync("rsa", { modulusLength: 1024 }),
+      result = {};
+    for (const kind of ["public", "private"])
+      for (const format of ["jwk", "pem"])
+        for (const field of ["type", "format", "cipher", "passphrase"])
+          for (const mode of ["trace", "null", "number", "object", "throw"]) {
+            const log = [],
+              options = {};
+            for (const prop of ["type", "format", "cipher", "passphrase"])
+              Object.defineProperty(options, prop, {
+                enumerable: true,
+                configurable: true,
+                get() {
+                  log.push(prop);
+                  if (prop === field) {
+                    if (mode === "throw") throw Error("getter " + prop);
+                    if (mode === "null") return null;
+                    if (mode === "number") return 1;
+                    if (mode === "object")
+                      return {
+                        toString() {
+                          log.push("toString " + prop);
+                          return prop === "type"
+                            ? kind === "private"
+                              ? "pkcs8"
+                              : "spki"
+                            : prop === "format"
+                              ? format
+                              : "aes-256-cbc";
+                        },
+                      };
+                  }
+                  return prop === "type"
+                    ? kind === "private"
+                      ? "pkcs8"
+                      : "spki"
+                    : prop === "format"
+                      ? format
+                      : undefined;
+                },
+                set(v) {
+                  log.push("set " + prop);
+                  Object.defineProperty(options, prop, {
+                    value: v,
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                  });
+                },
+              });
+            let output;
+            try {
+              const value = pair[kind + "Key"].export(options);
+              output =
+                typeof value === "string" ? "pem" : (value.kty ?? "buffer");
+            } catch (e) {
+              output = {
+                name: e.name,
+                code: e.code ?? null,
+                message: e.message,
+              };
+            }
+            result[`${kind}/${format}/${field}/${mode}`] = { log, output };
+          }
+    return result;
+  },
+  cryptoKeyExportFormats: function ({ crypto: c }) {
+    const result = {};
+    const pairs = {
+      rsa: c.generateKeyPairSync("rsa", { modulusLength: 1024 }),
+      ec: c.generateKeyPairSync("ec", { namedCurve: "prime256v1" }),
+      ed25519: c.generateKeyPairSync("ed25519"),
+    };
+    const run = (name, key, options) => {
+      try {
+        const v = key.export(options);
+        result[name] =
+          typeof v === "string"
+            ? "pem"
+            : v instanceof Uint8Array
+              ? "der"
+              : (v.kty ?? "object");
+      } catch (e) {
+        result[name] = {
+          name: e.name,
+          message: e.message,
+          code: e.code ?? null,
+        };
+      }
+    };
+    for (const [algorithm, pair] of Object.entries(pairs))
+      for (const kind of ["public", "private"]) {
+        const key = pair[kind + "Key"];
+        for (const format of [undefined, "buffer", "pem", "der", "jwk", "wat"])
+          for (const type of [
+            undefined,
+            "pkcs1",
+            "pkcs8",
+            "sec1",
+            "spki",
+            "nope",
+          ])
+            run(`${algorithm}/${kind}/${format}/${type}`, key, {
+              format,
+              type,
+            });
+        for (const cipher of [
+          "not-cipher",
+          "aes-256-cbc",
+          "aes-256-gcm",
+          "aes-256-ctr",
+          "chacha20-poly1305",
+          "AES-256-CBC",
+          "aes-256-cbc\0junk",
+          "des-ede3-cbc",
+        ])
+          run(`${algorithm}/${kind}/cipher/${cipher}`, key, {
+            format: "pem",
+            type: kind === "private" ? "pkcs8" : "spki",
+            cipher,
+            passphrase: "password",
+          });
+      }
+    return result;
+  },
   cryptoPrimeBrands: function ({ crypto: c }) {
     const result = {};
     for (const operation of ["check", "add", "rem"]) {

@@ -74,6 +74,42 @@ API int cipher_key_parse(const unsigned char *data,int size,int pem,int private_
  EVP_PKEY_free(key);ERR_clear_error();
  if(key_der_size<=0){cipher_key_clear();return 0;}return is_private?2:1;
 }
+// Encoding follows ncrypto v1.1.4 writePrivateKey/writePublicKey.
+// The input is a canonical, unencrypted PKCS8 or SPKI from the owned key.
+API int cipher_key_export(const unsigned char *data,int size,int private_key,int pem,int type,const char *cipher,int has_cipher,const unsigned char *password,int password_size,int has_password,int ec_encoding){
+ cipher_key_clear();ERR_clear_error();
+ const EVP_CIPHER *algorithm=NULL;
+ if(private_key && has_cipher){algorithm=EVP_get_cipherbyname(cipher);if(!algorithm)return -1;}
+ const unsigned char *cursor=data;
+ EVP_PKEY *key=private_key?key_private(data,size,0,0,NULL):d2i_PUBKEY(NULL,&cursor,size);
+ if(!key){ERR_clear_error();return 0;}
+ BIO *bio=BIO_new(BIO_s_mem());int ok=0;
+ if(!bio){EVP_PKEY_free(key);return 0;}
+ const char *pass=has_password?(const char*)password:NULL;
+ if(private_key){
+  if(type==0){
+   ok=pem?PEM_write_bio_PKCS8PrivateKey(bio,key,algorithm,pass,password_size,NULL,NULL):i2d_PKCS8PrivateKey_bio(bio,key,algorithm,pass,password_size,NULL,NULL);
+  }else if(type==1){
+   RSA *rsa=EVP_PKEY_get0_RSA(key);
+   if(rsa)ok=pem?PEM_write_bio_RSAPrivateKey(bio,rsa,algorithm,(const unsigned char*)pass,password_size,NULL,NULL):i2d_RSAPrivateKey_bio(bio,rsa);
+  }else if(type==2){
+   EC_KEY *ec=EVP_PKEY_get0_EC_KEY(key);
+   if(ec){if(ec_encoding>=0)EC_KEY_set_enc_flags(ec,ec_encoding);ok=pem?PEM_write_bio_ECPrivateKey(bio,ec,algorithm,(const unsigned char*)pass,password_size,NULL,NULL):i2d_ECPrivateKey_bio(bio,ec);}
+  }
+ }else if(type==1){
+  RSA *rsa=EVP_PKEY_get0_RSA(key);
+  if(rsa)ok=pem?PEM_write_bio_RSAPublicKey(bio,rsa):i2d_RSAPublicKey_bio(bio,rsa);
+ }else ok=pem?PEM_write_bio_PUBKEY(bio,key):i2d_PUBKEY_bio(bio,key);
+ if(ok==1){
+  const unsigned char *encoded;size_t length;
+  if(BIO_mem_contents(bio,&encoded,&length) && length<=0x7fffffff){
+   key_der=OPENSSL_malloc(length?length:1);
+   if(key_der){if(length)memcpy(key_der,encoded,length);key_der_size=(int)length;}else ok=0;
+  }else ok=0;
+ }
+ BIO_free(bio);EVP_PKEY_free(key);ERR_clear_error();
+ if(ok!=1){cipher_key_clear();return 0;}return 1;
+}
 #define AEAD(name) if(!strcmp(algorithm,#name)) return EVP_aead_##name();
 API const EVP_AEAD *cipher_aead(const char *algorithm) {
  AEAD(aes_128_gcm) AEAD(aes_192_gcm) AEAD(aes_256_gcm)

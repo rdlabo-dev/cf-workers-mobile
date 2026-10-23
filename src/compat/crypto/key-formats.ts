@@ -50,7 +50,7 @@ function fixed(bytes: Buffer, length: number): Buffer {
   if (bytes.length > length) throw new Error("EC JWK invalid public key");
   return Buffer.concat([Buffer.alloc(length - bytes.length), bytes]);
 }
-function dictionaryString(value: any): string {
+export function dictionaryString(value: any): string {
   const object = (item: any) =>
     item !== null && (typeof item === "object" || typeof item === "function");
   if (object(value)) {

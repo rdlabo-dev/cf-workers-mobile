@@ -1,3 +1,4 @@
+import { exportOptions, exportAsymmetric } from "./key-export.js";
 import { validateExportOptions } from "./key-options.js";
 import { exportJwk } from "./key-formats.js";
 // API behavior follows workerd@5358e3d337336eaf696a48bc1563d808b10feba5
@@ -5,12 +6,8 @@ import { exportJwk } from "./key-formats.js";
 // synchronous-engine boundary; adapter-created secret keys own copied bytes.
 import { Buffer } from "node:buffer";
 import { keyStates, type KeyState } from "./key-state.js";
-import { bytes, isAnyBuffer, validateInteger } from "./validation.js";
-import {
-  validateObject,
-  validateString,
-  validateOneOf,
-} from "../net/validators.js";
+import { isAnyBuffer, validateInteger } from "./validation.js";
+import { validateObject, validateOneOf } from "../net/validators.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
 function state(value: object): KeyState {
   const result = keyStates.get(value);
@@ -88,37 +85,16 @@ export abstract class KeyObject {
       "options",
       current.asymmetric?.type,
     );
+    options = exportOptions(options);
+    if (options.format === undefined)
+      throw new TypeError("Missing format option");
     if (current.asymmetric) {
       if (options.format === "jwk")
         return exportJwk(current.asymmetric, current.type === "private");
-      validateOneOf(options.format, "options.format", ["pem", "der"]);
-      validateOneOf(
-        options.type,
-        "options.type",
-        current.type === "private"
-          ? ["pkcs1", "pkcs8", "sec1"]
-          : ["pkcs1", "spki"],
-      );
-      if (options.cipher !== undefined)
-        validateString(options.cipher, "options.cipher");
-      if (
-        current.type === "public" &&
-        options.type === "pkcs1" &&
-        current.asymmetric.type !== "rsa"
-      )
-        throw new Error("PKCS1 can only be used for RSA keys");
-      const passphrase =
-        options.passphrase === undefined
-          ? undefined
-          : bytes(options.passphrase, "options.passphrase");
-      if (current.asymmetric.type === "dh")
-        throw new Error("Failed to export key");
-      const result = current.asymmetric.export(
+      const result = exportAsymmetric(
+        current.asymmetric,
         current.type === "private",
-        options.format === "pem",
-        options.type,
-        options.cipher,
-        passphrase,
+        options,
       );
       return options.format === "pem"
         ? new TextDecoder().decode(result)
