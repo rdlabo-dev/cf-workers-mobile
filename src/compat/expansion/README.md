@@ -57,6 +57,16 @@ Where absent, its input brand is unverified; equivalent half-float bytes are
 still tested as a byte-array input. This does not certify complete crypto input
 coverage on that engine.
 
+Random bytes and fills use the pinned Workers frontend and host cryptographic
+entropy. `pseudoRandomBytes` is the same function as `randomBytes`. Sync fills
+return the selected subview; callback fills return the original input. Workers'
+byte-length validation and typed-array element slicing are preserved, including
+its host Web Crypto quota and rejection of floating-point arrays. Input brands
+are checked with intrinsic accessors, not `Symbol.toStringTag`. Host Web Crypto
+brand-error wording varies by engine; shared contracts verify the error class.
+The upstream random/prime fixtures and consumer declaration checks run with
+`npx vitest run src/compat/crypto/random.spec.ts`.
+
 Adapter-created secret keys support copied raw/JWK export, equality, generation,
 HMAC, HKDF and symmetric ciphers. KeyObject.from can retain a host CryptoKey, but
 synchronous extraction of its opaque key material is unavailable. RSA, EC, Ed25519 and X25519 key generation and PEM/DER/JWK conversion use

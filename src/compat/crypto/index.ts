@@ -37,24 +37,27 @@ export * from "./metadata.js";
 // below are separately verified against the pinned Workers profile.
 // @ts-expect-error crypto-browserify has no declarations
 import original from "crypto-browserify/index.js";
+const originalSupported = { ...original };
+for (const name of ["prng", "rng", "listCiphers", "createCredentials"])
+  delete originalSupported[name];
 import { hkdf, hkdfSync } from "./hkdf.js";
-import { randomInt, randomUUID } from "./random.js";
+import {
+  randomInt,
+  randomUUID,
+  randomBytes,
+  randomFill,
+  randomFillSync,
+} from "./random.js";
+export { randomBytes, randomFill, randomFillSync };
+export const pseudoRandomBytes = randomBytes;
 import { scrypt, scryptSync } from "./scrypt.js";
 export { hkdf, hkdfSync, randomInt, randomUUID, scrypt, scryptSync };
 export const {
-  prng,
-  pseudoRandomBytes,
-  rng,
-  randomBytes,
-  listCiphers,
   DiffieHellmanGroup,
   createDiffieHellmanGroup,
   getDiffieHellman,
   createDiffieHellman,
   DiffieHellman,
-  randomFill,
-  randomFillSync,
-  createCredentials,
   constants,
 } = original;
 import {
@@ -78,7 +81,7 @@ export const CryptoKey = globalThis.CryptoKey;
 export default {
   X509Certificate,
   Certificate,
-  ...original,
+  ...originalSupported,
   pbkdf2,
   pbkdf2Sync,
   Hash,
@@ -114,6 +117,10 @@ export default {
   CryptoKey,
   randomInt,
   randomUUID,
+  pseudoRandomBytes,
+  randomBytes,
+  randomFill,
+  randomFillSync,
   hash,
   scrypt,
   scryptSync,

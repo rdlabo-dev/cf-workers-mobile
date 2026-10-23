@@ -1,4 +1,121 @@
 export const eventCases = {
+  cryptoRandomContracts: async function ({ crypto }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (e) {
+        return { name: e.name, code: e.code ?? null, message: e.message };
+      }
+    };
+    const fills = [
+      () => new Uint8Array(16),
+      () => new Uint16Array(8),
+      () => new Int32Array(4),
+      () => new BigUint64Array(2),
+      () => new DataView(new ArrayBuffer(24), 4, 16),
+      () => new ArrayBuffer(16),
+    ].map((make) => {
+      const input = make();
+      const result = crypto.randomFillSync(input, 1, 1);
+      const whole = new Uint8Array(
+        input instanceof ArrayBuffer ? input : input.buffer,
+      );
+      const start = (input.byteOffset ?? 0) + (input.BYTES_PER_ELEMENT ?? 1);
+      const end = start + (input.BYTES_PER_ELEMENT ?? 1);
+      return {
+        length: result.byteLength,
+        offset: result.byteOffset,
+        brand: Object.prototype.toString.call(result),
+        same: result === input,
+        outsideZero: whole.every((v, i) => (i >= start && i < end) || v === 0),
+      };
+    });
+    const errors = [
+      () => crypto.randomBytes(-1),
+      () => crypto.randomBytes(1.5),
+      () => crypto.randomBytes("1"),
+      () => crypto.randomFillSync("x"),
+      () => crypto.randomFillSync(new Uint8Array(2), -1),
+      () => crypto.randomFillSync(new Uint8Array(2), 0, 3),
+      () => crypto.randomFill(new Uint8Array(2), 3, () => {}),
+      () => crypto.randomFill(new Uint8Array(2), null),
+      () => crypto.randomBytes(0, null),
+    ].map((fn) => attempt(fn));
+    const brandChecks = [
+      { [Symbol.toStringTag]: "ArrayBuffer", byteLength: 1 },
+      {
+        [Symbol.toStringTag]: "DataView",
+        byteLength: 1,
+        buffer: new ArrayBuffer(1),
+        byteOffset: 0,
+      },
+      Object.defineProperty(new ArrayBuffer(0), Symbol.toStringTag, {
+        value: "Object",
+      }),
+      Object.defineProperty(
+        new DataView(new ArrayBuffer(0)),
+        Symbol.toStringTag,
+        { value: "Object" },
+      ),
+    ].map((input) => attempt(() => crypto.randomFillSync(input).byteLength));
+    const beyond = crypto.randomFillSync(new Uint8Array(2), 3);
+    const hostErrors = [
+      () => crypto.randomFillSync(new Float32Array(2)),
+      () => crypto.randomBytes(65537),
+    ].map((fn) => {
+      try {
+        fn();
+        return "accepted";
+      } catch (e) {
+        return e.name;
+      }
+    });
+    const order = [],
+      input = new DataView(new ArrayBuffer(32), 8, 16);
+    const callback = await new Promise((resolve) => {
+      const result = crypto.randomFill(input, 2, 4, (error, value) => {
+        order.push("callback");
+        resolve({ error: error?.name ?? null, same: value === input });
+      });
+      order.push("sync");
+      if (result !== undefined)
+        throw new Error("randomFill must return undefined");
+    });
+    const empty = await new Promise((resolve) =>
+      crypto.randomBytes(0, (error, value) =>
+        resolve({ error: error?.name ?? null, length: value.length }),
+      ),
+    );
+    let detachedName;
+    try {
+      const get = crypto.webcrypto.getRandomValues;
+      get(new Uint8Array(1));
+    } catch (e) {
+      detachedName = e.name;
+    }
+    const get = crypto.getRandomValues;
+    return {
+      fills,
+      brandChecks,
+      errors,
+      hostErrors,
+      beyond: beyond.byteLength,
+      callback,
+      order,
+      empty,
+      detachedName,
+      boundLength: get(new Uint8Array(1)).length,
+      aliases: [
+        crypto.pseudoRandomBytes === crypto.randomBytes,
+        crypto.default.pseudoRandomBytes === crypto.randomBytes,
+      ],
+      extraAliases: ["prng", "rng", "listCiphers", "createCredentials"].map(
+        (name) => [name in crypto, name in crypto.default],
+      ),
+      aliasError: attempt(() => crypto.pseudoRandomBytes(-1)),
+    };
+  },
+
   cryptoWorkLimits: async function ({ crypto }) {
     const attempt = (fn) => {
       try {
