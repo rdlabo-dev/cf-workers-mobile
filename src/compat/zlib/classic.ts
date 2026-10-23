@@ -1,3 +1,4 @@
+import type { ZlibOptions, SyncCodec, AsyncCodec } from "./public-types.js";
 import {
   optionInteger as integer,
   codecBytes,
@@ -9,38 +10,38 @@ import { Zlib } from "./classic-base.cjs";
 import { ZlibStream } from "./classic-binding.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
 export class Deflate extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     super(options, 1);
   }
 }
 export class Inflate extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     super(options, 2);
   }
 }
 export class Gzip extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     super(options, 3);
   }
 }
 export class Gunzip extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     super(options, 4);
   }
 }
 export class DeflateRaw extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     if (options?.windowBits === 8) options.windowBits = 9;
     super(options, 5);
   }
 }
 export class InflateRaw extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     super(options, 6);
   }
 }
 export class Unzip extends Zlib {
-  constructor(options?: any) {
+  constructor(options?: ZlibOptions) {
     super(options, 7);
   }
 }
@@ -53,13 +54,15 @@ const constructors = [
   InflateRaw,
   Unzip,
 ];
-export const createDeflate = (options?: any) => new Deflate(options);
-export const createInflate = (options?: any) => new Inflate(options);
-export const createGzip = (options?: any) => new Gzip(options);
-export const createGunzip = (options?: any) => new Gunzip(options);
-export const createDeflateRaw = (options?: any) => new DeflateRaw(options);
-export const createInflateRaw = (options?: any) => new InflateRaw(options);
-export const createUnzip = (options?: any) => new Unzip(options);
+export const createDeflate = (options?: ZlibOptions) => new Deflate(options);
+export const createInflate = (options?: ZlibOptions) => new Inflate(options);
+export const createGzip = (options?: ZlibOptions) => new Gzip(options);
+export const createGunzip = (options?: ZlibOptions) => new Gunzip(options);
+export const createDeflateRaw = (options?: ZlibOptions) =>
+  new DeflateRaw(options);
+export const createInflateRaw = (options?: ZlibOptions) =>
+  new InflateRaw(options);
+export const createUnzip = (options?: ZlibOptions) => new Unzip(options);
 const maxChunk = 134217728;
 function bytes(input: any, parameter = 1, method = "zlibSync"): Uint8Array {
   if (typeof input === "string") return Buffer.from(input);
@@ -220,29 +223,87 @@ function callbackOperation(
   }
   queueMicrotask(() => (error ? callback(error) : callback(null, result)));
 }
-export const deflateSync = (input: any, options?: any) =>
-  sync(1, input, options);
-export const inflateSync = (input: any, options?: any) =>
-  sync(2, input, options);
-export const gzipSync = (input: any, options?: any) => sync(3, input, options);
-export const gunzipSync = (input: any, options?: any) =>
-  sync(4, input, options);
-export const deflateRawSync = (input: any, options?: any) =>
-  sync(5, input, options);
-export const inflateRawSync = (input: any, options?: any) =>
-  sync(6, input, options);
-export const unzipSync = (input: any, options?: any) => sync(7, input, options);
-export const deflate = (input: any, options: any, callback?: any) =>
-  callbackOperation(1, input, options, callback);
-export const inflate = (input: any, options: any, callback?: any) =>
-  callbackOperation(2, input, options, callback);
-export const gzip = (input: any, options: any, callback?: any) =>
-  callbackOperation(3, input, options, callback);
-export const gunzip = (input: any, options: any, callback?: any) =>
-  callbackOperation(4, input, options, callback);
-export const deflateRaw = (input: any, options: any, callback?: any) =>
-  callbackOperation(5, input, options, callback);
-export const inflateRaw = (input: any, options: any, callback?: any) =>
-  callbackOperation(6, input, options, callback);
-export const unzip = (input: any, options: any, callback?: any) =>
-  callbackOperation(7, input, options, callback);
+export const deflateSync: SyncCodec<ZlibOptions, Deflate> = ((
+  input: any,
+  options?: any,
+) => sync(1, input, options)) as SyncCodec<ZlibOptions, Deflate>;
+export const inflateSync: SyncCodec<ZlibOptions, Inflate> = ((
+  input: any,
+  options?: any,
+) => sync(2, input, options)) as SyncCodec<ZlibOptions, Inflate>;
+export const gzipSync: SyncCodec<ZlibOptions, Gzip> = ((
+  input: any,
+  options?: any,
+) => sync(3, input, options)) as SyncCodec<ZlibOptions, Gzip>;
+export const gunzipSync: SyncCodec<ZlibOptions, Gunzip> = ((
+  input: any,
+  options?: any,
+) => sync(4, input, options)) as SyncCodec<ZlibOptions, Gunzip>;
+export const deflateRawSync: SyncCodec<ZlibOptions, DeflateRaw> = ((
+  input: any,
+  options?: any,
+) => sync(5, input, options)) as SyncCodec<ZlibOptions, DeflateRaw>;
+export const inflateRawSync: SyncCodec<ZlibOptions, InflateRaw> = ((
+  input: any,
+  options?: any,
+) => sync(6, input, options)) as SyncCodec<ZlibOptions, InflateRaw>;
+export const unzipSync: SyncCodec<ZlibOptions, Unzip> = ((
+  input: any,
+  options?: any,
+) => sync(7, input, options)) as SyncCodec<ZlibOptions, Unzip>;
+export const deflate: AsyncCodec<ZlibOptions, Deflate> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(1, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  Deflate
+>;
+export const inflate: AsyncCodec<ZlibOptions, Inflate> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(2, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  Inflate
+>;
+export const gzip: AsyncCodec<ZlibOptions, Gzip> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(3, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  Gzip
+>;
+export const gunzip: AsyncCodec<ZlibOptions, Gunzip> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(4, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  Gunzip
+>;
+export const deflateRaw: AsyncCodec<ZlibOptions, DeflateRaw> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(5, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  DeflateRaw
+>;
+export const inflateRaw: AsyncCodec<ZlibOptions, InflateRaw> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(6, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  InflateRaw
+>;
+export const unzip: AsyncCodec<ZlibOptions, Unzip> = ((
+  input: any,
+  options: any,
+  callback?: any,
+) => callbackOperation(7, input, options, callback)) as AsyncCodec<
+  ZlibOptions,
+  Unzip
+>;

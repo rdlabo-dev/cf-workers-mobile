@@ -1,3 +1,9 @@
+import type {
+  BrotliOptions,
+  ZstdOptions,
+  SyncCodec,
+  AsyncCodec,
+} from "./public-types.js";
 import {
   nativeNumber,
   codecBytes,
@@ -18,31 +24,32 @@ import {
   kMaxZstdDParam,
 } from "./classic-base.cjs";
 export class BrotliCompress extends Brotli {
-  constructor(options?: any) {
+  constructor(options?: BrotliOptions) {
     super(options, 9);
   }
 }
 export class BrotliDecompress extends Brotli {
-  constructor(options?: any) {
+  constructor(options?: BrotliOptions) {
     super(options, 8);
   }
 }
 export class ZstdCompress extends Zstd {
-  constructor(options?: any) {
+  constructor(options?: ZstdOptions) {
     super(options, 10, zstdInitCParamsArray, kMaxZstdCParam);
   }
 }
 export class ZstdDecompress extends Zstd {
-  constructor(options?: any) {
+  constructor(options?: ZstdOptions) {
     super(options, 11, zstdInitDParamsArray, kMaxZstdDParam);
   }
 }
-export const createBrotliCompress = (options?: any) =>
+export const createBrotliCompress = (options?: BrotliOptions) =>
   new BrotliCompress(options);
-export const createBrotliDecompress = (options?: any) =>
+export const createBrotliDecompress = (options?: BrotliOptions) =>
   new BrotliDecompress(options);
-export const createZstdCompress = (options?: any) => new ZstdCompress(options);
-export const createZstdDecompress = (options?: any) =>
+export const createZstdCompress = (options?: ZstdOptions) =>
+  new ZstdCompress(options);
+export const createZstdDecompress = (options?: ZstdOptions) =>
   new ZstdDecompress(options);
 
 function bytes(value: unknown, method: string): Uint8Array {
@@ -218,22 +225,62 @@ function asyncOperation(
   }
   queueMicrotask(() => (error ? callback(error) : callback(null, result)));
 }
-export const brotliCompressSync = (input: unknown, options?: any) =>
-  sync("brotli", true, input, options);
-export const brotliDecompressSync = (input: unknown, options?: any) =>
-  sync("brotli", false, input, options);
-export const zstdCompressSync = (input: unknown, options?: any) =>
-  sync("zstd", true, input, options);
-export const zstdDecompressSync = (input: unknown, options?: any) =>
-  sync("zstd", false, input, options);
-export const brotliCompress = (input: unknown, options?: any, callback?: any) =>
-  asyncOperation("brotli", true, input, options, callback);
-export const brotliDecompress = (
+export const brotliCompressSync: SyncCodec<BrotliOptions, BrotliCompress> = ((
+  input: unknown,
+  options?: any,
+) => sync("brotli", true, input, options)) as SyncCodec<
+  BrotliOptions,
+  BrotliCompress
+>;
+export const brotliDecompressSync: SyncCodec<BrotliOptions, BrotliDecompress> =
+  ((input: unknown, options?: any) =>
+    sync("brotli", false, input, options)) as SyncCodec<
+    BrotliOptions,
+    BrotliDecompress
+  >;
+export const zstdCompressSync: SyncCodec<ZstdOptions, ZstdCompress> = ((
+  input: unknown,
+  options?: any,
+) => sync("zstd", true, input, options)) as SyncCodec<
+  ZstdOptions,
+  ZstdCompress
+>;
+export const zstdDecompressSync: SyncCodec<ZstdOptions, ZstdDecompress> = ((
+  input: unknown,
+  options?: any,
+) => sync("zstd", false, input, options)) as SyncCodec<
+  ZstdOptions,
+  ZstdDecompress
+>;
+export const brotliCompress: AsyncCodec<BrotliOptions, BrotliCompress> = ((
   input: unknown,
   options?: any,
   callback?: any,
-) => asyncOperation("brotli", false, input, options, callback);
-export const zstdCompress = (input: unknown, options?: any, callback?: any) =>
-  asyncOperation("zstd", true, input, options, callback);
-export const zstdDecompress = (input: unknown, options?: any, callback?: any) =>
-  asyncOperation("zstd", false, input, options, callback);
+) => asyncOperation("brotli", true, input, options, callback)) as AsyncCodec<
+  BrotliOptions,
+  BrotliCompress
+>;
+export const brotliDecompress: AsyncCodec<BrotliOptions, BrotliDecompress> = ((
+  input: unknown,
+  options?: any,
+  callback?: any,
+) => asyncOperation("brotli", false, input, options, callback)) as AsyncCodec<
+  BrotliOptions,
+  BrotliDecompress
+>;
+export const zstdCompress: AsyncCodec<ZstdOptions, ZstdCompress> = ((
+  input: unknown,
+  options?: any,
+  callback?: any,
+) => asyncOperation("zstd", true, input, options, callback)) as AsyncCodec<
+  ZstdOptions,
+  ZstdCompress
+>;
+export const zstdDecompress: AsyncCodec<ZstdOptions, ZstdDecompress> = ((
+  input: unknown,
+  options?: any,
+  callback?: any,
+) => asyncOperation("zstd", false, input, options, callback)) as AsyncCodec<
+  ZstdOptions,
+  ZstdDecompress
+>;

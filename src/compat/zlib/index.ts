@@ -1,3 +1,13 @@
+export type {
+  CodecInput,
+  CodecOptions,
+  ZlibOptions,
+  BrotliOptions,
+  ZstdOptions,
+  CodecInfo,
+  CodecCallback,
+} from "./public-types.js";
+import type { CodecInput } from "./public-types.js";
 import {
   viewBytes,
   isAnyBuffer,
@@ -369,7 +379,7 @@ function data(input: unknown): Uint8Array {
     "Failed to execute 'crc32' on 'ZlibUtil': parameter 1 is not of type 'string or ArrayBuffer or ArrayBufferView'.",
   );
 }
-export function crc32(input: unknown, value = 0): number {
+export function crc32(input: CodecInput, value = 0): number {
   validateUint32(value, "value");
   let crc = value ^ -1;
   for (const byte of data(input)) {

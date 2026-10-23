@@ -312,34 +312,37 @@ execFileSync(
 );
 // Compile the installed adapter declarations, rather than resolving node:fs
 // to @types/node. Library checking must remain enabled to catch broken .d.ts.
-await writeFile(
-  join(temp, "fs-consumer.mts"),
-  (
-    await readFile(join(root, "tests/types/fs-consumer.mts"), "utf8")
-  ).replaceAll("../../src/", "./node_modules/cf-workers-native/dist/"),
-);
-execFileSync(
-  process.execPath,
-  [
-    "node_modules/typescript/bin/tsc",
-    "--noEmit",
-    "--strict",
-    "--skipLibCheck",
-    "false",
-    "--types",
-    "node",
-    "--lib",
-    "esnext,dom",
-    "--moduleResolution",
-    "nodenext",
-    "--module",
-    "nodenext",
-    "--target",
-    "es2022",
-    "fs-consumer.mts",
-  ],
-  { cwd: temp, stdio: "pipe" },
-);
+for (const fixture of ["fs-consumer.mts", "zlib-consumer.mts"]) {
+  await writeFile(
+    join(temp, fixture),
+    (await readFile(join(root, "tests/types", fixture), "utf8")).replaceAll(
+      "../../src/",
+      "./node_modules/cf-workers-native/dist/",
+    ),
+  );
+  execFileSync(
+    process.execPath,
+    [
+      "node_modules/typescript/bin/tsc",
+      "--noEmit",
+      "--strict",
+      "--skipLibCheck",
+      "false",
+      "--types",
+      "node",
+      "--lib",
+      "esnext,dom",
+      "--moduleResolution",
+      "nodenext",
+      "--module",
+      "nodenext",
+      "--target",
+      "es2022",
+      fixture,
+    ],
+    { cwd: temp, stdio: "pipe" },
+  );
+}
 // Readiness must identify this consumer, not an unrelated preview on the
 // same port. Otherwise a stale server can supply passing historical results.
 const previewIdentity = randomUUID();
