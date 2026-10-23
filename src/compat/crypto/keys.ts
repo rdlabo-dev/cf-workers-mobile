@@ -75,6 +75,8 @@ export abstract class KeyObject {
         options.passphrase === undefined
           ? undefined
           : bytes(options.passphrase, "options.passphrase");
+      if (current.asymmetric.type === "dh")
+        throw new Error("Failed to export key");
       const result = current.asymmetric.export(
         current.type === "private",
         options.format === "pem",

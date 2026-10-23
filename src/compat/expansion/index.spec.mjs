@@ -1,4 +1,233 @@
 export const eventCases = {
+  cryptoWorkLimits: async function ({ crypto }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (error) {
+        return {
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message,
+        };
+      }
+    };
+    const options = [
+      { N: 1024, r: 1, p: 32768 },
+      { N: 2, r: 1, p: 1048577 },
+      { N: 65536, r: 1, p: 1 },
+      { N: 16, r: 1, p: 1, maxmem: 1 },
+      { N: 16, r: 1, p: 1, maxmem: 4294967296 },
+      { N: 16, r: 1, p: 1, maxmem: 4294967295 },
+      { N: 16, r: 1, p: 1 },
+    ];
+    const result = {
+      scrypt: options.map((options) =>
+        attempt(() => crypto.scryptSync("p", "s", 8, options).toString("hex")),
+      ),
+      rsa: attempt(() =>
+        crypto.generateKeyPairSync("rsa", { modulusLength: 16385 }),
+      ),
+      dh: attempt(() =>
+        crypto.generateKeyPairSync("dh", { prime: new Uint8Array(1025) }),
+      ),
+    };
+    const order = [];
+    result.callback = await new Promise((resolve) => {
+      crypto.scrypt("p", "s", 8, options[0], (error) => {
+        order.push("callback");
+        resolve({
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message,
+        });
+      });
+      order.push("returned");
+    });
+    result.order = order;
+    return result;
+  },
+  cryptoKeygenContracts: async function ({ crypto, util }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (error) {
+        return {
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message,
+        };
+      }
+    };
+    const errors = [
+      ["dh", {}],
+      ["dh", { prime: "p" }],
+      ["dh", { primeLength: -1 }],
+      ["dh", { primeLength: 512 }],
+      ["dh", { generator: -1 }],
+      ["dh", { group: "modp14", primeLength: 512 }],
+      ["dh", { group: "modp14", prime: new Uint8Array([3]) }],
+      ["dh", { group: "modp14", generator: 2 }],
+      ["dh", { prime: new Uint8Array([3]), primeLength: 512 }],
+      ["dh", { group: "modp1" }],
+      ["dh", { group: "unknown" }],
+      ["ed25519", { publicKeyEncoding: "pem" }],
+      ["x25519", { privateKeyEncoding: "pem" }],
+      ["ed25519", { privateKeyEncoding: { format: "pem", type: "pkcs1" } }],
+      [
+        "rsa",
+        {
+          modulusLength: 1024,
+          privateKeyEncoding: {
+            format: "der",
+            type: "pkcs1",
+            cipher: "aes-128-cbc",
+            passphrase: "pw",
+          },
+        },
+      ],
+      [
+        "ec",
+        {
+          namedCurve: "prime256v1",
+          privateKeyEncoding: {
+            format: "pem",
+            type: "pkcs8",
+            cipher: "aes-128-cbc",
+          },
+        },
+      ],
+    ].map(([type, options]) =>
+      attempt(() => {
+        crypto.generateKeyPairSync(type, options);
+        return "accepted";
+      }),
+    );
+    const rsaBoundaries = [0, 1, 16, 255, 256, 511].map((modulusLength) =>
+      attempt(() => {
+        crypto.generateKeyPairSync("rsa", { modulusLength });
+        return "accepted";
+      }),
+    );
+    const rsaRounded = [513, 520, 639, 640, 1023].map(
+      (modulusLength) =>
+        crypto.generateKeyPairSync("rsa", { modulusLength }).privateKey
+          .asymmetricKeyDetails.modulusLength,
+    );
+    const rsaExponents = [0, 1, 2, 4].map((publicExponent) =>
+      attempt(() => {
+        crypto.generateKeyPairSync("rsa", {
+          modulusLength: 512,
+          publicExponent,
+        });
+        return "accepted";
+      }),
+    );
+    const smallDh = [0, 1, 2, 3, 5, 23, 37, 255].map((p) =>
+      attempt(() => {
+        const { publicKey, privateKey } = crypto.generateKeyPairSync("dh", {
+          prime: new Uint8Array([p]),
+          generator: 2,
+        });
+        return [
+          publicKey.asymmetricKeyType,
+          privateKey.asymmetricKeyType,
+          crypto.createPublicKey(privateKey).type,
+          attempt(
+            () => publicKey.export({ type: "spki", format: "der" }).length > 0,
+          ),
+          attempt(
+            () =>
+              privateKey.export({ type: "pkcs8", format: "der" }).length > 0,
+          ),
+        ];
+      }),
+    );
+    const curves = [
+      "P-224",
+      "P-256",
+      "P-384",
+      "P-521",
+      "prime256v1",
+      "prime256v1\0suffix",
+      "secp256r1",
+      "secp256k1",
+      "PRIME256V1",
+    ].map((namedCurve) => [
+      namedCurve,
+      attempt(
+        () =>
+          crypto.generateKeyPairSync("ec", { namedCurve }).publicKey
+            .asymmetricKeyDetails,
+      ),
+    ]);
+    const ecEncoding = ["named", "explicit"].map((paramEncoding) => {
+      const { privateKey } = crypto.generateKeyPairSync("ec", {
+        namedCurve: "P-256",
+        paramEncoding,
+      });
+      const data = privateKey.export({ type: "sec1", format: "der" });
+      return {
+        paramEncoding,
+        length: data.length,
+        curveParameter: data
+          .toString("hex")
+          .includes("a00a06082a8648ce3d030107"),
+      };
+    });
+    const alice = crypto.generateKeyPairSync("dh", { group: "MODP14" });
+    const prime = crypto.getDiffieHellman("modp14").getPrime(),
+      padded = new Uint8Array(prime.length + 4);
+    padded.set(prime, 2);
+    const bob = crypto.generateKeyPairSync("dh", {
+      prime: new DataView(padded.buffer, 2, prime.length),
+      generator: 2,
+    });
+    const a = crypto.diffieHellman({
+        privateKey: alice.privateKey,
+        publicKey: bob.publicKey,
+      }),
+      b = crypto.diffieHellman({
+        privateKey: bob.privateKey,
+        publicKey: alice.publicKey,
+      });
+    const mismatchedDh = [
+      crypto.generateKeyPairSync("dh", { group: "modp5" }),
+      crypto.generateKeyPairSync("dh", { prime, generator: 5 }),
+    ].map((peer) =>
+      attempt(
+        () =>
+          crypto.diffieHellman({
+            publicKey: alice.publicKey,
+            privateKey: peer.privateKey,
+          }).length,
+      ),
+    );
+    const clonedDh = crypto
+      .diffieHellman({
+        publicKey: crypto.createPublicKey(bob.privateKey),
+        privateKey: alice.privateKey,
+      })
+      .equals(a);
+    const pair = await util.promisify(crypto.generateKeyPair)("ed25519", {});
+    return {
+      errors,
+      curves,
+      ecEncoding,
+      rsaBoundaries,
+      rsaExponents,
+      rsaRounded,
+      smallDh,
+      mismatchedDh,
+      clonedDh,
+      dh: {
+        type: alice.privateKey.asymmetricKeyType,
+        length: a.length,
+        equal: a.toString("hex") === b.toString("hex"),
+      },
+      promisify: [pair.publicKey.type, pair.privateKey.type],
+    };
+  },
+
   cryptoCipherAlgorithms: async function ({ crypto }) {
     const results = [];
     for (const name of [

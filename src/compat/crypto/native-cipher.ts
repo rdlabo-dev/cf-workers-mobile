@@ -75,3 +75,50 @@ export function output(api: API, pointer: number, length: number): Uint8Array {
 export function size(api: API, pointer: number): number {
   return new DataView(api.memory.buffer).getUint32(pointer, true);
 }
+
+// Match Workers' curve lookup before handing generation to the owned key backend.
+export function curveName(name: string): string {
+  return inputs([name], (api, [p]) => {
+    const pointer = api.cipher_curve_name(p);
+    if (pointer === 0) throw new Error("Invalid or unsupported curve");
+    if (pointer === -1) throw new Error("Failed to initialize key");
+    const memory = new Uint8Array(api.memory.buffer);
+    let end = pointer;
+    while (memory[end]) end++;
+    return new TextDecoder().decode(memory.subarray(pointer, end));
+  });
+}
+
+export function generateDh(prime: Uint8Array, generator: number): Uint8Array {
+  return inputs([prime, prime.length * 2], (api, [p, out]) => {
+    if (!api.cipher_dh_generate(p, prime.length, generator, out))
+      throw new Error("Failed to generate key");
+    return output(api, out, prime.length * 2);
+  });
+}
+export function deriveDh(
+  prime: Uint8Array,
+  generator: Uint8Array,
+  privateKey: Uint8Array,
+  publicKey: Uint8Array,
+): Uint8Array {
+  return inputs(
+    [prime, generator, privateKey, publicKey, prime.length],
+    (api, [p, g, x, y, out]) => {
+      const length = api.cipher_dh_derive(
+        p,
+        prime.length,
+        g,
+        generator.length,
+        x,
+        privateKey.length,
+        y,
+        publicKey.length,
+        out,
+      );
+      if (length < 0)
+        throw new Error("Failed to derive shared diffie-hellman secret");
+      return output(api, out, length);
+    },
+  );
+}

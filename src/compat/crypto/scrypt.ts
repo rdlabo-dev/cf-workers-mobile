@@ -44,14 +44,24 @@ const cryptoImpl = {
     maxmem: number,
     length: number,
   ) {
+    // JSG validates the uint32 binding argument before entering the backend.
+    if (maxmem > 0xffffffff)
+      throw new TypeError(
+        "Value out of range. Must be less than or equal to 4294967295.",
+      );
+    // Pinned workerd IsolateLimitEnforcer::checkScryptCost (2^20).
+    if (N > 1048576 || r > 1048576 || p > 1048576 || N * r * p > 1048576)
+      throw new RangeError("Scrypt failed: cost exceeds maximum (1048576).");
     if (
       N < 2 ||
       (N & (N - 1)) !== 0 ||
+      N >= 2 ** (16 * r) ||
+      r * p >= 2 ** 30 ||
       r < 1 ||
       p < 1 ||
       128 * N * r + 128 * r * p + 256 * r > maxmem
     ) {
-      throw new Error("Invalid scrypt params");
+      throw new Error("Scrypt failed");
     }
     return new Uint8Array(syncScrypt(password, salt, N, r, p, length)).buffer;
   },

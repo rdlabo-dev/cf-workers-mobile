@@ -2,6 +2,10 @@
 #include <openssl/aead.h>
 #include <openssl/cipher.h>
 #include <openssl/err.h>
+#include <openssl/ec.h>
+#include <openssl/dh.h>
+#include <openssl/bn.h>
+#include <openssl/obj.h>
 #include <openssl/mem.h>
 #include <string.h>
 #define API EMSCRIPTEN_KEEPALIVE
@@ -36,3 +40,25 @@ API const char *cipher_reason(unsigned long code){return ERR_reason_error_string
 API int cipher_info(const EVP_CIPHER *cipher,int kind){return kind==0?EVP_CIPHER_key_length(cipher):kind==1?EVP_CIPHER_iv_length(cipher):kind==2?EVP_CIPHER_block_size(cipher):EVP_CIPHER_mode(cipher);}
 
 API int cipher_bad_decrypt(void){uint32_t code=ERR_peek_last_error();int result=ERR_GET_LIB(code)==ERR_LIB_CIPHER && ERR_GET_REASON(code)==CIPHER_R_BAD_DECRYPT;ERR_clear_error();return result;}
+
+API intptr_t cipher_curve_name(const char *name){
+ int nid=EC_curve_nist2nid(name);if(nid==NID_undef)nid=OBJ_sn2nid(name);
+ if(nid==NID_undef)return 0;EC_GROUP *group=EC_GROUP_new_by_curve_name(nid);if(!group)return -1;
+ EC_GROUP_free(group);return (intptr_t)OBJ_nid2sn(nid);
+}
+
+API int cipher_dh_generate(const unsigned char *prime,int length,unsigned long generator,unsigned char *out){
+ DH *dh=DH_new();BIGNUM *p=BN_bin2bn(prime,length,NULL),*g=BN_new();int ok=0;
+ if(!dh || !p || !g || !BN_set_word(g,generator) || !DH_set0_pqg(dh,p,NULL,g))goto done;
+ p=NULL;g=NULL;if(!DH_generate_key(dh))goto done;
+ const BIGNUM *pub,*priv;DH_get0_key(dh,&pub,&priv);
+ ok=BN_bn2bin_padded(out,length,pub) && BN_bn2bin_padded(out+length,length,priv);
+ done: BN_free(p);BN_free(g);DH_free(dh);return ok;
+}
+API int cipher_dh_derive(const unsigned char *prime,int plen,const unsigned char *generator,int glen,const unsigned char *priv,int xlen,const unsigned char *pub,int ylen,unsigned char *out){
+ DH *dh=DH_new();BIGNUM *p=BN_bin2bn(prime,plen,NULL),*g=BN_bin2bn(generator,glen,NULL),*x=BN_bin2bn(priv,xlen,NULL),*y=BN_bin2bn(pub,ylen,NULL);int result=-1;
+ if(!dh || !p || !g || !x || !y || !DH_set0_pqg(dh,p,NULL,g))goto done;
+ p=NULL;g=NULL;if(!DH_set0_key(dh,NULL,x))goto done;x=NULL;
+ result=DH_compute_key_padded(out,y,dh);
+ done: BN_free(p);BN_free(g);BN_clear_free(x);BN_free(y);DH_free(dh);return result;
+}

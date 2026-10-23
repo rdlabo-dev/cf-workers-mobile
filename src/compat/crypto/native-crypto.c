@@ -5,6 +5,7 @@
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/ec.h>
+#include <openssl/dh.h>
 #include <openssl/ecdsa.h>
 #include <openssl/err.h>
 #include <openssl/provider.h>
@@ -54,7 +55,7 @@ API void wk_key_free(EVP_PKEY *key) { EVP_PKEY_free(key); }
 API const char *wk_key_type(EVP_PKEY *key) { return EVP_PKEY_get0_type_name(key); }
 API int wk_key_bits(EVP_PKEY *key) { return EVP_PKEY_get_bits(key); }
 API int wk_key_equal(EVP_PKEY *a,EVP_PKEY *b) { return EVP_PKEY_eq(a,b); }
-API int wk_key_export(EVP_PKEY *key,int private_key,int pem,int type,const char *cipher_name,const char *password,int password_length) {
+API int wk_key_export(EVP_PKEY *key,int private_key,int pem,int type,const char *cipher_name,const char *password,int password_length,int ec_encoding) {
   ERR_clear_error();BIO *bio=BIO_new(BIO_s_mem());if(!bio)return 0;
   const EVP_CIPHER *cipher=cipher_name && *cipher_name?EVP_get_cipherbyname(cipher_name):NULL;
   if(cipher_name && *cipher_name && !cipher){BIO_free(bio);return 0;}
@@ -62,7 +63,7 @@ API int wk_key_export(EVP_PKEY *key,int private_key,int pem,int type,const char 
   if(private_key) {
     if(type==0) ok=pem?PEM_write_bio_PKCS8PrivateKey(bio,key,cipher,(char *)password,password_length,NULL,NULL):i2d_PKCS8PrivateKey_bio(bio,key,cipher,(char *)password,password_length,NULL,NULL);
     else if(type==1) {RSA *rsa=EVP_PKEY_get1_RSA(key);if(rsa){ok=pem?PEM_write_bio_RSAPrivateKey(bio,rsa,cipher,(const unsigned char *)password,password_length,NULL,NULL):i2d_RSAPrivateKey_bio(bio,rsa);RSA_free(rsa);}}
-    else if(type==2) {EC_KEY *ec=EVP_PKEY_get1_EC_KEY(key);if(ec){ok=pem?PEM_write_bio_ECPrivateKey(bio,ec,cipher,(const unsigned char *)password,password_length,NULL,NULL):i2d_ECPrivateKey_bio(bio,ec);EC_KEY_free(ec);}}
+    else if(type==2) {EC_KEY *ec=EVP_PKEY_get1_EC_KEY(key);if(ec){if(ec_encoding>=0)EC_KEY_set_enc_flags(ec,ec_encoding);ok=pem?PEM_write_bio_ECPrivateKey(bio,ec,cipher,(const unsigned char *)password,password_length,NULL,NULL):i2d_ECPrivateKey_bio(bio,ec);EC_KEY_free(ec);}}
   } else {
     if(type==1) {RSA *rsa=EVP_PKEY_get1_RSA(key);if(rsa){ok=pem?PEM_write_bio_RSAPublicKey(bio,rsa):i2d_RSAPublicKey_bio(bio,rsa);RSA_free(rsa);}}
     else ok=pem?PEM_write_bio_PUBKEY(bio,key):i2d_PUBKEY_bio(bio,key);
@@ -77,6 +78,14 @@ API EVP_PKEY *wk_key_generate(const char *type,int bits,const char *curve,unsign
   if(ok && (!strcmp(type,"EC") || !strcmp(type,"DH")))ok=EVP_PKEY_CTX_set_group_name(ctx,curve)>0;
   if(ok)ok=EVP_PKEY_generate(ctx,&key)>0;
   EVP_PKEY_CTX_free(ctx);if(!ok){EVP_PKEY_free(key);return NULL;}return key;
+}
+API EVP_PKEY *wk_key_generate_dh(const unsigned char *prime,int length,unsigned long generator,const unsigned char *components) {
+ ERR_clear_error();BIGNUM *p=BN_bin2bn(prime,length,NULL),*g=BN_new(),*pub=BN_bin2bn(components,length,NULL),*priv=BN_bin2bn(components+length,length,NULL);
+ DH *dh=DH_new();EVP_PKEY *key=NULL;
+ if(!p || !g || !pub || !priv || !dh || !BN_set_word(g,generator) || !DH_set0_pqg(dh,p,NULL,g))goto done;
+ p=NULL;g=NULL;if(!DH_set0_key(dh,pub,priv))goto done;pub=NULL;priv=NULL;
+ key=EVP_PKEY_new();if(!key || !EVP_PKEY_assign_DH(key,dh)){EVP_PKEY_free(key);key=NULL;goto done;}dh=NULL;
+ done: DH_free(dh);BN_free(p);BN_free(g);BN_free(pub);BN_clear_free(priv);return key;
 }
 static int signature_width(EVP_PKEY *key) {
   if(EVP_PKEY_is_a(key,"EC"))return (EVP_PKEY_get_bits(key)+7)/8;

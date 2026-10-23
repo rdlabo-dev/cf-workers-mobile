@@ -123,6 +123,7 @@ const released = new FinalizationRegistry<number>((pointer) =>
   library().wk_key_free(pointer),
 );
 export class NativeKey {
+  ecEncoding = -1;
   checkCertificate(cert: number, operation: number) {
     return library().wk_x509_compare(cert, this.handle(), operation) === 1;
   }
@@ -206,6 +207,17 @@ export class NativeKey {
         ),
     );
   }
+  static generateDh(
+    prime: Uint8Array,
+    generator: number,
+    components: Uint8Array,
+  ) {
+    return inputs([prime, components], (api, [p, c]) => {
+      const pointer = api.wk_key_generate_dh(p, prime.byteLength, generator, c);
+      if (!pointer) throw new Error("Failed to generate key");
+      return new NativeKey(pointer);
+    });
+  }
   static generate(type: string, bits = 0, curve?: string, exponent = 65537) {
     return inputs(
       [type, curve],
@@ -238,6 +250,7 @@ export class NativeKey {
           c,
           p,
           password?.length ?? 0,
+          this.ecEncoding,
         )
       )
         throw error();

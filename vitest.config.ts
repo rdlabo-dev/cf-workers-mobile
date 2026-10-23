@@ -73,6 +73,7 @@ export default defineConfig({
       "src/browser/fetch/scope.spec.ts",
       "src/compat/net/sockets.spec.ts",
       "src/compat/tls/upgrade.spec.ts",
+      "src/compat/crypto/kdf-limits.spec.ts",
       "src/compat/crypto/cipher.spec.ts",
       "src/compat/crypto/hash.spec.ts",
       "src/compat/crypto/hash-types.spec.ts",

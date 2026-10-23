@@ -41,7 +41,8 @@ processing. Streaming output is not cumulatively capped by maxOutputLength.
 The pinned source revisions and artifact hashes accompany the codecs; rebuild
 with scripts/build-native-codecs.mjs or scripts/build-native-zlib.mjs and the pinned Emscripten SDK. Gzip/deflate and Brotli/Zstd streams use the pinned Workers stream lifecycle. The comparative cases include constructor validation, callback timing, reset, close, byte accounting, dictionaries and output limits; whole-module acceptance remains a separate gate.
 Scrypt uses a synchronous JavaScript backend, including for callback completion,
-so large parameters can block the WebView.
+so large parameters can block the WebView. Cost and maxmem validation follow the
+pinned Workers limits, including its 1048576 cost ceiling.
 
 Hash and HMAC use the owned OpenSSL backend, including incremental input,
 Hash copying, stream finalization and repeated-digest behavior. `getHashes()`
@@ -61,8 +62,14 @@ HMAC, HKDF and symmetric ciphers. KeyObject.from can retain a host CryptoKey, bu
 synchronous extraction of its opaque key material is unavailable. RSA, EC, Ed25519 and X25519 key generation and PEM/DER/JWK conversion use
 bundled OpenSSL 3.5.9 WebAssembly; RSA/EC streaming and one-shot signatures
 are compared with Workers and independent test signatures. This covers selected
-algorithms and operations, not the whole crypto module. Additional key-generation
-options and remaining error contracts still need work. Cipheriv/Decipheriv use the same pinned BoringSSL revision as Workers. Their
+algorithms and operations, not the whole crypto module. Generation validates encoding
+options before allocating keys, preserves RSA's 16384-bit limit and 128-bit size
+rounding, and matches EC curve aliases and SEC1 parameter flags. DH custom-prime
+generation and shared-secret calculation use the pinned BoringSSL backend,
+including small primes and rejection of mismatched parameters. Workers' DH key
+export rejection is preserved. The upstream key-generation and scrypt fixtures
+run with `npx vitest run src/compat/crypto/kdf-limits.spec.ts`.
+Remaining key import/export and other crypto error contracts still need work. Cipheriv/Decipheriv use the same pinned BoringSSL revision as Workers. Their
 frontend preserves Workers' `authLengthTag` option spelling, AEAD's one-update
 limit, early authentication-tag requirements, tag consumption and buffer copies.
 The listed classic and AEAD cipher names have shared algorithm/state contracts;
