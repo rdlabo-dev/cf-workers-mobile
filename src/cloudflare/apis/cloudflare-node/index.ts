@@ -1,5 +1,5 @@
 import { Headers } from "../../../browser/headers/index.js";
-import { Response } from "../../../browser/response/index.js";
+import { Response as WorkersResponse } from "../../../browser/response/index.js";
 // Copyright (c) 2024-2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -138,8 +138,11 @@ export async function handleAsNodeRequest(
             : [value])
             headers.append(key, String(item));
         }
+        // This bridge exposes the standard Fetch contract. Its HTTP body chunks
+        // are ArrayBuffer-backed; owned Headers also implements the iterator
+        // protocol without depending on a particular TypeScript DOM lib version.
         resolve(
-          new Response(
+          new WorkersResponse(
             request.method === "HEAD" ||
               [204, 205, 304].includes(res.statusCode)
               ? null
@@ -149,7 +152,7 @@ export async function handleAsNodeRequest(
               statusText: res.statusMessage,
               headers,
             },
-          ),
+          ) as unknown as Response,
         );
       } catch (error) {
         reject(error);
