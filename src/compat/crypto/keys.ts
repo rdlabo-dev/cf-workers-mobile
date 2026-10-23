@@ -1,0 +1,248 @@
+import { exportJwk } from "./key-formats.js";
+// API behavior follows workerd@5358e3d337336eaf696a48bc1563d808b10feba5
+// crypto_keys.ts (Apache-2.0 and Node MIT). Host CryptoKey export is an explicit
+// synchronous-engine boundary; adapter-created secret keys own copied bytes.
+import { Buffer } from "node:buffer";
+import { keyStates, type KeyState } from "./key-state.js";
+import { bytes, validateInteger } from "./validation.js";
+import {
+  validateObject,
+  validateString,
+  validateOneOf,
+} from "../net/validators.js";
+import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
+function state(value: object): KeyState {
+  const result = keyStates.get(value);
+  if (!result) throw new ERR_INVALID_ARG_TYPE("key", "KeyObject", value);
+  return result;
+}
+function boundary(): never {
+  throw Object.assign(
+    new Error(
+      "Synchronous export of a host CryptoKey is unavailable in this WebView runtime",
+    ),
+    { code: "ERR_METHOD_NOT_IMPLEMENTED" },
+  );
+}
+export function create(
+  type: KeyState["type"],
+  value: Omit<KeyState, "type">,
+): KeyObject {
+  const Class =
+    type === "secret"
+      ? SecretKeyObject
+      : type === "public"
+        ? PublicKeyObject
+        : PrivateKeyObject;
+  const result = Object.create(Class.prototype) as KeyObject;
+  keyStates.set(result, { type, ...value });
+  return result;
+}
+export abstract class KeyObject {
+  constructor() {
+    throw new Error("Illegal constructor");
+  }
+  static from(key: CryptoKey): KeyObject {
+    if (!(key instanceof globalThis.CryptoKey))
+      throw new ERR_INVALID_ARG_TYPE("key", "CryptoKey", key);
+    return create(key.type, { native: key });
+  }
+  abstract get type(): KeyState["type"];
+  get [Symbol.toStringTag]() {
+    return "KeyObject";
+  }
+  export(options: any = {}): any {
+    validateObject(options, "options");
+    if (options.format === undefined) options.format = "buffer";
+    validateString(options.format, "options.format");
+    if (options.type !== undefined)
+      validateString(options.type, "options.type");
+    const current = state(this);
+    if (current.asymmetric) {
+      if (options.format === "jwk")
+        return exportJwk(current.asymmetric, current.type === "private");
+      validateOneOf(options.format, "options.format", ["pem", "der"]);
+      validateOneOf(
+        options.type,
+        "options.type",
+        current.type === "private"
+          ? ["pkcs1", "pkcs8", "sec1"]
+          : ["pkcs1", "spki"],
+      );
+      if (options.cipher !== undefined)
+        validateString(options.cipher, "options.cipher");
+      const passphrase =
+        options.passphrase === undefined
+          ? undefined
+          : bytes(options.passphrase, "options.passphrase");
+      const result = current.asymmetric.export(
+        current.type === "private",
+        options.format === "pem",
+        options.type,
+        options.cipher,
+        passphrase,
+      );
+      return options.format === "pem"
+        ? new TextDecoder().decode(result)
+        : Buffer.from(result);
+    }
+    const data = current.bytes;
+    if (!data) return boundary();
+    if (options.format === "buffer") return Buffer.from(data);
+    if (options.format === "jwk")
+      return {
+        kty: "oct",
+        ext: true,
+        k: Buffer.from(data)
+          .toString("base64")
+          .replace(/=/g, "")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_"),
+      };
+    throw new TypeError(
+      `Invalid format for secret key export: ${options.format}`,
+    );
+  }
+  equals(other: KeyObject): boolean {
+    if (other == null)
+      throw new TypeError("Cannot read properties of null or undefined");
+    const a = state(this),
+      b = keyStates.get(other);
+    if (this === other || (a.native && a.native === b?.native)) return true;
+    if (a.type !== other?.type) return false;
+    if (!b)
+      throw new ERR_INVALID_ARG_TYPE("otherKeyObject", "KeyObject", other);
+    if (a.asymmetric && b.asymmetric) return a.asymmetric.equals(b.asymmetric);
+    if (!a.bytes || !b.bytes) return boundary();
+    if (a.bytes.length !== b.bytes.length) return false;
+    let difference = 0;
+    for (let i = 0; i < a.bytes.length; i++)
+      difference |= a.bytes[i] ^ b.bytes[i];
+    return difference === 0;
+  }
+}
+export class SecretKeyObject extends KeyObject {
+  get type(): "secret" {
+    return "secret";
+  }
+  override export(options?: any) {
+    return super.export(options);
+  }
+  get symmetricKeySize() {
+    const key = state(this);
+    return (
+      key.bytes?.length ?? ((key.native?.algorithm as any)?.length ?? 0) | 0
+    );
+  }
+  [Symbol.for("nodejs.util.inspect.custom")]() {
+    return `SecretKeyObject { size: ${this.symmetricKeySize} }`;
+  }
+}
+abstract class AsymmetricKeyObject extends KeyObject {
+  get asymmetricKeyType() {
+    const key = state(this).asymmetric;
+    if (!key) return boundary();
+    return key.type;
+  }
+  get asymmetricKeyDetails() {
+    const key = state(this).asymmetric;
+    if (!key) return boundary();
+    if (key.type === "rsa")
+      return {
+        modulusLength: key.bits,
+        publicExponent: BigInt(
+          "0x" + Buffer.from(key.parameter("e")).toString("hex"),
+        ),
+      };
+    if (key.type === "ec") return { namedCurve: key.group };
+    return {};
+  }
+  toCryptoKey() {
+    throw Object.assign(
+      new Error("The toCryptoKey method is not implemented"),
+      { code: "ERR_METHOD_NOT_IMPLEMENTED" },
+    );
+  }
+}
+export class PublicKeyObject extends AsymmetricKeyObject {
+  get type(): "public" {
+    return "public";
+  }
+  override export(options?: any) {
+    return super.export(options);
+  }
+}
+export class PrivateKeyObject extends AsymmetricKeyObject {
+  get type(): "private" {
+    return "private";
+  }
+  override export(options?: any) {
+    return super.export(options);
+  }
+}
+export function createSecretKey(
+  value: unknown,
+  encoding?: BufferEncoding,
+): SecretKeyObject {
+  if (
+    typeof value !== "string" &&
+    !(value instanceof ArrayBuffer) &&
+    !ArrayBuffer.isView(value) &&
+    !(
+      typeof SharedArrayBuffer !== "undefined" &&
+      value instanceof SharedArrayBuffer
+    )
+  )
+    throw new ERR_INVALID_ARG_TYPE(
+      "key",
+      ["string", "ArrayBuffer", "TypedArray", "DataView"],
+      value,
+    );
+  const data =
+    typeof value === "string"
+      ? Buffer.from(value, encoding)
+      : typeof SharedArrayBuffer !== "undefined" &&
+          value instanceof SharedArrayBuffer
+        ? new Uint8Array(value)
+        : bytes(value, "key");
+  return create("secret", { bytes: new Uint8Array(data) }) as SecretKeyObject;
+}
+export function secretMaterial(value: unknown): any {
+  if (typeof value !== "object" || value === null || !keyStates.has(value))
+    return value;
+  const key = state(value);
+  if (key.type !== "secret") throw new TypeError("Expected a secret key");
+  if (!key.bytes) return boundary();
+  return Buffer.from(key.bytes);
+}
+export function generateKeySync(
+  type: string,
+  options: { length: number },
+): SecretKeyObject {
+  validateOneOf(type, "type", ["hmac", "aes"]);
+  validateObject(options, "options");
+  if (type === "hmac")
+    validateInteger(options.length, "options.length", 8, 65536);
+  else validateOneOf(options.length, "options.length", [128, 192, 256]);
+  const material = new Uint8Array(Math.floor(options.length / 8));
+  globalThis.crypto.getRandomValues(material);
+  return createSecretKey(material);
+}
+export function generateKey(
+  type: string,
+  options: { length: number },
+  callback: (error: unknown, key?: SecretKeyObject) => void,
+): void {
+  let key: SecretKeyObject | undefined, failure: unknown;
+  try {
+    key = generateKeySync(type, options);
+  } catch (error) {
+    failure = error;
+  }
+  queueMicrotask(() => callback(failure ?? null, key));
+}
+
+export { isKeyObject } from "./key-state.js";
+export function getKeyObjectHandle(key: KeyObject) {
+  return key;
+}

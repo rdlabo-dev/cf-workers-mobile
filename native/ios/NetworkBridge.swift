@@ -22,13 +22,23 @@ final class NetworkBridge {
             }
         }
     }
+    func socketVerifyTls(_ call: CAPPluginCall) {
+        guard let id = call.getString("id"), let encoded = call.getArray("certificates", String.self), encoded.count <= 32 else { reject(call, "Invalid certificate chain"); return }
+        let certificates = encoded.compactMap { $0.utf8.count <= 1048576 ? Data(base64Encoded: $0) : nil }
+        guard certificates.count == encoded.count else { reject(call, "Invalid certificate chain"); return }
+        sockets.verifyTls(id: id, certificates: certificates, completion: socketResult(call))
+    }
+    func socketStartTls(_ call: CAPPluginCall) {
+        guard let id = call.getString("id") else { reject(call, "Missing socket"); return }
+        sockets.startTls(id: id, servername: call.getString("servername"), completion: socketResult(call))
+    }
     func socketWatch(_ call: CAPPluginCall) {
         guard let id = call.getString("id") else { reject(call, "Missing socket"); return }
         sockets.watch(id: id, completion: socketResult(call))
     }
     func socketOpen(_ call: CAPPluginCall) {
         guard let id = call.getString("id"), let host = call.getString("host"), let port = call.getInt("port") else { reject(call, "Invalid socket open"); return }
-        sockets.open(id: id, host: host, port: port, tls: call.getBool("tls") ?? false, completion: socketResult(call))
+        sockets.open(id: id, host: host, port: port, tls: call.getBool("tls") ?? false, servername: call.getString("servername"), completion: socketResult(call))
     }
     func socketWrite(_ call: CAPPluginCall) {
         guard let id = call.getString("id"), let encoded = call.getString("chunk"), encoded.utf8.count <= 87384, let data = Data(base64Encoded: encoded) else { reject(call, "Invalid socket write"); return }

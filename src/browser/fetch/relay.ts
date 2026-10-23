@@ -9,6 +9,8 @@ import {
 const methods = new Set<NativeNetworkMethod>([
   "socketWatch",
   "socketOpen",
+  "socketStartTls",
+  "socketVerifyTls",
   "socketWrite",
   "socketEnd",
   "socketRead",

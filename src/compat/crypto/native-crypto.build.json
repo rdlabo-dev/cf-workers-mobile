@@ -1,0 +1,40 @@
+{
+  "revisions": {
+    "emsdk": "e4fe26ef59168ff44f4c23c466e497bf60b3411e",
+    "openssl": "45e844fa2a14ec92d146bd8f5778ac130b6625fb"
+  },
+  "configure": [
+    "linux-generic32",
+    "--cross-compile-prefix=",
+    "no-asm",
+    "no-shared",
+    "no-threads",
+    "no-tests",
+    "no-dso",
+    "no-module",
+    "no-apps",
+    "no-docs",
+    "no-sock",
+    "no-ui-console",
+    "no-autoload-config",
+    "no-engine",
+    "no-afalgeng",
+    "--with-rand-seed=getrandom",
+    "-O3"
+  ],
+  "flags": [
+    "-O3",
+    "-Wno-deprecated-declarations",
+    "-sSTANDALONE_WASM=1",
+    "-sALLOW_MEMORY_GROWTH=1",
+    "-sFILESYSTEM=0",
+    "-sASSERTIONS=0",
+    "-sMALLOC=emmalloc",
+    "-sABORTING_MALLOC=0",
+    "--no-entry",
+    "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\"]"
+  ],
+  "libraries": ["libssl.a", "libcrypto.a"],
+  "bindingSha256": "819bf16122da0df3c5ce7b6158b23700b8d42778fcb0e14f3a9e054d5f68831f",
+  "sha256": "b25197493fce8f3b40615654f877b3dec064d90e3cd1a34dc86695dd3bb68c50"
+}

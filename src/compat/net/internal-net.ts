@@ -1832,6 +1832,10 @@ function initializeConnection(
         allowHalfOpen: true,
         // A Node.js socket is always capable of being upgraded to the TLS socket.
         secureTransport: socket.encrypted ? "on" : "starttls",
+        expectedServerHostname: socket.encrypted
+          ? (socket as Socket & { servername?: string }).servername ||
+            socket._host
+          : undefined,
         // We are not going to pass the high water-mark here. The outer Node.js
         // stream will implement the appropriate backpressure for us.
       });

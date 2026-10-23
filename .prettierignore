@@ -28,3 +28,6 @@ demo/tests/native-embedding/android/app/src/main/assets/
 demo/tests/native-embedding/android/build/
 demo/tests/native-embedding/android/app/build/
 demo/tests/native-embedding/android/.gradle/
+
+# Generated pinned stream implementation.
+src/compat/stream-web/workers-ponyfill.js

@@ -27,21 +27,22 @@ and [verification scope](native-embedding.md#verification) for host-specific evi
 Whole-Node compatibility is incomplete. Importing a module successfully does not
 establish equivalent methods, validation, state, scheduling or engine behavior.
 
-| Area                                              | Behavior and limitations                                                                                                                                                                   |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| path, querystring, string_decoder, buffer, timers | Implement the pinned Workers profile. Workers stubs remain stubs; for example, matchesGlob reproduces the pinned rejection.                                                                |
-| HTTP and net                                      | In-memory server dispatch; no OS listening server. Outbound TCP/TLS requires the native transport.                                                                                         |
-| fs / fs/promises                                  | Read-only embedded virtual files. Writes, FileHandle, watch and full filesystem semantics are unsupported.                                                                                 |
-| module                                            | Limited builtin registry; createRequire loads VFS JSON only. Executable modules must be bundled; arbitrary dynamic resolution is unsupported.                                              |
-| process, events, console, util / util/types / sys | Incomplete exports or behavior. Engine introspection, call sites and host-object detection are not equivalent to Workers.                                                                  |
-| crypto and zlib                                   | Dependency implementations do not cover all Workers exports, algorithms, keys or codecs. Do not assume cryptographic or compression parity.                                                |
-| TLS and HTTP internals                            | node:tls is incomplete. \_http_common, \_http_outgoing, \_http_server, \_tls_wrap and \_stream_wrap fail the import audit. Native TLS transport does not imply Node TLS API compatibility. |
-| Streams                                           | A packaged fallback supplies byte streams when the host lacks them. Workers tee cancellation reasons and pipeTo abort timing are not fully reproduced.                                     |
-| async_hooks                                       | Build-transformed async functions retain scoped stores. Untransformed native async callbacks reject; arbitrary dynamic code and request-origin isolation are not fully supported.          |
-| diagnostics_channel                               | Synchronous channel/store contracts are implemented; async propagation depends on the async-hooks limitations.                                                                             |
-| worker_threads                                    | Workers stubs and local MessagePort behavior, not Node threads. Trusted-event branding, host-object serialization and global identity differ.                                              |
-| DNS                                               | DNS-over-HTTPS implementation; synthetic Service Binding/Hyperdrive address overrides are not implemented.                                                                                 |
-| Other modules                                     | Implementations and shared contracts exist, but whole-module acceptance remains outstanding. Namespace equality alone is insufficient.                                                     |
+| Area                                              | Behavior and limitations                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| path, querystring, string_decoder, buffer, timers | Implement the pinned Workers profile. Workers stubs remain stubs; for example, matchesGlob reproduces the pinned rejection.                                                                                                                                                                                                    |
+| HTTP and net                                      | In-memory server dispatch; no OS listening server. Outbound TCP/TLS requires the native transport.                                                                                                                                                                                                                             |
+| fs / fs/promises                                  | Read-only embedded files plus request-local in-memory `/tmp`, with writes, descriptors and FileHandle operations. Watch is unsupported, as in Workers. Full filesystem semantics remain under audit.                                                                                                                           |
+| module                                            | Limited builtin registry; createRequire loads VFS JSON only. Executable modules must be bundled; arbitrary dynamic resolution is unsupported.                                                                                                                                                                                  |
+| process, console, util / util/types / sys         | Incomplete exports or behavior. Engine introspection, call sites and host-object detection are not equivalent to Workers.                                                                                                                                                                                                      |
+| crypto and zlib                                   | Selected profiles cover random/hash/HKDF/scrypt, secret/asymmetric keys, signatures, primes and Brotli/Zstd streaming. X509Certificate parsing, fields and checks are implemented with the pinned Workers limits; additional algorithms and full crypto/codec parity remain gaps.                                              |
+| TLS and HTTP internals                            | TLS and HTTP internal imports resolve. Direct Node TLS exchange and hostname rejection are tested on native transports. Existing native sockets upgrade with authenticated TLS before application writes. TLS 1.2/1.3 upgrades are tested on both OSes; custom Duplex wrapping and complete class/state contracts remain gaps. |
+| Streams                                           | An owned implementation supplies byte streams and the tested Workers tee cancellation and pipeTo abort behavior on every host. Whole-module acceptance remains open.                                                                                                                                                           |
+| async_hooks                                       | Build-transformed async functions retain scoped stores. Untransformed native async callbacks reject; arbitrary dynamic code and request-origin isolation are not fully supported.                                                                                                                                              |
+| diagnostics_channel                               | Synchronous channel/store contracts are implemented; async propagation depends on the async-hooks limitations.                                                                                                                                                                                                                 |
+| worker_threads                                    | Workers stubs and local MessagePort behavior, not Node threads. Trusted-event branding, host-object serialization and global identity differ.                                                                                                                                                                                  |
+| DNS                                               | DNS-over-HTTPS implementation; synthetic Service Binding/Hyperdrive address overrides are not implemented.                                                                                                                                                                                                                     |
+| events                                            | [WebView events profile](../src/compat/events/README.md): EventEmitter, abort/iteration helpers, transformed AsyncResource propagation and process warning delivery. Native async and V8 inspection remain bounded.                                                                                                            |
+| Other modules                                     | Implementations and shared contracts exist, but whole-module acceptance remains outstanding. Namespace equality alone is insufficient.                                                                                                                                                                                         |
 
 The exact missing/extra export baseline is maintained in
 [surface-gaps.json](../demo/tests/experiments/node-compat/surface-gaps.json), against
@@ -49,6 +50,57 @@ The exact missing/extra export baseline is maintained in
 Those files are the source of truth; this guide does not duplicate the export list.
 Run `npm run build`, then `npm run test:node-inventory --prefix demo` to check it.
 Behavioral contracts live beside each implementation in `src/compat`.
+
+### Completion assessment
+
+The import audit checks export names and their JavaScript types against the pinned
+Workers profile. A passing audit means no new surface regression; it does not
+establish whole-module compatibility. In particular, a function replaced with an
+object is now a regression even if the export name is unchanged.
+
+After `npm run build`, run `npm run test:node-completion --prefix demo` to regenerate
+`demo/artifacts/node-inventory/completion.json`. The report covers every pinned
+module in both Chromium and WebKit, distinguishes surface gaps from aligned but
+uncertified modules, and records the next investigation with evidence references.
+Missing engines, modules, type-audit data or a mismatched profile fail generation.
+The optional report flag `--require-complete` rejects surface-only evidence; it
+must not be used to turn report generation into a compatibility certificate.
+
+Residual work has different causes:
+
+- **Implementation gaps:** `crypto`, `zlib` and remaining virtual filesystem semantics
+  still need operation-level implementation and verification. Their absence is
+  not evidence of technical impossibility.
+- **Behavior gaps:** Remaining stream lifecycle and synthetic DNS behavior require
+  specific adapters and contracts, beyond exporting the right names.
+- **Engine boundaries:** proxy/promise introspection, native async continuation
+  hooks and trusted MessagePort branding have observable differences. Build-time
+  transforms or native bridges require explicit scope and separate verification.
+- **Workers stubs:** preserve the pinned runtime's actual no-op/rejection behavior.
+  Do not implement desktop Node capabilities merely because Node exposes them.
+- **Verification gaps:** even an aligned export surface needs whole-module
+  operation/prototype coverage and native acceptance before it is called complete.
+
+Run `npm run test:node-boundaries --prefix demo` for the counterexamples and
+`npm run test:events --prefix demo` for the Workers events baseline and implementation. `node:events` is routed through the
+[WebView events profile](../src/compat/events/README.md); process warning delivery
+and microtask scheduling are shared with that adapter. Tests compare ordinary
+Vite/esbuild imports in-page and in Dedicated Workers. Engine inspection and
+untransformed native-async boundaries remain explicit; matching this profile does
+not certify all Workers/Node modules.
+
+The [additional compatibility profiles](../src/compat/expansion/README.md) cover
+console stubs, sys/util aliases, selected crypto operations, request-local `/tmp`,
+secret KeyObjects, Brotli/Zstd/CRC32, filesystem metadata, stream cancellation,
+module metadata and HTTP helpers. Run
+`npm run test:node-expansion --prefix demo` for live differential tests against
+the pinned Workers version. CI runs these checks alongside the existing events
+suite. For native verification, prepare an installed consumer with
+`npm run test:events:native:prepare --prefix demo`, then run
+`npm run test:node-expansion:native --prefix demo -- ios <simulator-uuid>` or
+`npm run test:node-expansion:native --prefix demo -- android <emulator-serial>`.
+Native reports include the candidate hash and installed tarball identity under
+`demo/artifacts/node-inventory/native-expansion/`.
 
 Workers non-functional modules do not gain device capabilities: VM isolates,
 process spawning, V8 heap access, UDP sockets and an OS terminal are not supplied.

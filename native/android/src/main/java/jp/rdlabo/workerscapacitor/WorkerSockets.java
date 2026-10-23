@@ -33,13 +33,15 @@ final class WorkerSockets {
         final Result opening;
         final ArrayDeque<byte[]> chunks = new ArrayDeque<>();
         SocketChannel channel;
-        Result reading, watching;
+        Result reading, watching, upgrading;
+        String host; int port;
         int count, offset;
         boolean ready, closed, eof, ended, writing, reset;
         Connection(String id, Result opening) { this.id=id; this.opening=opening; }
         void fail(String message) {
             if (closed) return;
             closed=true;
+            if(upgrading!=null) { Result pending=upgrading; upgrading=null; pending.reject(message); }
             if (!ready) { ready=true; opening.reject(message); }
             if (reading!=null) {
                 Result pending=reading; reading=null;
@@ -85,7 +87,8 @@ final class WorkerSockets {
             fail("Socket failed: "+error.getMessage());
         }
     }
-    synchronized void open(String id,String host,int port,boolean tls,Result result) {
+    synchronized void open(String id,String host,int port,boolean tls,Result result) { open(id,host,port,tls,null,result); }
+    synchronized void open(String id,String host,int port,boolean tls,String servername,Result result) {
         if(stopped || id==null || id.isEmpty() || connections.containsKey(id) || host==null || host.isEmpty() || port<1 || port>65535) { result.reject("Invalid socket open"); return; }
         try {
             final SSLEngine engine;
@@ -96,11 +99,11 @@ final class WorkerSockets {
                     SSLContext context=SSLContext.getInstance("TLS");
                     context.init(null,null,null); tlsContext=context;
                 }
-                engine=tlsContext.createSSLEngine(host,port); engine.setUseClientMode(true);
+                engine=tlsContext.createSSLEngine(servername==null || servername.isEmpty() ? host : servername,port); engine.setUseClientMode(true);
                 SSLParameters parameters=engine.getSSLParameters(); parameters.setEndpointIdentificationAlgorithm("HTTPS"); engine.setSSLParameters(parameters);
             } else engine=null;
             if(group==null) group=new NioEventLoopGroup(1);
-            Connection connection=new Connection(id,result); connections.put(id,connection);
+            Connection connection=new Connection(id,result); connection.host=host; connection.port=port; connections.put(id,connection);
             ChannelFuture future=new Bootstrap().group(group).channel(NioSocketChannel.class)
                 .option(ChannelOption.AUTO_READ,false).option(ChannelOption.ALLOW_HALF_CLOSURE,true)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS,30000)
@@ -129,6 +132,37 @@ final class WorkerSockets {
                 }); connection.channel.read(); }
             });
         } catch(Exception error) { Connection connection=connections.remove(id); if(connection!=null) connection.fail(error.toString()); else result.reject(error.toString()); }
+    }
+    void startTls(String id,String servername,Result result) {
+        perform(id,result,connection -> {
+            if(connection.ended || connection.eof || connection.writing || connection.upgrading!=null || connection.channel.pipeline().get(SslHandler.class)!=null) { result.reject("Socket cannot be upgraded"); return; }
+            try {
+                final SSLEngine engine;
+                synchronized(this) {
+                    if(tlsContext==null) { tlsContext=SSLContext.getInstance("TLS"); tlsContext.init(null,null,null); }
+                    engine=tlsContext.createSSLEngine(servername==null || servername.isEmpty()?connection.host:servername,connection.port);
+                }
+                engine.setUseClientMode(true);
+                SSLParameters parameters=engine.getSSLParameters(); parameters.setEndpointIdentificationAlgorithm("HTTPS"); engine.setSSLParameters(parameters);
+                connection.upgrading=result;
+                JSObject moved=new JSObject(); moved.put("upgraded",true);
+                if(connection.reading!=null) { Result pending=connection.reading; connection.reading=null; pending.resolve(moved); }
+                if(connection.watching!=null) { Result pending=connection.watching; connection.watching=null; pending.resolve(moved); }
+                ArrayDeque<byte[]> buffered=new ArrayDeque<>(connection.chunks); connection.chunks.clear();
+                int firstOffset=connection.offset; connection.offset=0;
+                SslHandler handler=new SslHandler(engine);
+                connection.channel.pipeline().addFirst(handler);
+                for(byte[] chunk:buffered) {
+                    connection.channel.pipeline().fireChannelRead(Unpooled.wrappedBuffer(chunk,firstOffset,chunk.length-firstOffset)); firstOffset=0;
+                }
+                handler.handshakeFuture().addListener(handshake -> {
+                    if(connection.closed) return;
+                    if(!handshake.isSuccess()) { connection.fail("TLS failed: "+handshake.cause()); return; }
+                    Result pending=connection.upgrading; connection.upgrading=null; pending.resolve(null); connection.pump();
+                });
+                connection.channel.read();
+            } catch(Exception error) { result.reject(error.toString()); connection.fail(error.toString()); }
+        });
     }
     private static String authority(java.net.InetSocketAddress address) {
         String host=address.getAddress().getHostAddress(); return (host.contains(":")?"["+host+"]":host)+":"+address.getPort();
@@ -163,7 +197,7 @@ final class WorkerSockets {
         try { chunk=Base64.decode(encoded,Base64.DEFAULT); } catch(Exception error) { result.reject("Invalid socket chunk"); return; }
         if(chunk.length>65536) { result.reject("Socket chunk exceeds limit"); return; }
         perform(id,result,connection -> {
-            if(connection.ended || connection.writing) { result.reject("Socket write unavailable"); return; }
+            if(connection.ended || connection.writing || connection.upgrading!=null) { result.reject("Socket write unavailable"); return; }
             connection.writing=true;
             connection.channel.writeAndFlush(Unpooled.wrappedBuffer(chunk)).addListener(future -> {
                 connection.writing=false;
@@ -174,11 +208,25 @@ final class WorkerSockets {
     void end(String id,Result result) {
         perform(id,result,true,connection -> {
             if(connection.reset) { result.resolve(null); return; }
-            if(connection.writing) { result.reject("Socket write still pending"); return; }
+            if(connection.writing || connection.upgrading!=null) { result.reject("Socket write still pending"); return; }
             if(connection.ended) { result.resolve(null); return; }
             connection.ended=true;
-            connection.channel.shutdownOutput().addListener(future -> {
-                if(future.isSuccess()) result.resolve(null); else { result.reject("Socket end failed"); connection.fail("Socket end failed"); }
+            Runnable shutdownOutput=() -> {
+                if(connection.eof && !connection.channel.isActive()) { result.resolve(null); return; }
+                connection.channel.shutdownOutput().addListener(future -> {
+                    if(future.isSuccess() || connection.eof) result.resolve(null);
+                    else { result.reject("Socket end failed"); connection.fail("Socket end failed"); }
+                });
+            };
+            SslHandler tls=connection.channel.pipeline().get(SslHandler.class);
+            if(tls==null) shutdownOutput.run();
+            else tls.closeOutbound().addListener(future -> {
+                // TLS close_notify half-closes the TLS write side. Do not send
+                // TCP FIN here: it can close a peer's raw transport before its
+                // encrypted response has flushed. The read side owns final close.
+                if(future.isSuccess()) result.resolve(null);
+                else if(connection.eof) result.resolve(null);
+                else { result.reject("TLS end failed"); connection.fail("TLS end failed"); }
             });
         });
     }

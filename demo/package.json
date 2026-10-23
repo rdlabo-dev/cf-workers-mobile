@@ -40,6 +40,7 @@
     "test:runtime:fallback:dev": "playwright test --config tests/playwright.stream-fallback-dev.config.ts",
     "test:service-bindings": "node --test tests/experiments/services/integration.test.mjs",
     "test:cloudflare-bindings": "node --test tests/experiments/cloudflare/integration.test.mjs",
+    "test:node-completion": "npm run test:node-inventory && node tests/experiments/node-compat/completion-report.mjs",
     "test:node-boundaries": "node --test tests/experiments/node-compat/*.probe.mjs",
     "test:opennext": "node --test tests/opennext/integration.test.mjs && vite build --config tests/opennext/local/vite.config.ts && node tests/opennext/local/esbuild.mjs && node --test tests/opennext/local.test.mjs",
     "test:opennext:split": "vite build --config tests/opennext/split/vite.config.ts && node tests/opennext/split/esbuild.mjs && node --test --test-concurrency=1 tests/opennext/split/*.test.mjs",
@@ -47,7 +48,12 @@
     "test:void:routes": "npm --prefix void run build && node --test tests/void/routes/acceptance.test.mjs",
     "test:upstream:opennext:prepare": "node tests/upstream/opennext/prepare.mjs",
     "test:upstream:opennext": "node --test tests/upstream/opennext/acceptance.test.mjs",
-    "test:upstream:opennext:native": "node --test tests/upstream/opennext/native.test.mjs"
+    "test:upstream:opennext:native": "node --test tests/upstream/opennext/native.test.mjs",
+    "test:events": "node --test tests/experiments/node-compat/events-baseline.probe.mjs tests/experiments/node-compat/events-surface.probe.mjs tests/experiments/node-compat/events-contracts.probe.mjs",
+    "test:events:native:prepare": "node tests/experiments/node-compat/prepare-events-consumer.mjs",
+    "test:events:native": "node tests/experiments/node-compat/events-native.mjs",
+    "test:node-expansion": "node --test tests/experiments/node-compat/expansion-contracts.probe.mjs",
+    "test:node-expansion:native": "node tests/experiments/node-compat/expansion-native.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",

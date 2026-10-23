@@ -73,6 +73,25 @@ export default { async fetch() {
       ),
       expected.modules,
     );
+    const expectedTypes = JSON.parse(
+      await readFile(new URL("export-types.json", import.meta.url), "utf8"),
+    );
+    assert.deepEqual(expectedTypes.profile, profile);
+    assert.equal(expectedTypes.sourceRevision, expected.sourceRevision);
+    assert.deepEqual(
+      Object.fromEntries(
+        Object.entries(result.modules).map(([name, value]) => [
+          name,
+          Object.fromEntries(
+            Object.entries(value.exports ?? {}).map(([key, descriptor]) => [
+              key,
+              descriptor.type,
+            ]),
+          ),
+        ]),
+      ),
+      expectedTypes.modules,
+    );
     await mkdir(artifacts, { recursive: true });
     await writeFile(
       new URL("workerd.json", artifacts),

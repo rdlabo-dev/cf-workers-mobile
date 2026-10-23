@@ -3,6 +3,7 @@ import type { NativeCall } from "./native-network.js";
 type Host = {
   cookiesGet(callback: string, url: string): void;
   cookiesSet(callback: string, url: string, cookies: string): void;
+  socketStartTls(callback: string, id: string, servername: string): void;
   socketWatch(callback: string, id: string): void;
   socketOpen(
     callback: string,
@@ -10,6 +11,7 @@ type Host = {
     host: string,
     port: number,
     tls: boolean,
+    servername: string,
   ): void;
   socketWrite(callback: string, id: string, chunk: string): void;
   socketEnd(callback: string, id: string): void;
@@ -66,6 +68,9 @@ export function getHostCall(): NativeCall | undefined {
           case "cookiesSet":
             host.cookiesSet(id, String(args.url), JSON.stringify(args.cookies));
             break;
+          case "socketStartTls":
+            host.socketStartTls(id, handle, String(args.servername ?? ""));
+            break;
           case "socketWatch":
             host.socketWatch(id, handle);
             break;
@@ -76,6 +81,9 @@ export function getHostCall(): NativeCall | undefined {
               String(args.host),
               Number(args.port),
               args.tls === true,
+              typeof args.servername === "string"
+                ? args.servername
+                : String(args.host),
             );
             break;
           case "socketWrite":

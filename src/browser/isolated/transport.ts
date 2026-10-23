@@ -1,3 +1,4 @@
+import { runWithRequestScope } from "../../shared/request-scope.js";
 import { setWorkerEnv } from "../../cloudflare/apis/cloudflare-workers/index.js";
 import { isResponse } from "../fetch/interop.js";
 import { Request as WorkerRequest } from "../request/index.js";
@@ -115,21 +116,23 @@ export function serve(worker: WorkerHandler<unknown>) {
         body,
         signal: controller.signal,
       });
-      const response = await worker.fetch(request as unknown as Request, env, {
-        props: {},
-        passThroughOnException() {
-          throw new Error(
-            "passThroughOnException is unsupported for local execution.",
-          );
-        },
-        waitUntil(promise) {
-          pending.push(
-            promise.catch((cause) => {
-              errors.push(String(cause));
-            }),
-          );
-        },
-      });
+      const response = await runWithRequestScope(() =>
+        worker.fetch(request as unknown as Request, env, {
+          props: {},
+          passThroughOnException() {
+            throw new Error(
+              "passThroughOnException is unsupported for local execution.",
+            );
+          },
+          waitUntil(promise) {
+            pending.push(
+              promise.catch((cause) => {
+                errors.push(String(cause));
+              }),
+            );
+          },
+        }),
+      );
       if (!isResponse(response) || response.status === 0)
         throw new TypeError("worker.fetch must return a non-error Response.");
       if (response.bodyUsed || response.body?.locked)

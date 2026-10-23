@@ -1,5 +1,6 @@
 import stdlib from "node-stdlib-browser";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 export const configuredPath = fileURLToPath(
   new URL("../configured.js", import.meta.url),
@@ -19,6 +20,9 @@ export const globalsInstallPath = fileURLToPath(
 export const nodeGlobalsInstallPath = fileURLToPath(
   new URL("../shared/globals/node-install.js", import.meta.url),
 );
+export const processStatePath = fileURLToPath(
+  new URL("../compat/process/state.js", import.meta.url),
+);
 export const nodeCompatPath = (name: string) =>
   fileURLToPath(new URL(`../compat/${name}/index.js`, import.meta.url));
 const workersModulePath = (name: string) =>
@@ -33,6 +37,16 @@ const polyfill = (specifier: string) =>
 // One entry per builtin; subpaths precede parent aliases when expanded.
 // The optional third path is the CommonJS constructor entry.
 const builtins: readonly (readonly [string, string, string?])[] = [
+  ["_http_common", "http-common/index.js"],
+  ["_http_outgoing", "http-outgoing/index.js"],
+  ["_http_server", "http-server/index.js"],
+  ["zlib", "zlib/index.js"],
+  ["crypto", "crypto/index.js", "crypto/index.cjs"],
+  ["console", "console/index.js"],
+  ["sys", "util/index.js"],
+  ["util/types", "util/types/index.js"],
+  ["events", "events/index.js", "events/index.cjs"],
+  ["process", "process/index.js", "process/index.cjs"],
   ["punycode", "punycode/index.js"],
   ["child_process", "child-process/index.js"],
   ["cluster", "cluster/index.js"],
@@ -64,6 +78,9 @@ const builtins: readonly (readonly [string, string, string?])[] = [
   ["tty", "tty/index.js"],
   ["url", "url/index.js"],
   ["diagnostics_channel", "diagnostics-channel/index.js"],
+  ["tls", "tls/index.js"],
+  ["_tls_wrap", "tls-wrap/index.js"],
+  ["_stream_wrap", "stream-wrap/index.js"],
   ["_tls_common", "tls-common/index.js"],
   ["async_hooks", "async-hooks/index.js"],
   ["timers/promises", "timers/promises.js", "timers/promises.cjs"],
@@ -117,7 +134,14 @@ function builtinAliases(commonJS = false): Record<string, string> {
 
 export function compatibilityAliases(): Record<string, string> {
   return {
-    "process/": stdlib.process,
+    "process/": nodeCompatPath("process"),
+    // Preserve brorand's browser crypto:false branch across Vite aliases.
+    brorand: fileURLToPath(
+      new URL("../compat/crypto/brorand.cjs", import.meta.url),
+    ),
+    "cf-workers-native:process-base": createRequire(import.meta.url).resolve(
+      stdlib.process,
+    ),
     "cloudflare:node": workersModulePath("cloudflare-node"),
     "cloudflare:workers": workersModulePath("cloudflare-workers"),
     "punycode/": polyfill("punycode/punycode.js"),
@@ -135,6 +159,7 @@ export function commonJSCompatibilityAliases(): Record<string, string> {
 
 export function compatibilityDependencies(): string[] {
   return [
+    processStatePath,
     "cloudflare:node",
     "cloudflare:workers",
     ...Object.keys(builtinAliases()),

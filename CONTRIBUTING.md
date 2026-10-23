@@ -69,6 +69,20 @@ not ship it behind an experimental flag as a substitute for finishing it. Design
 notes and reproducible experiments can be reviewed independently without adding
 unfinished production behavior.
 
+### Explicit WebView events profile
+
+The approved events work targets the current WebView architecture with documented
+engine boundaries, rather than replacing the engine to seek unrestricted Workers
+equivalence. The events adapter and its process event/warning/nextTick integration
+may be accepted against the [WebView events profile](src/compat/events/README.md).
+This is a scoped exception to unrestricted whole-module equivalence above, not a
+blanket exception for new incomplete Node modules. Keep the existing process and
+async-hooks limitations visible. Require the shared behavioral contracts, public
+Vite/esbuild imports, an independently installed tarball, and iOS/Android page and
+Dedicated Worker evidence for this profile. Do not label the complete Node
+compatibility inventory or unrestricted Workers behavior **Complete** as a result.
+Publishing and release authorization remain separate.
+
 ### 0.1.0 Preview exception
 
 0.1.0 Preview may include existing compatibility implementations with the limitations documented in the [compatibility inventory](docs/compatibility.md). Their inclusion does not establish complete module compatibility or certify untested behavior. Keep missing exports, unsupported operations and verification boundaries visible; a passing application scenario does not make its dependencies complete.

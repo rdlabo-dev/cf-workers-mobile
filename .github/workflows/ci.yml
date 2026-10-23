@@ -102,6 +102,8 @@ jobs:
           - suite: workers
             commands: |
               npm run test:node-inventory
+              npm run test:events
+              npm run test:node-expansion
               npm run test:workers -- --allowOnly=false
               npm run test:browser
           - suite: runtime
@@ -219,7 +221,7 @@ jobs:
         working-directory: demo
       - run: npm run typecheck
         working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
+      - run: bash ../.github/scripts/install-playwright.sh chromium webkit
         working-directory: demo
       - name: Run ${{ matrix.suite }} contracts
         run: ${{ matrix.commands }}
@@ -307,7 +309,7 @@ jobs:
         working-directory: demo
       - run: npm run typecheck
         working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
+      - run: bash ../.github/scripts/install-playwright.sh chromium webkit
         working-directory: demo
       - run: npm run test:d1-migration
         working-directory: demo
@@ -342,7 +344,7 @@ jobs:
         working-directory: demo
       - run: npm run typecheck
         working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
+      - run: bash ../.github/scripts/install-playwright.sh chromium webkit
         working-directory: demo
       - run: npm run test:runtime:fallback
         working-directory: demo
@@ -365,7 +367,7 @@ jobs:
           cache-dependency-path: package.json
       - run: npm install
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: bash .github/scripts/install-playwright.sh chromium
       - run: npm run test:package
       - name: Verify packed native plugin discovery
         run: node demo/tests/scripts/prepare-native-package.mjs
@@ -396,7 +398,7 @@ jobs:
       - name: Check the original Worker in workerd
         run: npm run test:upstream:workerd -- --reporter=default --reporter=json --outputFile=artifacts/upstream/workerd-results.json
         working-directory: demo
-      - run: npx playwright install --with-deps chromium webkit
+      - run: bash ../.github/scripts/install-playwright.sh chromium webkit
         working-directory: demo
       - name: Build and test the browser adapter against the same expectations
         run: npm run test:upstream:browser

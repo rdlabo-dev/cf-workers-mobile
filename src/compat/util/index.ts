@@ -1,3 +1,4 @@
+import { isKeyObject } from "../crypto/key-state.js";
 import { debuglog } from "./debuglog.js";
 import {
   inspect,
@@ -23,7 +24,49 @@ export * from "./core.js";
 // @ts-expect-error the polyfill ships CJS without declarations
 import util from "util/util.js";
 import { Buffer } from "node:buffer";
-export const types = util.types;
+export const types = Object.assign(util.types, {
+  isKeyObject,
+  isDate(value: unknown) {
+    try {
+      Date.prototype.getTime.call(value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  isRegExp(value: unknown) {
+    try {
+      Object.getOwnPropertyDescriptor(RegExp.prototype, "source")!.get!.call(
+        value,
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  isNativeError(value: unknown) {
+    return typeof (Error as any).isError === "function"
+      ? (Error as any).isError(value)
+      : value instanceof Error;
+  },
+  isCryptoKey(value: unknown) {
+    try {
+      const ctor = globalThis.CryptoKey;
+      if (!ctor) return false;
+      Object.getOwnPropertyDescriptor(ctor.prototype, "type")!.get!.call(value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  isFloat16Array(value: unknown) {
+    const getTag = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(Uint8Array.prototype),
+      Symbol.toStringTag,
+    )!.get!;
+    return getTag.call(value) === "Float16Array";
+  },
+});
 export const isArray = Array.isArray;
 export const isBoolean = (val: unknown): boolean => typeof val === "boolean";
 export const isBuffer = (val: unknown): boolean => Buffer.isBuffer(val);

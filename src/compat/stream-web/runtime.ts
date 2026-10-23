@@ -1,9 +1,9 @@
 import { contextConstructor } from "./context.js";
 import * as ponyfill from "./ponyfill.js";
 import { nativeStreams } from "../../shared/globals/platform.js";
-// iOS 26.1 has default streams but no readable byte streams or BYOB readers.
-export const usesPonyfill =
-  typeof nativeStreams.ReadableByteStreamController !== "function";
+// Use owned Streams on every host: native Streams differ from Workers
+// in tee cancellation and pending pipeTo abort behavior.
+export const usesPonyfill = true;
 export const ReadableStream: typeof globalThis.ReadableStream =
   contextConstructor(
     (usesPonyfill

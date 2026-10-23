@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Security
 import Capacitor
 
 /// TCP byte transport. All state and completions belong to one serial queue.
@@ -7,6 +8,8 @@ final class SocketBridge: @unchecked Sendable {
     private final class Connection: @unchecked Sendable {
         let id: String
         let transport: NWConnection
+        var encrypted = false
+        var host = ""
         var opening: ((Result<PluginCallResultData, Error>) -> Void)?
         var reading: ((Result<PluginCallResultData, Error>) -> Void)?
         var writing: ((Result<PluginCallResultData, Error>) -> Void)?
@@ -51,12 +54,19 @@ final class SocketBridge: @unchecked Sendable {
         let waiters = value.closeWaiters; value.closeWaiters.removeAll()
         for waiter in waiters { waiter() }
     }
-    func open(id: String, host: String, port: Int, tls: Bool, completion: @escaping Completion) {
+    func open(id: String, host: String, port: Int, tls: Bool, servername: String? = nil, completion: @escaping Completion) {
         queue.async {
             guard !self.stopped, !id.isEmpty, !host.isEmpty, port > 0, port <= 65535,
                   self.values[id] == nil, let endpointPort = NWEndpoint.Port(rawValue: UInt16(port)) else { completion(.failure(Failure.invalid)); return }
-            let transport = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: tls ? .tls : .tcp)
+            let parameters: NWParameters
+            if tls {
+                let options = NWProtocolTLS.Options()
+                sec_protocol_options_set_tls_server_name(options.securityProtocolOptions, servername ?? host)
+                parameters = NWParameters(tls: options, tcp: NWProtocolTCP.Options())
+            } else { parameters = .tcp }
+            let transport = NWConnection(host: NWEndpoint.Host(host), port: endpointPort, using: parameters)
             let value = Connection(id, transport)
+            value.host = host; value.encrypted = tls
             value.opening = completion
             self.values[id] = value
             transport.stateUpdateHandler = { [weak self, weak value] state in
@@ -87,6 +97,31 @@ final class SocketBridge: @unchecked Sendable {
                 }
             }
             transport.start(queue: self.queue)
+        }
+    }
+    func startTls(id: String, servername: String?, completion: @escaping Completion) {
+        queue.async {
+            guard let value = self.values[id], value.ready, !value.closed, !value.eof, !value.ended, !value.encrypted, value.writing == nil,
+                  let hostname = servername, !hostname.isEmpty, !hostname.utf8.contains(0) else { completion(.failure(Failure.invalid)); return }
+            value.encrypted = true; value.host = hostname
+            value.reading?(.success(["upgraded": true])); value.reading = nil
+            value.watching?(.success(["upgraded": true])); value.watching = nil
+            // JS encrypts records with OpenSSL memory BIOs on this same TCP stream.
+            // The successful JS open is withheld until verifyTls authenticates it.
+            completion(.success(["tlsEngine": "openssl-wasm"]))
+        }
+    }
+    func verifyTls(id: String, certificates: [Data], completion: @escaping Completion) {
+        queue.async {
+            guard let value = self.values[id], !value.closed, value.encrypted, !certificates.isEmpty else { completion(.failure(Failure.invalid)); return }
+            let chain = certificates.compactMap { SecCertificateCreateWithData(nil, $0 as CFData) }
+            guard chain.count == certificates.count else { completion(.failure(Failure.invalid)); return }
+            var trust: SecTrust?
+            let policy = SecPolicyCreateSSL(true, value.host as CFString)
+            guard SecTrustCreateWithCertificates(chain as CFArray, policy, &trust) == errSecSuccess, let trust else { completion(.failure(Failure.invalid)); return }
+            var error: CFError?
+            guard SecTrustEvaluateWithError(trust, &error) else { completion(.failure(error as Error? ?? Failure.invalid)); return }
+            completion(.success([:]))
         }
     }
     func watch(id: String, completion: @escaping Completion) {
