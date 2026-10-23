@@ -1,6 +1,10 @@
+import {
+  viewBytes,
+  isAnyBuffer,
+  bufferBytes,
+} from "../../shared/buffer-source.js";
 import { Buffer } from "node:buffer";
 import { validateUint32 } from "../net/validators.js";
-import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
 import * as compression from "./compression.js";
 export * from "./compression.js";
 import * as classic from "./classic.js";
@@ -359,13 +363,10 @@ export const constants = Object.freeze({ ...pinnedConstants });
 
 function data(input: unknown): Uint8Array {
   if (typeof input === "string") return Buffer.from(input);
-  if (ArrayBuffer.isView(input))
-    return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-  if (input instanceof ArrayBuffer) return new Uint8Array(input);
-  throw new ERR_INVALID_ARG_TYPE(
-    "buffer",
-    ["string", "Buffer", "TypedArray", "DataView", "ArrayBuffer"],
-    input,
+  if (ArrayBuffer.isView(input)) return viewBytes(input);
+  if (isAnyBuffer(input)) return bufferBytes(input);
+  throw new TypeError(
+    "Failed to execute 'crc32' on 'ZlibUtil': parameter 1 is not of type 'string or ArrayBuffer or ArrayBufferView'.",
   );
 }
 export function crc32(input: unknown, value = 0): number {

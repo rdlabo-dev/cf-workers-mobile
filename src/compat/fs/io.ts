@@ -1,3 +1,4 @@
+import { viewBytes } from "../../shared/buffer-source.js";
 import { Buffer } from "node:buffer";
 import { pathOf, descriptorFlags, readDescriptor } from "./writable.js";
 import { fileMode } from "./mode.js";
@@ -249,7 +250,7 @@ export function installIo(api: any, promises: any) {
           );
         return [
           path,
-          Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+          Buffer.from(viewBytes(data)),
           Boolean(value & 1024),
           Boolean(value & 128),
         ];

@@ -1,3 +1,5 @@
+import { viewBytes } from "../../shared/buffer-source.js";
+import { bindingBuffers } from "./input.js";
 import * as codecs from "./codec-binding.js";
 import { Buffer } from "node:buffer";
 import { library, message } from "./native-zlib.js";
@@ -31,13 +33,7 @@ export class ZlibStream {
   ) {
     this.state = state;
     this.callback = callback;
-    const bytes =
-      dictionary &&
-      Buffer.from(
-        dictionary.buffer,
-        dictionary.byteOffset,
-        dictionary.byteLength,
-      );
+    const bytes = dictionary && Buffer.from(viewBytes(dictionary));
     const pointer = bytes ? this.api.malloc(bytes.length || 1) : 0;
     try {
       if (bytes) {
@@ -73,9 +69,17 @@ export class ZlibStream {
     outputLength: number,
   ) {
     const api = this.api;
-    const buffer = ArrayBuffer.isView(input)
-      ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
-      : new Uint8Array(input);
+    const bounds = bindingBuffers(
+      "ZlibContext",
+      input,
+      inputOffset,
+      inputLength,
+      output,
+      outputOffset,
+      outputLength,
+    );
+    const buffer = bounds.source;
+    ({ inputOffset, inputLength, outputOffset, outputLength } = bounds);
     const pointer = api.malloc(Math.max(1, inputLength) + outputLength + 8);
     if (!pointer) throw new RangeError("Memory limit exceeded");
     const out = pointer + Math.max(1, inputLength),
@@ -97,7 +101,7 @@ export class ZlibStream {
       const view = new DataView(api.memory.buffer);
       this.state[0] = view.getUint32(state, true);
       this.state[1] = view.getUint32(state + 4, true);
-      output.set(
+      bounds.target.set(
         new Uint8Array(api.memory.buffer, out, outputLength - this.state[0]),
         outputOffset,
       );

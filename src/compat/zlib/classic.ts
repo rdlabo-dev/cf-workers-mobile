@@ -1,3 +1,9 @@
+import { nativeNumber } from "./input.js";
+import {
+  viewBytes,
+  isAnyBuffer,
+  bufferBytes,
+} from "../../shared/buffer-source.js";
 import { Buffer } from "node:buffer";
 import { Zlib } from "./classic-base.cjs";
 import { ZlibStream } from "./classic-binding.js";
@@ -55,18 +61,17 @@ export const createDeflateRaw = (options?: any) => new DeflateRaw(options);
 export const createInflateRaw = (options?: any) => new InflateRaw(options);
 export const createUnzip = (options?: any) => new Unzip(options);
 const maxChunk = 134217728;
-function bytes(input: any, parameter = 1): Buffer {
+function bytes(input: any, parameter = 1, method = "zlibSync"): Buffer {
   if (typeof input === "string") return Buffer.from(input);
-  if (ArrayBuffer.isView(input))
-    return Buffer.from(input.buffer, input.byteOffset, input.byteLength);
-  if (input instanceof ArrayBuffer) return Buffer.from(input);
+  if (ArrayBuffer.isView(input)) return Buffer.from(viewBytes(input));
+  if (isAnyBuffer(input)) return Buffer.from(bufferBytes(input));
   throw new TypeError(
-    `Failed to execute 'zlibSync' on 'ZlibUtil': parameter ${parameter} is not of type 'string or ArrayBuffer or ArrayBufferView'.`,
+    `Failed to execute '${method}' on 'ZlibUtil': parameter ${parameter} is not of type 'string or ArrayBuffer or ArrayBufferView'.`,
   );
 }
 function integer(value: any, fallback: number, unsigned = true) {
   if (value === undefined) return fallback;
-  const number = Number(value);
+  const number = nativeNumber(value);
   if (
     !Number.isFinite(number) ||
     number < (unsigned ? 0 : -2147483648) ||
@@ -84,11 +89,11 @@ function bounded(value: number, name: string, min: number, max: number) {
     );
   return value;
 }
-function prepare(input: any, options: any) {
-  const data = bytes(input);
+function prepare(input: any, options: any, method = "zlibSync") {
+  const data = bytes(input, 1, method);
   if (typeof options !== "object" || options === null)
     throw new TypeError(
-      "Failed to execute 'zlibSync' on 'ZlibUtil': parameter 2 is not of type 'Options'.",
+      `Failed to execute '${method}' on 'ZlibUtil': parameter 2 is not of type 'Options'.`,
     );
   // Conversion precedes native validation, including otherwise unused flush.
   const opts = {
@@ -208,7 +213,7 @@ function callbackOperation(
     queueMicrotask(() => (error ? callback(error) : callback(null, result)));
     return;
   }
-  const { data, opts } = prepare(input, options);
+  const { data, opts } = prepare(input, options, "zlib");
   let result: Buffer | undefined, error: unknown;
   try {
     result = fast(mode, data, opts);

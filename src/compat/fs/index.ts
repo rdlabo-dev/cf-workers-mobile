@@ -141,8 +141,8 @@ for (const name of [
     return temporary.promises[name](...args);
   };
 }
-promises.watch = async function* () {
-  api.watch();
+promises.watch = function () {
+  throw new Error("Not implemented");
 };
 // Workers validates ownership/permission requests but has no mutable Unix
 // ownership or permissions. These operations must not change the memory VFS.

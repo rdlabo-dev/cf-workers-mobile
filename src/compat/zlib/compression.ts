@@ -1,3 +1,9 @@
+import { nativeNumber } from "./input.js";
+import {
+  viewBytes,
+  isAnyBuffer,
+  bufferBytes,
+} from "../../shared/buffer-source.js";
 import { Buffer } from "node:buffer";
 import { NativeCodec, type Kind } from "./native-codecs.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
@@ -37,18 +43,17 @@ export const createZstdCompress = (options?: any) => new ZstdCompress(options);
 export const createZstdDecompress = (options?: any) =>
   new ZstdDecompress(options);
 
-function bytes(value: unknown): Uint8Array {
+function bytes(value: unknown, method: string): Uint8Array {
   if (typeof value === "string") return Buffer.from(value);
-  if (ArrayBuffer.isView(value))
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) return viewBytes(value);
+  if (isAnyBuffer(value)) return bufferBytes(value);
   throw new TypeError(
-    "Input must be a string or ArrayBuffer or ArrayBufferView",
+    `Failed to execute '${method}' on 'ZlibUtil': parameter 1 is not of type 'string or ArrayBuffer or ArrayBufferView'.`,
   );
 }
 function integer(value: unknown, fallback: number, unsigned = true) {
   if (value === undefined) return fallback;
-  const number = Number(value);
+  const number = nativeNumber(value);
   if (
     !Number.isFinite(number) ||
     number < (unsigned ? 0 : -2147483648) ||
@@ -61,7 +66,7 @@ function integer(value: unknown, fallback: number, unsigned = true) {
 }
 function pledged(value: any) {
   if (value === undefined) return undefined;
-  const number = Number(value);
+  const number = nativeNumber(value);
   if (!Number.isFinite(number) || number < 0 || number >= 18446744073709551616)
     throw new TypeError(
       "The value cannot be converted because it is not an integer.",
@@ -81,7 +86,7 @@ function convert(options: any) {
   const params = Object.fromEntries(
     Object.entries(options.params ?? {}).map(([key, value]) => [
       key,
-      Number(value) | 0,
+      nativeNumber(value) | 0,
     ]),
   );
   return {
@@ -165,7 +170,12 @@ function sync(kind: Kind, encode: boolean, input: unknown, options: any = {}) {
       engine: instance,
     };
   }
-  return fast(kind, encode, bytes(input), convert(options));
+  return fast(
+    kind,
+    encode,
+    bytes(input, `${kind}${encode ? "Compress" : "Decompress"}Sync`),
+    convert(options),
+  );
 }
 function asyncOperation(
   kind: Kind,
@@ -193,7 +203,7 @@ function asyncOperation(
       engine: instance,
     });
   } else {
-    const data = bytes(input),
+    const data = bytes(input, `${kind}${encode ? "Compress" : "Decompress"}`),
       config = convert(options);
     run = () => fast(kind, encode, data, config);
   }

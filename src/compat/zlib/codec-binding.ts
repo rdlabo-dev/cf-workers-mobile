@@ -1,3 +1,4 @@
+import { bindingBuffers } from "./input.js";
 import { library, string } from "./native-codecs.js";
 class CodecBinding {
   private api = library();
@@ -82,6 +83,16 @@ class CodecBinding {
     outputOffset: number,
     outputLength: number,
   ) {
+    const bounds = bindingBuffers(
+      `${this.kind === "brotli" ? "Brotli" : "Zstd"}${this.encode ? "Encoder" : "Decoder"}Context`,
+      input,
+      inputOffset,
+      inputLength,
+      output,
+      outputOffset,
+      outputLength,
+    );
+    ({ inputOffset, inputLength, outputOffset, outputLength } = bounds);
     if (
       this.finished &&
       !this.encode &&
@@ -92,9 +103,7 @@ class CodecBinding {
       return;
     }
     const api = this.api,
-      buffer = ArrayBuffer.isView(input)
-        ? new Uint8Array(input.buffer, input.byteOffset, input.byteLength)
-        : new Uint8Array(input);
+      buffer = bounds.source;
     const pointer = api.malloc(Math.max(1, inputLength) + outputLength + 8);
     if (!pointer) throw new RangeError("Memory limit exceeded");
     const out = pointer + Math.max(1, inputLength),
@@ -120,7 +129,7 @@ class CodecBinding {
         produced = view.getUint32(state + 4, true);
       this.state[0] = outputLength - produced;
       this.state[1] = inputLength - consumed;
-      output.set(
+      bounds.target.set(
         new Uint8Array(api.memory.buffer, out, produced),
         outputOffset,
       );

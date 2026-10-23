@@ -28,6 +28,7 @@ export async function measureOperation(name, operation, warmOperation) {
     measurements[name] = {
       hostCapabilities: {
         float16Array: typeof globalThis.Float16Array === "function",
+        sharedArrayBuffer: typeof globalThis.SharedArrayBuffer === "function",
       },
       operationMs: performance.now() - started,
       wasm,

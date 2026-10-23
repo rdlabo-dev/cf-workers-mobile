@@ -49,11 +49,23 @@ retained volume reference; finalization also releases an abandoned descriptor.
 `readableWebStream()` captures `read` when created. The upstream and additional
 receiver/lifetime tests run with `npx vitest run src/compat/fs/file-handle.spec.ts
 src/compat/fs/directory.spec.ts`.
+`fs.promises.watch()` throws Workers' `Not implemented` error at invocation,
+before returning a Promise or iterator. File writes consume the intrinsic view
+extent; the positional read/write frontends retain their observable property
+access, as in Workers.
 
 zlib 1.3.1, Brotli 1.1.0 and Zstd 1.5.7 use bundled, synchronously initialized WebAssembly.
 The profile covers parameters, synchronous/callback operations, incremental
 streams, flush/reset, byte accounting and output limits for synchronous
 processing. Streaming output is not cumulatively capped by maxOutputLength.
+Fast compression helpers, their callbacks and CRC32 consume intrinsic byte
+ranges, including detached views as empty input. Stream frontends retain the
+Workers property-access behavior. Owned bindings validate input and output
+slices against their intrinsic extents before entering Wasm, including uint32
+overflow and `info: true` calls with shadowed byte lengths. Numeric conversion
+rejects BigInt, including objects coercing to BigInt. Shared-memory and
+cross-realm helper checks run in Node; ordinary browser/native contracts do not
+claim SharedArrayBuffer availability.
 The pinned source revisions and artifact hashes accompany the codecs; rebuild
 with scripts/build-native-codecs.mjs or scripts/build-native-zlib.mjs and the pinned Emscripten SDK. Gzip/deflate and Brotli/Zstd streams use the pinned Workers stream lifecycle. The comparative cases include constructor validation, callback timing, reset, close, byte accounting, dictionaries and output limits; whole-module acceptance remains a separate gate.
 Scrypt uses a synchronous JavaScript backend, including for callback completion,

@@ -1,4 +1,447 @@
 export const eventCases = {
+  codecNativeBounds: function ({ zlib: z }) {
+    const result = {};
+    for (const factory of [
+      "createDeflate",
+      "createBrotliCompress",
+      "createZstdCompress",
+    ]) {
+      for (const [
+        name,
+        inputOffset,
+        inputLength,
+        outputOffset,
+        outputLength,
+      ] of [
+        ["inputExtent", 0, 2, 0, 1],
+        ["inputOverflow", 4294967295, 1, 0, 1],
+        ["inputOffset", 2, 0, 0, 1],
+        ["outputExtent", 0, 1, 0, 2],
+        ["outputOverflow", 0, 1, 4294967295, 1],
+        ["outputOffset", 0, 1, 2, 0],
+        ["negative", 0, -1, 0, 1],
+        ["bigintInputOffset", 0n, 1, 0, 1],
+        ["bigintInputLength", 0, 1n, 0, 1],
+        ["bigintOutputOffset", 0, 1, 0n, 1],
+        ["bigintOutputLength", 0, 1, 0, 1n],
+        [
+          "objectBigInt",
+          {
+            valueOf() {
+              return 0n;
+            },
+          },
+          1,
+          0,
+          1,
+        ],
+        [
+          "exoticBigInt",
+          {
+            [Symbol.toPrimitive]() {
+              return 0n;
+            },
+          },
+          1,
+          0,
+          1,
+        ],
+
+        ["huge", 0, 4294967296, 0, 1],
+        ["nan", 0, NaN, 0, 1],
+      ]) {
+        const engine = z[factory]();
+        engine.on("error", () => {});
+        const input = new Uint8Array([65]),
+          output = new Uint8Array(1);
+        Object.defineProperty(input, "byteLength", { value: 32 });
+        Object.defineProperty(output, "byteLength", { value: 32 });
+        try {
+          engine._handle.writeSync(
+            4,
+            input,
+            inputOffset,
+            inputLength,
+            output,
+            outputOffset,
+            outputLength,
+          );
+          result[factory + "/" + name] = "accepted";
+        } catch (e) {
+          result[factory + "/" + name] = {
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+          };
+        } finally {
+          engine.destroy();
+        }
+      }
+    }
+    return result;
+  },
+
+  codecInputForms: async function ({ zlib: z }) {
+    const result = {};
+    for (const family of ["deflate", "brotliCompress", "zstdCompress"])
+      for (const info of [false, true])
+        for (const mode of ["sync", "callback"])
+          for (const kind of [
+            "array",
+            "typed",
+            "data",
+            "shadowBuffer",
+            "shadowLength",
+            "length0",
+            "length2",
+            "lengthNegative",
+            "lengthFraction",
+            "lengthHuge",
+            "lengthNaN",
+            "detached",
+            "null",
+            "number",
+            "fake",
+          ]) {
+            let buffer = new ArrayBuffer(3);
+            new Uint8Array(buffer).set([8, 1, 9]);
+            let input =
+              kind === "array" || kind === "detached"
+                ? buffer
+                : kind === "data"
+                  ? new DataView(buffer, 1, 1)
+                  : kind === "null"
+                    ? null
+                    : kind === "number"
+                      ? 1
+                      : kind === "fake"
+                        ? { [Symbol.toStringTag]: "ArrayBuffer" }
+                        : new Uint8Array(buffer, 1, 1);
+            if (kind === "shadowBuffer")
+              Object.defineProperty(input, "buffer", {
+                value: new Uint8Array([7]).buffer,
+              });
+            if (kind === "shadowLength")
+              Object.defineProperty(input, "byteLength", {
+                get() {
+                  throw new Error("shadow length");
+                },
+              });
+            if (kind.startsWith("length"))
+              Object.defineProperty(input, "byteLength", {
+                value: {
+                  length0: 0,
+                  length2: 2,
+                  lengthNegative: -1,
+                  lengthFraction: 1.5,
+                  lengthHuge: 4294967296,
+                  lengthNaN: NaN,
+                }[kind],
+              });
+            if (kind === "detached")
+              structuredClone(buffer, { transfer: [buffer] });
+            const key = `${family}/${info}/${mode}/${kind}`;
+            const error = (e) => ({
+              name: e.name,
+              code: e.code ?? null,
+              ...(info && kind === "null" && e.name === "TypeError" && !e.code
+                ? {}
+                : { message: e.message }),
+            });
+            const decode = (value) => {
+              const output = info ? value.buffer : value;
+              return Array.from(
+                z[
+                  family === "deflate"
+                    ? "inflateSync"
+                    : family === "brotliCompress"
+                      ? "brotliDecompressSync"
+                      : "zstdDecompressSync"
+                ](output),
+              );
+            };
+            try {
+              if (mode === "sync")
+                result[key] = {
+                  stage: "return",
+                  value: decode(z[family + "Sync"](input, { info })),
+                };
+              else
+                result[key] = await new Promise((resolve, reject) => {
+                  let returned = false;
+                  z[family](input, { info }, (e, v) => {
+                    try {
+                      resolve({
+                        stage: "callback",
+                        later: returned,
+                        ...(e ? { error: error(e) } : { value: decode(v) }),
+                      });
+                    } catch (failure) {
+                      reject(failure);
+                    }
+                  });
+                  returned = true;
+                });
+            } catch (e) {
+              result[key] = { stage: "throw", error: error(e) };
+            }
+          }
+    for (const name of [
+      "crc32",
+      "deflateSync",
+      "brotliCompressSync",
+      "zstdCompressSync",
+    ])
+      for (const input of [
+        null,
+        undefined,
+        1,
+        true,
+        { [Symbol.toStringTag]: "ArrayBuffer" },
+      ]) {
+        try {
+          result[name + "/invalid/" + String(input)] = {
+            value: z[name](input),
+          };
+        } catch (e) {
+          result[name + "/invalid/" + String(input)] = {
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+          };
+        }
+      }
+    return result;
+  },
+
+  codecInputViews: async function ({ zlib: z }) {
+    const result = {},
+      attempt = async (name, fn) => {
+        try {
+          result[name] = await fn();
+        } catch (e) {
+          result[name] = {
+            name: e.name,
+            ...(name.startsWith("detached") &&
+            name.includes("/stream/") &&
+            e.name === "TypeError"
+              ? {}
+              : { message: e.message }),
+            code: e.code ?? null,
+          };
+        }
+      };
+    for (const family of ["deflate", "brotliCompress", "zstdCompress"])
+      for (const kind of [
+        "typed",
+        "data",
+        "detachedTyped",
+        "detachedData",
+        "detachedBuffer",
+      ])
+        for (const shadow of ["none", "buffer", "byteOffset", "byteLength"])
+          for (const mode of ["crc32", "sync", "callback", "stream"]) {
+            await attempt(`${kind}/${shadow}/${mode}/${family}`, async () => {
+              let buffer = new ArrayBuffer(3);
+              new Uint8Array(buffer).set([8, 1, 9]);
+              let value =
+                kind.includes("Data") || kind === "data"
+                  ? new DataView(buffer, 1, 1)
+                  : kind === "detachedBuffer"
+                    ? buffer
+                    : new Uint8Array(buffer, 1, 1);
+              if (shadow !== "none")
+                Object.defineProperty(value, shadow, {
+                  get() {
+                    throw new Error("shadow " + shadow);
+                  },
+                });
+              if (kind.startsWith("detached"))
+                structuredClone(buffer, { transfer: [buffer] });
+              if (mode === "crc32") return z.crc32(value);
+              if (mode === "sync")
+                return Array.from(
+                  z[
+                    family === "deflate"
+                      ? "inflateSync"
+                      : family === "brotliCompress"
+                        ? "brotliDecompressSync"
+                        : "zstdDecompressSync"
+                  ](z[family + "Sync"](value)),
+                );
+              if (mode === "callback") {
+                const compressed = await new Promise((resolve, reject) =>
+                  z[family](value, (e, r) => (e ? reject(e) : resolve(r))),
+                );
+                return Array.from(
+                  z[
+                    family === "deflate"
+                      ? "inflateSync"
+                      : family === "brotliCompress"
+                        ? "brotliDecompressSync"
+                        : "zstdDecompressSync"
+                  ](compressed),
+                );
+              }
+              const stream =
+                  z["create" + family[0].toUpperCase() + family.slice(1)](),
+                chunks = [];
+              try {
+                await new Promise((resolve, reject) => {
+                  stream.on("data", (chunk) => chunks.push(chunk));
+                  stream.on("end", resolve);
+                  stream.on("error", reject);
+                  stream.end(value);
+                });
+              } finally {
+                stream.destroy();
+              }
+              const total = chunks.reduce((n, c) => n + c.length, 0),
+                data = new Uint8Array(total);
+              let at = 0;
+              for (const c of chunks) {
+                data.set(c, at);
+                at += c.length;
+              }
+              return Array.from(
+                z[
+                  family === "deflate"
+                    ? "inflateSync"
+                    : family === "brotliCompress"
+                      ? "brotliDecompressSync"
+                      : "zstdDecompressSync"
+                ](data),
+              );
+            });
+          }
+    return result;
+  },
+  fsInputViews: async function ({ fs }) {
+    const r = {};
+    for (const kind of ["typed", "data"])
+      for (const property of ["buffer", "byteOffset", "byteLength"])
+        for (const name of ["writeFileSync", "writeSync", "readSync"]) {
+          const buffer = new ArrayBuffer(3);
+          new Uint8Array(buffer).set([8, 1, 9]);
+          const view =
+            kind === "typed"
+              ? new Uint8Array(buffer, 1, 1)
+              : new DataView(buffer, 1, 1);
+          Object.defineProperty(view, property, {
+            get() {
+              throw new Error("shadow " + property);
+            },
+          });
+          fs.writeFileSync("/tmp/p", "a");
+          const fd = fs.openSync("/tmp/p", "r+");
+          try {
+            if (name === "writeFileSync") fs.writeFileSync("/tmp/p", view);
+            else fs[name](fd, view, 0, 1, 0);
+            r[`${kind}/${property}/${name}`] = {
+              file: Array.from(fs.readFileSync("/tmp/p")),
+              view: Array.from(new Uint8Array(buffer)),
+            };
+          } catch (e) {
+            r[`${kind}/${property}/${name}`] = {
+              name: e.name,
+              message: e.message,
+              code: e.code ?? null,
+            };
+          } finally {
+            fs.closeSync(fd);
+          }
+        }
+    return r;
+  },
+  fsPromiseWatch: async function ({ fs }) {
+    const results = [];
+    for (const args of [
+      [],
+      ["/tmp"],
+      [null],
+      [1],
+      ["/tmp", null],
+      ["/tmp", { signal: AbortSignal.abort() }],
+    ]) {
+      let stage = "call";
+      try {
+        const iterator = fs.promises.watch(...args);
+        stage = "next";
+        await iterator.next();
+        stage = "return";
+        results.push(await iterator.return());
+      } catch (e) {
+        results.push({
+          stage,
+          name: e.name,
+          message: e.message,
+          code: e.code ?? null,
+        });
+      }
+    }
+    return results;
+  },
+  tlsPrototypeContracts: function ({ tls: t }) {
+    const r = { prototype: Reflect.ownKeys(t.TLSSocket.prototype).map(String) },
+      methods = {
+        renegotiate: [[], [{}], [null], [{}, 1], [{}, () => {}]],
+        exportKeyingMaterial: [
+          [],
+          [0, "label"],
+          [1, "label"],
+          [-1, "label"],
+          [1, 2],
+          [1, "label", new Uint8Array(1)],
+          [1, "label", new ArrayBuffer(1)],
+        ],
+        setMaxSendFragment: [[], [0], [-1], [1.5], [2147483648], ["1"]],
+        setServername: [[], [null], [1], ["name"]],
+        setSession: [[], [null], [1], ["session"]],
+        disableRenegotiation: [[]],
+      };
+    for (const name of [
+      "getPeerCertificate",
+      "getCertificate",
+      "getPeerX509Certificate",
+      "getX509Certificate",
+      "setKeyCert",
+      "getCipher",
+      "getSharedSigalgs",
+      "getEphemeralKeyInfo",
+      "getFinished",
+      "getPeerFinished",
+      "getProtocol",
+      "getSession",
+      "getTLSTicket",
+      "isSessionReused",
+      "enableTrace",
+    ])
+      methods[name] = [[]];
+    for (const [name, cases] of Object.entries(methods)) {
+      r[name] = [];
+      for (const args of cases) {
+        const socket = new t.TLSSocket();
+        socket.on("error", () => {});
+        try {
+          const v = socket[name](...args);
+          r[name].push({
+            value: v === undefined ? "undefined" : v,
+            servername: socket.servername ?? null,
+          });
+        } catch (e) {
+          r[name].push({
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+          });
+        } finally {
+          socket.destroy();
+        }
+      }
+    }
+    return r;
+  },
+
   cryptoKeyInputOptions: async function ({ crypto }) {
     const result = {},
       attempt = (name, fn) => {
