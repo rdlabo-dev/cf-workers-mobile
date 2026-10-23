@@ -54,7 +54,8 @@ export { randomBytes, randomFill, randomFillSync };
 export const pseudoRandomBytes = randomBytes;
 import { scrypt, scryptSync } from "./scrypt.js";
 export { hkdf, hkdfSync, randomInt, randomUUID, scrypt, scryptSync };
-export const { constants } = original;
+import { constants } from "./constants.js";
+export { constants };
 import {
   Cipheriv,
   Decipheriv,
@@ -69,8 +70,8 @@ import {
   privateDecrypt,
 } from "./rsa.js";
 export { publicEncrypt, privateEncrypt, publicDecrypt, privateDecrypt };
-export const webcrypto = globalThis.crypto;
-export const subtle = webcrypto.subtle;
+import { webcrypto, subtle } from "./webcrypto.js";
+export { webcrypto, subtle };
 export const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
 export const CryptoKey = globalThis.CryptoKey;
 export default {
@@ -78,6 +79,7 @@ export default {
   Certificate,
   ...originalSupported,
   ...dh,
+  constants,
   pbkdf2,
   pbkdf2Sync,
   Hash,

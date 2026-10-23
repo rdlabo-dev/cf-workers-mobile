@@ -1,3 +1,4 @@
+import { signatureDigest } from "./digests.js";
 import { curveName, generateDh, deriveDh } from "./native-cipher.js";
 import { validateExportOptions } from "./key-options.js";
 import {
@@ -308,15 +309,19 @@ export function sign(
   const digest = digestName(algorithm),
     raw = bytes(data, "data");
   const execute = () => {
-    const options = optionsOf(key);
+    const options = optionsOf(key),
+      native = handle(operationKey(key, true));
+    if (native.type === "dsa")
+      throw new Error("Signing with DSA keys is not currently supported");
+    const normalized = digest === null ? null : signatureDigest(digest);
+    if (
+      native.type === "x25519" ||
+      (native.type === "ed25519" && normalized !== null) ||
+      (native.type !== "ed25519" && normalized === null)
+    )
+      throw new Error("Failed to initialize signing context");
     return Buffer.from(
-      handle(operationKey(key, true)).sign(
-        digest,
-        raw,
-        options.padding ?? 0,
-        options.saltLength ?? -1,
-        options.dsaEncoding === "ieee-p1363",
-      ),
+      native.sign(normalized, raw, 0, -1, options.dsaEncoding === "ieee-p1363"),
     );
   };
   if (callback === undefined) return execute();
@@ -340,13 +345,23 @@ export function verify(
     raw = bytes(data, "data"),
     sig = bytes(signature, "signature");
   const execute = () => {
-    const options = optionsOf(key);
-    return handle(operationKey(key, false)).verify(
-      digest,
+    const options = optionsOf(key),
+      native = handle(operationKey(key, false));
+    if (native.type === "dsa")
+      throw new Error("Verifying with DSA keys is not currently supported");
+    const normalized = digest === null ? null : signatureDigest(digest);
+    if (
+      native.type === "x25519" ||
+      (native.type === "ed25519" && normalized !== null) ||
+      (native.type !== "ed25519" && normalized === null)
+    )
+      throw new Error("Failed to initialize verification context");
+    return native.verify(
+      normalized,
       raw,
       sig,
-      options.padding ?? 0,
-      options.saltLength ?? -1,
+      0,
+      -1,
       options.dsaEncoding === "ieee-p1363",
     );
   };

@@ -80,6 +80,8 @@ export default defineConfig({
       "src/compat/crypto/cipher.spec.ts",
       "src/compat/crypto/hash.spec.ts",
       "src/compat/crypto/hash-types.spec.ts",
+      "src/compat/crypto/signatures.spec.ts",
+      "src/compat/crypto/digest-stream.spec.ts",
       "src/compat/fs/writable.spec.ts",
       "src/compat/fs/glob.spec.ts",
       "src/compat/fs/directory.spec.ts",

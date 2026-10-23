@@ -35,6 +35,6 @@
     "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\"]"
   ],
   "libraries": ["libssl.a", "libcrypto.a"],
-  "bindingSha256": "92baac21ba01df72107bcfaa1d2520a672f7677975cef4d3c3b09835a1c11e3e",
-  "sha256": "a29aa2dc870b72ff2268a0d57958d94460654e19cdbbd54e3c9fe8f92dc4532c"
+  "bindingSha256": "d79c0264ee2d96b41a255ee119a5ba8e973be6f9f5dc3ea6d404226c840308d5",
+  "sha256": "f877b01e7fc19c0d9dfc116c9cd579faeef7c65960d9ef5aaafde01c17d5cfda"
 }

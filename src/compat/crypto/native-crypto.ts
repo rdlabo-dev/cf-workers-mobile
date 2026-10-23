@@ -430,6 +430,10 @@ export class NativeDigest {
     return new NativeDigest("", this.context, pointer);
   }
 
+  assertActive() {
+    if (!this.pointer)
+      throw new Error(`${this.context} context has already been finalized`);
+  }
   update(data: Uint8Array) {
     if (!this.pointer)
       throw new Error(`${this.context} context has already been finalized`);
@@ -458,6 +462,7 @@ const ecReleased = new FinalizationRegistry<number>((pointer) =>
 export class NativeECDH {
   private pointer: number;
   constructor(curve: string) {
+    curve = curve.split("\0")[0]!;
     if (!["secp224r1", "prime256v1", "secp384r1", "secp521r1"].includes(curve))
       throw new Error("Invalid curve");
     this.pointer = inputs([curve], (api, [p]) => api.wk_ec_new(p));

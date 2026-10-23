@@ -34,8 +34,7 @@ export function isAnyBuffer(value: unknown): value is ArrayBuffer {
 export function bytes(value: unknown, name: string): Buffer {
   if (typeof value === "string") return Buffer.from(value);
   if (isAnyBuffer(value)) return Buffer.from(value);
-  if (ArrayBuffer.isView(value))
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  if (ArrayBuffer.isView(value)) return Buffer.from(viewBytes(value));
   throw new ERR_INVALID_ARG_TYPE(
     name,
     ["string", "ArrayBuffer", "Buffer", "TypedArray", "DataView"],
@@ -46,4 +45,57 @@ export function bytes(value: unknown, name: string): Buffer {
 // Native Workers crypto entry points use signed 32-bit buffer lengths.
 export function validateCryptoLength(length: number, message: string): void {
   if (length > 0x7fffffff) throw new RangeError(message);
+}
+
+const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+const typedArrayBuffer = Object.getOwnPropertyDescriptor(
+  typedArrayPrototype,
+  "buffer",
+)!.get!;
+const typedArrayOffset = Object.getOwnPropertyDescriptor(
+  typedArrayPrototype,
+  "byteOffset",
+)!.get!;
+const typedArrayLength = Object.getOwnPropertyDescriptor(
+  typedArrayPrototype,
+  "byteLength",
+)!.get!;
+const dataViewBuffer = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "buffer",
+)!.get!;
+const dataViewOffset = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "byteOffset",
+)!.get!;
+const dataViewLength = Object.getOwnPropertyDescriptor(
+  DataView.prototype,
+  "byteLength",
+)!.get!;
+/** Read the intrinsic view extent, ignoring shadowed user properties. */
+export function viewBytes(value: ArrayBufferView): Uint8Array {
+  let buffer: ArrayBufferLike;
+  try {
+    buffer = typedArrayBuffer.call(value);
+  } catch {
+    buffer = dataViewBuffer.call(value);
+    try {
+      return new Uint8Array(
+        buffer,
+        dataViewOffset.call(value),
+        dataViewLength.call(value),
+      );
+    } catch {
+      return new Uint8Array(0);
+    }
+  }
+  try {
+    return new Uint8Array(
+      buffer,
+      typedArrayOffset.call(value),
+      typedArrayLength.call(value),
+    );
+  } catch {
+    return new Uint8Array(0);
+  }
 }

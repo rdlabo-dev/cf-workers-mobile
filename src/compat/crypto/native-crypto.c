@@ -122,7 +122,7 @@ API int wk_verify(EVP_PKEY *key,const char *digest,const unsigned char *data,siz
     int length=i2d_ECDSA_SIG(value,&converted);ECDSA_SIG_free(value);if(length<=0){EVP_MD_CTX_free(ctx);return -1;}
     signature=converted;signature_length=(size_t)length;
   }
-  int result=ok?EVP_DigestVerify(ctx,signature,signature_length,data,length):-1;OPENSSL_free(converted);EVP_MD_CTX_free(ctx);return result;
+  int result=ok?(EVP_DigestVerify(ctx,signature,signature_length,data,length)==1?1:0):-1;OPENSSL_free(converted);EVP_MD_CTX_free(ctx);return result;
 }
 
 API int wk_derive(EVP_PKEY *key,EVP_PKEY *peer) {
@@ -193,7 +193,7 @@ API int wk_verify_hash(EVP_PKEY *key,const char *digest,const unsigned char *dat
   int ok=EVP_PKEY_verify_init(ctx)>0 && EVP_PKEY_CTX_set_signature_md(ctx,EVP_get_digestbyname(digest))>0;
   if(ok && padding)ok=EVP_PKEY_CTX_set_rsa_padding(ctx,padding)>0;
   if(ok && padding==RSA_PKCS1_PSS_PADDING)ok=EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx,saltlen)>0;
-  int result=ok?EVP_PKEY_verify(ctx,signature,signature_length,data,length):-1;EVP_PKEY_CTX_free(ctx);return result;
+  int result=ok?(EVP_PKEY_verify(ctx,signature,signature_length,data,length)==1?1:0):-1;EVP_PKEY_CTX_free(ctx);return result;
 }
 API EC_KEY *wk_ec_new(const char *curve) {return EC_KEY_new_by_curve_name(OBJ_sn2nid(curve));}
 API void wk_ec_free(EC_KEY *key) {EC_KEY_free(key);}

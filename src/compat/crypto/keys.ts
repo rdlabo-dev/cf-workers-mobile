@@ -1,3 +1,4 @@
+import { validateExportOptions } from "./key-options.js";
 import { exportJwk } from "./key-formats.js";
 // API behavior follows workerd@5358e3d337336eaf696a48bc1563d808b10feba5
 // crypto_keys.ts (Apache-2.0 and Node MIT). Host CryptoKey export is an explicit
@@ -53,11 +54,13 @@ export abstract class KeyObject {
   }
   export(options: any = {}): any {
     validateObject(options, "options");
-    if (options.format === undefined) options.format = "buffer";
-    validateString(options.format, "options.format");
-    if (options.type !== undefined)
-      validateString(options.type, "options.type");
     const current = state(this);
+    validateExportOptions(
+      options,
+      current.type,
+      "options",
+      current.asymmetric?.type,
+    );
     if (current.asymmetric) {
       if (options.format === "jwk")
         return exportJwk(current.asymmetric, current.type === "private");

@@ -9,7 +9,20 @@ import { build } from "esbuild";
 import { chromium, webkit } from "@playwright/test";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { workersCapacitorPlugin } from "../../../../dist/tooling/esbuild.js";
-import { eventCases } from "../../../../src/compat/expansion/index.spec.mjs";
+import { eventCases as allEventCases } from "../../../../src/compat/expansion/index.spec.mjs";
+
+const requestedCases = process.env.NODE_COMPAT_CASES?.split(",");
+if (requestedCases)
+  for (const name of requestedCases)
+    assert.ok(
+      Object.hasOwn(allEventCases, name),
+      `Unknown compatibility case: ${name}`,
+    );
+const eventCases = requestedCases
+  ? Object.fromEntries(
+      requestedCases.map((name) => [name, allEventCases[name]]),
+    )
+  : allEventCases;
 
 const root = fileURLToPath(new URL("../../../..", import.meta.url));
 const profile = JSON.parse(
@@ -30,7 +43,7 @@ const runtime = new Miniflare(
       {
         type: "ESModule",
         path: "/fixture/main.mjs",
-        contents: `import * as tls from 'node:tls'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
+        contents: `import * as tls from 'node:tls'; import * as classicStreams from 'node:stream'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 const cases = {${Object.entries(eventCases)
@@ -38,7 +51,7 @@ const cases = {${Object.entries(eventCases)
           .join(",")}};
 export default {async fetch(request) {
  const name = new URL(request.url).pathname.slice(1);
- return Response.json(await cases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http}));
+ return Response.json(await cases[name]({process, tls, classicStreams, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http}));
 }};`,
       },
       { type: "Text", path: "/fixture/readonly.txt", contents: "abcdef" },
@@ -62,7 +75,12 @@ try {
 } finally {
   await runtime.dispose();
 }
-const output = new URL("../../../artifacts/node-inventory/", import.meta.url);
+const output = new URL(
+  requestedCases
+    ? "../../../artifacts/node-inventory/targeted/"
+    : "../../../artifacts/node-inventory/",
+  import.meta.url,
+);
 await mkdir(output, { recursive: true });
 await writeFile(
   new URL("expansion-contracts-workerd.json", output),
@@ -72,13 +90,13 @@ const compiled = await build({
   absWorkingDir: root,
   stdin: {
     resolveDir: root,
-    contents: `import * as tls from 'node:tls'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
+    contents: `import * as tls from 'node:tls'; import * as classicStreams from 'node:stream'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { eventCases } from './src/compat/expansion/index.spec.mjs';
 import { runWithRequestScope as withRequestScope } from './dist/shared/request-scope.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
-export const run = name => eventCases[name]({withRequestScope,process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
+export const run = name => eventCases[name]({withRequestScope,process, tls, classicStreams, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
   },
   bundle: true,
   platform: "browser",
@@ -95,13 +113,13 @@ export const run = name => eventCases[name]({withRequestScope,process, tls, stre
 const entry = fileURLToPath(new URL("expansion-vite-entry.mjs", output));
 await writeFile(
   entry,
-  `import * as tls from 'node:tls'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
+  `import * as tls from 'node:tls'; import * as classicStreams from 'node:stream'; import * as streams from 'node:stream/web'; import * as module from 'node:module'; import * as httpCommon from 'node:_http_common'; import * as httpOutgoing from 'node:_http_outgoing'; import * as httpServer from 'node:_http_server'; import * as http from 'node:http'; import * as fs from 'node:fs'; import * as zlib from 'node:zlib'; import * as sys from 'node:sys'; import * as util from 'node:util'; import * as types from 'node:util/types'; import * as console from 'node:console'; import * as crypto from 'node:crypto';
 import { eventCases } from ${JSON.stringify(fileURLToPath(new URL("../../../../src/compat/expansion/index.spec.mjs", import.meta.url)))};
 import { runWithRequestScope as withRequestScope } from ${JSON.stringify(fileURLToPath(new URL("../../../../dist/shared/request-scope.js", import.meta.url)))};
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
 fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
-export const run = name => eventCases[name]({withRequestScope,process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
+export const run = name => eventCases[name]({withRequestScope,process, tls, classicStreams, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});`,
 );
 const viteResult = await viteBuild({
   configFile: false,

@@ -108,3 +108,50 @@ it("closes the connection when destroyed during authentication", async () => {
   expect(call.mock.calls.some(([, m]) => m === "socketWrite")).toBe(false);
   plain.destroy();
 });
+
+import { Duplex } from "../stream/duplex.js";
+it("constructs the Workers custom Duplex wrapper and forwards bytes", async () => {
+  const writes: string[] = [];
+  const custom = Duplex({
+    read() {},
+    write(chunk: Uint8Array, _encoding: string, callback: () => void) {
+      writes.push(Buffer.from(chunk).toString());
+      callback();
+    },
+  });
+  const wrapped = new TLSSocket(custom);
+  wrapped.on("error", () => {});
+  const data = new Promise<string>((resolve) =>
+    wrapped.once("data", (chunk: Uint8Array) =>
+      resolve(Buffer.from(chunk).toString()),
+    ),
+  );
+  await tick();
+  wrapped.write("outbound");
+  custom.push(Buffer.from("inbound"));
+  expect(await data).toBe("inbound");
+  await tick();
+  expect(writes).toEqual(["outbound"]);
+  wrapped.destroy();
+  custom.destroy();
+});
+it("custom Duplex EOF emits end before close", async () => {
+  const custom = Duplex({
+    read() {},
+    write(_chunk: unknown, _encoding: unknown, callback: () => void) {
+      callback();
+    },
+  });
+  const wrapped = new TLSSocket(custom);
+  const events: string[] = [];
+  wrapped.on("error", () => {});
+  wrapped.on("data", () => {});
+  wrapped.on("end", () => events.push("end"));
+  wrapped.on("close", () => events.push("close"));
+  await tick();
+  custom.push(null);
+  await tick();
+  expect(events).toEqual(["end", "close"]);
+  wrapped.destroy();
+  custom.destroy();
+});

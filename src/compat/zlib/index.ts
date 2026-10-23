@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { validateInteger } from "../crypto/validation.js";
+import { validateUint32 } from "../net/validators.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
 import * as compression from "./compression.js";
 export * from "./compression.js";
@@ -369,7 +369,7 @@ function data(input: unknown): Uint8Array {
   );
 }
 export function crc32(input: unknown, value = 0): number {
-  validateInteger(value, "value", 0, 0xffffffff);
+  validateUint32(value, "value");
   let crc = value ^ -1;
   for (const byte of data(input)) {
     crc ^= byte;

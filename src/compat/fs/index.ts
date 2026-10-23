@@ -361,6 +361,19 @@ promises.open = async (...args: any[]) => {
   fileMode(args[2], 0o666);
   args[2] = 0o666;
   const handle = await openPromise(...args);
+  const prototype = Object.getPrototypeOf(handle);
+  if (!Object.hasOwn(prototype, "readLines"))
+    Object.defineProperty(prototype, "readLines", {
+      value: function readLines(this: any) {
+        if (this.fd === -1 || this.fd === undefined)
+          throw Object.assign(new Error("Bad file descriptor"), {
+            code: "EBADF",
+          });
+        throw new Error("not implemented");
+      },
+      writable: true,
+      configurable: true,
+    });
   const closeHandle = handle.close.bind(handle);
   handle.close = () => {
     if (handle.fd === -1) {

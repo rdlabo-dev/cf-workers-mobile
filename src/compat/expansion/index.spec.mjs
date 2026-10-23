@@ -1,4 +1,458 @@
 export const eventCases = {
+  tlsCustomDuplexStates: async function ({ tls: t, classicStreams: s }) {
+    const out = {};
+    const tick = () => new Promise((r) => setTimeout(r, 15));
+    for (const mode of [
+      "eof",
+      "writeError",
+      "parentObserved",
+      "directError",
+      "destroy",
+      "object",
+      "encoding",
+    ]) {
+      const events = [];
+      const custom = new s.Duplex({
+        allowHalfOpen: true,
+        objectMode: mode === "object",
+        read() {},
+        write(c, e, cb) {
+          cb(
+            ["writeError", "parentObserved"].includes(mode)
+              ? new Error("write fail")
+              : undefined,
+          );
+        },
+      });
+      custom.on("error", (e) => events.push("customError:" + e.message));
+      custom.on("close", () => events.push("customClose"));
+      if (mode === "encoding") custom.setEncoding("utf8");
+      let wrapped;
+      try {
+        wrapped = new t.TLSSocket(custom);
+        custom.on("error", (e) => events.push("lateCustomError:" + e.message));
+        if (mode === "parentObserved")
+          wrapped._parentWrap.on("error", (e) =>
+            events.push("parentError:" + e.message),
+          );
+        wrapped.on("error", (e) => events.push("error:" + e.message));
+        wrapped.on("close", () => events.push("close"));
+        wrapped.on("end", () => events.push("end"));
+        wrapped.on("data", (c) => events.push("data:" + String(c)));
+        await tick();
+        if (mode === "eof") custom.push(null);
+        if (["writeError", "parentObserved"].includes(mode))
+          wrapped.write("x", (e) => events.push("write:" + e?.message));
+        if (mode === "directError") custom.emit("error", new Error("manual"));
+        if (mode === "destroy") wrapped.destroy();
+        if (mode === "object") custom.push({ x: 1 });
+        if (mode === "encoding") custom.push("abc");
+        await tick();
+        out[mode] = {
+          events: [...events],
+          destroyed: wrapped.destroyed,
+          customDestroyed: custom.destroyed,
+        };
+      } catch (e) {
+        out[mode] = { name: e.name, message: e.message, events: [...events] };
+      } finally {
+        wrapped?.destroy();
+        custom.destroy();
+        await tick();
+      }
+    }
+    return out;
+  },
+  tlsCustomDuplex: async function ({ tls, classicStreams }) {
+    const writes = [];
+    const custom = new classicStreams.Duplex({
+      read() {},
+      write(chunk, encoding, callback) {
+        writes.push(Array.from(chunk));
+        callback();
+      },
+    });
+    const wrapped = new tls.TLSSocket(custom);
+    wrapped.on("error", () => {});
+    const read = new Promise((resolve) =>
+      wrapped.once("data", (chunk) => resolve(Array.from(chunk))),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise((resolve, reject) =>
+      wrapped.write(new Uint8Array([1, 2]), (error) =>
+        error ? reject(error) : resolve(),
+      ),
+    );
+    custom.push(new Uint8Array([3, 4]));
+    const data = await read;
+    const result = {
+      writes,
+      data,
+      encrypted: wrapped.encrypted,
+      authorized: wrapped.authorized,
+      secureConnecting: wrapped.secureConnecting,
+    };
+    wrapped.destroy();
+    custom.destroy();
+    return result;
+  },
+  cryptoWebExtensions: async function ({ crypto }) {
+    const attempt = async (fn) => {
+      try {
+        return await fn();
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    const result = {};
+    for (const algorithm of [
+      "SHA-1",
+      "SHA-256",
+      "SHA-384",
+      "SHA-512",
+      "MD5",
+      "crc32",
+      "crc32c",
+      "crc64nvme",
+      "sha-256",
+      "SHA-256\0suffix",
+      "sha256",
+      "MD4",
+      null,
+      {},
+      42,
+    ])
+      result[String(algorithm)] = await attempt(async () => {
+        const d = new crypto.webcrypto.DigestStream(algorithm),
+          w = d.getWriter();
+        await w.write("1234");
+        await w.write(new Uint8Array([53, 54, 55, 56, 57]));
+        await w.close();
+        return {
+          digest: Array.from(new Uint8Array(await d.digest)),
+          count: String(d.bytesWritten),
+        };
+      });
+    for (const well of [false, true])
+      for (const chunks of [
+        ["\ud800"],
+        ["\ud800", "\udc00"],
+        ["\ud800", new Uint8Array([65]), "\udc00"],
+      ])
+        result[well + ":" + JSON.stringify(chunks)] = await attempt(
+          async () => {
+            const d = new crypto.webcrypto.DigestStream("SHA-256", {
+                toWellFormed: well,
+              }),
+              w = d.getWriter(),
+              counts = [];
+            for (const chunk of chunks) {
+              await w.write(chunk);
+              counts.push(String(d.bytesWritten));
+            }
+            await w.close();
+            return {
+              counts,
+              final: String(d.bytesWritten),
+              digest: Array.from(new Uint8Array(await d.digest)),
+            };
+          },
+        );
+    const d = new crypto.webcrypto.DigestStream("SHA-256");
+    const reason = { abort: true },
+      rejected = d.digest.catch((e) => e);
+    await d.abort(reason);
+    result.abort = (await rejected) === reason;
+    const disposed = new crypto.webcrypto.DigestStream("SHA-256"),
+      writer = disposed.getWriter();
+    const disposal = disposed.digest.catch((e) => ({
+      name: e.name,
+      message: e.message,
+    }));
+    disposed[Symbol.dispose]();
+    disposed[Symbol.dispose]();
+    await writer.write("");
+    result.disposed = await disposal;
+    result.afterDispose = await attempt(() => writer.write("a"));
+    for (const [i, value] of [
+      null,
+      {},
+      "a",
+      new ArrayBuffer(1),
+      new Uint8Array(1),
+      new DataView(new ArrayBuffer(1)),
+    ].entries())
+      result["timing" + i] = await attempt(() =>
+        crypto.subtle.timingSafeEqual(value, new Uint8Array(1)),
+      );
+    result.timingLength = await attempt(() =>
+      crypto.subtle.timingSafeEqual(new Uint8Array(1), new Uint8Array(2)),
+    );
+    result.timingDifferent = crypto.subtle.timingSafeEqual(
+      new Uint8Array([1]),
+      new Uint8Array([2]),
+    );
+    const named = function () {};
+    Object.defineProperty(named, "name", { value: "SHA-256" });
+    result.functionAlgorithm = await attempt(async () => {
+      const d = new crypto.webcrypto.DigestStream(named);
+      await d.getWriter().close();
+      return Array.from(new Uint8Array(await d.digest));
+    });
+    for (const view of [
+      new Uint8Array([1]),
+      new DataView(new Uint8Array([1]).buffer),
+    ]) {
+      Object.defineProperties(view, {
+        buffer: { value: new Uint8Array([9]).buffer },
+        byteOffset: { value: 0 },
+        byteLength: { value: 1 },
+      });
+      result["shadowCompare:" + view.constructor.name] =
+        crypto.subtle.timingSafeEqual(view, new Uint8Array([1]));
+      const d = new crypto.webcrypto.DigestStream("crc32"),
+        w = d.getWriter();
+      await w.write(view);
+      await w.close();
+      result["shadowDigest:" + view.constructor.name] = Array.from(
+        new Uint8Array(await d.digest),
+      );
+    }
+    const detached = new ArrayBuffer(1),
+      detachedView = new DataView(detached);
+    structuredClone(detached, { transfer: [detached] });
+    result.detached = [
+      crypto.subtle.timingSafeEqual(detached, new ArrayBuffer(0)),
+      crypto.subtle.timingSafeEqual(detachedView, new ArrayBuffer(0)),
+    ];
+    return result;
+  },
+  cryptoSignatureParameters: function ({ crypto }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    const data = new Uint8Array([1, 2]);
+    const rsa = crypto.generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const privatePem = rsa.privateKey.export({ format: "pem", type: "pkcs8" });
+    const publicPem = rsa.publicKey.export({ format: "pem", type: "spki" });
+    const signature = crypto.sign("sha256", data, rsa.privateKey);
+    const results = [];
+    for (const padding of [-1, 0, 1, 2, 3, 4, 5, 6, 99])
+      for (const saltLength of [undefined, -3, -2, -1, 0, 32, 95]) {
+        const options = { padding, saltLength };
+        results.push([
+          attempt(
+            () =>
+              crypto
+                .createSign("sha256")
+                .update(data)
+                .sign({ key: privatePem, ...options }).length,
+          ),
+          attempt(() =>
+            crypto
+              .createVerify("sha256")
+              .update(data)
+              .verify({ key: publicPem, ...options }, signature),
+          ),
+          attempt(
+            () =>
+              crypto.sign("sha256", data, { key: privatePem, ...options })
+                .length,
+          ),
+          attempt(() =>
+            crypto.verify(
+              "sha256",
+              data,
+              { key: publicPem, ...options },
+              signature,
+            ),
+          ),
+        ]);
+      }
+    const ec = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const ecPrivate = ec.privateKey.export({ format: "pem", type: "pkcs8" }),
+      ecPublic = ec.publicKey.export({ format: "pem", type: "spki" });
+    for (const padding of [undefined, -1, 3, 99])
+      results.push([
+        attempt(
+          () =>
+            crypto
+              .createSign("sha256")
+              .update(data)
+              .sign({ key: ecPrivate, padding }).length > 0,
+        ),
+        attempt(() =>
+          crypto
+            .createVerify("sha256")
+            .update(data)
+            .verify({ key: ecPublic, padding }, new Uint8Array([1])),
+        ),
+      ]);
+    for (const signature of [
+      null,
+      {},
+      [],
+      new ArrayBuffer(1),
+      new DataView(new ArrayBuffer(1)),
+    ])
+      results.push(
+        attempt(() =>
+          crypto
+            .createVerify("sha256")
+            .update(data)
+            .verify(ec.publicKey, signature),
+        ),
+      );
+    for (const type of ["ed25519", "x25519"]) {
+      const pair = crypto.generateKeyPairSync(type);
+      const signer = crypto.createSign("sha256").update(data);
+      results.push(
+        attempt(() => signer.sign(pair.privateKey)),
+        attempt(() => {
+          signer.update(data);
+          return true;
+        }),
+      );
+      results.push(
+        attempt(() => crypto.sign("sha256", data, pair.privateKey)),
+        attempt(() =>
+          crypto.verify("sha256", data, pair.publicKey, new Uint8Array(64)),
+        ),
+      );
+    }
+    return results;
+  },
+  cryptoSignatureInventory: function ({ crypto }) {
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    const result = {};
+    result.constants = {
+      nullPrototype: Object.getPrototypeOf(crypto.constants) === null,
+      descriptors: Object.getOwnPropertyDescriptors(crypto.constants),
+    };
+    for (const algorithm of [
+      "sha3-256",
+      "ripemd160",
+      "blake2b512",
+      "DSA-SHA",
+      "sha256",
+      "SHA256",
+      "sha256\0suffix",
+    ]) {
+      for (const operation of ["createSign", "createVerify"])
+        result[operation + ":" + algorithm] = attempt(() => {
+          crypto[operation](algorithm);
+          return true;
+        });
+    }
+    const pair = crypto.generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const data = new Uint8Array([1, 2, 3]);
+    const signature = crypto.sign("sha256", data, {
+      key: pair.privateKey.export({ format: "pem", type: "pkcs8" }),
+      dsaEncoding: "ieee-p1363",
+    });
+    for (const view of [
+      signature,
+      new DataView(
+        signature.buffer,
+        signature.byteOffset,
+        signature.byteLength,
+      ),
+      new Uint16Array(
+        signature.buffer,
+        signature.byteOffset,
+        signature.byteLength / 2,
+      ),
+    ]) {
+      result[
+        "verify:" + (view === signature ? "Buffer" : view.constructor.name)
+      ] = attempt(() =>
+        crypto
+          .createVerify("sha256")
+          .update(data)
+          .verify(
+            {
+              key: pair.publicKey.export({ format: "pem", type: "spki" }),
+              dsaEncoding: "ieee-p1363",
+            },
+            view,
+          ),
+      );
+    }
+    for (const algorithm of ["sha3-256", "DSA-SHA", "sha256\0suffix"])
+      result["oneShot:" + algorithm] = attempt(
+        () => crypto.sign(algorithm, data, pair.privateKey).length > 0,
+      );
+    const ed = crypto.generateKeyPairSync("ed25519");
+    const verifier = crypto.createVerify("sha256").update(data);
+    result.ed = attempt(() =>
+      verifier.verify(ed.publicKey, new Uint8Array(64)),
+    );
+    result.afterEd = attempt(() => {
+      verifier.update(data);
+      return true;
+    });
+    for (const type of ["pkcs1", "sec1"])
+      result["export:" + type] = attempt(
+        () => pair.privateKey.export({ format: "der", type }).length,
+      );
+    result.nulCurve = attempt(() => {
+      crypto.createECDH("prime256v1\0suffix");
+      return true;
+    });
+    return result;
+  },
+  fsReadLinesInventory: async function ({ fs }) {
+    const path = "/tmp/read-lines-inventory";
+    const attempt = (fn) => {
+      try {
+        fn();
+        return "accepted";
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    await fs.promises.writeFile(path, "a\nb\n");
+    const handle = await fs.promises.open(path, "r");
+    try {
+      const open = attempt(() => handle.readLines());
+      await handle.close();
+      return { open, closed: attempt(() => handle.readLines()) };
+    } finally {
+      await handle.close();
+      await fs.promises.unlink(path);
+    }
+  },
+  zlibCrcSeedInventory: function ({ zlib }) {
+    return [
+      -1,
+      4294967296,
+      1.5,
+      NaN,
+      Infinity,
+      "1",
+      null,
+      undefined,
+      0,
+      4294967295,
+    ].map((value) => {
+      try {
+        return zlib.crc32(new Uint8Array([1, 2]), value);
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    });
+  },
+
   cryptoDhContracts: function ({ crypto, withRequestScope = (fn) => fn() }) {
     return withRequestScope(() => {
       const attempt = (fn) => {

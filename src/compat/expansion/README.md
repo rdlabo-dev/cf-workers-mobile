@@ -18,6 +18,12 @@ Additional profiles cover process resource/permission/report stubs, its pinned
 wall-clock hrtime behavior, and TLS hostname/ALPN/options contracts. Native runs
 also test real TLS exchange and hostname mismatch rejection.
 
+Custom Duplex wrapping follows Workers' stream behavior, including byte
+forwarding, EOF and error cleanup. This path does not perform a TLS handshake or
+encrypt the custom Duplex's bytes. Authenticated TLS/STARTTLS requires the native
+socket transport; wrapping an arbitrary stream does not provide that security.
+The custom byte-stream adapter uses owned BYOB streams on both WebViews.
+
 The SDK starts a fresh /tmp volume for each local fetch dispatch. Handles opened
 inside that request retain their volume; embedded bundle assets stay read-only.
 Standalone imports outside SDK dispatch share a fallback volume. Copying embedded files to /tmp preserves immutable embedded bytes. Permission
@@ -56,6 +62,23 @@ Native measurements record whether the engine provides `Float16Array`.
 Where absent, its input brand is unverified; equivalent half-float bytes are
 still tested as a byte-array input. This does not certify complete crypto input
 coverage on that engine.
+
+`crypto.webcrypto.DigestStream` uses the owned incremental digest backend for
+SHA-1/256/384/512 and MD5, plus CRC32/CRC32C/CRC64NVME. Its string input follows
+Workers' WTF-8 behavior by default; `toWellFormed` carries a trailing high
+surrogate across string writes. Digest promises, byte counts, abort and disposal
+follow the pinned runtime. `crypto.subtle.timingSafeEqual` uses the Wasm native
+comparison primitive and intrinsic BufferSource extents. These extensions retain
+the host Crypto/SubtleCrypto objects and their existing WebCrypto operations.
+The tests are `src/compat/crypto/digest-stream.spec.ts` and the shared
+`cryptoWebExtensions` case.
+
+Signature digest aliases, constant descriptors, binary signature views and
+failure states are compared with Workers. Streaming RSA padding/salt options
+apply to the streaming signature API; the pinned one-shot implementation
+validates their frontend types but does not apply them. This distinction is
+intentional. The strict consumer declarations and parameter matrix cover both
+forms; they do not certify every key import/export option.
 
 Random bytes and fills use the pinned Workers frontend and host cryptographic
 entropy. `pseudoRandomBytes` is the same function as `randomBytes`. Sync fills
@@ -136,3 +159,8 @@ Workers reports `fips=true` because of its own crypto backend. The WebView's
 JavaScript implementations do not establish FIPS compliance, so that flag is
 not copied merely to match the export inventory. `setFips` and `setEngine`
 retain Workers' unsupported-operation behavior.
+
+For focused diagnosis, set `NODE_COMPAT_CASES` to a comma-separated list when
+running `expansion-contracts.probe.mjs`. Focused output goes to
+`demo/artifacts/node-inventory/targeted/` and does not replace the full baseline
+used by native acceptance. Omit this variable for the required complete run.
