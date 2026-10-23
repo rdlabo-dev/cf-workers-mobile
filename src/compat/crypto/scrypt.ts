@@ -32,7 +32,7 @@ import {
 } from "./validation.js";
 import { validateFunction, validateUint32 } from "../net/validators.js";
 import { ERR_INVALID_ARG_VALUE } from "../net/errors.js";
-type ArrayLike = any;
+export type ArrayLike = ArrayBuffer | string | Buffer | ArrayBufferView;
 const kMaxLength = 2147483647;
 const cryptoImpl = {
   getScrypt(
@@ -67,8 +67,8 @@ const cryptoImpl = {
   },
 };
 export interface ValidatedScryptOptions {
-  password: ArrayLike;
-  salt: ArrayLike;
+  password: Buffer;
+  salt: Buffer;
   keylen: number;
   N: number;
   r: number;
@@ -100,14 +100,14 @@ function validateParameters(
   options?: ScryptOptions,
 ): ValidatedScryptOptions {
   // TODO(soon): Add support for KeyObject input.
-  password = getArrayBufferOrView(password, "password");
-  salt = getArrayBufferOrView(salt, "salt");
+  const passwordBytes = getArrayBufferOrView(password, "password");
+  const saltBytes = getArrayBufferOrView(salt, "salt");
 
-  if (password.byteLength >= kMaxLength) {
-    throw new ERR_INVALID_ARG_VALUE("password", password, "is too big");
+  if (passwordBytes.byteLength >= kMaxLength) {
+    throw new ERR_INVALID_ARG_VALUE("password", passwordBytes, "is too big");
   }
-  if (salt.byteLength >= kMaxLength) {
-    throw new ERR_INVALID_ARG_VALUE("salt", salt, "is too big");
+  if (saltBytes.byteLength >= kMaxLength) {
+    throw new ERR_INVALID_ARG_VALUE("salt", saltBytes, "is too big");
   }
 
   validateInteger(keylen, "keylen", 0, kMaxLength);
@@ -160,8 +160,8 @@ function validateParameters(
   }
 
   return {
-    password,
-    salt,
+    password: passwordBytes,
+    salt: saltBytes,
     keylen,
     N: N as number,
     r: r as number,
@@ -185,22 +185,31 @@ export function scrypt(
     options = defaults;
   }
 
-  let N: number;
-  let r: number;
-  let p: number;
-  let maxmem: number;
-  ({ password, salt, keylen, N, r, p, maxmem } = validateParameters(
-    password,
-    salt,
-    keylen,
-    options as ScryptOptions,
-  ));
+  const {
+    password: passwordBytes,
+    salt: saltBytes,
+    keylen: outputLength,
+    N,
+    r,
+    p,
+    maxmem,
+  } = validateParameters(password, salt, keylen, options as ScryptOptions);
 
   validateFunction(callback, "callback");
 
   new Promise<ArrayBuffer>((res, rej) => {
     try {
-      res(cryptoImpl.getScrypt(password, salt, N, r, p, maxmem, keylen));
+      res(
+        cryptoImpl.getScrypt(
+          passwordBytes,
+          saltBytes,
+          N,
+          r,
+          p,
+          maxmem,
+          outputLength,
+        ),
+      );
     } catch (err) {
       rej(err as Error);
     }
@@ -220,18 +229,25 @@ export function scryptSync(
   keylen: number,
   options?: ScryptOptions,
 ): Buffer {
-  let N: number;
-  let r: number;
-  let p: number;
-  let maxmem: number;
-  ({ password, salt, keylen, N, r, p, maxmem } = validateParameters(
-    password,
-    salt,
-    keylen,
-    options,
-  ));
+  const {
+    password: passwordBytes,
+    salt: saltBytes,
+    keylen: outputLength,
+    N,
+    r,
+    p,
+    maxmem,
+  } = validateParameters(password, salt, keylen, options);
 
   return Buffer.from(
-    cryptoImpl.getScrypt(password, salt, N, r, p, maxmem, keylen),
+    cryptoImpl.getScrypt(
+      passwordBytes,
+      saltBytes,
+      N,
+      r,
+      p,
+      maxmem,
+      outputLength,
+    ),
   );
 }

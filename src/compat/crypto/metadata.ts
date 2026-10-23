@@ -22,8 +22,12 @@ export function setEngine(_engine: string, _flags?: number): never {
 export function setFips(_enabled: boolean): never {
   return unavailable("setFips");
 }
-// Do not copy Workers' fips=true: this adapter uses JavaScript algorithms,
-// not Workers' FIPS backend. That capability remains an explicit boundary.
+// The owned backends do not run in a validated FIPS mode. Report the actual
+// capability rather than copying Workers' true value.
+export const fips = false;
+export function getFips(): boolean {
+  return fips;
+}
 
 export { getCipherInfo } from "./cipher-info.js";
 

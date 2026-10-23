@@ -4,6 +4,7 @@ import { pbkdf2, pbkdf2Sync } from "./pbkdf2.js";
 export { pbkdf2, pbkdf2Sync };
 import { Hash, Hmac, createHmac, createHash, hash } from "./hash.js";
 export { Hash, Hmac, createHmac, createHash, hash };
+export type { HashOptions } from "./hash.js";
 import { X509Certificate } from "./x509.js";
 export { X509Certificate };
 import { Certificate } from "./certificate.js";
@@ -14,6 +15,11 @@ import * as signatures from "./signatures.js";
 export * from "./signatures.js";
 import * as prime from "./prime.js";
 export * from "./prime.js";
+export type {
+  PrimeNum as primeNum,
+  GeneratePrimeOptions as generatePrimeOptions,
+  CheckPrimeOptions as checkPrimeOptions,
+} from "./prime.js";
 import * as asymmetric from "./asymmetric.js";
 export {
   createPrivateKey,
@@ -35,13 +41,6 @@ export {
 } from "./keys.js";
 import * as metadata from "./metadata.js";
 export * from "./metadata.js";
-// Existing algorithms retain the dependency implementation. Additional APIs
-// below are separately verified against the pinned Workers profile.
-// @ts-expect-error crypto-browserify has no declarations
-import original from "crypto-browserify/index.js";
-const originalSupported = { ...original };
-for (const name of ["prng", "rng", "listCiphers", "createCredentials"])
-  delete originalSupported[name];
 import { hkdf, hkdfSync } from "./hkdf.js";
 import {
   randomInt,
@@ -54,6 +53,7 @@ export { randomBytes, randomFill, randomFillSync };
 export const pseudoRandomBytes = randomBytes;
 import { scrypt, scryptSync } from "./scrypt.js";
 export { hkdf, hkdfSync, randomInt, randomUUID, scrypt, scryptSync };
+export type { ArrayLike as arrayLike } from "./scrypt.js";
 import { constants } from "./constants.js";
 export { constants };
 import {
@@ -77,7 +77,6 @@ export const CryptoKey = globalThis.CryptoKey;
 export default {
   X509Certificate,
   Certificate,
-  ...originalSupported,
   ...dh,
   constants,
   pbkdf2,
@@ -85,7 +84,17 @@ export default {
   Hash,
   createHash,
   ...metadata,
-  ...asymmetric,
+  get fips() {
+    return metadata.getFips();
+  },
+  set fips(value: boolean) {
+    metadata.setFips(value);
+  },
+  createPrivateKey: asymmetric.createPrivateKey,
+  createPublicKey: asymmetric.createPublicKey,
+  generateKeyPair: asymmetric.generateKeyPair,
+  generateKeyPairSync: asymmetric.generateKeyPairSync,
+  timingSafeEqual: asymmetric.timingSafeEqual,
   ...signatures,
   ...prime,
   publicEncrypt,

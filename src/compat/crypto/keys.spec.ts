@@ -119,3 +119,13 @@ test("shared key buffers are decoded when the host provides shared memory", () =
   expect(createPrivateKey(shared).equals(privateKey)).toBe(true);
   expect(createPrivateKey({ key: shared }).equals(privateKey)).toBe(true);
 });
+
+test("FIPS reporting describes the owned backend capability", async () => {
+  const crypto = await import("./index.js");
+  expect(crypto.fips).toBe(false);
+  expect(crypto.getFips()).toBe(false);
+  expect(crypto.default.fips).toBe(false);
+  expect(() => {
+    crypto.default.fips = true;
+  }).toThrow("The setFips method is not implemented");
+});

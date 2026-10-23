@@ -17,7 +17,7 @@ describe("Workers digest BufferSource brands", () => {
       },
     });
     const actual = new Uint8Array(
-      await subtle.digest("MD5", view as Uint8Array<ArrayBuffer>),
+      await subtle.digest("MD5", view as unknown as Uint8Array<ArrayBuffer>),
     );
     expect(Array.from(actual)).toEqual([
       85, 165, 64, 8, 173, 27, 165, 137, 170, 33, 13, 38, 41, 193, 223, 65,

@@ -1,4 +1,134 @@
 export const eventCases = {
+  cryptoKeyDetailsShape: async function ({ crypto: c }) {
+    const result = {};
+    const record = (name, key) => {
+      const detail = key.asymmetricKeyDetails;
+      result[name] = Reflect.ownKeys(detail).map((name) => {
+        const d = Object.getOwnPropertyDescriptor(detail, name);
+        return {
+          name: String(name),
+          value:
+            d.value === undefined
+              ? "undefined"
+              : typeof d.value === "bigint"
+                ? d.value.toString()
+                : d.value,
+          enumerable: d.enumerable,
+          writable: d.writable,
+          configurable: d.configurable,
+        };
+      });
+    };
+    for (const [algorithm, options] of [
+      ["rsa", { modulusLength: 1024 }],
+      ["ec", { namedCurve: "prime256v1" }],
+      ["ed25519", {}],
+      ["x25519", {}],
+      ["dh", { group: "modp14" }],
+    ]) {
+      const pair = c.generateKeyPairSync(algorithm, options);
+      for (const kind of ["privateKey", "publicKey"])
+        record(`${algorithm}/${kind}`, pair[kind]);
+    }
+    // Pinned Workers rejects DSA generation; import its public upstream fixture.
+    const dsa = c.createPrivateKey(
+      "-----BEGIN DSA PRIVATE KEY-----\nMIIB0gIBAAKBiQDp3xGIsNcKZWSpur2Ab2f5rirhu5AsYGLI/XZvzueoO4kLPp3s\nzKHXabBObdxU07kRFkfpV9lftdXT3a6E/Wxb+w2d7g0F7pWTdwpmmofcRtwgbynm\nJKvqWt/OwfVFsdUvvpVci9AxY/5rdM/K54Srp6iSpfteBYKGqCpPnswikND0GxKM\n1MbzAhUAqAPKCZ4hxromirUu33tn3Nhsq20CgYgf0tH2nwzWlPLoN4OJvC5dVLPv\nMRyJTQekW8tR0oY6PeshmZOaoI0L3e/M4KeZ/4qiY7IRNksP2YGJxjfS6W+h+MNj\nPO5r0aYYFYCPQ8JbhBO7l0hdXmkTY3FcdyRHeh2gwe3bBX6Auev2MGgL616Cgd/K\nH8PAX9EHmrNPcQOWHem4KcfJXqouAoGIcZ/4bJurOAw5OL4+5BsE4jfSVFq4nmNl\n+m6Iy6ls3hOHOZ9sJlw0Fi+ZtdeddOTYnIngW/kH09XGoF5JJOaLQv2O4GmZfDfn\nla+vfHZPsOxmYqeEbSwA2pqlhOn/dCshBOymhwNLXp1FJ3JUEyh8i605X06XmWoj\n4ZIu/tr1xbnZDLHuFjBmXAIURbB5/IDf2h0sW+qL5gHFO8bgr+E=\n-----END DSA PRIVATE KEY-----\n",
+    );
+    record("dsa/privateKey", dsa);
+    record("dsa/publicKey", c.createPublicKey(dsa));
+    for (const algorithm of [
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: 1024,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256",
+      },
+      { name: "ECDSA", namedCurve: "P-384" },
+      { name: "ECDH", namedCurve: "P-256" },
+    ]) {
+      const pair = await c.subtle.generateKey(
+        algorithm,
+        true,
+        algorithm.name === "ECDH" ? ["deriveBits"] : ["sign", "verify"],
+      );
+      for (const kind of ["privateKey", "publicKey"])
+        record(`host/${algorithm.name}/${kind}`, c.KeyObject.from(pair[kind]));
+    }
+    return result;
+  },
+  cryptoExportSurface: function ({ crypto: c }) {
+    const descriptor = Object.getOwnPropertyDescriptor(c.default, "fips");
+    let setter;
+    try {
+      c.default.fips = false;
+      setter = "success";
+    } catch (error) {
+      setter = {
+        name: error.name,
+        code: error.code ?? null,
+        message: error.message,
+      };
+    }
+    return {
+      named: Object.keys(c).sort(),
+      default: Object.keys(c.default).sort(),
+      fips: {
+        namedType: typeof c.fips,
+        getterType: typeof c.getFips,
+        descriptor: {
+          get: typeof descriptor?.get,
+          set: typeof descriptor?.set,
+          enumerable: descriptor?.enumerable,
+          configurable: descriptor?.configurable,
+        },
+        internallyConsistent:
+          c.fips === c.getFips() && c.default.fips === c.getFips(),
+        setter,
+      },
+    };
+  },
+  cryptoKeyInspection: function ({ crypto: c, util }) {
+    const pair = c.generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const result = {};
+    const symbol = Symbol.for("nodejs.util.inspect.custom");
+    for (const [name, key] of Object.entries({
+      secret: c.createSecretKey("key"),
+      private: pair.privateKey,
+      public: pair.publicKey,
+    })) {
+      const prototypes = [];
+      let proto = Object.getPrototypeOf(key);
+      while (proto !== Object.prototype) {
+        prototypes.push(
+          Reflect.ownKeys(proto).map((name) => {
+            const d = Object.getOwnPropertyDescriptor(proto, name);
+            return {
+              name: String(name),
+              enumerable: d.enumerable,
+              configurable: d.configurable,
+              writable: d.writable,
+              valueType: typeof d.value,
+              length:
+                typeof d.value === "function" ? d.value.length : undefined,
+              get: typeof d.get,
+              set: typeof d.set,
+            };
+          }),
+        );
+        proto = Object.getPrototypeOf(proto);
+      }
+      const inspections = [];
+      for (const depth of [-1, 0, 1, 2]) {
+        const output = key[symbol](depth, { depth });
+        inspections.push({
+          direct: output === key ? "same-key" : output,
+          inspect: util.inspect(key, { depth }),
+        });
+      }
+      result[name] = { prototypes, inspections };
+    }
+    return result;
+  },
   cryptoSubtleDigestViews: async function ({ crypto: c }) {
     const result = {};
     for (const algorithm of ["SHA-1", "SHA-256", "SHA-384", "SHA-512", "MD5"]) {

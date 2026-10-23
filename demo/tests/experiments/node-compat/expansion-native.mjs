@@ -432,6 +432,9 @@ main();
 `;
 await writeFile(`${artifacts}/bootstrap.js`, bootstrapCode);
 await runNativeAcceptance({
+  // The expansion suite includes key derivation/encoding on both execution modes.
+  // Keep its overall budget separate from the individual Worker/socket deadlines.
+  timeout: 180_000,
   backend,
   artifacts,
   platform,

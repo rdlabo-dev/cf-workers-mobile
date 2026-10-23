@@ -1,3 +1,4 @@
+import { inspect } from "../util/inspect.js";
 import { exportOptions, exportAsymmetric } from "./key-export.js";
 import { validateExportOptions } from "./key-options.js";
 import { exportJwk } from "./key-formats.js";
@@ -73,9 +74,6 @@ export abstract class KeyObject {
     });
   }
   abstract get type(): KeyState["type"];
-  get [Symbol.toStringTag]() {
-    return "KeyObject";
-  }
   export(options: any = {}): any {
     validateObject(options, "options");
     const current = state(this);
@@ -134,25 +132,92 @@ export abstract class KeyObject {
       difference |= a.bytes[i] ^ b.bytes[i];
     return difference === 0;
   }
+  get [Symbol.toStringTag]() {
+    return "KeyObject";
+  }
 }
 export class SecretKeyObject extends KeyObject {
-  get type(): "secret" {
-    return "secret";
+  get symmetricKeySize() {
+    const key = state(this);
+    return (
+      (key.bytes?.length ?? (key.native?.algorithm as any)?.length ?? 0) | 0
+    );
   }
   override export(options?: any) {
     return super.export(options);
   }
-  get symmetricKeySize() {
-    const key = state(this);
-    return (
-      key.bytes?.length ?? ((key.native?.algorithm as any)?.length ?? 0) | 0
-    );
+  get type(): "secret" {
+    return "secret";
   }
-  [Symbol.for("nodejs.util.inspect.custom")]() {
-    return `SecretKeyObject { size: ${this.symmetricKeySize} }`;
+  [Symbol.for("nodejs.util.inspect.custom")](
+    depth: number,
+    options: { depth?: number },
+  ) {
+    if (depth < 0) return this;
+    const opts = {
+      ...options,
+      depth: options.depth == null ? null : options.depth - 1,
+    };
+    return `${this.constructor.name} ${inspect({ size: this.symmetricKeySize }, opts)}`;
   }
 }
 abstract class AsymmetricKeyObject extends KeyObject {
+  get asymmetricKeyDetails() {
+    const details = (() => {
+      const current = state(this),
+        key = current.asymmetric;
+      if (!key) {
+        const algorithm = current.nativeAlgorithm as
+          | RsaHashedKeyAlgorithm
+          | EcKeyAlgorithm
+          | undefined;
+        if (!algorithm) return boundary();
+        if ("modulusLength" in algorithm) {
+          let publicExponent = 0n;
+          for (const value of algorithm.publicExponent)
+            publicExponent = (publicExponent << 8n) | BigInt(value);
+          return { modulusLength: algorithm.modulusLength, publicExponent };
+        }
+        if ("namedCurve" in algorithm)
+          return {
+            namedCurve:
+              (
+                {
+                  "P-256": "prime256v1",
+                  "P-384": "secp384r1",
+                  "P-521": "secp521r1",
+                } as Record<string, string>
+              )[algorithm.namedCurve] ?? algorithm.namedCurve,
+          };
+        return {};
+      }
+      if (key.type === "rsa")
+        return {
+          modulusLength: key.bits,
+          publicExponent: BigInt(
+            "0x" + Buffer.from(key.parameter("e")).toString("hex"),
+          ),
+        };
+      if (key.type === "ec") return { namedCurve: key.group };
+      if (key.type === "dsa") {
+        const q = key.parameter("q");
+        return {
+          modulusLength: key.bits,
+          divisorLength: q.length
+            ? (q.length - 1) * 8 + 32 - Math.clz32(q[0])
+            : 0,
+        };
+      }
+      return {};
+    })();
+    return {
+      modulusLength: undefined,
+      publicExponent: undefined,
+      divisorLength: undefined,
+      namedCurve: undefined,
+      ...details,
+    };
+  }
   get asymmetricKeyType() {
     const current = state(this),
       key = current.asymmetric;
@@ -176,74 +241,38 @@ abstract class AsymmetricKeyObject extends KeyObject {
     }
     return key.type;
   }
-  get asymmetricKeyDetails() {
-    const current = state(this),
-      key = current.asymmetric;
-    if (!key) {
-      const algorithm = current.nativeAlgorithm as
-        | RsaHashedKeyAlgorithm
-        | EcKeyAlgorithm
-        | undefined;
-      if (!algorithm) return boundary();
-      if ("modulusLength" in algorithm) {
-        let publicExponent = 0n;
-        for (const value of algorithm.publicExponent)
-          publicExponent = (publicExponent << 8n) | BigInt(value);
-        return { modulusLength: algorithm.modulusLength, publicExponent };
-      }
-      if ("namedCurve" in algorithm)
-        return {
-          namedCurve:
-            (
-              {
-                "P-256": "prime256v1",
-                "P-384": "secp384r1",
-                "P-521": "secp521r1",
-              } as Record<string, string>
-            )[algorithm.namedCurve] ?? algorithm.namedCurve,
-        };
-      return {};
-    }
-    if (key.type === "rsa")
-      return {
-        modulusLength: key.bits,
-        publicExponent: BigInt(
-          "0x" + Buffer.from(key.parameter("e")).toString("hex"),
-        ),
-      };
-    if (key.type === "ec") return { namedCurve: key.group };
-    if (key.type === "dsa") {
-      const q = key.parameter("q");
-      return {
-        modulusLength: key.bits,
-        divisorLength: q.length
-          ? (q.length - 1) * 8 + 32 - Math.clz32(q[0])
-          : 0,
-      };
-    }
-    return {};
-  }
   toCryptoKey() {
     throw Object.assign(
       new Error("The toCryptoKey method is not implemented"),
       { code: "ERR_METHOD_NOT_IMPLEMENTED" },
     );
   }
+  [Symbol.for("nodejs.util.inspect.custom")](
+    depth: number,
+    options: { depth?: number },
+  ) {
+    if (depth < 0) return this;
+    const opts = {
+      ...options,
+      depth: options.depth == null ? null : options.depth - 1,
+    };
+    return `${this.constructor.name} ${inspect({ type: this.asymmetricKeyType, details: this.asymmetricKeyDetails }, opts)}`;
+  }
 }
 export class PublicKeyObject extends AsymmetricKeyObject {
+  override export(options?: any) {
+    return super.export(options);
+  }
   get type(): "public" {
     return "public";
   }
-  override export(options?: any) {
-    return super.export(options);
-  }
 }
 export class PrivateKeyObject extends AsymmetricKeyObject {
-  get type(): "private" {
-    return "private";
-  }
   override export(options?: any) {
     return super.export(options);
+  }
+  get type(): "private" {
+    return "private";
   }
 }
 export function createSecretKey(

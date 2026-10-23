@@ -124,7 +124,11 @@ These remain observable engine boundaries, not whole-module acceptance.
 RSA, EC, Ed25519 and X25519 key generation and owned key operations use
 bundled OpenSSL 3.5.9 WebAssembly. PEM/DER import first uses the pinned BoringSSL
 and ncrypto parsing rules, including unsupported key types, encoding selection,
-encrypted input and certificate public keys. Temporary private DER copies are
+encrypted input and certificate public keys. PEM/DER export uses the same
+BoringSSL writer and ncrypto encoding choices, after the Workers frontend and
+native dictionary option conversions. EC encoding flags survive the canonical
+key transfer. Plain and encrypted PKCS8/PKCS1/SEC1/SPKI outputs are checked by
+re-importing and comparing key material. Temporary private DER copies are
 cleared after transfer. JWK import preserves dictionary getter order, snapshots
 array lengths, validates base64url and EC private scalar bounds, and accepts
 Workers' curve aliases. DSA metadata and the JWK export rejection are preserved.
@@ -208,10 +212,12 @@ views over shared memory are accepted where the host exposes shared memory.
 Other standard SubtleCrypto operations still use the host implementation and
 remain subject to the operation-level compatibility inventory.
 
-Workers reports `fips=true` because of its own crypto backend. The WebView's
-JavaScript implementations do not establish FIPS compliance, so that flag is
-not copied merely to match the export inventory. `setFips` and `setEngine`
-retain Workers' unsupported-operation behavior.
+Workers reports `fips=true` because of its own crypto backend. The owned WebView
+backends do not run in a validated FIPS mode: `fips` and `getFips()` report false.
+This is an explicit capability difference, not Workers FIPS equivalence.
+`setFips`, assignment to default-export `fips`, and `setEngine` retain Workers'
+unsupported-operation behavior. Surface contracts check names and descriptors;
+the local capability value is asserted separately from Workers behavior.
 
 For focused diagnosis, set `NODE_COMPAT_CASES` to a comma-separated list when
 running `expansion-contracts.probe.mjs`. Focused output goes to
