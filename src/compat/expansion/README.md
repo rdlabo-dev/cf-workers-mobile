@@ -102,8 +102,24 @@ The upstream random/prime fixtures and consumer declaration checks run with
 
 Adapter-created secret keys support copied raw/JWK export, equality, generation,
 HMAC, HKDF and symmetric ciphers. KeyObject.from can retain a host CryptoKey, but
-synchronous extraction of its opaque key material is unavailable. RSA, EC, Ed25519 and X25519 key generation and PEM/DER/JWK conversion use
-bundled OpenSSL 3.5.9 WebAssembly; RSA/EC streaming and one-shot signatures
+synchronous extraction of its opaque key material is unavailable. Its public
+algorithm metadata is copied through intrinsic getters when the KeyObject is
+created. On WebKit, a host key's algorithm object can already have been mutated
+before that conversion; its original metadata cannot then be recovered through
+the public synchronous API. Transparent Proxy arrays are also indistinguishable
+from ordinary arrays in JavaScript, while Workers rejects them in JWK dictionaries.
+These remain observable engine boundaries, not whole-module acceptance.
+RSA, EC, Ed25519 and X25519 key generation and owned key operations use
+bundled OpenSSL 3.5.9 WebAssembly. PEM/DER import first uses the pinned BoringSSL
+and ncrypto parsing rules, including unsupported key types, encoding selection,
+encrypted input and certificate public keys. Temporary private DER copies are
+cleared after transfer. JWK import preserves dictionary getter order, snapshots
+array lengths, validates base64url and EC private scalar bounds, and accepts
+Workers' curve aliases. DSA metadata and the JWK export rejection are preserved.
+SharedArrayBuffer input is checked separately on hosts with shared memory;
+the ordinary browser profile does not provide that constructor, and the native
+key contracts use ArrayBuffer rather than claiming shared-memory coverage.
+RSA/EC streaming and one-shot signatures
 are compared with Workers and independent test signatures. This covers selected
 algorithms and operations, not the whole crypto module. Generation validates encoding
 options before allocating keys, preserves RSA's 16384-bit limit and 128-bit size
@@ -156,7 +172,7 @@ writes wait for authenticated TLS; hostname mismatch or cancellation closes
 the connection without sending queued application bytes. Native acceptance
 exchanges a plaintext upgrade command followed by TLS, checks connection counts
 and tests page and Dedicated Worker modes on both OSes. Custom Duplex wrapping
-is unsupported. iOS upgrades use the existing OpenSSL Wasm backend with memory
+forwards bytes as in Workers and does not itself encrypt them. iOS upgrades use the existing OpenSSL Wasm backend with memory
 BIOs on the original TCP connection; SecTrust must authenticate the peer chain
 and hostname before the connection opens or application data is exposed. Android
 uses the existing Netty channel with the platform SSLEngine. Native tests cover

@@ -32,3 +32,8 @@ and lifecycle behavior from `src/workerd/api/node/crypto.c++` at that same worke
 revision. The cipher fixture retains the upstream `crypto_cipher-test.js` notices.
 BoringSSL commit `427ec40cc8edc545253289232e885708c409e5ea` supplies the bundled cipher
 primitives; its license and bundled third-party notices are in `LICENSE.boringssl`.
+
+PEM/DER key parsing is adapted from `src/ncrypto.cpp` in Node.js ncrypto
+`v1.1.4`, the version pinned by workerd. Copyright (c) 2025 Node.js; the MIT
+license is retained in `LICENSE.ncrypto`. Parsing uses the bundled BoringSSL
+backend before transferring owned key material to the OpenSSL operation backend.

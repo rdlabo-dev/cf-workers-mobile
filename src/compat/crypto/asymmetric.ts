@@ -1,5 +1,5 @@
 import { signatureDigest } from "./digests.js";
-import { curveName, generateDh, deriveDh } from "./native-cipher.js";
+import { curveName, generateDh, deriveDh, decodeKey } from "./native-cipher.js";
 import { validateExportOptions } from "./key-options.js";
 import {
   ERR_INCOMPATIBLE_OPTION_PAIR,
@@ -44,12 +44,16 @@ function input(value: any, privateKey: boolean): NativeKey {
       value,
     );
   const options =
-    typeof value === "string" ||
-    value instanceof ArrayBuffer ||
-    ArrayBuffer.isView(value)
+    typeof value === "string" || isAnyBuffer(value) || ArrayBuffer.isView(value)
       ? { key: value }
       : value;
-  const data = options.key;
+  const {
+    key: data,
+    encoding = "utf8",
+    format = "pem",
+    type,
+    passphrase,
+  } = options;
   if (
     data == null ||
     data instanceof KeyObject ||
@@ -62,44 +66,40 @@ function input(value: any, privateKey: boolean): NativeKey {
     );
   if (
     typeof data === "object" &&
-    !(data instanceof ArrayBuffer) &&
+    !isAnyBuffer(data) &&
     !ArrayBuffer.isView(data)
   )
     return importJwk(data, privateKey);
-  const format = options.format ?? "pem";
+  if (
+    typeof data !== "string" &&
+    !isAnyBuffer(data) &&
+    !ArrayBuffer.isView(data)
+  )
+    throw new ERR_INVALID_ARG_TYPE(
+      "key",
+      ["ArrayBuffer", "Buffer", "TypedArray", "DataView", "string", "object"],
+      value,
+    );
   validateOneOf(format, "format", ["pem", "der"]);
-  if (options.type !== undefined)
+  if (type !== undefined)
     validateOneOf(
-      options.type,
+      type,
       "type",
       privateKey ? ["pkcs1", "pkcs8", "sec1"] : ["pkcs1", "spki"],
     );
   const raw =
-    typeof data === "string"
-      ? Buffer.from(data, options.encoding ?? "utf8")
-      : bytes(data, "key");
+    typeof data === "string" ? Buffer.from(data, encoding) : bytes(data, "key");
   const password =
-    options.passphrase === undefined
+    passphrase == null
       ? undefined
-      : typeof options.passphrase === "string"
-        ? Buffer.from(options.passphrase, options.encoding ?? "utf8")
-        : bytes(options.passphrase, "passphrase");
-  if (privateKey) return NativeKey.parse(raw, format === "pem", true, password);
+      : typeof passphrase === "string"
+        ? Buffer.from(passphrase, encoding)
+        : bytes(passphrase, "passphrase");
+  const decoded = decodeKey(raw, format === "pem", privateKey, type, password);
   try {
-    return NativeKey.parse(raw, format === "pem", false, password);
-  } catch (error) {
-    // createPublicKey also accepts a serialized private key, deriving public material.
-    let key: NativeKey;
-    try {
-      key = NativeKey.parse(raw, format === "pem", true, password);
-    } catch {
-      throw error;
-    }
-    try {
-      return NativeKey.parse(key.export(false, false, "spki"), false, false);
-    } finally {
-      key.dispose();
-    }
+    return NativeKey.parse(decoded.data, false, decoded.privateKey);
+  } finally {
+    decoded.data.fill(0);
   }
 }
 export function createPrivateKey(value: unknown): PrivateKeyObject {

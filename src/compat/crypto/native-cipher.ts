@@ -76,6 +76,48 @@ export function size(api: API, pointer: number): number {
   return new DataView(api.memory.buffer).getUint32(pointer, true);
 }
 
+export function validateEcPrivate(name: string, value: Uint8Array): void {
+  inputs([name, value], (api, [curve, data]) => {
+    if (!api.cipher_ec_private_valid(curve, data, value.byteLength))
+      throw new Error("EW JWK invalid private key");
+  });
+}
+
+export function decodeKey(
+  data: Uint8Array,
+  pem: boolean,
+  privateKey: boolean,
+  type: string | undefined,
+  password?: Uint8Array,
+): { data: Uint8Array; privateKey: boolean } {
+  return inputs([data, password ?? 0], (api, [p, pass]) => {
+    try {
+      const result = api.cipher_key_parse(
+        p,
+        data.byteLength,
+        +pem,
+        +privateKey,
+        type === undefined
+          ? -1
+          : ["pkcs8", "pkcs1", "sec1", "spki"].indexOf(type),
+        pass,
+        password?.byteLength ?? 0,
+        +(password !== undefined),
+      );
+      if (!result)
+        throw new Error(
+          `Failed to parse ${privateKey ? "private" : "public"} key`,
+        );
+      return {
+        data: output(api, api.cipher_key_data(), api.cipher_key_der_size()),
+        privateKey: result === 2,
+      };
+    } finally {
+      api.cipher_key_clear();
+    }
+  });
+}
+
 // Match Workers' curve lookup before handing generation to the owned key backend.
 export function curveName(name: string): string {
   return inputs([name], (api, [p]) => {

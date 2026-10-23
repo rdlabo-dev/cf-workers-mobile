@@ -25,6 +25,30 @@ function boundary(): never {
     { code: "ERR_METHOD_NOT_IMPLEMENTED" },
   );
 }
+const nativeAlgorithm = Object.getOwnPropertyDescriptor(
+  globalThis.CryptoKey.prototype,
+  "algorithm",
+)!.get!;
+const nativeType = Object.getOwnPropertyDescriptor(
+  globalThis.CryptoKey.prototype,
+  "type",
+)!.get!;
+function cloneAlgorithm(value: any): any {
+  if (ArrayBuffer.isView(value))
+    return new Uint8Array(
+      value.buffer,
+      value.byteOffset,
+      value.byteLength,
+    ).slice();
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value).map(([name, entry]) => [
+        name,
+        cloneAlgorithm(entry),
+      ]),
+    );
+  return value;
+}
 export function create(
   type: KeyState["type"],
   value: Omit<KeyState, "type">,
@@ -46,7 +70,10 @@ export abstract class KeyObject {
   static from(key: CryptoKey): KeyObject {
     if (!(key instanceof globalThis.CryptoKey))
       throw new ERR_INVALID_ARG_TYPE("key", "CryptoKey", key);
-    return create(key.type, { native: key });
+    return create(nativeType.call(key), {
+      native: key,
+      nativeAlgorithm: cloneAlgorithm(nativeAlgorithm.call(key)),
+    });
   }
   abstract get type(): KeyState["type"];
   get [Symbol.toStringTag]() {
@@ -74,6 +101,12 @@ export abstract class KeyObject {
       );
       if (options.cipher !== undefined)
         validateString(options.cipher, "options.cipher");
+      if (
+        current.type === "public" &&
+        options.type === "pkcs1" &&
+        current.asymmetric.type !== "rsa"
+      )
+        throw new Error("PKCS1 can only be used for RSA keys");
       const passphrase =
         options.passphrase === undefined
           ? undefined
@@ -145,13 +178,56 @@ export class SecretKeyObject extends KeyObject {
 }
 abstract class AsymmetricKeyObject extends KeyObject {
   get asymmetricKeyType() {
-    const key = state(this).asymmetric;
-    if (!key) return boundary();
+    const current = state(this),
+      key = current.asymmetric;
+    if (!key) {
+      const name = current.nativeAlgorithm?.name;
+      if (name === undefined) return boundary();
+      return (
+        (
+          {
+            "RSASSA-PKCS1-v1_5": "rsa",
+            "RSA-PSS": "rsa",
+            "RSA-OAEP": "rsa",
+            ECDSA: "ec",
+            ECDH: "ecdh",
+            Ed25519: "ed25519",
+            "NODE-ED25519": "ed25519",
+            X25519: "x25519",
+          } as Record<string, string>
+        )[name] ?? name
+      );
+    }
     return key.type;
   }
   get asymmetricKeyDetails() {
-    const key = state(this).asymmetric;
-    if (!key) return boundary();
+    const current = state(this),
+      key = current.asymmetric;
+    if (!key) {
+      const algorithm = current.nativeAlgorithm as
+        | RsaHashedKeyAlgorithm
+        | EcKeyAlgorithm
+        | undefined;
+      if (!algorithm) return boundary();
+      if ("modulusLength" in algorithm) {
+        let publicExponent = 0n;
+        for (const value of algorithm.publicExponent)
+          publicExponent = (publicExponent << 8n) | BigInt(value);
+        return { modulusLength: algorithm.modulusLength, publicExponent };
+      }
+      if ("namedCurve" in algorithm)
+        return {
+          namedCurve:
+            (
+              {
+                "P-256": "prime256v1",
+                "P-384": "secp384r1",
+                "P-521": "secp521r1",
+              } as Record<string, string>
+            )[algorithm.namedCurve] ?? algorithm.namedCurve,
+        };
+      return {};
+    }
     if (key.type === "rsa")
       return {
         modulusLength: key.bits,
@@ -160,6 +236,15 @@ abstract class AsymmetricKeyObject extends KeyObject {
         ),
       };
     if (key.type === "ec") return { namedCurve: key.group };
+    if (key.type === "dsa") {
+      const q = key.parameter("q");
+      return {
+        modulusLength: key.bits,
+        divisorLength: q.length
+          ? (q.length - 1) * 8 + 32 - Math.clz32(q[0])
+          : 0,
+      };
+    }
     return {};
   }
   toCryptoKey() {

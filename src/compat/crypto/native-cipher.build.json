@@ -21,6 +21,6 @@
     "-sEXPORTED_FUNCTIONS=[\"_malloc\",\"_free\"]"
   ],
   "libraries": ["libdecrepit.a", "libcrypto.a"],
-  "bindingSha256": "930b5fc1bc1844b987e03234c9d8ca560a2da8d6b402707dc171de0bb1c08cc3",
-  "sha256": "e0d9300f35b387a087fa792d8c04f2f9fef36cbde68d6f9334eccf3db887ff98"
+  "bindingSha256": "efa506a0bdd98bb852ed8915d2f741ccf527ba8b7d49df564f30920ce163e42e",
+  "sha256": "e68aa7213767bf14c391ce0e407e4272e5036e3d5778613c34c7ca44ebbda5b1"
 }

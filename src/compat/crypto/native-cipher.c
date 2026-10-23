@@ -7,8 +7,73 @@
 #include <openssl/bn.h>
 #include <openssl/obj.h>
 #include <openssl/mem.h>
+#include <openssl/pem.h>
+#include <openssl/x509.h>
 #include <string.h>
 #define API EMSCRIPTEN_KEEPALIVE
+// Key decoding follows ncrypto v1.1.4 using the same BoringSSL parser as Workers.
+static unsigned char *key_der;
+static int key_der_size;
+API void cipher_key_clear(void) {
+ if(key_der){if(key_der_size>0)OPENSSL_cleanse(key_der,key_der_size);OPENSSL_free(key_der);}
+ key_der=NULL;key_der_size=0;
+}
+API const unsigned char *cipher_key_data(void){return key_der;}
+API int cipher_key_der_size(void){return key_der_size;}
+struct key_password {const unsigned char *data;int size;};
+static int key_password_cb(char *out,int capacity,int writing,void *opaque){
+ (void)writing;struct key_password *pass=opaque;
+ if(!pass || pass->size>capacity)return -1;
+ if(pass->size)memcpy(out,pass->data,pass->size);return pass->size;
+}
+static int key_encrypted(const unsigned char *data,int size){
+ if(size<2 || data[0]!=0x30)return 0;
+ size_t offset=2,length=data[1];
+ if(length&0x80){size_t count=length&0x7f;length=0;
+  if(count>sizeof(size_t) || count+2>(size_t)size)return 0;
+  for(size_t i=0;i<count;i++)length=(length<<8)|data[i+2];offset+=count;
+ }
+ return length && offset<(size_t)size && data[offset]!=2;
+}
+static EVP_PKEY *key_private(const unsigned char *data,int size,int pem,int type,struct key_password *pass){
+ BIO *bio=BIO_new_mem_buf(data,size);if(!bio)return NULL;
+ ERR_clear_error();EVP_PKEY *key=NULL;
+ if(pem)key=PEM_read_bio_PrivateKey(bio,NULL,key_password_cb,pass);
+ else if(type==1 || type==2)key=d2i_PrivateKey_bio(bio,NULL);
+ else if(type==0){
+  if(key_encrypted(data,size))key=d2i_PKCS8PrivateKey_bio(bio,NULL,key_password_cb,pass);
+  else {PKCS8_PRIV_KEY_INFO *info=d2i_PKCS8_PRIV_KEY_INFO_bio(bio,NULL);if(info){key=EVP_PKCS82PKEY(info);PKCS8_PRIV_KEY_INFO_free(info);}}
+ }
+ BIO_free(bio);if(ERR_peek_error()){EVP_PKEY_free(key);key=NULL;}return key;
+}
+static EVP_PKEY *key_public(const unsigned char *data,int size,int pem,int type){
+ EVP_PKEY *key=NULL;const unsigned char *cursor=data;
+ if(!pem)return type==1?d2i_PublicKey(EVP_PKEY_RSA,NULL,&cursor,size):type==3?d2i_PUBKEY(NULL,&cursor,size):NULL;
+ BIO *bio=BIO_new_mem_buf(data,size);if(!bio)return NULL;
+ const char *labels[]={"PUBLIC KEY","RSA PUBLIC KEY","CERTIFICATE"};
+ for(int i=0;i<3 && !key;i++){
+  unsigned char *decoded=NULL;long length=0;BIO_reset(bio);ERR_clear_error();
+  if(PEM_bytes_read_bio(&decoded,&length,NULL,labels[i],bio,NULL,NULL)!=1)continue;
+  cursor=decoded;
+  if(i==0)key=d2i_PUBKEY(NULL,&cursor,length);
+  else if(i==1)key=d2i_PublicKey(EVP_PKEY_RSA,NULL,&cursor,length);
+  else {X509 *cert=d2i_X509(NULL,&cursor,length);if(cert){key=X509_get_pubkey(cert);X509_free(cert);}}
+  OPENSSL_free(decoded);
+ }
+ BIO_free(bio);return key;
+}
+// Returns 1 for public material, 2 for private material (including public fallback).
+API int cipher_key_parse(const unsigned char *data,int size,int pem,int private_key,int type,const unsigned char *password,int password_size,int has_password){
+ cipher_key_clear();ERR_clear_error();struct key_password pass={password,password_size};
+ EVP_PKEY *key=NULL;int is_private=private_key;
+ if(!private_key)key=key_public(data,size,pem,type<0?1:type);
+ if(!key){key=key_private(data,size,pem,type<0?0:type,has_password?&pass:NULL);is_private=1;}
+ if(!key){ERR_clear_error();return 0;}
+ if(is_private){PKCS8_PRIV_KEY_INFO *info=EVP_PKEY2PKCS8(key);if(info){key_der_size=i2d_PKCS8_PRIV_KEY_INFO(info,&key_der);PKCS8_PRIV_KEY_INFO_free(info);}}
+ else key_der_size=i2d_PUBKEY(key,&key_der);
+ EVP_PKEY_free(key);ERR_clear_error();
+ if(key_der_size<=0){cipher_key_clear();return 0;}return is_private?2:1;
+}
 #define AEAD(name) if(!strcmp(algorithm,#name)) return EVP_aead_##name();
 API const EVP_AEAD *cipher_aead(const char *algorithm) {
  AEAD(aes_128_gcm) AEAD(aes_192_gcm) AEAD(aes_256_gcm)
@@ -45,6 +110,12 @@ API intptr_t cipher_curve_name(const char *name){
  int nid=EC_curve_nist2nid(name);if(nid==NID_undef)nid=OBJ_sn2nid(name);
  if(nid==NID_undef)return 0;EC_GROUP *group=EC_GROUP_new_by_curve_name(nid);if(!group)return -1;
  EC_GROUP_free(group);return (intptr_t)OBJ_nid2sn(nid);
+}
+API int cipher_ec_private_valid(const char *name,const unsigned char *data,int length){
+ int nid=EC_curve_nist2nid(name);if(nid==NID_undef)nid=OBJ_sn2nid(name);
+ EC_KEY *key=EC_KEY_new_by_curve_name(nid);BIGNUM *scalar=BN_bin2bn(data,length,NULL);
+ int ok=key && scalar && EC_KEY_set_private_key(key,scalar);
+ BN_clear_free(scalar);EC_KEY_free(key);ERR_clear_error();return ok;
 }
 
 API int cipher_dh_generate(const unsigned char *prime,int length,unsigned long generator,unsigned char *out){

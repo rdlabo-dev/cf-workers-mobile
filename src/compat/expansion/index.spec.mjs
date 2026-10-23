@@ -1,4 +1,453 @@
 export const eventCases = {
+  cryptoKeyInputOptions: async function ({ crypto }) {
+    const result = {},
+      attempt = (name, fn) => {
+        try {
+          result[name] = fn();
+        } catch (e) {
+          result[name] = {
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+          };
+        }
+      };
+    const privateKey = crypto.generateKeyPairSync("ec", {
+      namedCurve: "prime256v1",
+    }).privateKey;
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" }),
+      jwk = privateKey.export({ format: "jwk" });
+    for (const kind of ["private", "public"]) {
+      const method =
+        crypto[kind === "private" ? "createPrivateKey" : "createPublicKey"];
+      const order = [],
+        options = {};
+      for (const name of ["key", "encoding", "format", "type", "passphrase"])
+        Object.defineProperty(options, name, {
+          get() {
+            order.push(name);
+            return name === "key" ? jwk : undefined;
+          },
+        });
+      attempt(kind + "/order", () => ({ type: method(options).type, order }));
+      for (const [name, value] of Object.entries({
+        format: null,
+        type: null,
+        encoding: null,
+        passphrase: null,
+      }))
+        attempt(
+          kind + "/null/" + name,
+          () => method({ key: pem, [name]: value }).type,
+        );
+      for (const [name, value] of Object.entries({
+        number: 1,
+        boolean: true,
+        function: () => {},
+        string: "",
+        symbol: Symbol("x"),
+      }))
+        attempt(kind + "/key/" + name, () => method({ key: value }).type);
+      const data = new TextEncoder().encode(pem),
+        shared = new ArrayBuffer(data.length);
+      new Uint8Array(shared).set(data);
+      attempt(kind + "/arrayBuffer", () => method(shared).asymmetricKeyType);
+      attempt(
+        kind + "/arrayBufferOptions",
+        () => method({ key: shared }).asymmetricKeyType,
+      );
+    }
+    return result;
+  },
+
+  cryptoKeyDictionary: async function ({ crypto }) {
+    const result = {},
+      attempt = (name, fn) => {
+        try {
+          result[name] = fn();
+        } catch (e) {
+          result[name] = {
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+          };
+        }
+      };
+    const fields = [
+        "kty",
+        "use",
+        "key_ops",
+        "alg",
+        "ext",
+        "crv",
+        "x",
+        "y",
+        "d",
+        "n",
+        "e",
+        "p",
+        "q",
+        "dp",
+        "dq",
+        "qi",
+        "oth",
+        "k",
+        "pub",
+        "priv",
+      ],
+      order = [];
+    const input = {};
+    for (const name of fields)
+      Object.defineProperty(input, name, {
+        get() {
+          order.push(name);
+          return { kty: "RSA", n: "AQ", e: "AQAB" }[name];
+        },
+      });
+    attempt("order", () => {
+      const key = crypto.createPublicKey({ key: input });
+      return { order, key: key.export({ format: "jwk" }) };
+    });
+    let reads = 0;
+    attempt("changing", () => {
+      const key = crypto.createPublicKey({
+        key: {
+          kty: new String("RSA"),
+          get n() {
+            return ++reads === 1 ? "AQ" : "@@";
+          },
+          e: "AQAB",
+        },
+      });
+      return { reads, key: key.export({ format: "jwk" }) };
+    });
+    attempt(
+      "unused",
+      () =>
+        crypto.createPublicKey({
+          key: {
+            kty: "RSA",
+            n: "AQ",
+            e: "AQAB",
+            get d() {
+              throw new Error("unused getter");
+            },
+          },
+        }).type,
+    );
+    for (const name of ["key_ops", "oth"])
+      for (const [label, value] of Object.entries({
+        null: null,
+        number: 2,
+        string: "",
+        set: new Set(),
+        arraylike: { length: 0 },
+        empty: [],
+        mixed: [null, undefined, 1, {}, Symbol("x")],
+      }))
+        attempt(
+          name + "/" + label,
+          () =>
+            crypto.createPublicKey({
+              key: { kty: "RSA", n: "AQ", e: "AQAB", [name]: value },
+            }).type,
+        );
+    for (const name of ["kty", "n", "alg", "ext"])
+      attempt(
+        "symbol/" + name,
+        () =>
+          crypto.createPublicKey({
+            key: { kty: "RSA", n: "AQ", e: "AQAB", [name]: Symbol("x") },
+          }).type,
+      );
+    const ec = {
+      crv: "P-256",
+      kty: "EC",
+      x: "X0mMYR_uleZSIPjNztIkAS3_ud5LhNpbiIFp6fNf2Gs",
+      y: "UbJuPy2Xi0lW7UYTBxPK3yGgDu9EAKYIecjkHX5s2lI",
+    };
+    for (const d of ["", "AA", "AQ", "_w", "_".repeat(43), "A".repeat(86)])
+      attempt(
+        "scalar/" + d,
+        () =>
+          crypto
+            .createPrivateKey({ key: { ...ec, d } })
+            .export({ format: "jwk" }).d,
+      );
+    return result;
+  },
+
+  cryptoKeyParsing: async function ({ crypto, Buffer }) {
+    // Public test fixtures from pinned workerd crypto_keys-test.js (Apache-2.0).
+    const fixtures = {
+      "agent1-cert.pem":
+        "-----BEGIN CERTIFICATE-----\nMIID6DCCAtCgAwIBAgIUFH02wcL3Qgben6tfIibXitsApCYwDQYJKoZIhvcNAQEL\nBQAwejELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMQswCQYDVQQHDAJTRjEPMA0G\nA1UECgwGSm95ZW50MRAwDgYDVQQLDAdOb2RlLmpzMQwwCgYDVQQDDANjYTExIDAe\nBgkqhkiG9w0BCQEWEXJ5QHRpbnljbG91ZHMub3JnMCAXDTIyMDkwMzIxNDAzN1oY\nDzIyOTYwNjE3MjE0MDM3WjB9MQswCQYDVQQGEwJVUzELMAkGA1UECAwCQ0ExCzAJ\nBgNVBAcMAlNGMQ8wDQYDVQQKDAZKb3llbnQxEDAOBgNVBAsMB05vZGUuanMxDzAN\nBgNVBAMMBmFnZW50MTEgMB4GCSqGSIb3DQEJARYRcnlAdGlueWNsb3Vkcy5vcmcw\nggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDUVjIK+yDTgnCT3CxChO0E\n37q9VuHdrlKeKLeQzUJW2yczSfNzX/0zfHpjY+zKWie39z3HCJqWxtiG2wxiOI8c\n3WqWOvzVmdWADlh6EfkIlg+E7VC6JaKDA+zabmhPvnuu3JzogBMnsWl68lCXzuPx\ndeQAmEwNtqjrh74DtM+Ud0ulb//Ixjxo1q3rYKu+aaexSramuee6qJta2rjrB4l8\nB/bU+j1mDf9XQQfSjo9jRnp4hiTFdBl2k+lZzqE2L/rhu6EMjA2IhAq/7xA2MbLo\n9cObVUin6lfoo5+JKRgT9Fp2xEgDOit+2EA/S6oUfPNeLSVUqmXOSWlXlwlb9Nxr\nAgMBAAGjYTBfMF0GCCsGAQUFBwEBBFEwTzAjBggrBgEFBQcwAYYXaHR0cDovL29j\nc3Aubm9kZWpzLm9yZy8wKAYIKwYBBQUHMAKGHGh0dHA6Ly9jYS5ub2RlanMub3Jn\nL2NhLmNlcnQwDQYJKoZIhvcNAQELBQADggEBAMM0mBBjLMt9pYXePtUeNO0VTw9y\nFWCM8nAcAO2kRNwkJwcsispNpkcsHZ5o8Xf5mpCotdvziEWG1hyxwU6nAWyNOLcN\nG0a0KUfbMO3B6ZYe1GwPDjXaQnv75SkAdxgX5zOzca3xnhITcjUUGjQ0fbDfwFV5\nix8mnzvfXjDONdEznVa7PFcN6QliFUMwR/h8pCRHtE5+a10OSPeJSrGG+FtrGnRW\nG1IJUv6oiGF/MvWCr84REVgc1j78xomGANJIu2hN7bnD1nEMON6em8IfnDOUtynV\n9wfWTqiQYD5Zifj6WcGa0aAHMuetyFG4lIfMAHmd3gaKpks7j9l26LwRPvI=\n-----END CERTIFICATE-----\n",
+      "dh_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIIBPgIBADCCARcGCSqGSIb3DQEDATCCAQgCggEBAP//////////rfhUWKK7Spqv\n3FYgJz088di5xYPOLTaVqeE2QRRkM/vMk53OJJs++X0v42NjDHXY9oGyAq7EYXrT\n3x7V1f1lYSQz9R9fBm7QhWNlVT3tGvO1VxNef1fJNZhPDHDg5ot34qaJ2vPv6HId\n8VihNq3nNTCsyk9IOnl6vAqxgrMk+2HRCKlLssjj+7lq2rdg1/RoHU9Co945TfSu\nVu3nY3K7GQsHp8juCm1wngL84c334uzANATNKDQvYZFy/pzphYP/jk8SMu7ygYPD\n/jsbTG+tczu1/LwuwiAFxY7xg30Wg7LG80omwbLv+ohrQjhhKFyX//////////8C\nAQIEHgIcKNGyhQRxIhVXoyktdymwbN6MgXv85vPax+8eqQ==\n-----END PRIVATE KEY-----\n",
+      "dh_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIICJTCCARcGCSqGSIb3DQEDATCCAQgCggEBAP//////////rfhUWKK7Spqv3FYg\nJz088di5xYPOLTaVqeE2QRRkM/vMk53OJJs++X0v42NjDHXY9oGyAq7EYXrT3x7V\n1f1lYSQz9R9fBm7QhWNlVT3tGvO1VxNef1fJNZhPDHDg5ot34qaJ2vPv6HId8Vih\nNq3nNTCsyk9IOnl6vAqxgrMk+2HRCKlLssjj+7lq2rdg1/RoHU9Co945TfSuVu3n\nY3K7GQsHp8juCm1wngL84c334uzANATNKDQvYZFy/pzphYP/jk8SMu7ygYPD/jsb\nTG+tczu1/LwuwiAFxY7xg30Wg7LG80omwbLv+ohrQjhhKFyX//////////8CAQID\nggEGAAKCAQEA2whDVdYtNbr/isSFdw7rOSdbmcWrxiX6ppqDZ6yp8XjUj3/CEf/P\n60X7HndX+nXD7YaPtVZxktkIpArI7C+AH7fZxBduuv2eLnvYwK82jFHKe7zvfdMr\n26akMCV0kBA3ktgcftHlqYsIj52BaJlG37FRha3SDOL2yJOij3hNQhHCXTWLg7tP\nGtXmD202OoZ6Ll+LxBzBCFnxVauiKnzBGeawy4gDycUEHmq5oDRR68I2gmxmsLg5\nMQVAP5ljp+FEu4+TZm6hR4wQ5PRjCQ+teq+VqMro7EbbvZpn+X9kAgKSl2WDu0fT\nFbUnBn3HPBmUa/Fv/ooXrlckTUDjLkbWZQ==\n-----END PUBLIC KEY-----\n",
+      "dsa_private.pem":
+        "-----BEGIN DSA PRIVATE KEY-----\nMIIDVwIBAAKCAQEAoSw3Ghf02sMSmd5k2rvSqf6eJPFO7fHDRyvDDbifjO6/BKSI\nkXM43qyCqddC04arKg7wc1QDEQ8gb13pCmnC0RBiljE6ke4yK46Q5JjiEKH9U1eC\nbtTrhcGrLDgwbqvRM06EN6IfAL3OBF6YzS9wn3/EfSwW2Z8gAIkjZrTjEUTV+/gE\nAdfEgd/WAZxcc9zYKOwPy0/LjjldQw5fsPlIEkS1yJFlWMokSsZVYlJLR06h1S4k\nQoE3BqELirH/FQfJ36RMRFsaKZ6nQYS66Qc8rybQw2VlOJsqiRoTSDwREPz6j9oL\nYh1Ee86j5Xt9jbiBrK33UbkTr/jBtO0J2PR0+wIhAIXIexS5LQJPSoi96k6OU4yr\nLLmAIY8gS9mdYTdbpwcdAoIBAQCCN3gTjFiPgBQ/bj/Edp9w90SA+dQ/VnnYDTMc\nz+Mi/8sgtlQ3O9CCFb0327YnOLwvxsmSadT9XrIq1/5jGD2VtjFDVlridjYASrje\nzR2kdr781G+bxtVNQuIOKZl9xqruCmHUSSRL/vuCR6pKsA81ZPfpdcLh3RYYxDIo\nTK6tVX4GrX5bcxGDIUCQiTaqKv9Nzpm1liBLRm6LHczBsFk2OVrRyMsT3gh0J6DS\nUw+dw/Vru1J6glkrr0CxBWoJ65btcqtFyQV/76btor9Qgc/z9suYBoJZ3Ua0yAfv\n3J2ErOs1CAbh4LWNULA9eJObY2R4sAV7Q8wOMT5jmjKo4unpAoIBAQCE1m+DUb9L\nT58u6XV/L1p6K9T2mc6jAmzD51fPiUwsRov9sDGJmSnQjQ5pt3hVp8inVfNkhqOI\n1rpdKmx5W00fPu6VCiPuximuHSNHzJpCAVUrIH8YasS+AurCOwGMdvODLF6dx7yR\nMdxbiszrBry8J0TdvqElHZ1YmQDwoHH7R4pUd31jsk4gnE6pkqLgWwVAy0LXXGsg\n2JfnDvdQY8fIHkuezLdhOyO9pRlXSYv4fLdMaSjHyEcwr2hnm5tm5RsBwM+u0sDc\nyBqUjwoN8NTuLLasfJzzmjeHWDcRGFbzKt/xlUkQ7pf+xdelnLOstuPDGglB1U85\nREhx4rQGKg7nAiA0FX4e4Ms3OXUnmtsTALk5YMiMF3jUp4pRDhHFKBgsYQ==\n-----END DSA PRIVATE KEY-----\n",
+      "dsa_private_1025.pem":
+        "-----BEGIN DSA PRIVATE KEY-----\nMIIB0gIBAAKBiQDp3xGIsNcKZWSpur2Ab2f5rirhu5AsYGLI/XZvzueoO4kLPp3s\nzKHXabBObdxU07kRFkfpV9lftdXT3a6E/Wxb+w2d7g0F7pWTdwpmmofcRtwgbynm\nJKvqWt/OwfVFsdUvvpVci9AxY/5rdM/K54Srp6iSpfteBYKGqCpPnswikND0GxKM\n1MbzAhUAqAPKCZ4hxromirUu33tn3Nhsq20CgYgf0tH2nwzWlPLoN4OJvC5dVLPv\nMRyJTQekW8tR0oY6PeshmZOaoI0L3e/M4KeZ/4qiY7IRNksP2YGJxjfS6W+h+MNj\nPO5r0aYYFYCPQ8JbhBO7l0hdXmkTY3FcdyRHeh2gwe3bBX6Auev2MGgL616Cgd/K\nH8PAX9EHmrNPcQOWHem4KcfJXqouAoGIcZ/4bJurOAw5OL4+5BsE4jfSVFq4nmNl\n+m6Iy6ls3hOHOZ9sJlw0Fi+ZtdeddOTYnIngW/kH09XGoF5JJOaLQv2O4GmZfDfn\nla+vfHZPsOxmYqeEbSwA2pqlhOn/dCshBOymhwNLXp1FJ3JUEyh8i605X06XmWoj\n4ZIu/tr1xbnZDLHuFjBmXAIURbB5/IDf2h0sW+qL5gHFO8bgr+E=\n-----END DSA PRIVATE KEY-----\n",
+      "dsa_private_encrypted.pem":
+        "-----BEGIN DSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,FABA263DD471F214EF3E02699B837C20\n\nTj2+4x9MEIaQGFQ4o7hk12MriVYyvLO5aCbqq7LG5uhVk546/+bJc6hewdSwb6oT\nMYPbuV+QTdtqshqFESA0McyGlj4w1tOg5TomP84NTKvwTO1EirVLMukfF3dqaguw\nC117AZJkGbqgbi6lZ2bG0Hta6HRbhI5+ODFtOp3rKQ2KwVmtL7zw6vt3PCISeMHN\nfLqikDc2+YoI9V1FJis9/FATyqV8yrJYYQQpP1RQN+gDY4SSs/eUr+Me7RNy6Lz7\noH0tDaPGbiafwrZe1okksjxT2JQz1Q3hciBPikgdQIoE2NWTUlOeRYX0T0N2n37S\n6Odbcr522e+2XjcLj34Ozthp+Q5mIDcLuakazxkXhq0RyhJ7vo+xA2YiP7Q3vH7g\noAnsJPFNVY6wJhprZi2VofKIUJUiajAXGDVX2yEIG/DOA9rnx0ZP+zopXMi4ptu0\nRzWyAL+P4jn0b8vgPf9CYJmn4VNfOcVmomZ1Bw6hzqTE2FnThJCXU3l2eaC/wcSR\nuMRp8c6IM8AR5DUzUBKIckkvXj1m5iSZoKuR8dB7s9BhrRtBAI7K3G254G06sByv\n0pnft8r+BkMqgdfG4rJQoQJw7tVYln+pL/gYPDuYsqyJ9kFuHDqtBvlozqXY5AL1\nXQaXoD6xMACEoJSIv5y+TzFzXwFQrDW+G1724YOSbiioUfGD0tRfjj2ei63PThQr\nZ50SryfKQQf4UgcJeokMhmRWT2vPXEFWEP1b2FMEQxBy6fyKcqwZBAbhqF6usGEB\nnwr/S1HXQAGEsWoc/Z4yynB7uhOwWu/Vpj+V6B98NmC7EUX15Why8zCsT9gzaIgC\nM6sZafHhcmjfwc+lL9xFlU/wnAOz0LeKZWry3D0sXZn1r2FRlOJdtLLx01Sve/MU\nZRsgEDTkzv8E9dDltMeq8HQDCgLT1USTMWcY1kMELBj7y7ZdCWjH1QhTq2KlId+o\n1X28zJOsOL/XRseUSlpjmSSLRw1QQEypNCY2+tcvViAvn3AifipBbdzUNhvygLhc\na2+5rYsd8BBEFnMJx7lDiyqXGnZkBbhbCSIudppNcjC+akFlFp6fBzkp4mKBuKpc\nhwBBdfqdEyzqu6SVHM8nGV/aDoRuu9shV6MX0y/KnIgLedudn8aN2eLgjR5k1+99\n-----END DSA PRIVATE KEY-----\n",
+      "dsa_private_encrypted_1025.pem":
+        "-----BEGIN ENCRYPTED PRIVATE KEY-----\nMIIBvTBXBgkqhkiG9w0BBQ0wSjApBgkqhkiG9w0BBQwwHAQIqTW00yecdxMCAggA\nMAwGCCqGSIb3DQIJBQAwHQYJYIZIAWUDBAEqBBBKgO4UF0LfCkPyS+iCvSrtBIIB\nYD3W6FyEZ97/crnoyRqjPUtr2Mm4KJMtaB5ZiGFzZEzd6AH7N/dbtAAMIibtsjmd\nRYdIptpET6xTpUhM8TvpULyYaZnhZJKTpVUrTVdvFTS3DYDutu7aWRLTrle6LzcY\nXpIppeP8ZmYFdRBQxhF+KoDsP4O0QA+vWl2W2VmRfr+sK9R+qV89w0YMjEWHsYY+\nVZsDbJBGKkj9gzIvxIsRyack/+RsbiSDrh6WTw+D0jrX/IMbgPjvYfBFhpxGC7zR\nhDn9r3JaO2KdHh9kMtvQfshA1n636kb0X6ewY57BhEs3J4hpMg46c6YFry94to24\njxl5KutM0CFea7mYGtNf6WJXBsm7JSW03kjlqYoZGK43KNgZhzKAsXaNkoRkA5cw\nBzGfgmG6dHTpeAY9G4vM4inhCmGFA8Tx189g+xzRv16uFXRb8WFIllne1fEFaXRr\n1Rz2G6SPJkA3fsrl8zUIB0Y=\n-----END ENCRYPTED PRIVATE KEY-----\n",
+      "dsa_private_pkcs8.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIICZQIBADCCAjoGByqGSM44BAEwggItAoIBAQChLDcaF/TawxKZ3mTau9Kp/p4k\n8U7t8cNHK8MNuJ+M7r8EpIiRczjerIKp10LThqsqDvBzVAMRDyBvXekKacLREGKW\nMTqR7jIrjpDkmOIQof1TV4Ju1OuFwassODBuq9EzToQ3oh8Avc4EXpjNL3Cff8R9\nLBbZnyAAiSNmtOMRRNX7+AQB18SB39YBnFxz3Ngo7A/LT8uOOV1DDl+w+UgSRLXI\nkWVYyiRKxlViUktHTqHVLiRCgTcGoQuKsf8VB8nfpExEWxopnqdBhLrpBzyvJtDD\nZWU4myqJGhNIPBEQ/PqP2gtiHUR7zqPle32NuIGsrfdRuROv+MG07QnY9HT7AiEA\nhch7FLktAk9KiL3qTo5TjKssuYAhjyBL2Z1hN1unBx0CggEBAII3eBOMWI+AFD9u\nP8R2n3D3RID51D9WedgNMxzP4yL/yyC2VDc70IIVvTfbtic4vC/GyZJp1P1esirX\n/mMYPZW2MUNWWuJ2NgBKuN7NHaR2vvzUb5vG1U1C4g4pmX3Gqu4KYdRJJEv++4JH\nqkqwDzVk9+l1wuHdFhjEMihMrq1VfgatfltzEYMhQJCJNqoq/03OmbWWIEtGbosd\nzMGwWTY5WtHIyxPeCHQnoNJTD53D9Wu7UnqCWSuvQLEFagnrlu1yq0XJBX/vpu2i\nv1CBz/P2y5gGglndRrTIB+/cnYSs6zUIBuHgtY1QsD14k5tjZHiwBXtDzA4xPmOa\nMqji6ekEIgIgNBV+HuDLNzl1J5rbEwC5OWDIjBd41KeKUQ4RxSgYLGE=\n-----END PRIVATE KEY-----\n",
+      "dsa_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIDSDCCAjoGByqGSM44BAEwggItAoIBAQChLDcaF/TawxKZ3mTau9Kp/p4k8U7t\n8cNHK8MNuJ+M7r8EpIiRczjerIKp10LThqsqDvBzVAMRDyBvXekKacLREGKWMTqR\n7jIrjpDkmOIQof1TV4Ju1OuFwassODBuq9EzToQ3oh8Avc4EXpjNL3Cff8R9LBbZ\nnyAAiSNmtOMRRNX7+AQB18SB39YBnFxz3Ngo7A/LT8uOOV1DDl+w+UgSRLXIkWVY\nyiRKxlViUktHTqHVLiRCgTcGoQuKsf8VB8nfpExEWxopnqdBhLrpBzyvJtDDZWU4\nmyqJGhNIPBEQ/PqP2gtiHUR7zqPle32NuIGsrfdRuROv+MG07QnY9HT7AiEAhch7\nFLktAk9KiL3qTo5TjKssuYAhjyBL2Z1hN1unBx0CggEBAII3eBOMWI+AFD9uP8R2\nn3D3RID51D9WedgNMxzP4yL/yyC2VDc70IIVvTfbtic4vC/GyZJp1P1esirX/mMY\nPZW2MUNWWuJ2NgBKuN7NHaR2vvzUb5vG1U1C4g4pmX3Gqu4KYdRJJEv++4JHqkqw\nDzVk9+l1wuHdFhjEMihMrq1VfgatfltzEYMhQJCJNqoq/03OmbWWIEtGbosdzMGw\nWTY5WtHIyxPeCHQnoNJTD53D9Wu7UnqCWSuvQLEFagnrlu1yq0XJBX/vpu2iv1CB\nz/P2y5gGglndRrTIB+/cnYSs6zUIBuHgtY1QsD14k5tjZHiwBXtDzA4xPmOaMqji\n6ekDggEGAAKCAQEAhNZvg1G/S0+fLul1fy9aeivU9pnOowJsw+dXz4lMLEaL/bAx\niZkp0I0Oabd4VafIp1XzZIajiNa6XSpseVtNHz7ulQoj7sYprh0jR8yaQgFVKyB/\nGGrEvgLqwjsBjHbzgyxence8kTHcW4rM6wa8vCdE3b6hJR2dWJkA8KBx+0eKVHd9\nY7JOIJxOqZKi4FsFQMtC11xrINiX5w73UGPHyB5Lnsy3YTsjvaUZV0mL+Hy3TGko\nx8hHMK9oZ5ubZuUbAcDPrtLA3MgalI8KDfDU7iy2rHyc85o3h1g3ERhW8yrf8ZVJ\nEO6X/sXXpZyzrLbjwxoJQdVPOURIceK0BioO5w==\n-----END PUBLIC KEY-----\n",
+      "dsa_public_1025.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBzjCCATsGByqGSM44BAEwggEuAoGJAOnfEYiw1wplZKm6vYBvZ/muKuG7kCxg\nYsj9dm/O56g7iQs+nezModdpsE5t3FTTuREWR+lX2V+11dPdroT9bFv7DZ3uDQXu\nlZN3Cmaah9xG3CBvKeYkq+pa387B9UWx1S++lVyL0DFj/mt0z8rnhKunqJKl+14F\ngoaoKk+ezCKQ0PQbEozUxvMCFQCoA8oJniHGuiaKtS7fe2fc2GyrbQKBiB/S0faf\nDNaU8ug3g4m8Ll1Us+8xHIlNB6Rby1HShjo96yGZk5qgjQvd78zgp5n/iqJjshE2\nSw/ZgYnGN9Lpb6H4w2M87mvRphgVgI9DwluEE7uXSF1eaRNjcVx3JEd6HaDB7dsF\nfoC56/YwaAvrXoKB38ofw8Bf0Qeas09xA5Yd6bgpx8leqi4DgYwAAoGIcZ/4bJur\nOAw5OL4+5BsE4jfSVFq4nmNl+m6Iy6ls3hOHOZ9sJlw0Fi+ZtdeddOTYnIngW/kH\n09XGoF5JJOaLQv2O4GmZfDfnla+vfHZPsOxmYqeEbSwA2pqlhOn/dCshBOymhwNL\nXp1FJ3JUEyh8i605X06XmWoj4ZIu/tr1xbnZDLHuFjBmXA==\n-----END PUBLIC KEY-----\n",
+      "ec_p256_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgDxBsPQPIgMuMyQbx\nzbb9toew6Ev6e9O6ZhpxLNgmAEqhRANCAARfSYxhH+6V5lIg+M3O0iQBLf+53kuE\n2luIgWnp81/Ya1Gybj8tl4tJVu1GEwcTyt8hoA7vRACmCHnI5B1+bNpS\n-----END PRIVATE KEY-----\n",
+      "ec_p256_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEX0mMYR/uleZSIPjNztIkAS3/ud5L\nhNpbiIFp6fNf2GtRsm4/LZeLSVbtRhMHE8rfIaAO70QApgh5yOQdfmzaUg==\n-----END PUBLIC KEY-----\n",
+      "ec_p384_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDB3B+4e4C1OUxGftkEI\nGb/SCulzUP/iE940CB6+B6WWO4LT76T8sMWiwOAGUsuZmyKhZANiAASE43efMYmC\n/7Tx90elDGBEkVnOUr4ZkMZrl/cqe8zfVy++MmayPhR46Ah3LesMCNV+J0eG15w0\nIYJ8uqasuMN6drU1LNbNYfW7+hR0woajldJpvHMPv7wlnGOlzyxH1yU=\n-----END PRIVATE KEY-----\n",
+      "ec_p384_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEhON3nzGJgv+08fdHpQxgRJFZzlK+GZDG\na5f3KnvM31cvvjJmsj4UeOgIdy3rDAjVfidHhtecNCGCfLqmrLjDena1NSzWzWH1\nu/oUdMKGo5XSabxzD7+8JZxjpc8sR9cl\n-----END PUBLIC KEY-----\n",
+      "ec_p521_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIHuAgEAMBAGByqGSM49AgEGBSuBBAAjBIHWMIHTAgEBBEIAEghuafcab9jXW4gO\nQLeDaKOlHEiskQFjiL8klijk6i6DNOXcFfaJ9GW48kxpodw16ttAf9Z1WQstfzpK\nGUetHImhgYkDgYYABAGixYI8Gbc5zNze6rH2/OmsFV3unOnY1GDqG9RTfpJZXpL9\nChF1dG8HA4zxkM+X+jMSwm4THh0Wr1Euj9dK7E7QZwHd35XsQXgH13Hjc0QR9dvJ\nBWzlg+luNTY8CkaqiBdur5oFv/AjpXRimYxZDkhAEsTwXLwNohSUVMkN8IQtNI9D\naQ==\n-----END PRIVATE KEY-----\n",
+      "ec_p521_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIGbMBAGByqGSM49AgEGBSuBBAAjA4GGAAQBosWCPBm3Oczc3uqx9vzprBVd7pzp\n2NRg6hvUU36SWV6S/QoRdXRvBwOM8ZDPl/ozEsJuEx4dFq9RLo/XSuxO0GcB3d+V\n7EF4B9dx43NEEfXbyQVs5YPpbjU2PApGqogXbq+aBb/wI6V0YpmMWQ5IQBLE8Fy8\nDaIUlFTJDfCELTSPQ2k=\n-----END PUBLIC KEY-----\n",
+      "ec_secp256k1_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIGEAgEAMBAGByqGSM49AgEGBSuBBAAKBG0wawIBAQQgc34ocwTwpFa9NZZh3l88\nqXyrkoYSxvC0FEsU5v1v4IOhRANCAARw7OEVKlbGFqUJtY10/Yf/JSR0LzUL1PZ1\n4Ol/ErujAPgNwwGU5PSD6aTfn9NycnYB2hby9XwB2qF3+El+DV8q\n-----END PRIVATE KEY-----\n",
+      "ec_secp256k1_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEcOzhFSpWxhalCbWNdP2H/yUkdC81C9T2\ndeDpfxK7owD4DcMBlOT0g+mk35/TcnJ2AdoW8vV8Adqhd/hJfg1fKg==\n-----END PUBLIC KEY-----\n",
+      "ed25519_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIMFSujN0jIUIdzSvuxka0lfgVVkMdRTuaVvIYUHrvzXQ\n-----END PRIVATE KEY-----\n",
+      "ed25519_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAK1wIouqnuiA04b3WrMa+xKIKIpfHetNZRv3h9fBf768=\n-----END PUBLIC KEY-----\n",
+      "ed448_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMEcCAQAwBQYDK2VxBDsEOdOtCnu9bDdBqSHNNZ5xoDA5KdLBTUNPcKFaOADNX32s\ndfpo52pCtPqfku/l3/OfUHsF43EfZsaaWA==\n-----END PRIVATE KEY-----\n",
+      "ed448_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMEMwBQYDK2VxAzoAoX/ee5+jlcU53+BbGRsGIzly0V+SZtJ/oGXY0udf84q2hTW2\nRdstLktvwpkVJOoNb7oDgc2V5ZUA\n-----END PUBLIC KEY-----\n",
+      "rsa_private.pem":
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEpQIBAAKCAQEAt9xYiIonscC3vz/A2ceR7KhZZlDu/5bye53nCVTcKnWd2seY\n6UAdKersX6njr83Dd5OVe1BW/wJvp5EjWTAGYbFswlNmeD44edEGM939B6Lq+/8i\nBkrTi8mGN4YCytivE24YI0D4XZMPfkLSpab2y/Hy4DjQKBq1ThZ0UBnK+9IhX37J\nu/ZoGYSlTIGIhzyaiYBh7wrZBoPczIEu6et/kN2VnnbRUtkYTF97ggcv5h+hDpUQ\njQW0ZgOMcTc8n+RkGpIt0/iM/bTjI3Tz/gsFdi6hHcpZgbopPL630296iByyigQC\nPJVzdusFrQN5DeC+zT/nGypQkZanLb4ZspSx9QIDAQABAoIBAQCS2erYu8gyoGPi\n3E/zYgQ6ishFAZWzDWSFubwD5wSm4SSAzvViL/RbO6kqS25xR569DmLRiHzD17VI\nmJMsNECUnPrqR2TL256OJZaXrNHh3I1lUwVhEzjeKMsL4/ys+d70XPXoiocVblVs\nmoDXEIGEqa48ywPvVE3Fngeuxrsq3/GCVBNiwtt0YjAOZxmKEh31UZdHO+YI+wNF\n/Z8KQCPscN5HGlR0SIQOlqMANz49aKStrevdvjS1UcpabzDEkuK84g3saJhcpAhb\npGFmAf5GTjkkhE0rE1qDF15dSqrKGfCFtOjUeK17SIEN7E322ChmTReZ1hYGfoSV\ncdFntUINAoGBAPFKL5QeJ6wZu8R/ru11wTG6sQA0Jub2hGccPXpbnPrT+3CACOLI\nJTCLy/xTKW3dqRHj/wZEe+jUw88w7jwGb1BkWr4BI8tDvY9jQLP1jyuLWRfrxXbp\n4Z0oeBBwBeCI/ZG7FIvdDTqWxn1aj3Tmh6s4ByqEdtwrrrJPcBUNl01fAoGBAMMR\n3RGE/ca6X6xz6kgUD6TtHVhiiRJK1jm/u+q0n7i/MBkeDgTZkHYS7lPc0yIdtqaI\nPlz5yzwHnAvuMrv8LSdkjwioig2yQa3tAij8kXxqs7wN5418DMV2s1OJBrPthYPs\nbv4im2iI8V63JQS4ZMYQbckq8ABYccTpOnxXDy0rAoGBAKkvzHa+QjERhjB9GyoT\n1FhLQIsVBmYSWrp1+cGO9V6HPxoeHJzvm+wTSf/uS/FmaINL6+j4Ii4a6gWgmJts\nI6cqBtqNsAx5vjQJczf8KdxthBYa0sXTrsfktXNJKUXMqIgDtp9vazQ2vozs8AQX\nFPAAhD3SzgkJdCBBRSTt97ZfAoGAWAziKpxLKL7LnL4dzDcx8JIPIuwnTxh0plCD\ndCffyLaT8WJ9lXbXHFTjOvt8WfPrlDP/Ylxmfkw5BbGZOP1VLGjZn2DkH9aMiwNm\nbDXFPdG0G3hzQovx/9fajiRV4DWghLHeT9wzJfZabRRiI0VQR472300AVEeX4vgb\nrDBn600CgYEAk7czBCT9rHn/PNwCa17hlTy88C4vXkwbz83Oa+aX5L4e5gw5lhcR\n2ZuZHLb2r6oMt9rlD7EIDItSs+u21LOXWPTAlazdnpYUyw/CzogM/PN+qNwMRXn5\nuXFFhmlP2mVg2EdELTahXch8kWqHaCSX53yvqCtRKu/j76V31TfQZGM=\n-----END RSA PRIVATE KEY-----\n",
+      "rsa_private_2048.pem":
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEogIBAAKCAQEArk4OqxBqU5/k0FoUDU7CpZpjz6YJEXUpyqeJmFRVZPMUv/Rc\n7U4seLY+Qp6k26T/wlQ2WJWuyY+VJcbQNWLvjJWks5HWknwDuVs6sjuTM8CfHWn1\n960JkK5Ec2TjRhCQ1KJy+uc3GJLtWb4rWVgTbbaaC5fiR1/GeuJ8JH1Q50lB3mDs\nNGIk1U5jhNaYY82hYvlbErf6Ft5njHK0BOM5OTvQ6BBv7c363WNG7tYlNw1J40du\np9OQPo5JmXN/h+sRbdgG8iUxrkRibuGv7loh52QQgq2snznuRMdKidRfUZjCDGgw\nbgK23Q7n8VZ9Y10j8PIvPTLJ83PX4lOEA37JlwIDAQABAoIBACoL2Ev5lLyBaI+9\n+vJO2nNaL9OKSMu2SJODIJTnWwYUASBg0P3Jir6/r3sgi8IUJkH5UHbD/LrQcPkA\n4X7PU9vEyUsr1efWFIvk7t7JsjOctoVA5z2Mty74arivUIe5PUadvUC6/7Zk0u6A\nCjLuJRmlH7nGNKZk+xrvgWTH+fkgc5ddbFxoGH129RcVC+ePbsi1EF60C9KbJvp1\nxjUJ5cDtNYnZ/g+ULo6ZJjRG5kUCVSI8H/Nc/DmStKsjN0isKpNGofU5ArEwywGC\nCqxz/tr4hT2haAkVEto04ooYpqDUSqGEfPpLWL+CjFNPfCsWJ1tX5LQRvpu6eukd\nFO72oVECgYEA4+Ot7RQtGOtPeaxl3P7sbEzBZk0W/ZhCk+mzE2iYh0QXU44VtjtO\n/9CENajTklckiwlxjqBZ5NO1SiMQKBcmqkoA03x/DEujo2rMVuNPoc6ZYp1Gc4qA\n4ImkMQNsM7Swum42rKE960WoiWW7dsdEAq6vqgeApZlMU8lcKRAlOZkCgYEAw85H\n3bjF7gMatVibsWzj0zp2L4616m2v5Z3YkgohGRAvm1912DI5ku5Nmy9am57Z1EP2\nUtDOxahd/Vf6mK9lR4YEbNW1TenykViQJ6lmljOFUeZEZYYO3O+fthkyN/42l5yn\nMyUANTTb2rvt8amdRr0ARdRqWJmt5NfJzYBV+q8CgYB1ZjuZoQVCiybcRcYMPX/K\noxgW/avUZPYXgRNx8jZxqNBjiRUCVjdybhdOFXU5NI9s2SaZFV56Fd6VHM8b+CFB\nJPKcAMzqpqTccQ5nzJ6fevFl7iP3LekKw53EakD5uiI5SMH92OsvIymZ7sDOhgUx\nZJC2hTrvFLRPjbJerSSgMQKBgAv5iZuduT0dI30DtkHbjvNUF/ZAnA+CNcetJ5mG\n1Q9bVg4CgIqAR9UcjdJ3yurJhDjfDylxa7Pa4CSmRMUhtOfy4kJlr3jcXeFVsTs7\nuPJmpDimBHjRAgew/+t7Dv8tpNkQ04jlMmYOnYN7CspEvUGePW4H15kjjOb563WN\n67QxAoGAdhJPaHVtDBUrobn50ORVkVNJVZPBhEDbR6tNtHsgEevH7iYjxAdxEeUa\nc9S2iV9lir3hkrQceiYWAADcphWfO1HyP5Uld4sJzYiEGbSM7a0zRQjYlQgXFbZo\nSAc6Gok78kwECPwpmeH4lpGVeKNmzEteSBVYxGb9b6C/SSsu7l0=\n-----END RSA PRIVATE KEY-----\n",
+      "rsa_private_4096.pem":
+        "-----BEGIN RSA PRIVATE KEY-----\n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\n-----END RSA PRIVATE KEY-----\n",
+      "rsa_private_b.pem":
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEAyb1grrN+29fxeeEbTaSEja6TKDTpT/WXnqrFCS+h7IYcnDoA\nVwcsPU5FZeUPvLKMzi9NHSJ34LQCurqHgH8X+cw0YT3gdYS/7qoQiXs+zKv615Nc\nttD3xlQLceY+NwznoPXyyZwOeZqyU5Hiqbrqu6hdr6gQYogMNLn2NxBW2pGegd6+\nZGMCX3+/BtMP/6tXmttYjY+yhN2SrGz5cKhWpcHiC6X+B7uCKoKZy+t2jUxYVKUw\nWr1ZuM8kpSnuVCcv1OoMGEimEHA7v/eaF/y+z/VdQ4Y88GhTnVN4KbtgZ+o9Pohj\nxLFU62VeTALixU5mPQKSgSICKfjev0FUUurF6wIDAQABAoIBAQCs11C/PM/iYNfl\nmSSAWAStMrWni/Wc6QhXC2422ZV8hMZ8XwEtjtqrR6UTkLXz8HHMsR/7Zy2X2gJA\no1E2mS0ceoUiDxaA+RRL0W7Lq0j5qBsImZukkdLHG/iWRDJnjenhsParHsYUD6Lb\nELFGw/safjyOI4quMGtsvSqisKAJL5ZCPD5JHLhnNP8HXT6icSZrsqGhunb2tsa+\nOgcx1+bZzqdTsbvXdbw07Lnd/LRU0NDhjeEVl4J2yFNYY+OIj7/qrxSnZnGLLG0Y\nDFxiD+HCMvTBSooqvWI6FAipfyCGjUznGsVaRv7TuzHPuKE4LtbIC/Ac3Q10rKWq\nPmHALir5AoGBAOhGUCToWfYnj2zH0GIZQxnkrv9iRqmdGeCDX6ZM00Bs5tASnRo0\no90UtLbhWjHe1PKRKFyD4I7a8iIWxcWWun2XHgOtItctPN+lbjpTHTyE2yA1iZhe\ndKCV3bAo4t+puKrPkZmaBqFD/fQx7DNxYdRERa1giiZGhlMUN3l7/S21AoGBAN5Y\nnZ68NkTgklk4YBzsxwsMpQbgbihyG79gtDFxWonxZUQ29EsL01yd30pJNhg1LxDN\n0fADfHVzkZ3qYz9knge9a75Yk8UBM3DM+xu+DRkjKhK5mPX5oLvj6061u3Scs6tj\norpU/mV1amz5gqrkefMaelsdHRuGGZQVx9KTV2kfAoGBAN7EAL1E8nK4Qj/r6xkK\nbWZ6ArQABxFJELZYiPWvnLOfPka0c2PctIOmBiOXQa+urMDvIqyH9mhL6Al1mbwE\n8VreAfU4qb+BLW649FyPteyC5r2fWxV9EZGp6fG3ZM9psShw5o1QQaeM1BTNhGFa\nDp9L0x+TBSvsW4t2SjYDCjA5AoGASzxxGWVWd7gFzWrmGuOD9pkwvkLzA3yZJwjx\n8EkK+eJVAeAWic5WluBUzi43v7k/U9BRWYXUd2nDvEuziZ/iWXwfGSmf1umxHlo+\nHgURKZBcjDmBKLpvSSS2WsvjwnHD2hq81ZAtBOfWO0myjWECYuByxqHzV3zo6tLz\n6q0wxsECgYA26twPrAoRqvfvPnNj6o0LrsE39Tj6jHIVijT7Lbcf2xVnaDiQ18PQ\nRC6Tgkz5KZf8GKfMRMA3WopGn9QE2luI4RLIbhLozEDrkk2L7wSYqI9DZ1Hd26wf\nv3+3jdpsXkzHwWYz1a2+FhCF5mJJRQl6kd/B0wu00vdfwviK9OVO7w==\n-----END RSA PRIVATE KEY-----\n",
+      "rsa_private_encrypted.pem":
+        "-----BEGIN RSA PRIVATE KEY-----\nProc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,DB3D20E60E8FDC3356BD79712FF8EF7E\n\nK+vu0U3IFTJBBi6zW5Zng80O1jXq/ZmlOFs/j/SQpPwfW1Do9i/Dwa7ntBlTwrCm\nsd3IIPgu2ikfLwxvbxsZN540oCaCqaZ/bmmyzH3MyVDA9MllUu+X8+Q3ATzcYa9R\nU5XfF5DAXsSRnstCbmKagWVQpO0oX8k3ratfny6Ixq86Y82tK8+o5YiBFq1kqa+9\n4yat7IWQbqV5ifUtUPCHZwEqBt+WKazX05BqERjkckHdpfaDrBvSSPXTwoLm6uRR\nktkUVpO4tHMZ4VlcTfFtpz8gdYYod0nM6vz26hvbESHSwztSgMhmKdsE5eqmYfgu\nF4WkEN4bqAiPjKK3jnUKPt/vg2oKYFQlVYFl9QnBjiRqcQTi3e9lwn1hI7uoMb6g\nHuaCc57JJHPN/ZLP3ts4ZxFbwUjTGioh5Zh6WozG3L3+Ujwq/sDrAskRyzdcuP7I\nRs3oLbHY03OHyg8IbxR5Iu89l6FLqnR45yvbxXtZ7ImGOPM5Z9pB1CzDhGDx2F6g\nJ/Kf/7ZF2DmYUVbVKDfESEDhRfuMAVzhasDPTRqipSA5QvJVQY+J/6QDPrNNmHVB\n4e4ouHIDWERUf0t1Be7THvP3X8OJozj2HApzqa5ZCaJDo8eaL8TCD5uH75ID5URJ\nVscGHaUXT8/sxfHi1x8BibW5W5J/akFsnrnJU/1BZgGznIxjf5tKfHGppSIVdlKP\n3ghYNmEIFPNJ6cxuUA0D2IOV4uO3FTCU6seIzvJhYkmXnticcZYGtmGxXKrodtzS\nJ1YuaNkkO/YRZah285lQ6QCIhCFo4Oa4ILjgoTQISuw7nQj5ESyncauzLUBXKX0c\nXDUej64KNTvVF9UXdG48fYvNmSZWCnTye4UmPu17FmwpVra38U+EdoLyWyMIAI5t\nrP6Hhgc9BxOo41Im9QpTcAPfKAknP8Rbm3ACJG5T9FKq/c29d1E//eFR6SL51e/a\nyWdCgJN/FJOAX60+erPwoVoRFEttAeDPkklgFGdc8F4LIYAig9gEZ92ykFFz3fWz\njIcUVLrL+IokFbPVUBoMihqVyMQsWH+5Qq9wjxf6EDIf0BVtm9U4BJoOkPStFIfF\nKof7OVv7izyL8R/GIil9VQs9ftwkIUPeXx2Hw0bE3HJ3C8K4+mbLg3tKhGnBDU5Z\nXm5mLHoCRBa3ZRFWZtigX7POszdLAzftYo8o65Be4OtPS+tQAORk9gHsXATv7dDB\nOGw61x5KA55LHVHhWaRvu3J8E7nhxw0q/HskyZhDC+Y+Xs6vmQSb4nO4ET4NYX1P\nm3PMdgGoqRDJ2jZw4eoQdRKCM0EHSepSAYpO1tcAXhPZS4ITogoRgPpVgOebEQUL\nnKNeNu/BxMSH/IH15jjDLF3TiEoguF9xdTaCxIBzE1SFpVO0u9m9vXpWdPThVgsb\nVcEI487p7v9iImP3BYPT8ZYvytC26EH0hyOrwhahTvTb4vXghkLIyvPUg1lZHc6e\naPHb2AzYAHLnp/ehDQGKWrCOJ1JE2vBv8ZkLa+XZo7YASXBRZitPOMlvykEyzxmR\nQAmNhKGvFmeM2mmHAp0aC03rgF3lxNsXQ1CyfEdq3UV9ReSnttq8gtrJfCwxV+wY\n-----END RSA PRIVATE KEY-----\n",
+      "rsa_private_pkcs8.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC33FiIiiexwLe/\nP8DZx5HsqFlmUO7/lvJ7necJVNwqdZ3ax5jpQB0p6uxfqeOvzcN3k5V7UFb/Am+n\nkSNZMAZhsWzCU2Z4Pjh50QYz3f0Hour7/yIGStOLyYY3hgLK2K8TbhgjQPhdkw9+\nQtKlpvbL8fLgONAoGrVOFnRQGcr70iFffsm79mgZhKVMgYiHPJqJgGHvCtkGg9zM\ngS7p63+Q3ZWedtFS2RhMX3uCBy/mH6EOlRCNBbRmA4xxNzyf5GQaki3T+Iz9tOMj\ndPP+CwV2LqEdylmBuik8vrfTb3qIHLKKBAI8lXN26wWtA3kN4L7NP+cbKlCRlqct\nvhmylLH1AgMBAAECggEBAJLZ6ti7yDKgY+LcT/NiBDqKyEUBlbMNZIW5vAPnBKbh\nJIDO9WIv9Fs7qSpLbnFHnr0OYtGIfMPXtUiYkyw0QJSc+upHZMvbno4llpes0eHc\njWVTBWETON4oywvj/Kz53vRc9eiKhxVuVWyagNcQgYSprjzLA+9UTcWeB67Guyrf\n8YJUE2LC23RiMA5nGYoSHfVRl0c75gj7A0X9nwpAI+xw3kcaVHRIhA6WowA3Pj1o\npK2t692+NLVRylpvMMSS4rziDexomFykCFukYWYB/kZOOSSETSsTWoMXXl1KqsoZ\n8IW06NR4rXtIgQ3sTfbYKGZNF5nWFgZ+hJVx0We1Qg0CgYEA8UovlB4nrBm7xH+u\n7XXBMbqxADQm5vaEZxw9eluc+tP7cIAI4sglMIvL/FMpbd2pEeP/BkR76NTDzzDu\nPAZvUGRavgEjy0O9j2NAs/WPK4tZF+vFdunhnSh4EHAF4Ij9kbsUi90NOpbGfVqP\ndOaHqzgHKoR23Cuusk9wFQ2XTV8CgYEAwxHdEYT9xrpfrHPqSBQPpO0dWGKJEkrW\nOb+76rSfuL8wGR4OBNmQdhLuU9zTIh22pog+XPnLPAecC+4yu/wtJ2SPCKiKDbJB\nre0CKPyRfGqzvA3njXwMxXazU4kGs+2Fg+xu/iKbaIjxXrclBLhkxhBtySrwAFhx\nxOk6fFcPLSsCgYEAqS/Mdr5CMRGGMH0bKhPUWEtAixUGZhJaunX5wY71Xoc/Gh4c\nnO+b7BNJ/+5L8WZog0vr6PgiLhrqBaCYm2wjpyoG2o2wDHm+NAlzN/wp3G2EFhrS\nxdOux+S1c0kpRcyoiAO2n29rNDa+jOzwBBcU8ACEPdLOCQl0IEFFJO33tl8CgYBY\nDOIqnEsovsucvh3MNzHwkg8i7CdPGHSmUIN0J9/ItpPxYn2VdtccVOM6+3xZ8+uU\nM/9iXGZ+TDkFsZk4/VUsaNmfYOQf1oyLA2ZsNcU90bQbeHNCi/H/19qOJFXgNaCE\nsd5P3DMl9lptFGIjRVBHjvbfTQBUR5fi+BusMGfrTQKBgQCTtzMEJP2sef883AJr\nXuGVPLzwLi9eTBvPzc5r5pfkvh7mDDmWFxHZm5kctvavqgy32uUPsQgMi1Kz67bU\ns5dY9MCVrN2elhTLD8LOiAz8836o3AxFefm5cUWGaU/aZWDYR0QtNqFdyHyRaodo\nJJfnfK+oK1Eq7+PvpXfVN9BkYw==\n-----END PRIVATE KEY-----\n",
+      "rsa_private_pkcs8_bad.pem":
+        "-----BEGIN RSA PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC33FiIiiexwLe/\nP8DZx5HsqFlmUO7/lvJ7necJVNwqdZ3ax5jpQB0p6uxfqeOvzcN3k5V7UFb/Am+n\nkSNZMAZhsWzCU2Z4Pjh50QYz3f0Hour7/yIGStOLyYY3hgLK2K8TbhgjQPhdkw9+\nQtKlpvbL8fLgONAoGrVOFnRQGcr70iFffsm79mgZhKVMgYiHPJqJgGHvCtkGg9zM\ngS7p63+Q3ZWedtFS2RhMX3uCBy/mH6EOlRCNBbRmA4xxNzyf5GQaki3T+Iz9tOMj\ndPP+CwV2LqEdylmBuik8vrfTb3qIHLKKBAI8lXN26wWtA3kN4L7NP+cbKlCRlqct\nvhmylLH1AgMBAAECggEBAJLZ6ti7yDKgY+LcT/NiBDqKyEUBlbMNZIW5vAPnBKbh\nJIDO9WIv9Fs7qSpLbnFHnr0OYtGIfMPXtUiYkyw0QJSc+upHZMvbno4llpes0eHc\njWVTBWETON4oywvj/Kz53vRc9eiKhxVuVWyagNcQgYSprjzLA+9UTcWeB67Guyrf\n8YJUE2LC23RiMA5nGYoSHfVRl0c75gj7A0X9nwpAI+xw3kcaVHRIhA6WowA3Pj1o\npK2t692+NLVRylpvMMSS4rziDexomFykCFukYWYB/kZOOSSETSsTWoMXXl1KqsoZ\n8IW06NR4rXtIgQ3sTfbYKGZNF5nWFgZ+hJVx0We1Qg0CgYEA8UovlB4nrBm7xH+u\n7XXBMbqxADQm5vaEZxw9eluc+tP7cIAI4sglMIvL/FMpbd2pEeP/BkR76NTDzzDu\nPAZvUGRavgEjy0O9j2NAs/WPK4tZF+vFdunhnSh4EHAF4Ij9kbsUi90NOpbGfVqP\ndOaHqzgHKoR23Cuusk9wFQ2XTV8CgYEAwxHdEYT9xrpfrHPqSBQPpO0dWGKJEkrW\nOb+76rSfuL8wGR4OBNmQdhLuU9zTIh22pog+XPnLPAecC+4yu/wtJ2SPCKiKDbJB\nre0CKPyRfGqzvA3njXwMxXazU4kGs+2Fg+xu/iKbaIjxXrclBLhkxhBtySrwAFhx\nxOk6fFcPLSsCgYEAqS/Mdr5CMRGGMH0bKhPUWEtAixUGZhJaunX5wY71Xoc/Gh4c\nnO+b7BNJ/+5L8WZog0vr6PgiLhrqBaCYm2wjpyoG2o2wDHm+NAlzN/wp3G2EFhrS\nxdOux+S1c0kpRcyoiAO2n29rNDa+jOzwBBcU8ACEPdLOCQl0IEFFJO33tl8CgYBY\nDOIqnEsovsucvh3MNzHwkg8i7CdPGHSmUIN0J9/ItpPxYn2VdtccVOM6+3xZ8+uU\nM/9iXGZ+TDkFsZk4/VUsaNmfYOQf1oyLA2ZsNcU90bQbeHNCi/H/19qOJFXgNaCE\nsd5P3DMl9lptFGIjRVBHjvbfTQBUR5fi+BusMGfrTQKBgQCTtzMEJP2sef883AJr\nXuGVPLzwLi9eTBvPzc5r5pfkvh7mDDmWFxHZm5kctvavqgy32uUPsQgMi1Kz67bU\ns5dY9MCVrN2elhTLD8LOiAz8836o3AxFefm5cUWGaU/aZWDYR0QtNqFdyHyRaodo\nJJfnfK+oK1Eq7+PvpXfVN9BkYw==\n-----END RSA PRIVATE KEY-----\n",
+      "rsa_pss_private_2048.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADALBgkqhkiG9w0BAQoEggSoMIIEpAIBAAKCAQEAy4OMdS84PlgI5CRL\nbdbud9Ru7vprFr2YNNUmdT7D3YgApiv8CjzKXLiVDnbMET+lwmtag/EcZsxVCKov\nsu30pYASBriHOiMVYui9+ZaJoQ9yI6lOjG1RbuUBJXNSjHBJxqBqmcgZOb1mdRr/\neXzpAMWJ3hfuLojU2+zUSJ3/rvepepcLFG2q9nA0+PJskJ7Pnh3L0ydnv3U3hduM\nn5OVfm/Jx1FPyZpD184tJff+N+MY3s3hIcfuOnL9Pl4RPGeaTC4T1o460NaG6bG7\nc2Whg6NOaVgaFIaiNbrTTNCpVjeTyalsTXYlQQ3hiKjst0Q7pfFEkJDo8qiqLad1\nMsl59wIDAQABAoIBAQC6G8aqs0/f02nuGDLSc6cH9kCsUlz0ItW6GuJcfdVoFSNi\n0v5d7lGwkSveWk0ryOSw8rOHzUqHx3xLvDZ6jpkXcBMMClu/kq3QEb8JK90YaKOc\ncQvf52h83Pc7ZEatH1KYTcKudwp6fvXfSZ0vYEdD6WG2tHOgIollxSIsdjCHs1qi\n7baNHdK9T4DveuEZNcZ+LraZ1haHmFeqIPcy+KvpGuTaLCg5FPhH2jsIkw9apr7i\niFLi+IJ7S5Bn/8XShmJWk4hPyx0jtIkC5r2iJnHf4x+XYWZfdo7oew3Dg6Pa7T6r\nI164Nnaw0u0LvO4gQdvYaJ/j9A602nHTp7Tsq8chAoGBAOtVHgIqpmdzwR5KjotW\nLuGXDdO9X6Xfge9ca2MlWH1jOj+zqEV7JtrjnZAzzOgP2kgqzpIR71Njs8wkaxTJ\nTle0Ke6R/ghU9YOQgRByKjqJfQXHZnYFPsMg0diNYLroJ4SG8LO4+2SygTYZ4eKL\nqU0bda3QvQ7FL+rTNQBy01b9AoGBAN1jEQI80JxCT7AMvXE6nObIhbkASHte4yOE\n1CBwcOuBEGcuvMOvQVMzKITgea6+kgsu4ids4dM5PTPapQgpKqIIQ2/eSesaf56g\n73clGGSTPHJP0v+EfKg4+GYJf8o2swT0xDHkgWLgjjdsncB9hATc2j6DvHeau18d\npgCLz9kDAoGAXl/SGvhTp2UqayVnKMW1I07agrGNLA4II5+iiS4u4InskCNSNhr/\nKATj6TJ82AuTdCGGmdmLapuvPQzVzI42VsGvlzcA8wJvOwW2XIwMF1GPy8N9eZL8\n6m+89+Uqh4oWXvVmjgx+9JEJdFLI3Xs4t+1tMfll+AhoAPoWZUmnK1kCgYAvEBxR\niXQfg8lE97BeHcO1G/OxfGnsMCPBLT+bFcwrhGhkRv9B6kPM2BdJCB9WEpUhY3oY\nP4FSUdy85UIoFfhGMdOEOJEmNZ/jrPq7LVueJd63vlhwkU2exV2o82QDLNWpvA7p\nPFZ1Gp+hEKoIfaZPElQi7gZmtrIWaksb2pz42QKBgQCct9NP2qJfqeS4206RDnfv\nM238/O2lNhLWdSwY0g+tcN+I1sGs3+4vvrm95cxwAmXZyIM11wjdMcAPNxibodY7\nvufsebPHDBA0j0yuTjGkXefUKd1GdO88i5fppzxB7prDX9//DsWWrFhIMMRNYe0Q\naeHd/NPuHcjZKcnaVBgukQ==\n-----END PRIVATE KEY-----\n",
+      "rsa_pss_private_2048_sha1_sha1_20.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQowAASCBKcwggSjAgEAAoIBAQCpdutzsPFQ1100\nouR5aAwYry8aAtG0c+zX9UqNXGCpRDWzPPpXHUZSB1BmTTL4EhK2tkAfblYNqzRu\nCAYlKHbFpFLs2zLEorfp0WsFNPaBHE9JHpLIM4oXxPCUypZ7JAn56ZYonYCZ8Il5\n8SzD9aoF41RTEmpcx3XkL2RQa022RiSccYZKx/yzskUUAdTvTvYyujH1MkvsfVP+\nNs5bRL6IVqowFd3xv6ctvfQMxz0rltgTC+wOm3CFtn+G63y6P/Z0U2DRdacsNkN6\nPFGXAIB0kSvKzs8gVocEBiSwMkcT/KD3R68PY18b2auqaGcm8gA+gaVJ36KAW4dO\nAjbY+YitAgMBAAECggEAfPvfFXln0Ra1gE+vMDdjzITPuWBg57Uj9fbMIEwEYnKT\nJHmRrNRDe9Y3HuxK7hjuQmFSE5xdzUD6rzgtyBP63TOfkV7tJ4dXGxS/2JxCPeDy\nPNxWp18Ttwoh4as0pudikDYN8DCRm3eC/TO5r2EtH6CVHZuUZI8bTMsDMiihrQ8F\nB8+KucBG5DDy/OlDeieAZxZA4Y0/c+W0DNZ/LIPGwaqMzYCSZJXyV0t33HytUwM2\nQZ+RbWqcUcrCI3lFAO8IyEULCi+RnSByZeJ0xwUkdQTI5jT6+G8BrO70Oiab8g+Q\nRx2s7PxWpIMVS7/JD1PsL4hLrVh3uqh8PZl3/FG9IQKBgQDZWkOR2LA+ixmD6XJb\nQ+7zW2guHnK6wDrQFKmBGLaDdAER64WL1Unt6Umu7FPxth2niYMEgRexBgnj5hQN\nLfPYTiIeXs5ErrU96fVQABsV0Hra1M2Rhve5nynjFFpbHjDXtizzLpE30MsC7YkN\nEqD4YYzjWHrbk/UlQ7tx3eAvtQKBgQDHmNM4TRuyH2yaYxDqnho6fgJv7Z4KgbM0\n1wcUxi5kPDQsFtaVOzFhNserzsWvotQjLkC2+CK5qlCdm59ZlpUqszF6+YyUs5Gq\nWmHdqryduT1VxSV/pd6wGEQo27fxFV7LsT1JhVMh9Iri8MK0b1BD6+kVUf5NcKDB\nOd2o8A1gGQKBgA5Y3Pj1mrymJesFL91CYLWDpR7WN7CIG9m8Y2v4G6QVtjRenZQb\nYiPoMErxoqDj6pUyiIl1lADFa0W13ED6dYwjrDDhBTCXb7NEjELZnvATsOhc/6zJ\ngfSowvUQVN6K4aJ7jgAHZOKQT7ZDw7YvMpzyo4AmSQXRgG8TR34+rRu5AoGACApP\n9+SjSPmbFl0HQWw9Aj4xOvEHfMTcwzQmRN/23nLOZzhETJ6lzpS2VmVt8TVN9lzW\nnohAXdpOhQrP0HwQZjfxtlJ3J0ZUh9g8OQG3t2LO5bWbXRkBb3aKyFqRflSuDOaG\n4X9NagC/14R7U2loglPuf71d0SDIWQBLvZJt94ECgYEAnY7aKHnWdLszcB8uyEkJ\nEJkUEaa+K/nTqOzqffZ01cTWJmUG7a2KuvQ+UQM2BHk2+wBmUo45Iz/dyePOJY0B\nFu2agiV4+R4z2XVQnIvXgY5HaPxvLz0THksY/pD58gBmFaLMx4ADEwQ+s4Y2g12H\nABsKNRHfSnKTwOm/dYvcVqs=\n-----END PRIVATE KEY-----\n",
+      "rsa_pss_private_2048_sha256_sha256_16.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIIE7wIBADA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAaEaMBgGCSqGSIb3\nDQEBCDALBglghkgBZQMEAgGiAwIBEASCBKkwggSlAgEAAoIBAQDfqNM4C+QtD73i\nILqOkqfV8ha3O19jpX8UujIk1Z72bbbuwEzh0+sBw0dD0N8CgkXnePOEEd6q7HNm\nbyCNqRpDK6NDvaCMDWgEaD/PlHkRntvKh81IXSMC5imjRfOcZIE/Gnw7h8tanab0\nn75+ODvLJrmEWUG2q79Im1mWMx7Spod+Np6XEY+7I7nAUUWivr35Yx5DeyxY8rxF\nGpsLtGsi7JNQO4aHyeBpj8tz0Fhv23uPywE2nGmPHfnkXWbrTcHGbzYBgEbeSH9K\nUkRwczqDXNOPhtfaEHEFTm0MoeKCnJe1VOjSywev77dV1KZfpVh3Kh0ZRQIe9YOV\nJhj4lMx3AgMBAAECggEBAIc+IgK5Bg/NfgeXvNdrjPuM+PlxeHvb3h1dfebSGd5v\nd3elZpgDug6F07kJO2Db/4M5mx7YY2m9swZU2j1u7MeDQqU6rDMkBCruEu/lmtPx\n2Hv+ZD6Gux4MqU7mhKmkCJds34Rr16aCwCsZ0WmnfViZoQKLqnXYIsG31pNBdDjx\ngke0HhX1LkA9yTVwlk8xOaHPqI4KfsFAyoiiHzyttGDexzb1PzmM0pybAPDMhpN/\nwXp2kLjyzmUmPe2Y2yva69WVWo7qS6joKjY75MQ1t20HYgEL69IApvCPu4CANfi9\nj3FAaV/+WrnhKCi6QyUi5PCI/+AJLsjNQmqTXIdBEoECgYEA+XsgFbeZ6+ZzEHa7\nHyFH6kiyBLd0q7w+ZLPsoOmEApDaP3yXSC7eJU7M/tPUPj8VQMMSK2D6fgmUDwhb\n3mEXFZxf67UlPFsFjweYcBihwy4r8QKBwury6dEbHPSUq4mXFJF5XRQdGqRGkr/F\n8OLZ0MwmHLUzczA67PxP/wF8TsECgYEA5YD4RxxJJYfAk1rFbqHRhNB8UeYVL+Wo\nwsRET1JeFg+S5grLGUga+KBB8Jn7Ahaip7MVE0Iud1cgaDi4WBEJsbJ6oJTlHJEg\nJq7QAaBafwjeSCSnaEsVBVNvriy2WF7uAomLSKmW6uSUOBBFFt4+G+akG56EfOPc\n7YKBfsf5ITcCgYBvjVZzX307tfeNTQmuibsWTxsKcN2CTNG5RZpw+PlGDG8KJDOg\n2xQJqoqPBzjH/H0MUC03qE1ZPf8uGZa6gL9JsnpRctYLfselhMfsl5b9JxAO3AgZ\nl+S2GAH/mH1BlmwvjjyuGehJmVrVE1r2sviiHCaOf5dZ0h8HCGrco1VqAQKBgQCf\nfYkMofOTSUvjG2mpAHuCOQCsSaDfsFIfSBXQqgUIf7ouc8HAyAM2VOh+NAPj56cR\ns7opsAxqkvnKc+BoEy8Rdl8RyWeO+qvFNicHelBph9gxeod8SvFIyjsKZ7gwoYf1\n63AIBxMCGeeHLodU5Q10hkv1hau8vv2BcPhdCstu8QKBgQDgO4Rr36Pa5rjbNbGN\nPsJqALjthTeU0yaU8hdC7Hc7B/T6npEIhw3s1eNq7e0eeDltqz7tDnY8qysazbQZ\np1cV5TJ8+gtwGmDoADBnU1NXqX4Squfml6OhNEucpTdjux7JdLVmmQFraOT2Eu5f\n9uuNtA+d8uhBEXhskuvEC552ug==\n-----END PRIVATE KEY-----\n",
+      "rsa_pss_private_2048_sha512_sha256_20.pem":
+        "-----BEGIN PRIVATE KEY-----\nMIIE5wIBADA4BgkqhkiG9w0BAQowK6ANMAsGCWCGSAFlAwQCA6EaMBgGCSqGSIb3\nDQEBCDALBglghkgBZQMEAgEEggSmMIIEogIBAAKCAQEAvM9NgMCDqy5dqj5Ua2cZ\ncc4zVr+fCF34bZn63OBeYG8RTJKM3j36lO/yamtfDctDhb87b45CS6ipEr8J57I9\nWF55TNngsn6GNpXgwAe0eFXUnKonuqnGEC7x8r3vkAg99PBKhAtFc5oTaaZDAFKM\nzc5dIC/J0Y+kxhqjCPNI0ydQgZmKBrmYjM9cvbOYgRQL10GrWeJ+XHk2E33endaF\n+4dwjgyrzInt/l6OTkiCL8F59J/htk1GPru9BT6w5yOS/vH6q6FD6uizULVznytd\nlHjgnrVaHJmsqVjrYQa9OAZj9GBrTelBWvQ9b6+FBHUFHBp8HSp82lWCZThPrcZ/\nQwIDAQABAoIBADDzUfWic8CKuc/sbviVdzxRKHBCJ9oEeub3d9mR9gXsZcDDcfAg\ng3nfp6q9gZxS6YOga6llaXyyEnuAufGu/UaO38Xz6tR8BxHZ07YViU11ezTOzJQR\ndf82HJZBdf2SlXWOYtNPFMd+16+ZYl+QB19INE6m9Rz2r9KIj2I/qM7NPPVhDRF0\nG4O0Yf2vaPhjoIaewn7xtQ6wmX7pAGcd8dmYEIGGkBi8aY3BVwrRK1X4AmD+oSmE\nwXqR6MQIzD4KdypL4UD1Cb4GoFeVRclXvegOG+EKl0iD+mjTodB4yjoJh98NYe3+\nGtpR/2u3Ltq8RqWpIg8ryShQk/MIqGJ5KpkCgYEA80uNEYWlBt6QGNvVIYrhnw+V\n2nLJWedioKV4H1sr9OLF/7WFOUfsaflpVybnmwfNV15lEyHb/m/sCM9jTrNk1t/q\nqhRnvtmy3kntxWBeoA2o0TRg/XZKWjabZsr/4UE/Ztws2opOvl9x05IYeZlU+PbZ\nB1lX2e+vtMOpllvRr28CgYEAxqtfrYv8brp/fAUqGu/MtdHxQdU1+vE+auN17gam\nZM6ojIeasX4k2z0Rd/+8Dga9wPgO7hjtFZ2NWD5UwfBiw5U2PVZ6bp3iKSBPGHEh\nRsIR+nw8pFIgsQKoYnVK58tEnfQ31GSupKpYybHbaL5SdId+mfXU86SbKX/MefZX\ng20CgYBjn8hAKI2O5ovy4fHALnJ9A5DFRsOUgN8uERPDIz44pLOXJelLr1vreSnd\nehzUqrk20Xxp/S9sXMA2S1XK4EKmikI5KungiJxp0bP/Yprcxzsdj2k34LxJfJrd\n2Lo2rtUbdYUYaBIeek7N58EF6feVit8L11XV9APq7UQAQdD3GQKBgBmxuGIdpLw9\napeDo3pwYS1yxZ0aEi0uXkA8wtfSDFslTy89qogiJGomb8fxT0URIiF+849fseoF\nwm4TQasDiAJ7ndQ5BwSfbsya3R/wIbmhB+o5fy5RYOED0vtI6DMqWumC2GWjz+KE\nFY+gbRwS4V8o1vrajHwmYdrwKGXtskvRAoGADe/EdlCj98r6Zle9giF1C0GDIDTx\n8bR2m+Ogh9ZO218GpDMNaQ/WmbYVPDYMbRSOEA7y2gVkd1OeYhJMF6aYffp3aWhN\nt9g0uojLY0jfEpWBLBQdlYOTl7hOnLWRRcOAKTlHVg+OuD/O/GmdQ2Rg2H/hAWlI\nmuuTQPuQTCV1aTc=\n-----END PRIVATE KEY-----\n",
+      "rsa_pss_public_2048.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBIDALBgkqhkiG9w0BAQoDggEPADCCAQoCggEBAMuDjHUvOD5YCOQkS23W7nfU\nbu76axa9mDTVJnU+w92IAKYr/Ao8yly4lQ52zBE/pcJrWoPxHGbMVQiqL7Lt9KWA\nEga4hzojFWLovfmWiaEPciOpToxtUW7lASVzUoxwScagapnIGTm9ZnUa/3l86QDF\nid4X7i6I1Nvs1Eid/673qXqXCxRtqvZwNPjybJCez54dy9MnZ791N4XbjJ+TlX5v\nycdRT8maQ9fOLSX3/jfjGN7N4SHH7jpy/T5eETxnmkwuE9aOOtDWhumxu3NloYOj\nTmlYGhSGojW600zQqVY3k8mpbE12JUEN4Yio7LdEO6XxRJCQ6PKoqi2ndTLJefcC\nAwEAAQ==\n-----END PUBLIC KEY-----\n",
+      "rsa_pss_public_2048_sha1_sha1_20.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQowAAOCAQ8AMIIBCgKCAQEAqXbrc7DxUNddNKLkeWgM\nGK8vGgLRtHPs1/VKjVxgqUQ1szz6Vx1GUgdQZk0y+BIStrZAH25WDas0bggGJSh2\nxaRS7NsyxKK36dFrBTT2gRxPSR6SyDOKF8TwlMqWeyQJ+emWKJ2AmfCJefEsw/Wq\nBeNUUxJqXMd15C9kUGtNtkYknHGGSsf8s7JFFAHU7072Mrox9TJL7H1T/jbOW0S+\niFaqMBXd8b+nLb30DMc9K5bYEwvsDptwhbZ/hut8uj/2dFNg0XWnLDZDejxRlwCA\ndJErys7PIFaHBAYksDJHE/yg90evD2NfG9mrqmhnJvIAPoGlSd+igFuHTgI22PmI\nrQIDAQAB\n-----END PUBLIC KEY-----\n",
+      "rsa_pss_public_2048_sha256_sha256_16.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBUjA9BgkqhkiG9w0BAQowMKANMAsGCWCGSAFlAwQCAaEaMBgGCSqGSIb3DQEB\nCDALBglghkgBZQMEAgGiAwIBEAOCAQ8AMIIBCgKCAQEA36jTOAvkLQ+94iC6jpKn\n1fIWtztfY6V/FLoyJNWe9m227sBM4dPrAcNHQ9DfAoJF53jzhBHequxzZm8gjaka\nQyujQ72gjA1oBGg/z5R5EZ7byofNSF0jAuYpo0XznGSBPxp8O4fLWp2m9J++fjg7\nyya5hFlBtqu/SJtZljMe0qaHfjaelxGPuyO5wFFFor69+WMeQ3ssWPK8RRqbC7Rr\nIuyTUDuGh8ngaY/Lc9BYb9t7j8sBNpxpjx355F1m603Bxm82AYBG3kh/SlJEcHM6\ng1zTj4bX2hBxBU5tDKHigpyXtVTo0ssHr++3VdSmX6VYdyodGUUCHvWDlSYY+JTM\ndwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "rsa_pss_public_2048_sha512_sha256_20.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBTTA4BgkqhkiG9w0BAQowK6ANMAsGCWCGSAFlAwQCA6EaMBgGCSqGSIb3DQEB\nCDALBglghkgBZQMEAgEDggEPADCCAQoCggEBALzPTYDAg6suXao+VGtnGXHOM1a/\nnwhd+G2Z+tzgXmBvEUySjN49+pTv8mprXw3LQ4W/O2+OQkuoqRK/CeeyPVheeUzZ\n4LJ+hjaV4MAHtHhV1JyqJ7qpxhAu8fK975AIPfTwSoQLRXOaE2mmQwBSjM3OXSAv\nydGPpMYaowjzSNMnUIGZiga5mIzPXL2zmIEUC9dBq1niflx5NhN93p3WhfuHcI4M\nq8yJ7f5ejk5Igi/BefSf4bZNRj67vQU+sOcjkv7x+quhQ+ros1C1c58rXZR44J61\nWhyZrKlY62EGvTgGY/Rga03pQVr0PW+vhQR1BRwafB0qfNpVgmU4T63Gf0MCAwEA\nAQ==\n-----END PUBLIC KEY-----\n",
+      "rsa_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAt9xYiIonscC3vz/A2ceR\n7KhZZlDu/5bye53nCVTcKnWd2seY6UAdKersX6njr83Dd5OVe1BW/wJvp5EjWTAG\nYbFswlNmeD44edEGM939B6Lq+/8iBkrTi8mGN4YCytivE24YI0D4XZMPfkLSpab2\ny/Hy4DjQKBq1ThZ0UBnK+9IhX37Ju/ZoGYSlTIGIhzyaiYBh7wrZBoPczIEu6et/\nkN2VnnbRUtkYTF97ggcv5h+hDpUQjQW0ZgOMcTc8n+RkGpIt0/iM/bTjI3Tz/gsF\ndi6hHcpZgbopPL630296iByyigQCPJVzdusFrQN5DeC+zT/nGypQkZanLb4ZspSx\n9QIDAQAB\n-----END PUBLIC KEY-----\n",
+      "rsa_public_2048.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArk4OqxBqU5/k0FoUDU7C\npZpjz6YJEXUpyqeJmFRVZPMUv/Rc7U4seLY+Qp6k26T/wlQ2WJWuyY+VJcbQNWLv\njJWks5HWknwDuVs6sjuTM8CfHWn1960JkK5Ec2TjRhCQ1KJy+uc3GJLtWb4rWVgT\nbbaaC5fiR1/GeuJ8JH1Q50lB3mDsNGIk1U5jhNaYY82hYvlbErf6Ft5njHK0BOM5\nOTvQ6BBv7c363WNG7tYlNw1J40dup9OQPo5JmXN/h+sRbdgG8iUxrkRibuGv7loh\n52QQgq2snznuRMdKidRfUZjCDGgwbgK23Q7n8VZ9Y10j8PIvPTLJ83PX4lOEA37J\nlwIDAQAB\n-----END PUBLIC KEY-----\n",
+      "rsa_public_4096.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAxeStwofbjtZuol4lwKn1\nw08AzcSNLHfCqNFHa+W7er8is7LQsPljtPT4yn4lsao83ngHFvSC3tbMiRNDpUHY\nqH2wBuUkuOmCtYkZLi0307H0CwcVV6W5P3tNEt80IJ+PqlRxtTknezUtbOasbIi/\naornVWG+psgqDGrFZ4oTsWtiE0Svi7sDqN5E2dijmH/YYnlnwqszgzHdtAnARp1b\nG34E64sqWCmLoGCfPdHtym/CSdxOLOsDV15jrwODZQ/TJZ5thkwKZRxu7g9fwlhA\n1PiI5WDP4reXNaqa2bSgrzpAljQExYs4N0L7okSVOJQX9BEaoWtq8NLU8MpMdGoH\nNDU0Xr60Lfr58Z5qn8RGEvlTxoCbPJzPV2zgzD/lmEqft6NnfTclveA3sd8xSrOB\nUn4o3S8hS0b9Su7PBukHjM96/e0ReoIshSwXlQTLr2Ft8KwupyPm1ltNcTDtjqHc\nIWU6Bg+kPy9mxSVtGGZYAPtqGzNBA/m+oOja/OSPxAblPdln691DaDuZs5nuZCGw\nGcLaJWgiyoqvXAcyXDZFyH4OZZh8rsBLKbnFXHZ/ziG0cAozEygZEPJappw8Lx/a\ndy7WL/SJjxooiKapc7Bnfy8eSLV3+XAKxhLW/MQ6ChJ+e/8ExAY02ca4MpCvqwIk\n9TfV6FM8pWGqHzQFj0v3NL0CAwEAAQ==\n-----END PUBLIC KEY-----\n",
+      "rsa_public_b.pem":
+        "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyb1grrN+29fxeeEbTaSE\nja6TKDTpT/WXnqrFCS+h7IYcnDoAVwcsPU5FZeUPvLKMzi9NHSJ34LQCurqHgH8X\n+cw0YT3gdYS/7qoQiXs+zKv615NcttD3xlQLceY+NwznoPXyyZwOeZqyU5Hiqbrq\nu6hdr6gQYogMNLn2NxBW2pGegd6+ZGMCX3+/BtMP/6tXmttYjY+yhN2SrGz5cKhW\npcHiC6X+B7uCKoKZy+t2jUxYVKUwWr1ZuM8kpSnuVCcv1OoMGEimEHA7v/eaF/y+\nz/VdQ4Y88GhTnVN4KbtgZ+o9PohjxLFU62VeTALixU5mPQKSgSICKfjev0FUUurF\n6wIDAQAB\n-----END PUBLIC KEY-----\n",
+      "x25519_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VuBCIEIJi/yFpueUawC1BkXyWM8ONIBGFjL7UZHrD/Zo/KPDpn\n-----END PRIVATE KEY-----\n",
+      "x25519_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VuAyEAaSb8Q+RndwfNnPeOYGYPDUN3uhAPnMLzXyfi+mqfhig=\n-----END PUBLIC KEY-----\n",
+      "x448_private.pem":
+        "-----BEGIN PRIVATE KEY-----\nMEYCAQAwBQYDK2VvBDoEOLTDbazv6vHZWOmODQ3kk8TUOQgApB4j75rpInT5zSLl\n/xJHK8ixF7f+4uo+mGTCrK1sktI5UmCZ\n-----END PRIVATE KEY-----\n",
+      "x448_public.pem":
+        "-----BEGIN PUBLIC KEY-----\nMEIwBQYDK2VvAzkAioHSHVpTs6hMvghosEJDIR7ceFiE3+Xccxati64oOVJ7NWjf\nozE7ae31PXIUFq6cVYgvSKsDFPA=\n-----END PUBLIC KEY-----\n",
+    };
+    const result = {};
+    const attempt = (fn) => {
+      try {
+        return fn();
+      } catch (e) {
+        return { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    for (const [name, pem] of Object.entries(fixtures)) {
+      for (const kind of ["private", "public"]) {
+        result[name + "/" + kind] = attempt(() => {
+          const key = crypto[
+            kind === "private" ? "createPrivateKey" : "createPublicKey"
+          ]({ key: pem, passphrase: "password" });
+          const metadata = {
+            type: key.type,
+            algorithm: key.asymmetricKeyType,
+            details: Object.fromEntries(
+              Object.entries(key.asymmetricKeyDetails).map(([k, v]) => [
+                k,
+                typeof v === "bigint" ? String(v) : v,
+              ]),
+            ),
+          };
+          const types =
+            kind === "private" ? ["pkcs1", "pkcs8", "sec1"] : ["pkcs1", "spki"];
+          const formats = {};
+          for (const type of types)
+            for (const format of ["der", "pem"])
+              formats[type + "/" + format] = attempt(() => {
+                const encoded = key.export({ type, format });
+                const imported = crypto[
+                  kind === "private" ? "createPrivateKey" : "createPublicKey"
+                ]({ key: encoded, type, format });
+                return key.equals(imported);
+              });
+          return { ...metadata, formats };
+        });
+      }
+    }
+    const key = crypto.createPrivateKey(fixtures["rsa_private.pem"]),
+      pkcs8 = key.export({ format: "der", type: "pkcs8" });
+    result.derTypes = {};
+    for (const kind of ["private", "public"])
+      for (const type of [undefined, "pkcs1", "pkcs8", "sec1", "spki"])
+        result.derTypes[kind + "/" + type] = attempt(
+          () =>
+            crypto[kind === "private" ? "createPrivateKey" : "createPublicKey"](
+              { key: pkcs8, format: "der", type },
+            ).asymmetricKeyType,
+        );
+    return result;
+  },
+  cryptoJwkInputs: async function ({ crypto }) {
+    const result = {};
+    for (const kind of ["private", "public"])
+      for (const kty of ["RSA", "EC", "OKP", "bad"])
+        for (const value of [
+          undefined,
+          null,
+          0,
+          true,
+          {},
+          "",
+          "A",
+          "AA",
+          "AA==",
+          "A A",
+          "++//",
+          "--__",
+          "@@",
+          "AAA=",
+          "AA===",
+        ]) {
+          const key = {
+            kty,
+            crv: kty === "EC" ? "P-256" : "Ed25519",
+            n: value,
+            e: "AQAB",
+            x: value,
+            y: "AA",
+            d: value,
+          };
+          try {
+            const k = crypto[
+              kind === "private" ? "createPrivateKey" : "createPublicKey"
+            ]({ key });
+            result[`${kind}/${kty}/${JSON.stringify(value)}`] = {
+              ok: true,
+              type: k.asymmetricKeyType,
+            };
+          } catch (e) {
+            result[`${kind}/${kty}/${JSON.stringify(value)}`] = {
+              name: e.name,
+              message: e.message,
+              code: e.code ?? null,
+            };
+          }
+        }
+    const jwk = {
+      crv: "P-256",
+      d: "DxBsPQPIgMuMyQbxzbb9toew6Ev6e9O6ZhpxLNgmAEo",
+      kty: "EC",
+      x: "X0mMYR_uleZSIPjNztIkAS3_ud5LhNpbiIFp6fNf2Gs",
+      y: "UbJuPy2Xi0lW7UYTBxPK3yGgDu9EAKYIecjkHX5s2lI",
+    };
+    for (const crv of [
+      "P-256",
+      "prime256v1",
+      "secp256k1",
+      "bad",
+      "P-224",
+      undefined,
+      null,
+    ])
+      for (const kind of ["private", "public"]) {
+        try {
+          result[`${kind}/curve/${crv}`] = crypto[
+            kind === "private" ? "createPrivateKey" : "createPublicKey"
+          ]({ key: { ...jwk, crv } }).export({ format: "jwk" });
+        } catch (e) {
+          result[`${kind}/curve/${crv}`] = {
+            name: e.name,
+            message: e.message,
+            code: e.code ?? null,
+          };
+        }
+      }
+    return result;
+  },
+  cryptoHostKeyMetadata: async function ({ crypto }) {
+    const result = {};
+    for (const algorithm of [
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        modulusLength: 1024,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: "SHA-256",
+      },
+      { name: "ECDSA", namedCurve: "P-384" },
+      { name: "ECDH", namedCurve: "P-256" },
+    ]) {
+      const pair = await crypto.subtle.generateKey(
+        algorithm,
+        true,
+        algorithm.name === "ECDH" ? ["deriveBits"] : ["sign", "verify"],
+      );
+      for (const kind of ["privateKey", "publicKey"]) {
+        const key = crypto.KeyObject.from(pair[kind]);
+        const hostAlgorithm = pair[kind].algorithm;
+        hostAlgorithm.name = "fake";
+        if (hostAlgorithm.publicExponent) hostAlgorithm.publicExponent.fill(0);
+        if (hostAlgorithm.namedCurve) hostAlgorithm.namedCurve = "fake";
+        Object.defineProperty(pair[kind], "algorithm", {
+          value: {
+            name: "RSA-PSS",
+            modulusLength: 3,
+            publicExponent: new Uint8Array([7]),
+          },
+          configurable: true,
+        });
+
+        result[algorithm.name + "/" + kind] = {
+          type: key.type,
+          algorithm: key.asymmetricKeyType,
+          details: Object.fromEntries(
+            Object.entries(key.asymmetricKeyDetails).map(([k, v]) => [
+              k,
+              typeof v === "bigint" ? String(v) : v,
+            ]),
+          ),
+        };
+      }
+    }
+    return result;
+  },
+
   fsFileHandleInvalidReceivers: async function ({ fs }) {
     const h = await fs.promises.open("/tmp/fh-receivers", "w+");
     const methods = {

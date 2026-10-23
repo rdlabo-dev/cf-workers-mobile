@@ -19,7 +19,9 @@ hostname validation; Android uses the existing Netty channel and platform
 SSLEngine. Application reads and writes wait for authentication. The native suite
 covers TLS 1.2 and 1.3, repeated write-half-close followed by response reads, and
 rejection of hostname mismatch and an untrusted root in both execution modes.
-Custom Duplex wrapping remains unsupported.
+Custom Duplex wrapping follows Workers' byte-forwarding path and does not itself
+encrypt traffic. Shared contracts cover its EOF, destruction, invalid chunks,
+write errors and listener ordering separately from the native TLS exchanges.
 
 Whole-module acceptance remains open. Further socket lifecycle/prototype and
 error-path coverage is also required. Workers itself rejects server mode, custom
