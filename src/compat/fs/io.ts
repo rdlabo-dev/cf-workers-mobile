@@ -53,7 +53,14 @@ export function installIo(api: any, promises: any) {
       );
     };
     if (Object.hasOwn(promises, name))
-      promises[name] = async (...args: any[]) => api[name + "Sync"](...args);
+      promises[name] = async (...args: any[]) => {
+        const result = api[name + "Sync"](...args);
+        // Workers' whole-file promise writers resolve without a value, unlike
+        // their synchronous counterparts and FileHandle.writeFile.
+        return name === "writeFile" || name === "appendFile"
+          ? undefined
+          : result;
+      };
   };
   const flags = (flag: any) => {
     if (typeof flag === "number") {

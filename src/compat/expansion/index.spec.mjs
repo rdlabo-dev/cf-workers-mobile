@@ -5793,12 +5793,39 @@ export const eventCases = {
       dir = "/tmp/cf-promises";
     await p.mkdir(dir, { recursive: true });
     try {
+      const writes = [];
+      for (const data of [
+        "abc",
+        new Uint8Array([1, 2]),
+        new DataView(new Uint8Array([3, 4]).buffer),
+      ]) {
+        for (const name of ["writeFile", "appendFile"]) {
+          const path = dir + "/writes";
+          writes.push([name, typeof (await p[name](path, data))]);
+          const fd = fs.openSync(path, "w+");
+          try {
+            writes.push([name + "Fd", typeof (await p[name](fd, data))]);
+          } finally {
+            fs.closeSync(fd);
+          }
+        }
+      }
+      const syncWrites = [
+        fs.writeFileSync(dir + "/sync", "abc"),
+        fs.appendFileSync(dir + "/sync", "d"),
+      ];
       const handle = await p.open(dir + "/file", "w+");
       try {
-        await handle.writeFile("abc");
+        const handleWrite = await handle.writeFile("abc");
         const buffer = new Uint8Array(3);
         const read = await handle.read(buffer, 0, 3, 0);
         return {
+          writes,
+          syncWrites,
+          handleWrite: {
+            bytesWritten: handleWrite.bytesWritten,
+            buffer: Array.from(handleWrite.buffer),
+          },
           read: read.bytesRead,
           buffer: Array.from(buffer),
           size: (await handle.stat()).size,

@@ -13,7 +13,14 @@ function checkNodeCases(reports) {
     [],
   );
 }
-import { cp, mkdtemp, writeFile, mkdir, readdir } from "node:fs/promises";
+import {
+  cp,
+  mkdtemp,
+  writeFile,
+  mkdir,
+  readdir,
+  readFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { execFileSync, spawn } from "node:child_process";
@@ -158,6 +165,7 @@ execFileSync(
     "express@5.3.0",
     "@capacitor/core@8.5.3",
     "typescript@7.0.2",
+    "@types/node@26.6.5",
   ],
   { cwd: temp, stdio: "pipe" },
 );
@@ -299,6 +307,36 @@ execFileSync(
     "--target",
     "es2022",
     "consumer.ts",
+  ],
+  { cwd: temp, stdio: "pipe" },
+);
+// Compile the installed adapter declarations, rather than resolving node:fs
+// to @types/node. Library checking must remain enabled to catch broken .d.ts.
+await writeFile(
+  join(temp, "fs-consumer.mts"),
+  (
+    await readFile(join(root, "tests/types/fs-consumer.mts"), "utf8")
+  ).replaceAll("../../src/", "./node_modules/cf-workers-native/dist/"),
+);
+execFileSync(
+  process.execPath,
+  [
+    "node_modules/typescript/bin/tsc",
+    "--noEmit",
+    "--strict",
+    "--skipLibCheck",
+    "false",
+    "--types",
+    "node",
+    "--lib",
+    "esnext,dom",
+    "--moduleResolution",
+    "nodenext",
+    "--module",
+    "nodenext",
+    "--target",
+    "es2022",
+    "fs-consumer.mts",
   ],
   { cwd: temp, stdio: "pipe" },
 );

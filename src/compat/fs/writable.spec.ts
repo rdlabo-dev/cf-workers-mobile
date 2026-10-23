@@ -47,6 +47,7 @@ test("access uses Workers permissions for temporary and embedded files", async (
       expect.objectContaining({ code: "ERR_OUT_OF_RANGE" }),
     );
     await expect(
+      // @ts-expect-error Exercise runtime rejection of a nonnumeric mode.
       fs.promises.access("/tmp/access-data", "4"),
     ).rejects.toMatchObject({ code: "ERR_INVALID_ARG_TYPE" });
   });

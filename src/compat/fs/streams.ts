@@ -14,6 +14,10 @@ function bindFs(operations) {
     ]),
   );
 }
+import type {
+  Readable as DeclaredReadable,
+  Writable as DeclaredWritable,
+} from "node:stream";
 import { Readable } from "../stream/readable.js";
 import { Writable } from "../stream/writable.js";
 import { Buffer } from "node:buffer";
@@ -51,7 +55,7 @@ type FsyncType = typeof import("node:fs").fsync;
 type ReadType = typeof import("node:fs").read;
 type WriteType = typeof import("node:fs").write;
 type WritevType = typeof import("node:fs").writev;
-import type { FileHandle } from "node:fs/promises";
+import type { FileHandle } from "./file-handle.js";
 
 import { errorOrDestroy } from "../stream/destroy.js";
 import { eos } from "../stream/end-of-stream.js";
@@ -76,21 +80,21 @@ const reportError = (error: unknown) => {
 };
 
 export interface FsOperations {
-  open?: typeof OpenType | undefined;
-  close?: typeof CloseType | undefined;
-  fsync?: typeof FsyncType | undefined;
-  read?: typeof ReadType | undefined;
-  write?: typeof WriteType | undefined;
-  writev?: typeof WritevType | undefined;
+  open?: OpenType | undefined;
+  close?: CloseType | undefined;
+  fsync?: FsyncType | undefined;
+  read?: ReadType | undefined;
+  write?: WriteType | undefined;
+  writev?: WritevType | undefined;
 }
 
 export interface RealizedFsOperations {
-  open: typeof OpenType;
-  close: typeof CloseType;
-  fsync: typeof FsyncType;
-  read: typeof ReadType;
-  write: typeof WriteType;
-  writev: typeof WritevType;
+  open: OpenType;
+  close: CloseType;
+  fsync: FsyncType;
+  read: ReadType;
+  write: WriteType;
+  writev: WritevType;
 }
 
 // Temporary while developing...
@@ -370,7 +374,7 @@ const kIoDone = Symbol("kIoDone");
 const kHandle = Symbol("kHandle");
 
 // @ts-expect-error TS2323 Cannot redeclare.
-export declare class ReadStream extends Readable {
+export declare class ReadStream extends DeclaredReadable {
   fd: number | null;
   flags: string;
   path: string;
@@ -800,7 +804,7 @@ declare type WriteVChunk = {
 };
 
 // @ts-expect-error TS2323 Cannot redeclare.
-export declare class WriteStream extends Writable {
+export declare class WriteStream extends DeclaredWritable {
   fd: number | null;
   path: string;
   flags: string;

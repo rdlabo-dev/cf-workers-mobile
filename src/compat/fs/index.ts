@@ -1,3 +1,4 @@
+import type { FsPromises } from "./public-types.js";
 import { createFileHandle, FileHandle } from "./file-handle.js";
 import { installIo } from "./io.js";
 import * as fileStreams from "./streams.js";
@@ -80,10 +81,10 @@ for (const name of ["writeFileSync", "appendFileSync"])
       ? Buffer.byteLength(args[1], encoding)
       : args[1].byteLength;
   };
-const promises: any = { ...temporary.promises };
-for (const name of Object.keys(promises))
-  if (typeof promises[name] === "function" && /^[a-z]/.test(name))
-    promises[name] = (...args: any[]) => temporary.promises[name](...args);
+const promiseImpl: any = { ...temporary.promises };
+for (const name of Object.keys(promiseImpl))
+  if (typeof promiseImpl[name] === "function" && /^[a-z]/.test(name))
+    promiseImpl[name] = (...args: any[]) => temporary.promises[name](...args);
 for (const name of [
   "readFile",
   "readdir",
@@ -93,7 +94,7 @@ for (const name of [
   "access",
 ]) {
   const old = (embedded.promises as any)[name];
-  promises[name] = async (...args: any[]) =>
+  promiseImpl[name] = async (...args: any[]) =>
     temporaryPath(args[0]) ? temporary.promises[name](...args) : old(...args);
 }
 // Keep all writes inside the memory volume, including FileHandle operations.
@@ -116,7 +117,7 @@ for (const name of [
   "copyFile",
   "symlink",
 ]) {
-  promises[name] = async (...args: any[]) => {
+  promiseImpl[name] = async (...args: any[]) => {
     if (name === "symlink") {
       return new Promise((resolve, reject) =>
         temporary.symlink(...args, (error: unknown) =>
@@ -141,7 +142,7 @@ for (const name of [
     return temporary.promises[name](...args);
   };
 }
-promises.watch = function () {
+promiseImpl.watch = function () {
   throw new Error("Not implemented");
 };
 // Workers validates ownership/permission requests but has no mutable Unix
@@ -162,7 +163,7 @@ function installOperation(
         (error) => callback(error),
       );
   };
-  if (promise) promises[name] = async (...args: any[]) => handler(...args);
+  if (promise) promiseImpl[name] = async (...args: any[]) => handler(...args);
 }
 function temporaryStats(stat: any, readonly = false) {
   if (stat == null) return stat;
@@ -238,7 +239,7 @@ api.access = (path: unknown, mode: unknown, callback?: any) => {
   }
   queueMicrotask(() => callback(failure));
 };
-promises.access = async (path: unknown, mode?: unknown) =>
+promiseImpl.access = async (path: unknown, mode?: unknown) =>
   checkAccess(accessArgs(path, mode));
 function statOptions(options: any = {}) {
   validateObject(options, "options");
@@ -302,7 +303,7 @@ for (const name of ["chmod", "lchmod", "fchmod", "chown", "lchown", "fchown"]) {
     queueMicrotask(() => callback(error));
   };
   if (!name.startsWith("f"))
-    promises[name] = async (...args: any[]) => operation(prepare(args));
+    promiseImpl[name] = async (...args: any[]) => operation(prepare(args));
 }
 installOperation("statfs", (path: any, options: any = {}) => {
   pathOf(path);
@@ -356,8 +357,8 @@ for (const name of ["utimes", "lutimes", "futimes"]) {
     name !== "futimes",
   );
 }
-promises.FileHandle = FileHandle;
-promises.open = async (path: any, flags: any, mode: any) => {
+promiseImpl.FileHandle = FileHandle;
+promiseImpl.open = async (path: any, flags: any, mode: any) => {
   const run = retainTemporaryFiles();
   const fd = api.openSync(path, flags, mode);
   return createFileHandle({ fd, run, api });
@@ -533,7 +534,8 @@ api.cp = (source: any, destination: any, options: any, callback?: any) => {
   }
   queueMicrotask(() => callback(error ?? null));
 };
-api.promises = promises;
+api.promises = promiseImpl;
+const promises = promiseImpl as FsPromises;
 export { promises };
 // Validate public directory arguments before scheduling their callbacks.
 function directoryOperation(
@@ -559,7 +561,7 @@ function directoryOperation(
     }
     queueMicrotask(() => callback(error, value));
   };
-  promises[name] = async (path: any, options: any = {}) =>
+  promiseImpl[name] = async (path: any, options: any = {}) =>
     operation(prepare(path, options));
 }
 directoryOperation(
@@ -724,7 +726,7 @@ for (const name of ["link", "symlink"]) {
     }
     queueMicrotask(() => callback(error));
   };
-  promises[name] = async (source: any, destination: any, type?: any) =>
+  promiseImpl[name] = async (source: any, destination: any, type?: any) =>
     operation(prepare(source, destination, type));
 }
 for (const name of ["readlink", "realpath"])
@@ -770,7 +772,7 @@ api.unlink = (path: any, callback: any) => {
   }
   queueMicrotask(() => callback(error));
 };
-promises.unlink = async (path: any) => api.unlinkSync(path);
+promiseImpl.unlink = async (path: any) => api.unlinkSync(path);
 api.ReadStream = api.FileReadStream = fileStreams.ReadStream;
 api.WriteStream = api.FileWriteStream = fileStreams.WriteStream;
 api.createReadStream = fileStreams.createReadStream;
@@ -791,7 +793,7 @@ api.openAsBlob = (path: any, options: any = {}) => {
 api.Dir = WorkersDir;
 api.Dirent = WorkersDirent;
 installOperation("glob", workersGlob, false);
-promises.glob = async function* (pattern: any, options?: any) {
+promiseImpl.glob = async function* (pattern: any, options?: any) {
   yield* workersGlob(pattern, options);
 };
 function directoryOptions(options: any, open: boolean) {
@@ -843,7 +845,7 @@ directoryOperation(
     return new WorkersDir(readDirectory(path, recursive), path, { encoding });
   },
 );
-installIo(api, promises);
+installIo(api, promiseImpl);
 export const {
   Dir,
   Dirent,
@@ -950,4 +952,4 @@ export const {
   writev,
   writevSync,
 } = api;
-export default api;
+export default api as Record<string, any> & { promises: FsPromises };

@@ -22,14 +22,17 @@ test("FileHandle owns its events, methods and readonly descriptor", async () => 
       const detached = a.stat;
       await expect(detached()).rejects.toBeInstanceOf(TypeError);
       expect(() => {
+        // @ts-expect-error The descriptor is readonly in the public API.
         a.fd = 12345;
       }).toThrow(TypeError);
-      expect(() => new a.constructor()).toThrow("Illegal constructor");
+      expect(() => Reflect.construct(a.constructor, [])).toThrow(
+        "Illegal constructor",
+      );
       expect(() => a.readLines.call({ fd: a.fd })).toThrow(TypeError);
       for (const key of ["fd", "fs", "refs", "closePromise", "read", "stat"])
         expect(Object.hasOwn(a, key)).toBe(false);
-      expect(a.ref).toBeUndefined();
-      expect(a.unref).toBeUndefined();
+      expect(Reflect.get(a, "ref")).toBeUndefined();
+      expect(Reflect.get(a, "unref")).toBeUndefined();
       await a.close();
       expect(a.fd).toBeUndefined();
       await expect(a.stat()).rejects.toMatchObject({

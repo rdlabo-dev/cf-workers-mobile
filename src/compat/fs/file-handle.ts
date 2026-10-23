@@ -1,3 +1,12 @@
+import type { ReadStreamOptions, WriteStreamOptions } from "./streams.js";
+import type {
+  ReadOptions,
+  ReadResult,
+  WriteResult,
+  ReadFileOptions,
+  WriteFileOptions,
+} from "./public-types.js";
+import type { Stats, BigIntStats, ReadStream, WriteStream } from "node:fs";
 // FileHandle's public contract follows workerd 5358e3d337336eaf696a48bc1563d808b10feba5.
 // The filesystem backend and its request scope remain private.
 import { Buffer } from "node:buffer";
@@ -58,7 +67,10 @@ export class FileHandle extends EventEmitter {
     const backend = this.#backend!;
     return backend.run(() => backend.api[name](fd, ...args));
   }
-  async appendFile(data: string | ArrayBufferView, options: any = {}) {
+  async appendFile(
+    data: string | ArrayBufferView,
+    options: WriteFileOptions | BufferEncoding = {},
+  ) {
     await this.#invoke("appendFileSync", data, options);
   }
   async chmod(mode: string | number) {
@@ -73,6 +85,16 @@ export class FileHandle extends EventEmitter {
   async sync() {
     await this.#invoke("fsyncSync");
   }
+  read(options?: ReadOptions<Buffer>): Promise<ReadResult<Buffer>>;
+  read<T extends ArrayBufferView>(
+    options: ReadOptions<T> & { buffer: T },
+  ): Promise<ReadResult<T>>;
+  read<T extends ArrayBufferView>(
+    buffer: T,
+    offsetOrOptions?: number | ReadOptions<T>,
+    length?: number,
+    position?: number | bigint | null,
+  ): Promise<ReadResult<T>>;
   read(
     bufferOrOptions: any = {},
     offsetOrOptions: any = {},
@@ -108,7 +130,10 @@ export class FileHandle extends EventEmitter {
       return Promise.reject(error);
     }
   }
-  readv(buffers: ArrayBufferView[], position: number | bigint | null = null) {
+  readv<T extends readonly ArrayBufferView[]>(
+    buffers: T,
+    position: number | bigint | null = null,
+  ): Promise<{ bytesRead: number; buffers: T }> {
     try {
       return Promise.resolve({
         bytesRead: this.#invoke("readvSync", buffers, position),
@@ -118,22 +143,55 @@ export class FileHandle extends EventEmitter {
       return Promise.reject(error);
     }
   }
+  readFile(
+    options: BufferEncoding | (ReadFileOptions & { encoding: BufferEncoding }),
+  ): Promise<string>;
+  readFile(
+    options?:
+      | (ReadFileOptions & { encoding?: "buffer" | null })
+      | "buffer"
+      | null,
+  ): Promise<Buffer>;
+  readFile(
+    options?: ReadFileOptions | BufferEncoding | "buffer" | null,
+  ): Promise<string | Buffer>;
   async readFile(options: any = {}) {
     return await this.#invoke("readFileSync", options);
   }
-  readLines(_options: any = {}): never {
+  readLines(_options: unknown = {}): never {
     if (this.#fd === undefined) throw badDescriptor();
     throw new Error("not implemented");
   }
+  stat(options: { bigint: true }): Promise<BigIntStats>;
+  stat(options?: { bigint?: false }): Promise<Stats>;
+  stat(options?: { bigint?: boolean }): Promise<Stats | BigIntStats>;
   async stat(options: any = {}) {
     return await this.#invoke("fstatSync", options);
   }
   async truncate(length = 0) {
     await this.#invoke("ftruncateSync", length);
   }
-  async utimes(atime: any, mtime: any) {
+  async utimes(atime: string | number | Date, mtime: string | number | Date) {
     await this.#invoke("futimesSync", atime, mtime);
   }
+  write<T extends ArrayBufferView>(
+    buffer: T,
+    offsetPositionOrOptions?:
+      | number
+      | { offset?: number; length?: number; position?: number | bigint | null }
+      | null,
+    length?: number,
+    position?: number | bigint | null,
+  ): Promise<WriteResult<T>>;
+  write(
+    buffer: string,
+    position?: number | bigint | null,
+    encoding?: BufferEncoding,
+  ): Promise<WriteResult<Buffer>>;
+  write<T extends string | ArrayBufferView>(
+    buffer: T,
+    position?: number | null,
+  ): Promise<WriteResult<T extends string ? Buffer : T>>;
   write(
     buffer: string | ArrayBufferView,
     offsetPositionOrOptions: any = null,
@@ -156,7 +214,10 @@ export class FileHandle extends EventEmitter {
       return Promise.reject(error);
     }
   }
-  writev(buffers: ArrayBufferView[], position: number | bigint | null = null) {
+  writev<T extends readonly ArrayBufferView[]>(
+    buffers: T,
+    position: number | bigint | null = null,
+  ): Promise<{ bytesWritten: number; buffers: T }> {
     try {
       return Promise.resolve({
         bytesWritten: this.#invoke("writevSync", buffers, position),
@@ -166,6 +227,18 @@ export class FileHandle extends EventEmitter {
       return Promise.reject(error);
     }
   }
+  writeFile<T extends ArrayBufferView>(
+    data: T,
+    options?: WriteFileOptions | BufferEncoding,
+  ): Promise<WriteResult<T>>;
+  writeFile(
+    data: string,
+    options?: WriteFileOptions | BufferEncoding,
+  ): Promise<WriteResult<Buffer>>;
+  writeFile<T extends string | ArrayBufferView>(
+    data: T,
+    options?: WriteFileOptions | BufferEncoding,
+  ): Promise<WriteResult<T extends string ? Buffer : T>>;
   writeFile(data: string | ArrayBufferView, options: any = {}) {
     try {
       const bytesWritten = this.#invoke("writeFileSync", data, options);
@@ -193,7 +266,9 @@ export class FileHandle extends EventEmitter {
   async [asyncDispose]() {
     await this.close();
   }
-  readableWebStream(options: any = {}): ReadableStream<Uint8Array> {
+  readableWebStream(
+    options: { autoClose?: boolean } = {},
+  ): ReadableStream<Uint8Array> {
     if (this.#fd === undefined) throw badDescriptor();
     validateObject(options, "options");
     const { autoClose = true } = options;
@@ -236,11 +311,11 @@ export class FileHandle extends EventEmitter {
     this.once("close", finish);
     return stream;
   }
-  createReadStream(options: any = {}): any {
+  createReadStream(options: Omit<ReadStreamOptions, "fd"> = {}): ReadStream {
     const run = handleScopes.get(this) ?? ((fn: () => any) => fn());
     return run(() => createReadStream("", { ...options, fd: this }));
   }
-  createWriteStream(options: any = {}): any {
+  createWriteStream(options: Omit<WriteStreamOptions, "fd"> = {}): WriteStream {
     const run = handleScopes.get(this) ?? ((fn: () => any) => fn());
     return run(() => createWriteStream("", { ...options, fd: this }));
   }
