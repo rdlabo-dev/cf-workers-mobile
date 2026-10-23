@@ -13,10 +13,15 @@ rejection in both page and Dedicated Worker on iOS and Android. Dedicated Worker
 use the normal owned socket relay, including disposal. Trust overrides are confined
 to the independent debug test consumer and simulator CA store.
 
-Whole-module acceptance remains open. In-place upgrade of an existing plaintext
-socket is not implemented by the current native transport; it must not reconnect
-and silently discard the protocol state. This is an implementation gap requiring
-transport work, not an impossibility claim. Further socket lifecycle/prototype and
+Existing native plaintext sockets upgrade on the same TCP connection, preserving
+protocol state. iOS uses OpenSSL memory BIOs with mandatory SecTrust chain and
+hostname validation; Android uses the existing Netty channel and platform
+SSLEngine. Application reads and writes wait for authentication. The native suite
+covers TLS 1.2 and 1.3, repeated write-half-close followed by response reads, and
+rejection of hostname mismatch and an untrusted root in both execution modes.
+Custom Duplex wrapping remains unsupported.
+
+Whole-module acceptance remains open. Further socket lifecycle/prototype and
 error-path coverage is also required. Workers itself rejects server mode, custom
 verification callbacks, ALPN negotiation options and several introspection APIs
 in the pinned profile; retain those explicit failures.
