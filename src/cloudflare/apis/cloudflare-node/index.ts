@@ -1,3 +1,5 @@
+import { Headers } from "../../../browser/headers/index.js";
+import { Response } from "../../../browser/response/index.js";
 // Copyright (c) 2024-2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
@@ -129,7 +131,11 @@ export async function handleAsNodeRequest(
       try {
         const headers = new Headers();
         for (const [key, value] of Object.entries(res.getHeaders())) {
-          for (const item of Array.isArray(value) ? value : [value])
+          for (const item of Array.isArray(value)
+            ? key.toLowerCase() === "cookie" && value.length >= 2
+              ? [value.join("; ")]
+              : value
+            : [value])
             headers.append(key, String(item));
         }
         resolve(

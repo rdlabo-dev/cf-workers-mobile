@@ -1,10 +1,11 @@
+import { storeHTTPOptions } from "./server-options.js";
 import { asyncDispose } from "../../shared/globals/symbols.js";
 // Copyright (c) 2017-2026 Cloudflare, Inc.
 // Licensed under the Apache 2.0 license found in the LICENSE file or at:
 //     https://opensource.org/licenses/Apache-2.0
 // Copyright Joyent and Node contributors. All rights reserved. MIT license.
 // Adapted from workerd v1.20261012.1 node:http compatibility sources.
-import { Readable, Writable } from "node:stream";
+import { Readable, Writable, getDefaultHighWaterMark } from "node:stream";
 import { EventEmitter } from "node:events";
 import { Buffer } from "node:buffer";
 import {
@@ -24,6 +25,22 @@ import type {
   RequestOptions,
   ServerOptions,
 } from "node:http";
+
+import {
+  validateInteger,
+  validateString,
+  validateBoolean,
+  validateNumber,
+  validateObject,
+  validateOneOf,
+} from "../net/validators.js";
+import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
+import {
+  kIncomingMessage,
+  kServerResponse,
+  kUniqueHeaders,
+} from "./symbols.js";
+import { parseUniqueHeadersOption } from "./unique-headers.js";
 
 export const METHODS = [
   "ACL",
@@ -133,20 +150,7 @@ function coded<T extends Error>(error: T, code: string): T {
   return Object.assign(error, { code });
 }
 function validateType(value: unknown, type: string, name: string) {
-  if (typeof value !== type)
-    throw coded(
-      new TypeError(`${name} must be of type ${type}`),
-      "ERR_INVALID_ARG_TYPE",
-    );
-}
-function validateInteger(
-  value: unknown,
-  name: string,
-  minimum = Number.MIN_SAFE_INTEGER,
-) {
-  validateType(value, "number", name);
-  if (!Number.isSafeInteger(value) || (value as number) < minimum)
-    throw coded(new RangeError(`${name} is out of range`), "ERR_OUT_OF_RANGE");
+  if (typeof value !== type) throw new ERR_INVALID_ARG_TYPE(name, type, value);
 }
 function unsupportedOption(name: string): never {
   throw coded(
@@ -159,30 +163,6 @@ function notImplemented(name: string): Error {
     new Error(`The ${name} method is not implemented`),
     "ERR_METHOD_NOT_IMPLEMENTED",
   );
-}
-function validateString(value: unknown, name: string): asserts value is string {
-  if (typeof value !== "string")
-    throw coded(
-      new TypeError(`The "${name}" argument must be of type string.`),
-      "ERR_INVALID_ARG_TYPE",
-    );
-}
-function validateBoolean(
-  value: unknown,
-  name: string,
-): asserts value is boolean {
-  if (typeof value !== "boolean")
-    throw coded(
-      new TypeError(`The "${name}" argument must be of type boolean.`),
-      "ERR_INVALID_ARG_TYPE",
-    );
-}
-function validateNumber(value: unknown, name: string): asserts value is number {
-  if (typeof value !== "number")
-    throw coded(
-      new TypeError(`The "${name}" argument must be of type number.`),
-      "ERR_INVALID_ARG_TYPE",
-    );
 }
 export function validateHeaderName(
   name: unknown,
@@ -909,6 +889,7 @@ const captureRejection: typeof EventEmitter.captureRejectionSymbol =
     Symbol.for(
       "nodejs.rejection",
     )) as typeof EventEmitter.captureRejectionSymbol;
+
 export class Server extends EventEmitter {
   httpAllowHalfOpen = false;
   timeout = 0;
@@ -922,10 +903,11 @@ export class Server extends EventEmitter {
   rejectNonStandardBodyWrites = false;
   keepAliveTimeout = 5_000;
   keepAliveTimeoutBuffer = 1_000;
-  highWaterMark = 16 * 1024;
+  highWaterMark = getDefaultHighWaterMark(false);
   private port?: number;
-  private IncomingMessageClass: typeof IncomingMessage = IncomingMessage;
-  private ServerResponseClass: typeof ServerResponse = ServerResponse;
+  [kIncomingMessage]: typeof IncomingMessage = IncomingMessage;
+  [kServerResponse]: typeof ServerResponse = ServerResponse;
+  [kUniqueHeaders]: Set<string> | null = null;
 
   constructor(
     options?: ServerOptions | RequestListener,
@@ -953,73 +935,22 @@ export class Server extends EventEmitter {
       }
       return listeners.length !== 0;
     }) as typeof this.emit;
-    if (typeof options === "function") listener = options;
-    else if (options != null) {
-      if (typeof options !== "object")
-        throw coded(
-          new TypeError('The "options" argument must be of type object.'),
-          "ERR_INVALID_ARG_TYPE",
-        );
-      if (options.maxHeaderSize !== undefined) {
-        validateInteger(options.maxHeaderSize, "maxHeaderSize", 0);
-        unsupportedOption("maxHeaderSize");
-      }
-      for (const key of ["requestTimeout", "headersTimeout"] as const) {
-        if (options[key] !== undefined) {
-          validateInteger(options[key], key, 0);
-          this[key] = options[key];
-        }
-      }
-      this.headersTimeout =
-        options.headersTimeout ?? Math.min(60_000, this.requestTimeout);
-      if (
-        this.headersTimeout > 0 &&
-        this.requestTimeout > 0 &&
-        this.headersTimeout > this.requestTimeout
-      )
-        throw coded(
-          new RangeError("headersTimeout must be <= requestTimeout"),
-          "ERR_OUT_OF_RANGE",
-        );
-      for (const key of [
-        "keepAliveTimeout",
-        "keepAliveTimeoutBuffer",
-        "connectionsCheckingInterval",
-      ] as const) {
-        if (options[key] !== undefined) {
-          validateInteger(
-            options[key],
-            key,
-            key === "keepAliveTimeoutBuffer" ? Number.MIN_SAFE_INTEGER : 0,
-          );
-          unsupportedOption(key);
-        }
-      }
-      for (const key of [
-        "insecureHTTPParser",
-        "requireHostHeader",
-        "joinDuplicateHeaders",
-        "rejectNonStandardBodyWrites",
-      ] as const)
-        if (options[key] !== undefined)
-          validateType(options[key], "boolean", key);
-      this.requireHostHeader = options.requireHostHeader ?? true;
-      this.joinDuplicateHeaders = options.joinDuplicateHeaders ?? false;
-      this.rejectNonStandardBodyWrites =
-        options.rejectNonStandardBodyWrites ?? false;
-      if (options.highWaterMark !== undefined) {
-        validateType(options.highWaterMark, "number", "highWaterMark");
-        if (options.highWaterMark > 0)
-          this.highWaterMark = options.highWaterMark;
-      }
-      if (options.IncomingMessage)
-        this.IncomingMessageClass =
-          options.IncomingMessage as unknown as typeof IncomingMessage;
-      if (options.ServerResponse)
-        this.ServerResponseClass =
-          options.ServerResponse as unknown as typeof ServerResponse;
+    if (options != null) storeHTTPOptions.call(this, options);
+    const values = options as ServerOptions | undefined;
+    if (values?.highWaterMark !== undefined) {
+      validateNumber(values.highWaterMark, "options.highWaterMark");
+      if (values.highWaterMark > 0) this.highWaterMark = values.highWaterMark;
+    }
+    if (typeof options === "function") {
+      listener = options;
+      options = {};
+    } else if (options == null) {
+      options = {};
+    } else {
+      validateObject(options, "options");
     }
     if (listener) this.on("request", listener);
+    this[kUniqueHeaders] = parseUniqueHeadersOption(options.uniqueHeaders);
   }
   [captureRejection](
     error: unknown,
@@ -1074,8 +1005,8 @@ export class Server extends EventEmitter {
     setHandler(port, {
       server: this,
       createRequestResponse: () => ({
-        IncomingMessage: this.IncomingMessageClass,
-        ServerResponse: this.ServerResponseClass,
+        IncomingMessage: this[kIncomingMessage],
+        ServerResponse: this[kServerResponse],
       }),
     });
     const callback =
@@ -1168,20 +1099,9 @@ export class Agent extends EventEmitter {
     this.maxSockets = this.options.maxSockets || Agent.defaultMaxSockets;
     this.maxFreeSockets = this.options.maxFreeSockets || 256;
     this.scheduling = this.options.scheduling || "lifo";
-    if (!(["fifo", "lifo"] as unknown[]).includes(this.scheduling))
-      throw coded(
-        new TypeError("options.scheduling is invalid"),
-        "ERR_INVALID_ARG_VALUE",
-      );
+    validateOneOf(this.scheduling, "scheduling", ["fifo", "lifo"]);
     const maximum = this.options.maxTotalSockets;
-    if (maximum !== undefined) {
-      validateNumber(maximum, "maxTotalSockets");
-      if (Number.isNaN(maximum) || maximum < 1)
-        throw coded(
-          new RangeError("maxTotalSockets is out of range"),
-          "ERR_OUT_OF_RANGE",
-        );
-    }
+    if (maximum !== undefined) validateNumber(maximum, "maxTotalSockets", 1);
     this.maxTotalSockets = maximum === undefined ? Infinity : maximum;
   }
   createConnection() {

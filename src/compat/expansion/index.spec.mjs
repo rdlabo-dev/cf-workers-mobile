@@ -1,4 +1,136 @@
 export const eventCases = {
+  httpUniqueHeaders: async function ({ http: h, cloudflareNode: n }) {
+    const result = {};
+    for (const uniqueHeaders of [
+      undefined,
+      [],
+      ["X-List", ["Set-Cookie"]],
+      "x-list",
+      [1],
+    ]) {
+      let server;
+      const id = JSON.stringify(uniqueHeaders) ?? "undefined";
+      try {
+        server = h.createServer({ uniqueHeaders }, (_req, res) => {
+          res.setHeader("x-list", ["a", "b"]);
+          res.setHeader("cookie", ["a=1", "b=2"]);
+          res.setHeader("set-cookie", ["a=1", "b=2"]);
+          res.end("body");
+        });
+        const response = await n
+          .httpServerHandler(server)
+          .fetch(new Request("https://test/"));
+        result[id] = {
+          list: response.headers.get("x-list"),
+          cookie: response.headers.get("cookie"),
+          cookies: response.headers.getSetCookie(),
+          body: await response.text(),
+        };
+      } catch (error) {
+        result[id] = {
+          name: error.name,
+          code: error.code ?? null,
+          // Native TypeError wording differs between JavaScriptCore and V8.
+          invalidHeaderMethod: error.message.includes("toLowerCase"),
+        };
+      } finally {
+        server?.close();
+      }
+    }
+    return result;
+  },
+  httpOptionValidation: function ({ http: h }) {
+    const out = {};
+    const attempt = (id, fn) => {
+      try {
+        const v = fn();
+        out[id] = {
+          ok: true,
+          requestTimeout: v.requestTimeout,
+          headersTimeout: v.headersTimeout,
+          highWaterMark: v.highWaterMark,
+          maxTotalSockets: v.maxTotalSockets,
+          scheduling: v.scheduling,
+        };
+      } catch (e) {
+        out[id] = { name: e.name, message: e.message, code: e.code ?? null };
+      }
+    };
+    const values = [
+      undefined,
+      null,
+      false,
+      true,
+      -1,
+      0,
+      1,
+      1.5,
+      NaN,
+      Infinity,
+      Number.MAX_SAFE_INTEGER + 1,
+      "1",
+      {},
+    ];
+    for (const field of [
+      "maxHeaderSize",
+      "insecureHTTPParser",
+      "requestTimeout",
+      "headersTimeout",
+      "keepAliveTimeout",
+      "keepAliveTimeoutBuffer",
+      "connectionsCheckingInterval",
+      "requireHostHeader",
+      "joinDuplicateHeaders",
+      "rejectNonStandardBodyWrites",
+      "highWaterMark",
+    ])
+      for (let i = 0; i < values.length; i++)
+        attempt(`server/${field}/${i}`, () =>
+          h.createServer({ [field]: values[i] }),
+        );
+    for (const field of [
+      "scheduling",
+      "maxTotalSockets",
+      "maxSockets",
+      "maxFreeSockets",
+      "keepAlive",
+      "keepAliveMsecs",
+    ])
+      for (let i = 0; i < values.length; i++)
+        attempt(
+          `agent/${field}/${i}`,
+          () => new h.Agent({ [field]: values[i] }),
+        );
+    for (const kind of ["server", "agent"])
+      for (const mode of ["defaults", "all", "invalid"]) {
+        const log = [];
+        const options = new Proxy(
+          mode === "defaults"
+            ? {}
+            : {
+                requestTimeout: 1000,
+                headersTimeout: mode === "invalid" ? 2000 : 500,
+                joinDuplicateHeaders: false,
+                maxTotalSockets: 2,
+              },
+          {
+            get(t, p, r) {
+              if (typeof p === "string") log.push(p);
+              return Reflect.get(t, p, r);
+            },
+            ownKeys(t) {
+              log.push("ownKeys");
+              return Reflect.ownKeys(t);
+            },
+          },
+        );
+        attempt(`getter/${kind}/${mode}`, () =>
+          kind === "server" ? h.createServer(options) : new h.Agent(options),
+        );
+        out[`getter/${kind}/${mode}`].log = log;
+      }
+    return out;
+  },
   cryptoKdfInputLifetime: async function ({ crypto: c }) {
     const result = {};
     const run = (method, callback, key, salt, info) => {
