@@ -83,6 +83,7 @@ export default defineConfig({
       "src/compat/crypto/signatures.spec.ts",
       "src/compat/crypto/keys.spec.ts",
       "src/compat/crypto/subtle-digest.spec.ts",
+      "src/compat/crypto/kdf-input.spec.ts",
       "src/shared/buffer-source.spec.ts",
       "src/compat/zlib/input.spec.ts",
       "src/compat/crypto/digest-stream.spec.ts",

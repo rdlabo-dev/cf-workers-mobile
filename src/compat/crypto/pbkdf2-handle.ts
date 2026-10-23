@@ -1,4 +1,4 @@
-import { validateCryptoLength } from "./validation.js";
+import { inputBytes, validateCryptoLength } from "./validation.js";
 import { nativePbkdf2 } from "./native-crypto.js";
 import { aliases } from "./hash-handle.js";
 const sizes: Record<string, number> = {
@@ -13,23 +13,35 @@ const sizes: Record<string, number> = {
 };
 export default {
   getPbkdf(
-    password: Uint8Array,
-    salt: Uint8Array,
+    password: ArrayBuffer | ArrayBufferView,
+    salt: ArrayBuffer | ArrayBufferView,
     iterations: number,
     length: number,
     digest: string,
   ) {
-    const normalized = aliases[digest.toLowerCase()];
-    if (!normalized) throw new TypeError("Invalid Pbkdf2 digest: " + digest);
+    const passwordBytes = inputBytes(password, "getPbkdf", 1),
+      saltBytes = inputBytes(salt, "getPbkdf", 2);
+    const normalized = aliases[digest.split("\0")[0]!.toLowerCase()];
+    if (!normalized)
+      throw new TypeError("Invalid Pbkdf2 digest: " + digest + ".");
     validateCryptoLength(
-      password.byteLength,
+      passwordBytes.byteLength,
       "Pbkdf2 failed: password is too large",
     );
-    validateCryptoLength(salt.byteLength, "Pbkdf2 failed: salt is too large");
+    validateCryptoLength(
+      saltBytes.byteLength,
+      "Pbkdf2 failed: salt is too large",
+    );
     if (length > 255 * sizes[normalized])
       throw new RangeError(
         "Pbkdf2 failed: derived key length exceeds maximum for this hash",
       );
-    return nativePbkdf2(password, salt, iterations, length, normalized);
+    return nativePbkdf2(
+      passwordBytes,
+      saltBytes,
+      iterations,
+      length,
+      normalized,
+    );
   },
 };

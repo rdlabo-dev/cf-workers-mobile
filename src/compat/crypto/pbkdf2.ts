@@ -34,7 +34,7 @@ import {
   validateString,
 } from "../net/validators.js";
 
-import { bytes as getArrayBufferOrView } from "./validation.js";
+import { arrayBufferOrView as getArrayBufferOrView } from "./validation.js";
 
 export type ArrayLike =
   | string

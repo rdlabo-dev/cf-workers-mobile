@@ -1,4 +1,245 @@
 export const eventCases = {
+  cryptoKdfInputLifetime: async function ({ crypto: c }) {
+    const result = {};
+    const run = (method, callback, key, salt, info) => {
+      const args =
+        method === "hkdf"
+          ? ["sha256", key, salt, info, 8]
+          : method === "scrypt"
+            ? [key, salt, 8, { N: 16, r: 1, p: 1 }]
+            : [key, salt, 2, 8, "sha256"];
+      return callback
+        ? new Promise((resolve, reject) =>
+            c[method](...args, (error, value) =>
+              error ? reject(error) : resolve(value),
+            ),
+          )
+        : c[method + "Sync"](...args);
+    };
+    const serialize = (value) =>
+      Array.from(value instanceof ArrayBuffer ? new Uint8Array(value) : value);
+    for (const method of ["hkdf", "scrypt", "pbkdf2"])
+      for (const callback of [false, true])
+        for (const field of method === "hkdf"
+          ? ["key", "salt", "info"]
+          : ["key", "salt"])
+          for (const mode of ["detachedBuffer", "detachedView"]) {
+            const values = {
+              key: new Uint8Array([1]),
+              salt: new Uint8Array([2]),
+              info: new Uint8Array([3]),
+            };
+            const buffer = values[field].buffer;
+            if (mode === "detachedBuffer") values[field] = buffer;
+            structuredClone(buffer, { transfer: [buffer] });
+            try {
+              result[`${method}/${callback}/${field}/${mode}`] = serialize(
+                await run(
+                  method,
+                  callback,
+                  values.key,
+                  values.salt,
+                  values.info,
+                ),
+              );
+            } catch (error) {
+              result[`${method}/${callback}/${field}/${mode}`] = {
+                name: error.name,
+                code: error.code ?? null,
+                message: error.message,
+              };
+            }
+          }
+    for (const field of ["key", "salt"])
+      for (const mode of ["mutate", "detach"])
+        for (const callback of [false, true]) {
+          const values = {
+            key: new Uint8Array([1]),
+            salt: new Uint8Array([2]),
+            info: new Uint8Array([3]),
+          };
+          let reads = 0;
+          Object.defineProperty(values.info, "byteLength", {
+            get() {
+              reads++;
+              if (mode === "mutate") values[field][0] = 9;
+              else
+                structuredClone(values[field].buffer, {
+                  transfer: [values[field].buffer],
+                });
+              return 1;
+            },
+          });
+          try {
+            result[`hkdfGetter/${field}/${mode}/${callback}`] = {
+              bytes: serialize(
+                await run(
+                  "hkdf",
+                  callback,
+                  values.key,
+                  values.salt,
+                  values.info,
+                ),
+              ),
+              reads,
+            };
+          } catch (error) {
+            result[`hkdfGetter/${field}/${mode}/${callback}`] = {
+              name: error.name,
+              code: error.code ?? null,
+              message: error.message,
+              reads,
+            };
+          }
+        }
+    for (const digest of [
+      "SHA256",
+      "DSA-SHA",
+      "sha256\0junk",
+      "sha3-256",
+      "bad\0x",
+      "bad\nx",
+    ]) {
+      try {
+        result["pbkdfDigest/" + digest] = serialize(
+          c.pbkdf2Sync("k", "s", 2, 8, digest),
+        );
+      } catch (error) {
+        result["pbkdfDigest/" + digest] = {
+          name: error.name,
+          code: error.code ?? null,
+          message: error.message,
+        };
+      }
+    }
+    return result;
+  },
+  cryptoX509InputViews: function ({ crypto: c }) {
+    const pem =
+      "-----BEGIN CERTIFICATE-----\nMIID6DCCAtCgAwIBAgIUFH02wcL3Qgben6tfIibXitsApCYwDQYJKoZIhvcNAQEL\nBQAwejELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMQswCQYDVQQHDAJTRjEPMA0G\nA1UECgwGSm95ZW50MRAwDgYDVQQLDAdOb2RlLmpzMQwwCgYDVQQDDANjYTExIDAe\nBgkqhkiG9w0BCQEWEXJ5QHRpbnljbG91ZHMub3JnMCAXDTIyMDkwMzIxNDAzN1oY\nDzIyOTYwNjE3MjE0MDM3WjB9MQswCQYDVQQGEwJVUzELMAkGA1UECAwCQ0ExCzAJ\nBgNVBAcMAlNGMQ8wDQYDVQQKDAZKb3llbnQxEDAOBgNVBAsMB05vZGUuanMxDzAN\nBgNVBAMMBmFnZW50MTEgMB4GCSqGSIb3DQEJARYRcnlAdGlueWNsb3Vkcy5vcmcw\nggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDUVjIK+yDTgnCT3CxChO0E\n37q9VuHdrlKeKLeQzUJW2yczSfNzX/0zfHpjY+zKWie39z3HCJqWxtiG2wxiOI8c\n3WqWOvzVmdWADlh6EfkIlg+E7VC6JaKDA+zabmhPvnuu3JzogBMnsWl68lCXzuPx\ndeQAmEwNtqjrh74DtM+Ud0ulb//Ixjxo1q3rYKu+aaexSramuee6qJta2rjrB4l8\nB/bU+j1mDf9XQQfSjo9jRnp4hiTFdBl2k+lZzqE2L/rhu6EMjA2IhAq/7xA2MbLo\n9cObVUin6lfoo5+JKRgT9Fp2xEgDOit+2EA/S6oUfPNeLSVUqmXOSWlXlwlb9Nxr\nAgMBAAGjYTBfMF0GCCsGAQUFBwEBBFEwTzAjBggrBgEFBQcwAYYXaHR0cDovL29j\nc3Aubm9kZWpzLm9yZy8wKAYIKwYBBQUHMAKGHGh0dHA6Ly9jYS5ub2RlanMub3Jn\nL2NhLmNlcnQwDQYJKoZIhvcNAQELBQADggEBAMM0mBBjLMt9pYXePtUeNO0VTw9y\nFWCM8nAcAO2kRNwkJwcsispNpkcsHZ5o8Xf5mpCotdvziEWG1hyxwU6nAWyNOLcN\nG0a0KUfbMO3B6ZYe1GwPDjXaQnv75SkAdxgX5zOzca3xnhITcjUUGjQ0fbDfwFV5\nix8mnzvfXjDONdEznVa7PFcN6QliFUMwR/h8pCRHtE5+a10OSPeJSrGG+FtrGnRW\nG1IJUv6oiGF/MvWCr84REVgc1j78xomGANJIu2hN7bnD1nEMON6em8IfnDOUtynV\n9wfWTqiQYD5Zifj6WcGa0aAHMuetyFG4lIfMAHmd3gaKpks7j9l26LwRPvI=\n-----END CERTIFICATE-----\n";
+    const out = {},
+      original = new c.X509Certificate(pem).raw;
+    for (const kind of ["typed", "data"])
+      for (const property of [
+        "buffer",
+        "byteOffset",
+        "byteLength",
+        "detached",
+      ]) {
+        const bytes = new Uint8Array(original.length + 2);
+        bytes.set(original, 1);
+        const view =
+          kind === "typed"
+            ? new Uint8Array(bytes.buffer, 1, original.length)
+            : new DataView(bytes.buffer, 1, original.length);
+        if (property === "detached")
+          structuredClone(bytes.buffer, { transfer: [bytes.buffer] });
+        else
+          Object.defineProperty(view, property, {
+            get() {
+              throw Error("shadow " + property);
+            },
+          });
+        try {
+          const cert = new c.X509Certificate(view);
+          out[kind + "/" + property] = {
+            fingerprint: cert.fingerprint256,
+            subject: cert.subject,
+          };
+        } catch (e) {
+          out[kind + "/" + property] = {
+            name: e.name,
+            // inspect embeds the host's intrinsic stack; retain its category and
+            // failed property while excluding engine-specific stack text.
+            message:
+              kind === "data" && property === "detached"
+                ? {
+                    inspectionByteLengthFailure: String(e.message).includes(
+                      "byteLength",
+                    ),
+                  }
+                : e.message,
+            code: e.code ?? null,
+          };
+        }
+      }
+    return out;
+  },
+  cryptoKdfInputViews: function ({ crypto: c }) {
+    const result = {};
+    for (const operation of [
+      "pbkdfPassword",
+      "pbkdfSalt",
+      "scryptPassword",
+      "scryptSalt",
+      "hkdfKey",
+      "hkdfSalt",
+      "hkdfInfo",
+    ])
+      for (const type of ["buffer", "typed", "data"])
+        for (const property of ["buffer", "byteOffset", "byteLength"]) {
+          const buffer = new Uint8Array([8, 1, 9]),
+            value =
+              type === "buffer"
+                ? buffer.buffer
+                : type === "typed"
+                  ? new Uint8Array(buffer.buffer, 1, 1)
+                  : new DataView(buffer.buffer, 1, 1);
+          Object.defineProperty(value, property, {
+            get() {
+              throw Error("shadow " + property);
+            },
+          });
+          try {
+            let out;
+            if (operation.startsWith("pbkdf"))
+              out = c.pbkdf2Sync(
+                operation === "pbkdfPassword" ? value : "p",
+                operation === "pbkdfSalt" ? value : "s",
+                2,
+                8,
+                "sha256",
+              );
+            if (operation.startsWith("scrypt"))
+              out = c.scryptSync(
+                operation === "scryptPassword" ? value : "p",
+                operation === "scryptSalt" ? value : "s",
+                8,
+                { N: 16, r: 1, p: 1 },
+              );
+            if (operation.startsWith("hkdf"))
+              out = c.hkdfSync(
+                "sha256",
+                operation === "hkdfKey" ? value : "p",
+                operation === "hkdfSalt" ? value : "s",
+                operation === "hkdfInfo" ? value : "i",
+                8,
+              );
+            result[`${operation}/${type}/${property}`] = Array.from(
+              out instanceof ArrayBuffer ? new Uint8Array(out) : out,
+            );
+          } catch (e) {
+            result[`${operation}/${type}/${property}`] = {
+              name: e.name,
+              message: e.message,
+              code: e.code ?? null,
+            };
+          }
+        }
+    for (const digest of ["SHA256", "DSA-SHA", "sha256\0junk", "sha3-256"])
+      try {
+        result["hkdf/" + digest] = Array.from(
+          new Uint8Array(c.hkdfSync(digest, "k", "s", "i", 8)),
+        );
+      } catch (e) {
+        result["hkdf/" + digest] = {
+          name: e.name,
+          message: e.message,
+          code: e.code ?? null,
+        };
+      }
+    return result;
+  },
   cryptoKeyDetailsShape: async function ({ crypto: c }) {
     const result = {};
     const record = (name, key) => {

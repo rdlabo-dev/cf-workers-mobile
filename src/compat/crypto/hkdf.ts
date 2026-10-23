@@ -3,7 +3,12 @@ import { createHmac } from "./hash.js";
 import { aliases } from "./hash-handle.js";
 // RFC 5869 extract-and-expand, using the existing HMAC implementation.
 import { Buffer } from "node:buffer";
-import { bytes, validateInteger, validateCryptoLength } from "./validation.js";
+import {
+  arrayBufferOrView,
+  inputBytes,
+  validateInteger,
+  validateCryptoLength,
+} from "./validation.js";
 import { validateString, validateFunction } from "../net/validators.js";
 import { ERR_OUT_OF_RANGE } from "../net/errors.js";
 function parameters(
@@ -15,9 +20,28 @@ function parameters(
 ) {
   if (key instanceof KeyObject) key = key.export();
   validateString(digest, "digest");
-  const ikm = bytes(key, "ikm"),
-    s = bytes(salt, "salt"),
-    i = bytes(info, "info");
+  const ikm = arrayBufferOrView(key, "ikm", [
+      "string",
+      "SecretKeyObject",
+      "ArrayBuffer",
+      "TypedArray",
+      "DataView",
+      "Buffer",
+    ]),
+    s = arrayBufferOrView(salt, "salt", [
+      "string",
+      "ArrayBuffer",
+      "TypedArray",
+      "DataView",
+      "Buffer",
+    ]),
+    i = arrayBufferOrView(info, "info", [
+      "string",
+      "ArrayBuffer",
+      "TypedArray",
+      "DataView",
+      "Buffer",
+    ]);
   validateInteger(length, "length", 0, 2147483647);
   if (i.byteLength > 1024)
     throw new ERR_OUT_OF_RANGE(
@@ -34,12 +58,15 @@ function derive({
   i,
   length,
 }: ReturnType<typeof parameters>): ArrayBuffer {
-  if (!aliases[digest.toLowerCase()])
+  const keyBytes = inputBytes(ikm, "getHkdf", 2),
+    saltBytes = inputBytes(s, "getHkdf", 3),
+    infoBytes = inputBytes(i, "getHkdf", 4);
+  if (!aliases[digest.split("\0")[0]!.toLowerCase()])
     throw new TypeError("Invalid Hkdf digest: " + digest);
-  validateCryptoLength(i.byteLength, "Hkdf failed: info is too large");
-  validateCryptoLength(s.byteLength, "Hkdf failed: salt is too large");
-  validateCryptoLength(ikm.byteLength, "Hkdf failed: key is too large");
-  const prk = createHmac(digest, s).update(ikm).digest();
+  validateCryptoLength(infoBytes.byteLength, "Hkdf failed: info is too large");
+  validateCryptoLength(saltBytes.byteLength, "Hkdf failed: salt is too large");
+  validateCryptoLength(keyBytes.byteLength, "Hkdf failed: key is too large");
+  const prk = createHmac(digest, saltBytes).update(keyBytes).digest();
 
   let previous: Buffer = Buffer.alloc(0);
   try {
@@ -49,7 +76,7 @@ function derive({
     for (let offset = 0, counter = 1; offset < length; counter++) {
       const next = createHmac(digest, prk)
         .update(previous)
-        .update(i)
+        .update(infoBytes)
         .update(Buffer.from([counter]))
         .digest();
       previous.fill(0);

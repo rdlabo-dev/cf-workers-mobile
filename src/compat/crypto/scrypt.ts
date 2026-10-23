@@ -28,7 +28,8 @@ import { syncScrypt } from "scrypt-js";
 import { Buffer } from "node:buffer";
 import {
   validateInteger,
-  bytes as getArrayBufferOrView,
+  arrayBufferOrView as getArrayBufferOrView,
+  inputBytes,
 } from "./validation.js";
 import { validateFunction, validateUint32 } from "../net/validators.js";
 import { ERR_INVALID_ARG_VALUE } from "../net/errors.js";
@@ -36,14 +37,16 @@ export type ArrayLike = ArrayBuffer | string | Buffer | ArrayBufferView;
 const kMaxLength = 2147483647;
 const cryptoImpl = {
   getScrypt(
-    password: Uint8Array,
-    salt: Uint8Array,
+    password: ArrayBuffer | ArrayBufferView,
+    salt: ArrayBuffer | ArrayBufferView,
     N: number,
     r: number,
     p: number,
     maxmem: number,
     length: number,
   ) {
+    const passwordBytes = inputBytes(password, "getScrypt", 1),
+      saltBytes = inputBytes(salt, "getScrypt", 2);
     // JSG validates the uint32 binding argument before entering the backend.
     if (maxmem > 0xffffffff)
       throw new TypeError(
@@ -63,12 +66,13 @@ const cryptoImpl = {
     ) {
       throw new Error("Scrypt failed");
     }
-    return new Uint8Array(syncScrypt(password, salt, N, r, p, length)).buffer;
+    return new Uint8Array(syncScrypt(passwordBytes, saltBytes, N, r, p, length))
+      .buffer;
   },
 };
 export interface ValidatedScryptOptions {
-  password: Buffer;
-  salt: Buffer;
+  password: ArrayBuffer | ArrayBufferView;
+  salt: ArrayBuffer | ArrayBufferView;
   keylen: number;
   N: number;
   r: number;
