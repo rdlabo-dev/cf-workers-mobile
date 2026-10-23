@@ -3,7 +3,7 @@ type API = Record<string, (...args: number[]) => number> & {
   memory: WebAssembly.Memory;
 };
 let api: API | undefined;
-function library(): API {
+export function library(): API {
   if (!api) {
     const module = new WebAssembly.Module(binary as BufferSource);
     api = new WebAssembly.Instance(module, {
@@ -21,7 +21,7 @@ function library(): API {
   }
   return api;
 }
-function string(api: API, pointer: number) {
+export function string(api: API, pointer: number) {
   const bytes = new Uint8Array(api.memory.buffer);
   let end = pointer;
   while (bytes[end]) end++;
@@ -60,12 +60,20 @@ export class NativeCodec {
           Number(value),
         );
         if (kind === "brotli" ? !result : api.z_is_error(result))
-          throw Object.assign(new Error("Initialization failed"), {
-            code: "ERR_ZLIB_INITIALIZATION_FAILED",
-          });
+          throw new Error(
+            kind === "brotli"
+              ? "Setting parameter failed"
+              : "Setting parameter failed: " + string(api, api.z_error(result)),
+          );
       }
       if (pledged !== undefined && kind === "zstd" && encode)
-        this.zcheck(api.z_size(this.ctx, pledged));
+        this.zcheck(
+          api.z_size64(
+            this.ctx,
+            pledged >>> 0,
+            Math.floor(pledged / 4294967296) >>> 0,
+          ),
+        );
     } catch (error) {
       this.close();
       throw error;

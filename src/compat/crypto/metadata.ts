@@ -20,3 +20,5 @@ export function setFips(_enabled: boolean): never {
 }
 // Do not copy Workers' fips=true: this adapter uses JavaScript algorithms,
 // not Workers' FIPS backend. That capability remains an explicit boundary.
+
+export { getCipherInfo } from "./cipher-info.js";

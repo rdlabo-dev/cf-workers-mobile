@@ -68,7 +68,7 @@ await writeFile(
     compatibility_date: profile.compatibilityDate,
   }),
 );
-const { consumer, tarball, tarballSha256 } = JSON.parse(
+const consumerEvidence = JSON.parse(
   await readFile(
     new URL(
       "../../../artifacts/node-inventory/events-consumer.json",
@@ -76,6 +76,18 @@ const { consumer, tarball, tarballSha256 } = JSON.parse(
     ),
     "utf8",
   ),
+);
+const { consumer, tarball, tarballSha256 } = consumerEvidence;
+assert.equal(
+  createHash("sha256")
+    .update(await readFile(tarball))
+    .digest("hex"),
+  tarballSha256,
+);
+const { workersCapacitorPlugin: installedVitePlugin } = await import(
+  pathToFileURL(
+    `${consumer}/node_modules/cf-workers-native/dist/tooling/vite.js`,
+  ).href
 );
 const { workersCapacitorPlugin } = await import(
   pathToFileURL(
@@ -90,7 +102,10 @@ const compiled = await build({
 import { eventCases } from ${JSON.stringify(root + "/src/compat/expansion/index.spec.mjs")};
 import { AsyncLocalStorage } from 'node:async_hooks';
 import process from 'node:process';
-export const run = name => eventCases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http});
+fs.registerVirtualFiles({'/bundle/readonly.txt':'abcdef','/bundle/nested/child.txt':'child'});
+import {measureOperation,measurements} from ${JSON.stringify(root + "/demo/tests/experiments/node-compat/native-measurements.mjs")};
+export {measurements};
+export const run = name => measureOperation(name,()=>eventCases[name]({process, tls, streams, sys, util, types, console, crypto, fs, zlib, module, httpCommon, httpOutgoing, httpServer, http}),name==='classicCodecs'?()=>zlib.gzipSync('x'.repeat(1024)):undefined);
 export {createNetworkRelay, initializeWorkerNetwork} from ${JSON.stringify(consumer + "/node_modules/cf-workers-native/dist/browser/fetch/relay.js")};
 export const runTls = async ({port,upgradePort}) => {
  const attempt = (servername,halfClose=false) => new Promise((resolve,reject)=> {
@@ -153,6 +168,7 @@ await writeFile(
       device,
       tarball,
       tarballSha256,
+      consumerEvidence,
       cases: Object.keys(eventCases),
     },
     null,
@@ -362,21 +378,21 @@ async function main() {
 const source = ${JSON.stringify(source)};
 const names = ${JSON.stringify(Object.keys(eventCases))};
 const report = async value => {await fetch(${JSON.stringify(backend.url.origin + "/__acceptance/report")}, {method:'POST', mode:'no-cors', headers:{'content-type':'text/plain'}, body:JSON.stringify(value)});};
-const results = {};
+const results = {}, measurements = {};
 try {
  for (const mode of ['page', 'worker']) {
-  results[mode] = {};
+  results[mode] = {}; measurements[mode] = {};
   for (const name of names) {
    const url = URL.createObjectURL(new Blob([source], {type:'text/javascript'}));
    try {
-    if (mode === 'page') { const api = await import(/* @vite-ignore */ url); results[mode][name] = JSON.parse(JSON.stringify(await api.run(name))); }
+    if (mode === 'page') { const api = await import(/* @vite-ignore */ url); results[mode][name] = JSON.parse(JSON.stringify(await api.run(name))); measurements[mode][name] = api.measurements[name]; }
     else {
-     const workerURL = URL.createObjectURL(new Blob(['import {run} from ' + JSON.stringify(url) + '; self.onmessage = async ({data}) => {try {self.postMessage({value:JSON.parse(JSON.stringify(await run(data)))});} catch(error) {self.postMessage({error:String(error)});}};'], {type:'text/javascript'}));
+     const workerURL = URL.createObjectURL(new Blob(['import {run,measurements} from ' + JSON.stringify(url) + '; self.onmessage = async ({data}) => {try {self.postMessage({value:JSON.parse(JSON.stringify(await run(data))),measurements:measurements[data]});} catch(error) {self.postMessage({error:String(error)});}};'], {type:'text/javascript'}));
      const worker = new Worker(workerURL, {type:'module'});
      try {
       results[mode][name] = await new Promise((resolve,reject) => {
        const timer = setTimeout(() => reject(new Error('Worker timeout: '+name)), 8000);
-       worker.onmessage = ({data}) => {clearTimeout(timer); data.error ? reject(new Error(data.error)) : resolve(data.value);};
+       worker.onmessage = ({data}) => {clearTimeout(timer); if(data.error)reject(new Error(data.error));else {measurements[mode][name]=data.measurements;resolve(data.value);}};
        worker.onerror = event => {clearTimeout(timer);reject(new Error(event.message || 'Worker error'));};
        worker.postMessage(name);
       });
@@ -397,7 +413,7 @@ try {
   tlsWorker.onmessage=({data})=>{if(data.tls || data.error){clearTimeout(timer);data.error?reject(new Error(data.error)):resolve(data.tls);}};
   tlsWorker.postMessage(${JSON.stringify(tlsPorts)});
  });} finally {tlsWorker.terminate();await relay.dispose();URL.revokeObjectURL(workerURL);URL.revokeObjectURL(tlsURL);}
- await report({stage:'complete', nativeTls, hash:${JSON.stringify(hash)}, results});
+ await report({stage:'complete', measurements, nativeTls, hash:${JSON.stringify(hash)}, results});
  document.body.textContent = 'Compatibility contracts complete';
 } catch(error) {await report({stage:'failure', message:String(error), stack:error.stack});document.body.textContent=String(error);}
 }
@@ -409,6 +425,9 @@ await runNativeAcceptance({
   platform,
   device,
   bootstrapCode,
+  buildPlugin: installedVitePlugin,
+  bootstrapDirectory: `${consumer}/expansion-bootstrap`,
+  forbiddenModuleRoots: [`${root}/src`, `${root}/dist`],
   shell: consumer,
   appId: "jp.rdlabo.workerscapacitor.events",
   worker: `${artifacts}/worker.ts`,

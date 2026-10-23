@@ -1,42 +1,31 @@
 import { Buffer } from "node:buffer";
-// @ts-expect-error browserify-zlib has no declarations
-import original from "browserify-zlib/lib/index.js";
 import { validateInteger } from "../crypto/validation.js";
 import { ERR_INVALID_ARG_TYPE } from "../net/errors.js";
 import * as compression from "./compression.js";
 export * from "./compression.js";
-export const {
-  Zlib,
-  codes,
-  Deflate,
-  Inflate,
-  Gzip,
-  Gunzip,
-  DeflateRaw,
-  InflateRaw,
-  Unzip,
-  createDeflate,
-  createInflate,
-  createDeflateRaw,
-  createInflateRaw,
-  createGzip,
-  createGunzip,
-  createUnzip,
-  deflate,
-  deflateSync,
-  gzip,
-  gzipSync,
-  deflateRaw,
-  deflateRawSync,
-  unzip,
-  unzipSync,
-  inflate,
-  inflateSync,
-  gunzip,
-  gunzipSync,
-  inflateRaw,
-  inflateRawSync,
-} = original;
+import * as classic from "./classic.js";
+export * from "./classic.js";
+export const codes = Object.freeze(
+  Object.fromEntries(
+    [
+      "Z_OK",
+      "Z_STREAM_END",
+      "Z_NEED_DICT",
+      "Z_ERRNO",
+      "Z_STREAM_ERROR",
+      "Z_DATA_ERROR",
+      "Z_MEM_ERROR",
+      "Z_BUF_ERROR",
+      "Z_VERSION_ERROR",
+    ].flatMap((name) => {
+      const value = pinnedConstants[name as keyof typeof pinnedConstants];
+      return [
+        [name, value],
+        [value, name],
+      ];
+    }),
+  ),
+);
 import * as pinnedConstants from "./constants.js";
 const topLevelConstants = {
   Z_NO_FLUSH: pinnedConstants.Z_NO_FLUSH,
@@ -390,7 +379,8 @@ export function crc32(input: unknown, value = 0): number {
   return (crc ^ -1) >>> 0;
 }
 export default {
-  ...original,
+  codes,
+  ...classic,
   ...topLevelConstants,
   constants,
   ...compression,

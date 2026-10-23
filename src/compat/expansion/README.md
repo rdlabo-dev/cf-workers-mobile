@@ -13,7 +13,7 @@ hash/HKDF/scrypt, the four Workers ECDH curves, crypto engine/secure-heap stubs,
 writable memory-backed /tmp, module metadata, HTTP internal
 helpers, adapter-owned secret and asymmetric KeyObjects, prime generation and
 checking, incremental signatures, Certificate SPKAC and X509Certificate operations,
-Brotli/Zstd codecs and CRC32.
+zlib/Brotli/Zstd codecs and CRC32, and cipher metadata lookup.
 Additional profiles cover process resource/permission/report stubs, its pinned
 wall-clock hrtime behavior, and TLS hostname/ALPN/options contracts. Native runs
 also test real TLS exchange and hostname mismatch rejection.
@@ -22,15 +22,14 @@ The SDK starts a fresh /tmp volume for each local fetch dispatch. Handles opened
 inside that request retain their volume; embedded bundle assets stay read-only.
 Standalone imports outside SDK dispatch share a fallback volume. Copying embedded files to /tmp preserves immutable embedded bytes. Permission
 changes are validated no-ops and statfs returns the pinned Workers zero values.
-These checks do not cover every descriptor or cross-volume operation. Watching files is unsupported in Workers too.
+Embedded files support read-only descriptors, FileHandles, streams and links; copies into /tmp are writable and independent. Numeric file timestamps use milliseconds; embedded timestamps remain unchanged. Watching files is unsupported in Workers too. These profiles do not certify every filesystem operation.
 
-Brotli 1.1.0 and Zstd 1.5.7 use bundled, synchronously initialized WebAssembly.
+zlib 1.3.1, Brotli 1.1.0 and Zstd 1.5.7 use bundled, synchronously initialized WebAssembly.
 The profile covers parameters, synchronous/callback operations, incremental
 streams, flush/reset, byte accounting and output limits for synchronous
 processing. Streaming output is not cumulatively capped by maxOutputLength.
 The pinned source revisions and artifact hashes accompany the codecs; rebuild
-with scripts/build-native-codecs.mjs and the pinned Emscripten SDK. Remaining
-codec edge cases and inherited gzip/deflate behavior still require acceptance.
+with scripts/build-native-codecs.mjs or scripts/build-native-zlib.mjs and the pinned Emscripten SDK. Gzip/deflate and Brotli/Zstd streams use the pinned Workers stream lifecycle. The comparative cases include constructor validation, callback timing, reset, close, byte accounting, dictionaries and output limits; whole-module acceptance remains a separate gate.
 Scrypt uses a synchronous JavaScript backend, including for callback completion,
 so large parameters can block the WebView.
 
@@ -40,7 +39,7 @@ synchronous extraction of its opaque key material is unavailable. RSA, EC, Ed255
 bundled OpenSSL 3.5.9 WebAssembly; RSA/EC streaming and one-shot signatures
 are compared with Workers and independent test signatures. This covers selected
 algorithms and operations, not the whole crypto module. Additional key-generation
-options and remaining error contracts still need work.
+options and remaining error contracts still need work. `getCipherInfo` returns pinned Workers metadata; a successful lookup does not establish local availability of the named encryption algorithm.
 X509Certificate parses PEM/DER, exposes certificate fields and legacy objects,
 extracts RSA/EC public keys, checks names and issuers, and verifies signatures
 with certificate public keys. The pinned Workers runtime returns false for

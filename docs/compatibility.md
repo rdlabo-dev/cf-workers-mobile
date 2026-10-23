@@ -11,7 +11,7 @@ The earlier `workers-capacitor` package releases 0.1.0 Preview and the explicitl
 
 | Host              | Scope                                                                                                                                                                                     |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| iOS embedding     | 0.1.4 `WorkersIOS` SwiftPM product for UIKit/SwiftUI. Close before removing a UIKit controller; SwiftUI dismantling closes automatically.                                                 |
+| iOS embedding     | 0.1.5 `WorkersIOS` SwiftPM product for UIKit/SwiftUI. Close before removing a UIKit controller; SwiftUI dismantling closes automatically.                                                 |
 | Android embedding | Maven Central SDK `io.github.rdlabo:cf-workers-native-android:0.1.2`. Requires WebView `MULTI_PROFILE`; one SDK screen at a time, with persistent SDK cookies isolated from host cookies. |
 | Capacitor         | Existing Capacitor 8 integration, verified with 8.5.3; use this path for general native plugins.                                                                                          |
 

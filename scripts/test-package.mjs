@@ -43,6 +43,9 @@ console.log(`Consumer package: ${pack.name}@${pack.version} (${temp})`);
 for (const required of [
   "dist/ios.js",
   "dist/android.js",
+  "dist/compat/zlib/classic-base.cjs",
+  "dist/compat/zlib/classic-base.d.cts",
+  "dist/compat/zlib/native-zlib.js",
   "native/ios-host/WorkersView.swift",
   "native/android/consumer-rules.pro",
   "native/android/src/main/java/jp/rdlabo/workerscapacitor/WorkersNative.java",
@@ -111,7 +114,9 @@ for (const notice of [
   ),
   "dist/compat/crypto/LICENSE-APACHE",
   "dist/compat/crypto/LICENSE-3RD-PARTY.md",
-  ...["brotli", "zstd", "emscripten", "musl"].map(
+  "dist/compat/zlib/LICENSE-APACHE",
+  "dist/compat/zlib/LICENSE-3RD-PARTY.md",
+  ...["brotli", "zstd", "zlib", "emscripten", "musl"].map(
     (name) => `dist/compat/zlib/LICENSE.${name}`,
   ),
 ]) {

@@ -1,3 +1,4 @@
+import * as embedded from "./embedded.js";
 import { fileMode } from "./mode.js";
 import { registerRequestScope } from "../../shared/request-scope.js";
 // Writable, memory-only /tmp. Embedded bundle files remain read-only.
@@ -24,8 +25,8 @@ export function writablePath(value: any, syscall: string) {
   const path = pathOf(value);
   if (!(path === "/tmp" || path.startsWith("/tmp/")))
     throw Object.assign(
-      new Error(`EROFS: read-only file system, ${syscall} '${path}'`),
-      { code: "EROFS", errno: -30, syscall, path },
+      new Error(`operation not permitted, ${syscall} '${path}'`),
+      { code: "EPERM", errno: -1, syscall, path },
     );
   return path;
 }
@@ -34,6 +35,86 @@ function createTemporary() {
   const volume = new Volume();
   volume.mkdirSync("/tmp");
   const fs = createFsFromVolume(volume) as any;
+  const readonlyDescriptors = new Set<number>();
+  const readonlyInodes = new Set<number>();
+  const denied = (syscall: string, path?: string) =>
+    Object.assign(new Error("operation not permitted"), {
+      code: "EPERM",
+      errno: -1,
+      syscall,
+      ...(path ? { path } : {}),
+    });
+  function mount(path: string) {
+    if (
+      temporaryPath(path) ||
+      (fs.existsSync(path) && fs.statSync(path).isFile())
+    )
+      return;
+    let stat;
+    try {
+      stat = embedded.statSync(path);
+    } catch (error) {
+      if ((error as any).code === "ENOENT") return;
+      throw error;
+    }
+    if (stat.isDirectory()) {
+      fs.mkdirSync(path, { recursive: true });
+      for (const name of embedded.readdirSync(path) as string[])
+        mount(posix.join(path, name));
+    } else {
+      fs.mkdirSync(posix.dirname(path), { recursive: true });
+      fs.writeFileSync(path, embedded.readFileSync(path));
+      readonlyInodes.add(fs.statSync(path).ino);
+    }
+  }
+  function resolved(path: string): string {
+    let parent = path;
+    const missing = [];
+    while (!fs.existsSync(parent) && parent !== "/") {
+      missing.unshift(posix.basename(parent));
+      parent = posix.dirname(parent);
+    }
+    return posix.join(fs.realpathSync(parent), ...missing);
+  }
+  function mutable(value: any, syscall: string, follow = true) {
+    if (typeof value === "number") {
+      if (readonlyDescriptors.has(value)) throw denied(syscall);
+      return value;
+    }
+    const path = writablePath(value, syscall) as string;
+    const target = follow
+      ? resolved(path)
+      : posix.join(resolved(posix.dirname(path)), posix.basename(path));
+    if (
+      !temporaryPath(target) ||
+      (follow &&
+        fs.existsSync(target) &&
+        readonlyInodes.has(fs.statSync(target).ino))
+    )
+      throw denied(syscall, path);
+    return path;
+  }
+  function openPath(value: any, flags: any = "r") {
+    const path = pathOf(value);
+    mount(path);
+    const target = resolved(path);
+    const writes =
+      typeof flags === "number"
+        ? !!(
+            flags &
+            (fs.constants.O_WRONLY |
+              fs.constants.O_RDWR |
+              fs.constants.O_CREAT |
+              fs.constants.O_TRUNC |
+              fs.constants.O_APPEND)
+          )
+        : typeof flags === "string" && !["r", "rs", "sr"].includes(flags);
+    const readonly =
+      !temporaryPath(target) ||
+      (fs.existsSync(target) && readonlyInodes.has(fs.statSync(target).ino));
+    if (readonly && writes) throw denied("open", path);
+    return { path, readonly };
+  }
   const mutating = new Set([
     "appendFile",
     "writeFile",
@@ -80,7 +161,7 @@ function createTemporary() {
             };
         }
         if (base === "symlink") {
-          args[1] = writablePath(args[1], base);
+          args[1] = mutable(args[1], base, false);
           const target = Buffer.isBuffer(args[0])
             ? args[0].toString()
             : args[0];
@@ -90,16 +171,22 @@ function createTemporary() {
               ["string", "Buffer"],
               target,
             );
-          writablePath(posix.resolve(posix.dirname(args[1]), target), base);
-        } else if (["rename", "copyFile", "cp", "link"].includes(base)) {
-          args[0] = writablePath(args[0], base);
-          args[1] = writablePath(args[1], base);
-        } else if (
-          mutating.has(base) ||
-          base === "open" ||
-          base === "createWriteStream"
-        )
-          args[0] = writablePath(args[0], base);
+          const absolute = posix.resolve(posix.dirname(args[1]), target);
+          mount(absolute);
+          args[0] = absolute;
+        } else if (["copyFile", "cp", "link"].includes(base)) {
+          args[0] = pathOf(args[0]);
+          mount(args[0]);
+          args[1] = mutable(args[1], base, base !== "link");
+        } else if (base === "rename") {
+          args[0] = mutable(args[0], base, false);
+          args[1] = mutable(args[1], base, false);
+        } else if (mutating.has(base) || base === "createWriteStream")
+          args[0] = mutable(
+            args[0],
+            base,
+            !["unlink", "rm", "rmdir", "mkdir"].includes(base),
+          );
         else if (
           typeof args[0] === "string" ||
           args[0] instanceof URL ||
@@ -114,14 +201,129 @@ function createTemporary() {
         }
         throw error;
       }
+      if (
+        ["write", "writev", "ftruncate"].includes(base) &&
+        readonlyDescriptors.has(args[0])
+      ) {
+        const error = denied(base);
+        const callback = args[args.length - 1];
+        if (!name.endsWith("Sync") && typeof callback === "function") {
+          queueMicrotask(() => callback(error));
+          return;
+        }
+        throw error;
+      }
+      if (base === "close") readonlyDescriptors.delete(args[0]);
       return fs[name](...args);
     };
   }
+  api.openSync = (path: any, flags?: any, mode?: any) => {
+    const entry = openPath(path, flags);
+    const fd = fs.openSync(entry.path, flags, mode);
+    if (entry.readonly) readonlyDescriptors.add(fd);
+    return fd;
+  };
+  api.open = (path: any, flags: any, mode: any, callback?: any) => {
+    if (typeof mode === "function") {
+      callback = mode;
+      mode = undefined;
+    }
+    let fd: number | undefined,
+      error: unknown = null;
+    try {
+      fd = api.openSync(path, flags, mode);
+    } catch (failure) {
+      error = failure;
+    }
+    queueMicrotask(() => callback(error, fd));
+  };
+  api.createReadStream = (path: any, options?: any) => {
+    if (typeof options?.fd === "number")
+      return fs.createReadStream(path, options);
+    const entry = openPath(path, options?.flags);
+    const stream = fs.createReadStream(entry.path, options);
+    if (entry.readonly) {
+      stream.prependListener("open", (fd: number) =>
+        readonlyDescriptors.add(fd),
+      );
+      let fd: number | undefined;
+      stream.on("open", (value: number) => {
+        fd = value;
+      });
+      stream.on("close", () => {
+        if (fd !== undefined) readonlyDescriptors.delete(fd);
+      });
+    }
+    return stream;
+  };
+  api.promises = {
+    ...fs.promises,
+    open: async (path: any, flags?: any, mode?: any) => {
+      const entry = openPath(path, flags);
+      const handle = await fs.promises.open(entry.path, flags, mode);
+      for (const name of [
+        "write",
+        "writev",
+        "writeFile",
+        "appendFile",
+        "truncate",
+      ]) {
+        const operation = handle[name].bind(handle);
+        handle[name] = async (...args: any[]) => {
+          await handle.stat();
+          if (entry.readonly) throw denied(name);
+          return operation(...args);
+        };
+      }
+      if (entry.readonly) {
+        readonlyDescriptors.add(handle.fd);
+        const close = handle.close.bind(handle);
+        handle.close = async () => {
+          readonlyDescriptors.delete(handle.fd);
+          return close();
+        };
+      }
+      return handle;
+    },
+  };
+  for (const name of [
+    ...mutating,
+    "rename",
+    "copyFile",
+    "cp",
+    "link",
+    "symlink",
+  ])
+    api.promises[name] = (...args: any[]) =>
+      new Promise((resolve, reject) =>
+        api[name](...args, (error: unknown, value: unknown) =>
+          error ? reject(error) : resolve(value),
+        ),
+      );
   return {
     api,
+    statEmbedded(path: any, options?: any) {
+      const normalized = pathOf(path);
+      mount(normalized);
+      return fs.statSync(normalized, options);
+    },
+    readonly(value: any, follow = true) {
+      if (typeof value === "number") return readonlyDescriptors.has(value);
+      const path = pathOf(value);
+      const target = follow ? resolved(path) : path;
+      return (
+        !temporaryPath(target) ||
+        (follow &&
+          fs.existsSync(target) &&
+          readonlyInodes.has(fs.statSync(target).ino))
+      );
+    },
     clear() {
-      for (const name of fs.readdirSync("/tmp"))
-        fs.rmSync(`/tmp/${name}`, { recursive: true, force: true });
+      for (const name of fs.readdirSync("/"))
+        fs.rmSync(`/${name}`, { recursive: true, force: true });
+      fs.mkdirSync("/tmp");
+      readonlyDescriptors.clear();
+      readonlyInodes.clear();
     },
   };
 }
@@ -151,3 +353,11 @@ export function runWithTemporaryFiles<T>(callback: () => T): T {
 }
 
 registerRequestScope(runWithTemporaryFiles);
+
+export function readonlyFile(value: any, follow = true): boolean {
+  return active().readonly(value, follow);
+}
+
+export function embeddedStat(path: any, options?: any): any {
+  return active().statEmbedded(path, options);
+}

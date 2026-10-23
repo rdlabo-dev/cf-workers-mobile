@@ -1,4 +1,457 @@
 export const eventCases = {
+  fsTimes: async function ({ fs }) {
+    const readonly = "/bundle/readonly.txt",
+      writable = "/tmp/time-file";
+    fs.writeFileSync(writable, "x");
+    const result = [];
+    for (const path of [readonly, writable]) {
+      fs.utimesSync(path, 1000, 2000);
+      result.push(fs.statSync(path).mtimeMs);
+      const fd = fs.openSync(path, "r");
+      fs.futimesSync(fd, 3000n, new Date(4000));
+      result.push(fs.fstatSync(fd).mtimeMs);
+      fs.closeSync(fd);
+      const handle = await fs.promises.open(path, "r");
+      await handle.utimes(new Date(5000), 6000);
+      result.push((await handle.stat()).mtimeMs);
+      await handle.close();
+      for (const method of ["writeFile", "truncate"]) {
+        try {
+          await handle[method](method === "writeFile" ? "x" : 0);
+          result.push(null);
+        } catch (error) {
+          result.push(error.code);
+        }
+      }
+      for (const value of [null, {}, true, undefined]) {
+        try {
+          fs.utimesSync(path, value, 0);
+          result.push(null);
+        } catch (e) {
+          result.push(e.code);
+        }
+      }
+    }
+    return result;
+  },
+  cipherMetadata: async function ({ crypto: c }) {
+    const results = [];
+    for (const name of [
+      "aes-128-cbc",
+      "AES-192-CTR",
+      "aes-256-gcm",
+      "des-ede3-cbc",
+      "rc2-cbc",
+      "rc4",
+      "chacha20-poly1305",
+      "aes-128-ccm-matter",
+      "unknown",
+      419,
+      419.8,
+      950,
+      0,
+      NaN,
+    ]) {
+      for (const options of [
+        {},
+        { ivLength: 0 },
+        { ivLength: 1 },
+        { ivLength: 16 },
+        { ivLength: -1 },
+        { ivLength: NaN },
+        { ivLength: "12" },
+        { keyLength: 0 },
+        { keyLength: 1 },
+        { keyLength: 16 },
+        { keyLength: 32 },
+        null,
+        3,
+      ]) {
+        try {
+          results.push(c.getCipherInfo(name, options) ?? null);
+        } catch (e) {
+          results.push({ error: e.name, code: e.code ?? null });
+        }
+      }
+    }
+    for (const input of [null, {}, true, [], undefined]) {
+      try {
+        results.push(c.getCipherInfo(input) ?? null);
+      } catch (e) {
+        results.push({ error: e.name, code: e.code ?? null });
+      }
+    }
+    const first = c.getCipherInfo("aes-128-cbc");
+    first.keyLength = 999;
+    results.push(c.getCipherInfo("aes-128-cbc"));
+    return results;
+  },
+  codecLifecycle: async function ({ zlib: z }) {
+    const failure = (error) => ({ name: error.name, code: error.code ?? null });
+    const result = { options: [], callbacks: [], lifecycle: [] };
+    for (const name of ["brotli", "zstd"]) {
+      const Constructor =
+        z[name === "brotli" ? "BrotliCompress" : "ZstdCompress"];
+      const compress = z[name + "CompressSync"];
+      for (const options of [
+        { chunkSize: null },
+        { chunkSize: NaN },
+        { chunkSize: 63 },
+        { chunkSize: 64.5 },
+        { flush: -1 },
+        { flush: 6 },
+        { finishFlush: -1 },
+        { maxOutputLength: 0 },
+        { maxOutputLength: 1 },
+        { params: { 999: 1 } },
+        { params: { 1: "bad" } },
+        { params: { 1: 2, "01": 1 } },
+        { params: null },
+        null,
+        3,
+      ]) {
+        for (const mode of ["fast", "info", "stream"]) {
+          try {
+            const value =
+              mode === "stream"
+                ? new Constructor(options)
+                : compress(
+                    "hello",
+                    mode === "info" ? { ...options, info: true } : options,
+                  );
+            value.destroy?.();
+            result.options.push(null);
+          } catch (error) {
+            result.options.push(failure(error));
+          }
+        }
+      }
+      for (const options of [
+        { chunkSize: 63 },
+        { chunkSize: NaN },
+        { params: null },
+        { params: { 999: 1 } },
+        {},
+      ]) {
+        let returned = false;
+        const pending = new Promise((resolve) => {
+          try {
+            z[name + "Compress"]("hello", options, (error) =>
+              resolve({
+                when: "callback",
+                returned,
+                error: error ? failure(error) : null,
+              }),
+            );
+          } catch (error) {
+            resolve({ when: "throw", returned, error: failure(error) });
+          }
+        });
+        returned = true;
+        result.callbacks.push(await pending);
+      }
+    }
+    for (const name of [
+      "Deflate",
+      "Inflate",
+      "Gzip",
+      "Gunzip",
+      "DeflateRaw",
+      "InflateRaw",
+      "Unzip",
+      "BrotliCompress",
+      "BrotliDecompress",
+      "ZstdCompress",
+      "ZstdDecompress",
+    ]) {
+      const stream = new z[name]();
+      stream.bytesRead = 7;
+      const before = [stream.bytesWritten, stream.bytesRead, stream._closed];
+      stream.reset();
+      const afterReset = [stream.bytesWritten, stream.bytesRead];
+      let closes = 0;
+      stream.on("close", () => closes++);
+      const closed = new Promise((resolve) =>
+        stream.close((error) => resolve(error?.code ?? null)),
+      );
+      stream.destroy();
+      const closeCode = await closed;
+      let resetError;
+      try {
+        stream.reset();
+      } catch (error) {
+        resetError = failure(error);
+      }
+      result.lifecycle.push({
+        name,
+        before,
+        afterReset,
+        closed: stream._closed,
+        destroyed: stream.destroyed,
+        closes,
+        closeCode,
+        resetError,
+      });
+    }
+    const unzip = new z.Unzip();
+    const decoded = [];
+    unzip.on("data", (chunk) => decoded.push(chunk.toString()));
+    const write = (input) =>
+      new Promise((resolve, reject) =>
+        unzip.write(input, (error) => (error ? reject(error) : resolve())),
+      );
+    await write(z.deflateSync("first"));
+    unzip.reset();
+    await write(z.gzipSync("second"));
+    await write(z.gzipSync("third"));
+    unzip.destroy();
+    result.resetFormats = decoded.join("");
+    return result;
+  },
+
+  fsEmbedded: async function ({ fs }) {
+    const path = "/bundle/readonly.txt";
+    const attempt = (fn) => {
+      try {
+        return fn() ?? null;
+      } catch (error) {
+        return { code: error.code };
+      }
+    };
+    const fd = fs.openSync(path, "r");
+    const buffer = new Uint8Array(3);
+    const read = fs.readSync(fd, buffer, 0, 3, 1);
+    const result = {
+      read,
+      buffer: Array.from(buffer),
+      mode: fs.fstatSync(fd).mode,
+      write: attempt(() => fs.writeSync(fd, "x")),
+      truncate: attempt(() => fs.ftruncateSync(fd, 0)),
+    };
+    fs.closeSync(fd);
+    result.openWrite = attempt(() => fs.openSync(path, "r+"));
+    const handle = await fs.promises.open(path, "r");
+    result.promiseRead = await handle.readFile("utf8");
+    try {
+      await handle.truncate(0);
+    } catch (error) {
+      result.promiseTruncate = error.code;
+    }
+    await handle.close();
+    fs.symlinkSync(path, "/tmp/readonly-link");
+    result.link = fs.readlinkSync("/tmp/readonly-link");
+    result.linkRead = fs.readFileSync("/tmp/readonly-link", "utf8");
+    result.linkMode = fs.statSync("/tmp/readonly-link").mode;
+    result.linkAccess = attempt(() =>
+      fs.accessSync("/tmp/readonly-link", fs.constants.W_OK),
+    );
+    result.linkWrite = attempt(() =>
+      fs.writeFileSync("/tmp/readonly-link", "changed"),
+    );
+    let text = "";
+    for await (const chunk of fs.createReadStream(path, { start: 1, end: 3 }))
+      text += chunk.toString();
+    result.stream = text;
+    result.content = fs.readFileSync(path, "hex");
+    fs.unlinkSync("/tmp/readonly-link");
+    fs.linkSync(path, "/tmp/hard-link");
+    result.hardRead = fs.readFileSync("/tmp/hard-link", "utf8");
+    result.hardWrite = attempt(() =>
+      fs.writeFileSync("/tmp/hard-link", "changed"),
+    );
+    result.hardMetadata = [
+      fs.statSync("/tmp/hard-link").nlink,
+      fs.statSync("/tmp/hard-link").ino,
+      fs.statSync("/tmp/hard-link").mode,
+    ];
+    await fs.promises.cp("/bundle/nested", "/tmp/copied", { recursive: true });
+    result.copied = fs.readFileSync("/tmp/copied/child.txt", "utf8");
+    fs.writeFileSync("/tmp/copied/child.txt", "changed copy");
+    result.unchanged = fs.readFileSync("/bundle/nested/child.txt", "utf8");
+    result.filter = attempt(() =>
+      fs.cpSync(path, "/tmp/filtered", { filter: () => true }),
+    );
+    result.readonlyMutation = attempt(() => fs.writeFileSync(path, "changed"));
+    const big = fs.statSync(path, { bigint: true });
+    result.bigintMetadata = [
+      big.size,
+      big.mode,
+      big.ino,
+      big.nlink,
+      big.atimeNs,
+    ].map(String);
+    return result;
+  },
+
+  classicCodecs: async function ({ zlib: z }) {
+    const result = { roundtrips: [], validation: [], streams: [] };
+    const failure = (error) => ({ name: error.name, code: error.code ?? null });
+    const source = new Uint8Array([0, 1, 2, 3, 254, 255]);
+    for (const [encode, decode] of [
+      ["gzip", "gunzip"],
+      ["deflate", "inflate"],
+      ["deflateRaw", "inflateRaw"],
+    ]) {
+      for (const input of [
+        source,
+        new DataView(source.buffer, 1, 4),
+        source.buffer,
+        "hello",
+      ]) {
+        const compressed = z[encode + "Sync"](input);
+        result.roundtrips.push(Array.from(z[decode + "Sync"](compressed)));
+        const info = z[encode + "Sync"](input, { info: true });
+        result.roundtrips.push({
+          decoded: Array.from(z[decode + "Sync"](info.buffer)),
+          written: info.engine.bytesWritten,
+          closed: info.engine._closed,
+        });
+        let returned = false;
+        const done = new Promise((resolve, reject) =>
+          z[encode](input, (error, output) =>
+            error
+              ? reject(error)
+              : resolve({
+                  async: returned,
+                  decoded: Array.from(z[decode + "Sync"](output)),
+                }),
+          ),
+        );
+        returned = true;
+        result.roundtrips.push(await done);
+      }
+      for (const info of [false, true]) {
+        try {
+          z[decode + "Sync"](z[encode + "Sync"]("output exceeds limit"), {
+            info,
+            maxOutputLength: 3,
+          });
+          result.validation.push("unexpected success");
+        } catch (error) {
+          result.validation.push(failure(error));
+        }
+      }
+      const ctor = encode[0].toUpperCase() + encode.slice(1);
+      const engine = z["create" + ctor]({ chunkSize: 64 });
+      const chunks = [];
+      const end = new Promise((resolve, reject) => {
+        engine.on("data", (chunk) => chunks.push(chunk));
+        engine.on("error", reject);
+        engine.on("end", resolve);
+      });
+      engine.write("first");
+      await new Promise((resolve) => engine.flush(resolve));
+      await new Promise((resolve) =>
+        engine.params(1, z.constants.Z_DEFAULT_STRATEGY, resolve),
+      );
+      engine.end("second");
+      await end;
+      const compressed = new Uint8Array(
+        chunks.reduce((n, c) => n + c.length, 0),
+      );
+      let offset = 0;
+      for (const chunk of chunks) {
+        compressed.set(chunk, offset);
+        offset += chunk.length;
+      }
+      result.streams.push({
+        plain: new TextDecoder().decode(z[decode + "Sync"](compressed)),
+        written: engine.bytesWritten,
+      });
+    }
+    for (const options of [
+      { chunkSize: 63 },
+      { chunkSize: NaN },
+      { windowBits: 8 },
+      { windowBits: 0 },
+      { level: 10 },
+      { level: null },
+      { flush: 6 },
+      { maxOutputLength: 0 },
+      { maxOutputLength: 3 },
+    ]) {
+      for (const kind of ["fast", "info", "stream"]) {
+        try {
+          const value =
+            kind === "stream"
+              ? z.createGzip(options)
+              : z.gzipSync("hello", { ...options, info: kind === "info" });
+          value.destroy?.();
+          result.validation.push(null);
+        } catch (error) {
+          result.validation.push(failure(error));
+        }
+      }
+    }
+    const compressed = z.deflateSync("dictionary words", {
+      dictionary: new Uint8Array([1, 2, 3]),
+    });
+    result.dictionary = Array.from(
+      z.inflateSync(compressed, {
+        dictionary: new DataView(new Uint8Array([1, 2, 3]).buffer),
+      }),
+    );
+    result.unzip = Array.from(z.unzipSync(z.gzipSync(source)));
+    return result;
+  },
+
+  fsAccess: async function ({ fs }) {
+    fs.writeFileSync("/tmp/access-contract", "value");
+    const results = [];
+    for (const path of ["/tmp/access-contract", "/tmp/access-missing"]) {
+      for (let mode = 0; mode < 8; mode++) {
+        let sync = null;
+        try {
+          fs.accessSync(path, mode);
+        } catch (error) {
+          sync = error.code;
+        }
+        let promise = null;
+        try {
+          await fs.promises.access(path, mode);
+        } catch (error) {
+          promise = error.code;
+        }
+        let returned = false;
+        const pending = new Promise((resolve) =>
+          fs.access(path, mode, (error) =>
+            resolve([error?.code ?? null, returned]),
+          ),
+        );
+        returned = true;
+        results.push({ path, mode, sync, promise, callback: await pending });
+      }
+    }
+    const invalid = [];
+    for (const mode of [-1, 8, 1.5, "4"]) {
+      let callbackCalled = false;
+      try {
+        fs.access("/tmp/access-contract", mode, () => {
+          callbackCalled = true;
+        });
+      } catch (error) {
+        invalid.push([error.name, error.code, callbackCalled]);
+      }
+    }
+    const beforeDeletion = new Promise((resolve) =>
+      fs.access("/tmp/access-contract", (error) =>
+        resolve(error?.code ?? null),
+      ),
+    );
+    fs.unlinkSync("/tmp/access-contract");
+    const beforeCreation = new Promise((resolve) =>
+      fs.access("/tmp/access-contract", (error) =>
+        resolve(error?.code ?? null),
+      ),
+    );
+    fs.writeFileSync("/tmp/access-contract", "created");
+    return {
+      results,
+      invalid,
+      beforeDeletion: await beforeDeletion,
+      beforeCreation: await beforeCreation,
+    };
+  },
   x509: function ({ crypto: c }) {
     const pem =
       "-----BEGIN CERTIFICATE-----\nMIIDhDCCAmygAwIBAgIUdN1my4bhw3mAm+rrvYEZBzi4nuAwDQYJKoZIhvcNAQEL\nBQAwJjESMBAGA1UEAwwJbG9jYWxob3N0MRAwDgYDVQQKDAdXb3JrZXJzMB4XDTI2\nMTAyMjIzMTEyNVoXDTI2MTAyNDIzMTEyNVowJjESMBAGA1UEAwwJbG9jYWxob3N0\nMRAwDgYDVQQKDAdXb3JrZXJzMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC\nAQEAmdA4QcozdOsYQJXG5oDzOJEKHIoyM1HDVXgH2ZWTL0Qm9yJJ02uV55IhW2AY\nshAs1ZROFCae5891g4ohl1H4sFDE5HYuD4BLkh9RY8QcZ7170nA1fnxNfO0K0GZs\nJyCOerlt5fLJjcEQiiyjbs8/2yukxHJraHQIZ1cO/PbWJx9O7iZ5Ru7u2ompDrsz\nzTbVgjI/u4g+sHEf+11me+7WW13Lj4FvpDHZp1K9zoMtOj/ruURVs/5wO3gygNnO\nVVrtNc/0nOU0Qqlqyr0QC9ZkHpn374hL2m0KC9BNixbLdQ+Oy4O406UhQXUGOSPg\ndfN3MBgPJrs1yZ1Io6pL41LWXwIDAQABo4GpMIGmMB0GA1UdDgQWBBSlprvE05R3\nZRC3gulykkeMzbOIZzAPBgNVHRMBAf8EBTADAQH/MFUGA1UdEQROMEyCCWxvY2Fs\naG9zdIIOKi5leGFtcGxlLnRlc3SHBH8AAAGBEXRlc3RAZXhhbXBsZS50ZXN0hhZo\ndHRwczovL2V4YW1wbGUudGVzdC9hMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEF\nBQcDAjANBgkqhkiG9w0BAQsFAAOCAQEAWO4DydLOPOBNyKYw50dBT/UgF9l7zvk+\nl2C7v1dMVCtpKW4egHUjINf+tOHC7PLjMMSKDvM/NGszAePPRSAJzfvoIEF5nahz\nLAzcM3zIdp7vviP1yeSSgJH5QRvo4pMV13K4FHARR5L/ShZqEKvKbVwDCrzymkND\nV5SGa11p5xf0Fm6061vfgBQ85vNFANXByqznGhn9tBRf5pJGBl4cjTJ9WCl8zVCs\n++24wsetgXwxL9O1p+NvfM8SdTVGBSevAA/OAc2Fjoye4oJHH4n3sCsIxoEeRnb4\nZYhC9Q4UwNucHDFJASAMWC5AfX7P+HnaguZXGHsfBrw/39sZFdncwg==\n-----END CERTIFICATE-----\n";
