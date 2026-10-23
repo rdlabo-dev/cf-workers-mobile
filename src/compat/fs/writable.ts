@@ -96,7 +96,14 @@ function createTemporary() {
   // descriptors, FileHandles and streams cannot bypass these rules.
   const core = (volume as any)._core;
   let nextFd = 3;
-  core.newFdNumber = () => core.releasedFds.pop() ?? nextFd++;
+  // Workers allocates monotonically within a volume. Reusing a closed number
+  // would let a stale FileHandle access or close an unrelated descriptor.
+  core.releasedFds.push = () => 0;
+  core.newFdNumber = () => {
+    if (nextFd === 2147483647)
+      throw Object.assign(new Error("Too many open files"), { code: "EMFILE" });
+    return nextFd++;
+  };
   const createNode = core.createNode.bind(core);
   core.createNode = (...args: any[]) => {
     const node = createNode(...args);
@@ -568,6 +575,12 @@ export function runWithTemporaryFiles<T>(callback: () => T): T {
 }
 
 registerRequestScope(runWithTemporaryFiles);
+
+/** Retain the originating virtual volume for descriptor operations. */
+export function retainTemporaryFiles() {
+  const volume = active();
+  return <T>(operation: () => T): T => contexts.run(volume, operation);
+}
 
 export function readonlyFile(value: any, follow = true): boolean {
   return active().readonly(value, follow);

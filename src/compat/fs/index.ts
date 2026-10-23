@@ -1,7 +1,6 @@
-import { ReadableStream as WorkersReadableStream } from "../stream-web/runtime.js";
+import { createFileHandle, FileHandle } from "./file-handle.js";
 import { installIo } from "./io.js";
 import * as fileStreams from "./streams.js";
-import { registerFileHandle } from "./stream-utils.js";
 import { Dir as WorkersDir, Dirent as WorkersDirent } from "./directory.js";
 import { readDirectory } from "./directory-backend.js";
 import { globSync as workersGlob } from "./glob.js";
@@ -10,6 +9,7 @@ import { validateInteger } from "../crypto/validation.js";
 import * as embedded from "./embedded.js";
 import {
   temporary,
+  retainTemporaryFiles,
   temporaryPath,
   clearTemporaryFiles,
   writablePath,
@@ -356,108 +356,11 @@ for (const name of ["utimes", "lutimes", "futimes"]) {
     name !== "futimes",
   );
 }
-const openPromise = promises.open;
-promises.open = async (...args: any[]) => {
-  fileMode(args[2], 0o666);
-  args[2] = 0o666;
-  const handle = await openPromise(...args);
-  const prototype = Object.getPrototypeOf(handle);
-  if (!Object.hasOwn(prototype, "readLines"))
-    Object.defineProperty(prototype, "readLines", {
-      value: function readLines(this: any) {
-        if (this.fd === -1 || this.fd === undefined)
-          throw Object.assign(new Error("Bad file descriptor"), {
-            code: "EBADF",
-          });
-        throw new Error("not implemented");
-      },
-      writable: true,
-      configurable: true,
-    });
-  const closeHandle = handle.close.bind(handle);
-  handle.close = () => {
-    if (handle.fd === -1) {
-      handle.emit("close");
-      return Promise.resolve();
-    }
-    return closeHandle();
-  };
-  const publicHandle = new Proxy(handle, {
-    get(target, key) {
-      if (key === "fd") return target.fd === -1 ? undefined : target.fd;
-      const value = Reflect.get(target, key, target);
-      return typeof value === "function" &&
-        key !== "constructor" &&
-        !Object.hasOwn(target, key)
-        ? value.bind(target)
-        : value;
-    },
-  });
-  registerFileHandle(handle);
-  registerFileHandle(publicHandle);
-  handle.readableWebStream = (options: any = {}) => {
-    if (handle.fd === -1)
-      throw Object.assign(new Error("bad file descriptor"), { code: "EBADF" });
-    validateObject(options, "options");
-    const { autoClose = true } = options;
-    validateBoolean(autoClose, "options.autoClose");
-    let controller: ReadableByteStreamController,
-      ended = false;
-    const finish = () => {
-      if (!ended) {
-        ended = true;
-        controller.close();
-      }
-    };
-    const stream = new WorkersReadableStream({
-      type: "bytes",
-      autoAllocateChunkSize: 16384,
-      start(c) {
-        controller = c;
-      },
-      async pull(c) {
-        const req = c.byobRequest!;
-        const view = req.view!;
-        const { bytesRead } = await handle.read(view, 0, view.byteLength, null);
-        if (bytesRead === 0) {
-          finish();
-          if (autoClose) await handle.close();
-        }
-        req.respond(bytesRead);
-      },
-      async cancel() {
-        ended = true;
-        if (autoClose) await handle.close();
-      },
-    });
-    handle.once("close", finish);
-    return stream;
-  };
-  handle.createReadStream = (options: any = {}) =>
-    fileStreams.createReadStream("", { ...options, fd: handle });
-  handle.createWriteStream = (options: any = {}) =>
-    fileStreams.createWriteStream("", { ...options, fd: handle });
-  const stat = handle.stat.bind(handle);
-  const isReadonly = readonlyFile(handle.fd);
-  const utimes = handle.utimes.bind(handle);
-  handle.utimes = async (atime: any, mtime: any) => {
-    const access = fileTime(atime),
-      modified = fileTime(mtime);
-    await stat();
-    if (!isReadonly) await utimes(access, modified);
-  };
-  handle.stat = async (...options: any[]) =>
-    temporaryStats(await stat(...options), isReadonly);
-  handle.chmod = async (mode: unknown) => {
-    fileMode(mode);
-    await stat();
-  };
-  handle.chown = async (uid: number, gid: number) => {
-    validateInteger(uid, "uid", -1, 0xffffffff);
-    validateInteger(gid, "gid", -1, 0xffffffff);
-    await stat();
-  };
-  return publicHandle;
+promises.FileHandle = FileHandle;
+promises.open = async (path: any, flags: any, mode: any) => {
+  const run = retainTemporaryFiles();
+  const fd = api.openSync(path, flags, mode);
+  return createFileHandle({ fd, run, api });
 };
 // Copy an embedded bundle file into request-local /tmp without granting any
 // write access to its source volume.

@@ -83,6 +83,7 @@ export default defineConfig({
       "src/compat/crypto/signatures.spec.ts",
       "src/compat/crypto/digest-stream.spec.ts",
       "src/compat/fs/writable.spec.ts",
+      "src/compat/fs/file-handle.spec.ts",
       "src/compat/fs/glob.spec.ts",
       "src/compat/fs/directory.spec.ts",
       "src/shared/http-wire/index.spec.ts",

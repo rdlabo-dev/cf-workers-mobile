@@ -1,4 +1,174 @@
 export const eventCases = {
+  fsFileHandleInvalidReceivers: async function ({ fs }) {
+    const h = await fs.promises.open("/tmp/fh-receivers", "w+");
+    const methods = {
+      appendFile: ["x"],
+      chmod: [0],
+      chown: [0, 0],
+      datasync: [],
+      sync: [],
+      read: [new Uint8Array(1)],
+      readv: [[]],
+      readFile: [],
+      readLines: [],
+      stat: [],
+      truncate: [],
+      utimes: [0, 0],
+      write: [new Uint8Array(1)],
+      writev: [[]],
+      writeFile: ["x"],
+      close: [],
+      readableWebStream: [],
+      createReadStream: [],
+      createWriteStream: [],
+    };
+    const attempt = async (fn) => {
+      try {
+        const value = await fn();
+        if (value?.destroy) {
+          value.on("error", () => {});
+          value.destroy();
+        }
+        return "accepted";
+      } catch (e) {
+        return {
+          name: e.name,
+          code: e.code ?? null,
+          ...(e.name === "TypeError" ? {} : { message: e.message }),
+        };
+      }
+    };
+    const result = { fake: {}, closed: {} };
+    for (const [name, args] of Object.entries(methods))
+      result.fake[name] = await attempt(() => h[name].call({}, ...args));
+    await h.close();
+    for (const [name, args] of Object.entries(methods))
+      result.closed[name] = await attempt(() => h[name](...args));
+    await fs.promises.unlink("/tmp/fh-receivers");
+    return result;
+  },
+  fsFileHandleLifetime: async function ({ fs }) {
+    const path = "/tmp/fh-lifetime";
+    await fs.promises.writeFile(path, "original");
+    const old = await fs.promises.open(path, "r+"),
+      fd = old.fd;
+    fs.closeSync(fd);
+    const current = await fs.promises.open(path, "r+");
+    const error = async (fn) => {
+      try {
+        return await fn();
+      } catch (e) {
+        return { name: e.name, code: e.code ?? null };
+      }
+    };
+    const result = {
+      reused: fd === current.fd,
+      oldStat: await error(() => old.stat()),
+      oldRead: await error(() => old.read(new Uint8Array(1))),
+    };
+    await old.close();
+    result.current = (await current.stat()).size;
+    await current.close();
+    await fs.promises.writeFile(path, "");
+    const empty = await fs.promises.open(path, "r"),
+      stream = empty.readableWebStream();
+    empty.read = () => Promise.reject(new Error("replacement"));
+    const read = await stream.getReader().read();
+    result.capturedRead = read.done;
+    await empty.close();
+    await fs.promises.unlink(path);
+    return result;
+  },
+  fsFileHandleSurface: async function ({ fs }) {
+    const error = async (fn) => {
+      try {
+        const value = await fn();
+        return { accepted: true, value };
+      } catch (e) {
+        return e instanceof TypeError
+          ? { name: e.name }
+          : {
+              name: e.name,
+              message: e.message,
+              code: e.code ?? null,
+              syscall: e.syscall ?? null,
+            };
+      }
+    };
+    await fs.promises.writeFile("/tmp/handle-surface-a", "one");
+    await fs.promises.writeFile("/tmp/handle-surface-b", "second");
+    const a = await fs.promises.open("/tmp/handle-surface-a", "r+"),
+      b = await fs.promises.open("/tmp/handle-surface-b", "r");
+    const result = {};
+    try {
+      const prototype = Object.getPrototypeOf(a);
+      result.own = Reflect.ownKeys(a).map(String);
+      result.prototype = Reflect.ownKeys(prototype).map(String);
+      result.descriptor = {
+        own: Object.hasOwn(a, "fd"),
+        get: typeof Object.getOwnPropertyDescriptor(prototype, "fd")?.get,
+        set: typeof Object.getOwnPropertyDescriptor(prototype, "fd")?.set,
+      };
+      result.publicConstructor =
+        a.constructor === fs.promises.FileHandle &&
+        a instanceof fs.promises.FileHandle;
+      result.constructor = {
+        name: a.constructor.name,
+        length: a.constructor.length,
+      };
+      result.new = await error(() => new a.constructor());
+      result.identity = a.read === a.read && a.read === prototype.read;
+      let receiver = false;
+      result.chain =
+        a.on("test", function () {
+          receiver = this === a;
+        }) === a;
+      a.emit("test");
+      result.receiver = receiver;
+      result.borrowedStat = (await a.stat.call(b)).size;
+      const detached = a.stat;
+      result.detached = await error(() => detached());
+      result.fake = await error(() => a.stat.call({}));
+      result.fakeReadLines = await error(() => a.readLines.call({ fd: a.fd }));
+      result.assign = await error(() => {
+        a.fd = 12345;
+      });
+      const written = await a.writeFile("xy");
+      result.writeFile = {
+        bytesWritten: written.bytesWritten,
+        buffer: Array.from(written.buffer),
+        plain: Object.getPrototypeOf(written) === Object.prototype,
+      };
+      const read = await a.read(new Uint8Array(2), 0, 2, 0);
+      result.read = {
+        bytesRead: read.bytesRead,
+        buffer: Array.from(read.buffer),
+        plain: Object.getPrototypeOf(read) === Object.prototype,
+      };
+      result.noBackend = [
+        "fs",
+        "refs",
+        "closePromise",
+        "ref",
+        "unref",
+        "getAsyncId",
+      ].map((name) => name in a);
+      await a.close();
+      result.closedFd = typeof a.fd;
+      result.closedStat = await error(() => a.stat());
+      result.closedReadLines = await error(() => a.readLines());
+      let closed = 0;
+      a.on("close", () => closed++);
+      await a.close();
+      result.repeatClose = closed;
+      return result;
+    } finally {
+      await a.close();
+      await b.close();
+      await fs.promises.unlink("/tmp/handle-surface-a");
+      await fs.promises.unlink("/tmp/handle-surface-b");
+    }
+  },
   tlsCustomDuplexStates: async function ({ tls: t, classicStreams: s }) {
     const out = {};
     const tick = () => new Promise((r) => setTimeout(r, 15));
