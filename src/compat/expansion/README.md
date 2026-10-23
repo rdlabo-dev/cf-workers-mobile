@@ -201,6 +201,13 @@ RSA encrypt/decrypt digest names use the pinned Workers digest registry, includi
 its aliases, case handling and NUL termination. OpenSSL-only digest names are
 rejected through the same native error path.
 
+`crypto.subtle.digest` preserves host SubtleCrypto identity while using the
+Workers registry (SHA-1, SHA-256, SHA-384, SHA-512 and MD5), conversion order,
+promise rejection and intrinsic input extents. Bare SharedArrayBuffer is rejected;
+views over shared memory are accepted where the host exposes shared memory.
+Other standard SubtleCrypto operations still use the host implementation and
+remain subject to the operation-level compatibility inventory.
+
 Workers reports `fips=true` because of its own crypto backend. The WebView's
 JavaScript implementations do not establish FIPS compliance, so that flag is
 not copied merely to match the export inventory. `setFips` and `setEngine`

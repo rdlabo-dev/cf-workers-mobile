@@ -1,4 +1,158 @@
 export const eventCases = {
+  cryptoSubtleDigestViews: async function ({ crypto: c }) {
+    const result = {};
+    for (const algorithm of ["SHA-1", "SHA-256", "SHA-384", "SHA-512", "MD5"]) {
+      for (const mode of [
+        "buffer",
+        "typed",
+        "data",
+        "shadow",
+        "detached",
+        "snapshot",
+        "algorithmGetter",
+      ]) {
+        const backing = new Uint8Array([8, 1, 9]);
+        let input =
+          mode === "buffer"
+            ? backing.buffer
+            : mode === "data"
+              ? new DataView(backing.buffer, 1, 1)
+              : new Uint8Array(backing.buffer, 1, 1);
+        const log = [];
+        if (mode === "shadow")
+          for (const field of ["buffer", "byteOffset", "byteLength"])
+            Object.defineProperty(input, field, {
+              get() {
+                throw new Error("shadow " + field);
+              },
+            });
+        if (mode === "detached")
+          structuredClone(backing.buffer, { transfer: [backing.buffer] });
+        const name =
+          mode === "algorithmGetter"
+            ? {
+                get name() {
+                  log.push("name");
+                  structuredClone(backing.buffer, {
+                    transfer: [backing.buffer],
+                  });
+                  return {
+                    toString() {
+                      log.push("string");
+                      return algorithm;
+                    },
+                  };
+                },
+              }
+            : algorithm;
+        try {
+          const pending = c.subtle.digest(name, input);
+          if (mode === "snapshot") backing.fill(7);
+          result[`${algorithm}/${mode}`] = {
+            bytes: Array.from(new Uint8Array(await pending)),
+            log,
+          };
+        } catch (error) {
+          result[`${algorithm}/${mode}`] = {
+            name: error.name,
+            message: error.message,
+            log,
+          };
+        }
+      }
+    }
+    return result;
+  },
+  cryptoSubtleDigest: async function ({ crypto: c }) {
+    const subtle = c.subtle;
+    const result = {
+      surface: {
+        length: subtle.digest.length,
+        keys: Reflect.ownKeys(subtle.digest),
+      },
+    };
+    try {
+      const f = subtle.digest;
+      new f();
+      result.constructor = "success";
+    } catch (error) {
+      result.constructor = { name: error.name };
+    }
+    const cases = [
+      ["md5", "MD5"],
+      ["case", "md5"],
+      ["sha", "SHA-256"],
+      ["nul", "MD5\0junk"],
+      ["alias", "sha256"],
+      ["missing", "missing"],
+      ["undefined", undefined],
+      ["null", null],
+      ["number", 1],
+      ["symbol", Symbol("x")],
+      ["empty", {}],
+      ["nullName", { name: null }],
+      ["numberName", { name: 1 }],
+      ["undefinedName", { name: undefined }],
+      ["symbolName", { name: Symbol("x") }],
+      ["array", ["MD5"]],
+      ["stringObject", new String("MD5")],
+      ["dictionary", { name: "MD5" }],
+    ];
+    for (const [name, algorithm] of cases) {
+      let stage = "call";
+      try {
+        const p = subtle.digest(algorithm, new Uint8Array([1]));
+        stage = "await";
+        result[name] = {
+          hex: Array.from(new Uint8Array(await p)),
+          promise: p instanceof Promise,
+        };
+      } catch (e) {
+        result[name] = {
+          stage,
+          name: e.name,
+          message: e.message,
+          code: e.code ?? null,
+        };
+      }
+    }
+    for (const [name, data] of [
+      ["none", undefined],
+      ["null", null],
+      ["fake", {}],
+      ["view", new Uint8Array([1])],
+      ["buffer", new Uint8Array([1]).buffer],
+    ]) {
+      let stage = "call";
+      try {
+        const p = subtle.digest("MD5", data);
+        stage = "await";
+        result["data/" + name] = Array.from(new Uint8Array(await p));
+      } catch (e) {
+        result["data/" + name] = {
+          stage,
+          name: e.name,
+          message: e.message,
+          code: e.code ?? null,
+        };
+      }
+    }
+    let stage = "call";
+    try {
+      const p = subtle.digest.call({}, "MD5", new Uint8Array());
+      stage = "await";
+      await p;
+      result.receiver = "success";
+    } catch (e) {
+      result.receiver = {
+        stage,
+        name: e.name,
+        message: e.message,
+        code: e.code ?? null,
+      };
+    }
+    return result;
+  },
   cryptoKeyExportRoundTrips: function ({ crypto: c }) {
     const result = {};
     for (const algorithm of ["rsa", "ec", "ed25519", "x25519"])

@@ -1,3 +1,4 @@
+import { installDigest } from "./subtle-digest.js";
 import { installResourceSymbols } from "../../shared/globals/symbols.js";
 import { viewBytes } from "./validation.js";
 import { DigestStream } from "./digest-stream.js";
@@ -17,6 +18,7 @@ type WorkersCrypto = Crypto & {
 installResourceSymbols(globalThis.Symbol);
 export const webcrypto = globalThis.crypto as WorkersCrypto;
 export const subtle = webcrypto.subtle;
+installDigest(subtle);
 function source(value: ArrayBuffer | ArrayBufferView, parameter: number) {
   if (ArrayBuffer.isView(value)) return viewBytes(value);
   try {
@@ -50,7 +52,8 @@ function timingSafeEqual(
     throw new TypeError("Input buffers must have the same byte length.");
   return nativeTimingEqual(a, b);
 }
-// Preserve host Crypto/SubtleCrypto identity and native WebCrypto operations.
+// Preserve host Crypto/SubtleCrypto identity. Digest uses the Workers registry;
+// other standard operations retain their host implementation.
 // These Workers extensions use the owned digest and comparison backend.
 if (!("DigestStream" in webcrypto))
   Object.defineProperty(Object.getPrototypeOf(webcrypto), "DigestStream", {
