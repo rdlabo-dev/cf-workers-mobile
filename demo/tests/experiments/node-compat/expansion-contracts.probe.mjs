@@ -77,6 +77,7 @@ export default {async fetch(request) {
 const baseline = {};
 try {
   for (const name of Object.keys(eventCases)) {
+    console.log(`Workers baseline: ${name}`);
     const response = await runtime.dispatchFetch(
       `https://events.invalid/${name}`,
     );

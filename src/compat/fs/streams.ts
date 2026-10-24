@@ -373,8 +373,7 @@ const kIsPerformingIO = Symbol("kIsPerformingIO");
 const kIoDone = Symbol("kIoDone");
 const kHandle = Symbol("kHandle");
 
-// @ts-expect-error TS2323 Cannot redeclare.
-export declare class ReadStream extends DeclaredReadable {
+declare class ReadStreamInstance extends DeclaredReadable {
   fd: number | null;
   flags: string;
   path: string;
@@ -391,6 +390,7 @@ export declare class ReadStream extends DeclaredReadable {
   push(chunk: NodeJS.ArrayBufferView | null): boolean;
   close(callback?: ErrorOnlyCallback): void;
 }
+export type ReadStream = ReadStreamInstance;
 
 function construct(
   this: ReadStream | WriteStream,
@@ -650,8 +650,9 @@ function destroyImpl(
   }
 }
 
-// @ts-expect-error TS2323 Cannot redeclare.
-export function ReadStream(
+export const ReadStream: typeof ReadStreamInstance & {
+  (path: FilePath | null, options?: ReadStreamOptions): ReadStream;
+} = function ReadStream(
   this: ReadStream,
   path: FilePath,
   options: ReadStreamOptions = {},
@@ -750,7 +751,7 @@ export function ReadStream(
     },
   ]);
   return this;
-}
+};
 Object.setPrototypeOf(ReadStream.prototype, Readable.prototype);
 Object.setPrototypeOf(ReadStream, Readable);
 
@@ -803,8 +804,7 @@ declare type WriteVChunk = {
   encoding: ValidEncoding;
 };
 
-// @ts-expect-error TS2323 Cannot redeclare.
-export declare class WriteStream extends DeclaredWritable {
+declare class WriteStreamInstance extends DeclaredWritable {
   fd: number | null;
   path: string;
   flags: string;
@@ -823,6 +823,7 @@ export declare class WriteStream extends DeclaredWritable {
   close(cb?: ErrorOnlyCallback): void;
   destroySoon(): void;
 }
+export type WriteStream = WriteStreamInstance;
 
 function writeAll(
   this: WriteStream,
@@ -1019,8 +1020,9 @@ function writevImpl(
   if (this.pos !== undefined) this.pos += size;
 }
 
-// @ts-expect-error TS2323 Cannot redeclare.
-export function WriteStream(
+export const WriteStream: typeof WriteStreamInstance & {
+  (path: FilePath, options?: WriteStreamOptions): WriteStream;
+} = function WriteStream(
   this: WriteStream,
   path: FilePath,
   options: WriteStreamOptions = {},
@@ -1125,7 +1127,7 @@ export function WriteStream(
   }
 
   return this;
-}
+};
 Object.setPrototypeOf(WriteStream.prototype, Writable.prototype);
 Object.setPrototypeOf(WriteStream, Writable);
 
