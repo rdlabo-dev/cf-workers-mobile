@@ -1,3 +1,8 @@
+import {
+  currentDirectory as cwd,
+  changeDirectory as chdir,
+} from "./directory.js";
+export { cwd, chdir };
 import * as metadata from "./metadata.js";
 export {
   arch,
@@ -181,6 +186,8 @@ export const hrtime = Object.assign(
 );
 
 Object.assign(process, {
+  cwd,
+  chdir,
   hrtime,
   ...metadata,
   on,
